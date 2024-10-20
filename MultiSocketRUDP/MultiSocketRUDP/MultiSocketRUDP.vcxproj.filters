@@ -13,5 +13,39 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="소스 파일\lib">
+      <UniqueIdentifier>{233fe088-e254-4c25-a173-581205b446e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\MultiSocketRUDPCore">
+      <UniqueIdentifier>{728aca7e-114d-4f4b-b9d9-9ca42ff4b731}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\MultiSocketRUDPCore\CoreType">
+      <UniqueIdentifier>{9fa1f85a-84c2-4b97-8d12-a5bdb0e0513f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Protocol">
+      <UniqueIdentifier>{90e377ca-e90d-4e82-bbd6-62c571911009}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiSocketRUDPCore.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CoreType.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\CoreType</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiSocketRUDPCore.h">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
