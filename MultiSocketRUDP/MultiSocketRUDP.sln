@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.6.33815.320
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDP", "MultiSocketRUDP\MultiSocketRUDP.vcxproj", "{16F99C50-D24A-47B7-9402-2278BC3F0B0B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDPServer", "MultiSocketRUDP\MultiSocketRUDP.vcxproj", "{16F99C50-D24A-47B7-9402-2278BC3F0B0B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentsServer", "ContentsServer\ContentsServer.vcxproj", "{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,14 @@ Global
 		{16F99C50-D24A-47B7-9402-2278BC3F0B0B}.Release|x64.Build.0 = Release|x64
 		{16F99C50-D24A-47B7-9402-2278BC3F0B0B}.Release|x86.ActiveCfg = Release|Win32
 		{16F99C50-D24A-47B7-9402-2278BC3F0B0B}.Release|x86.Build.0 = Release|Win32
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Debug|x64.ActiveCfg = Debug|x64
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Debug|x64.Build.0 = Debug|x64
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Debug|x86.ActiveCfg = Debug|Win32
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Debug|x86.Build.0 = Debug|Win32
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x64.ActiveCfg = Release|x64
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x64.Build.0 = Release|x64
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x86.ActiveCfg = Release|Win32
+		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
