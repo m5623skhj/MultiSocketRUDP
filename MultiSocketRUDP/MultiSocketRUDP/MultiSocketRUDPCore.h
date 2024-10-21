@@ -31,6 +31,7 @@ private:
 	void CloseAllSockets();
 
 private:
+	bool threadStopFlag{};
 	bool isServerStopped{};
 	unsigned short numOfSockets{};
 	unsigned short portStartNumber{};
@@ -38,6 +39,7 @@ private:
 	std::vector<SOCKET> socketList;
 
 private:
+#if USE_IOCP_SESSION_BROKER
 	class RUDPSessionBroker : public CNetServer
 	{
 		friend MultiSocketRUDPCore;
@@ -64,6 +66,11 @@ private:
 	private:
 		bool isServerStopped{};
 	};
-
 	RUDPSessionBroker sessionBroker;
+#else
+	void RunSessionBrokerThread(unsigned short listenPort);
+
+private:
+	std::thread sessionBrokerThread{};
+#endif
 };

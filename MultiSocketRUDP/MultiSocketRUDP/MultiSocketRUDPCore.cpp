@@ -17,19 +17,29 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& optionFilePath, const 
 		return false;
 	}
 
+#if USE_IOCP_SESSION_BROKER
 	if (not sessionBroker.Start(sessionBrokerOptionFilePath))
 	{
 		CloseAllSockets();
 		std::cout << "SessionBroker start falied" << std::endl;
 		return false;
 	}
+#else
+	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort); });
+#endif
 
 	return true;
 }
 
 void MultiSocketRUDPCore::StopServer()
 {
+	threadStopFlag = true;
+
+#if USE_IOCP_SESSION_BROKER
 	sessionBroker.Stop();
+#else
+	sessionBrokerThread.join();
+#endif
 	CloseAllSockets();
 
 	isServerStopped = true;
@@ -105,6 +115,7 @@ void MultiSocketRUDPCore::CloseAllSockets()
 	}
 }
 
+#if USE_IOCP_SESSION_BROKER
 bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
 {
 	if (not CNetServer::Start(sessionBrokerOptionFilePath.c_str()))
@@ -141,3 +152,53 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 {
 
 }
+#else
+void MultiSocketRUDPCore::RunSessionBrokerThread(unsigned short listenPort)
+{
+	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
+
+	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (listenSocket == INVALID_SOCKET)
+	{
+		std::cout << "RunSessionBrokerThread listen socket is invalid with error " << WSAGetLastError() << std::endl;
+		return;
+	}
+
+	sockaddr_in serverAddr, clientAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
+	serverAddr.sin_port = htons(listenPort);
+	int sockAddrSize = static_cast<int>(sizeof(clientAddr));
+
+	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) 
+	{
+		std::cerr << "RunSessionBrokerThread bind failed with error " << WSAGetLastError() << std::endl;
+		closesocket(listenSocket);
+		return;
+	}
+
+	listen(listenSocket, SOMAXCONN);
+	while (not threadStopFlag)
+	{
+		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
+		if (clientSocket == INVALID_SOCKET)
+		{
+			std::cout << "RunSessionBrokerThread accept falid with error " << WSAGetLastError() << std::endl;
+			continue;
+		}
+
+		//Send rudp session infomation packet to client
+		//...
+		//int result = send(clientSocket, , , 0);
+		//if (result == SOCKET_ERROR) 
+		//{
+		//	std::cout << "RunSessionBrokerThread send failed with error " << WSAGetLastError() << std::endl;
+		//}
+
+		closesocket(clientSocket);
+	}
+
+	closesocket(listenSocket);
+	std::cout << "Session broker thread stopped" << std::endl;
+}
+#endif
