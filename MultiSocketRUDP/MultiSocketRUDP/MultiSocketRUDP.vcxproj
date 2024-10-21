@@ -27,6 +27,7 @@
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CoreType.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
   </ItemGroup>

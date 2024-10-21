@@ -47,5 +47,8 @@
     <ClInclude Include="MultiSocketRUDPCore.h">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClInclude>
+    <ClInclude Include="BuildConfig.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\CoreType</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
