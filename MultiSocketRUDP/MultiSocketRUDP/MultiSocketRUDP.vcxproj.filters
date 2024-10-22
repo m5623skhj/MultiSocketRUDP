@@ -39,6 +39,9 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPSessionBroker.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
