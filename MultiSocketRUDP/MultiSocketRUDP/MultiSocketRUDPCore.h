@@ -26,6 +26,7 @@ private:
 	[[nodiscard]]
 	bool InitNetwork();
 	bool RunAllThreads();
+	void RunSessionBroker();
 	std::optional<SOCKET> CreateRUDPSocket(unsigned short socketNumber);
 
 	void CloseAllSockets();

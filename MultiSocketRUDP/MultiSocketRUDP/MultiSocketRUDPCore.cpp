@@ -17,16 +17,12 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& optionFilePath, const 
 		return false;
 	}
 
-#if USE_IOCP_SESSION_BROKER
-	if (not sessionBroker.Start(sessionBrokerOptionFilePath))
+	if (not RunAllThreads())
 	{
-		CloseAllSockets();
-		std::cout << "SessionBroker start falied" << std::endl;
+		StopServer();
+		std::cout << "RunAllThreads() failed" << std::endl;
 		return false;
 	}
-#else
-	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort); });
-#endif
 
 	return true;
 }
@@ -78,7 +74,23 @@ bool MultiSocketRUDPCore::InitNetwork()
 
 bool MultiSocketRUDPCore::RunAllThreads()
 {
+	RunSessionBroker();
+
 	return true;
+}
+
+void MultiSocketRUDPCore::RunSessionBroker()
+{
+#if USE_IOCP_SESSION_BROKER
+	if (not sessionBroker.Start(sessionBrokerOptionFilePath))
+	{
+		CloseAllSockets();
+		std::cout << "SessionBroker start falied" << std::endl;
+		return false;
+	}
+#else
+	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort); });
+#endif
 }
 
 std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socketNumber)
@@ -153,6 +165,7 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 
 }
 #else
+
 void MultiSocketRUDPCore::RunSessionBrokerThread(unsigned short listenPort)
 {
 	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
