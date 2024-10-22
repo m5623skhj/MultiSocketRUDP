@@ -41,7 +41,7 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 }
 #else
 
-void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::string targetIP)
+void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP)
 {
 	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
 
@@ -76,10 +76,10 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
-		PortType targetPort;
+		PortType targetPort = invalidPort;
 
 		//Send rudp session infomation packet to client
-		buffer << targetIP << targetPort;
+		buffer << rudpSessionIP << targetPort;
 
 		buffer.m_iWriteLast = buffer.m_iWrite;
 		buffer.m_iWrite = 0;

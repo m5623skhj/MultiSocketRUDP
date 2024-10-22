@@ -4,9 +4,45 @@
 #include <thread>
 #include "NetServer.h"
 #include "NetServerSerializeBuffer.h"
+#include "CoreType.h"
+#include <unordered_map>
 
 #pragma comment(lib, "ws2_32.lib")
 
+class MultiSocketRUDPCore;
+
+class RUDPSession
+{
+	friend MultiSocketRUDPCore;
+private:
+	RUDPSession() = delete;
+	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock);
+
+private:
+	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock)
+	{
+		struct RUDPSessionCreator : public RUDPSession 
+		{ 
+			RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock)
+				: RUDPSession(inSessionId, inSock)
+			{
+			}
+		};
+
+		return std::make_shared<RUDPSessionCreator>(inSessionId, inSock);
+	}
+
+public:
+	virtual ~RUDPSession();
+
+protected:
+	virtual void OnRecv();
+
+private:
+	SessionIdType sessionId;
+	SOCKET sock;
+	bool isUsingSession{};
+};
 
 class MultiSocketRUDPCore
 {
@@ -29,15 +65,18 @@ private:
 	void RunSessionBroker();
 	std::optional<SOCKET> CreateRUDPSocket(unsigned short socketNumber);
 
-	void CloseAllSockets();
+private:
+	void CloseAllSessions();
 
 private:
 	bool threadStopFlag{};
 	bool isServerStopped{};
 	unsigned short numOfSockets{};
-	unsigned short portStartNumber{};
-	unsigned short sessionBrokerPort{};
-	std::vector<SOCKET> socketList;
+	PortType portStartNumber{};
+	PortType sessionBrokerPort{};
+	std::string ip{};
+	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingRUDPSocketMap;
+	std::vector<std::shared_ptr<RUDPSession>> unusedSessionList;
 
 private:
 #if USE_IOCP_SESSION_BROKER
@@ -69,7 +108,7 @@ private:
 	};
 	RUDPSessionBroker sessionBroker;
 #else
-	void RunSessionBrokerThread(unsigned short listenPort);
+	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
 
 private:
 	std::thread sessionBrokerThread{};
