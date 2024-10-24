@@ -1,6 +1,6 @@
 #pragma once
 #include <optional>
-#include <vector>
+#include <list>
 #include <thread>
 #include "NetServer.h"
 #include "NetServerSerializeBuffer.h"
@@ -15,22 +15,23 @@ class MultiSocketRUDPCore;
 class RUDPSession
 {
 	friend MultiSocketRUDPCore;
-private:
-	RUDPSession() = delete;
-	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock);
 
 private:
-	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock)
+	RUDPSession() = delete;
+	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
+
+private:
+	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
 	{
 		struct RUDPSessionCreator : public RUDPSession 
 		{ 
-			RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock)
-				: RUDPSession(inSessionId, inSock)
+			RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
+				: RUDPSession(inSessionId, inSock, inPort)
 			{
 			}
 		};
 
-		return std::make_shared<RUDPSessionCreator>(inSessionId, inSock);
+		return std::make_shared<RUDPSessionCreator>(inSessionId, inSock, inPort);
 	}
 
 public:
@@ -41,6 +42,7 @@ protected:
 
 private:
 	SessionIdType sessionId;
+	PortType port;
 	SOCKET sock;
 	bool isUsingSession{};
 };
@@ -77,13 +79,14 @@ private:
 	PortType sessionBrokerPort{};
 	std::string ip{};
 
-public:
-	
+private:
+	std::shared_ptr<RUDPSession> AcquireSession();
+	void ReleaseSession(std::shared_ptr<RUDPSession> session);
 
 private:
-	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingRUDPSessionMap;
-	std::shared_mutex usingRUDPSessionMapLock;
-	std::vector<std::shared_ptr<RUDPSession>> unusedSessionList;
+	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingSessionMap;
+	std::shared_mutex usingSessionMapLock;
+	std::list<std::shared_ptr<RUDPSession>> unusedSessionList;
 	std::recursive_mutex unusedSessionListLock;
 
 private:

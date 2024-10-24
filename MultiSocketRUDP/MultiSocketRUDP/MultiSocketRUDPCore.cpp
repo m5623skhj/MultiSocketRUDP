@@ -2,9 +2,10 @@
 #include <WinSock2.h>
 #include "MultiSocketRUDPCore.h"
 
-RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock)
+RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
 	: sessionId(inSessionId)
 	, sock(inSock)
+	, port(inPort)
 {
 }
 
@@ -72,8 +73,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		return false;
 	}
 
-	unusedSessionList.reserve(numOfSockets);
-	usingRUDPSessionMap.reserve(numOfSockets);
+	usingSessionMap.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
 		auto optSocket = CreateRUDPSocket(socketNumber);
@@ -84,7 +84,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		}
 
 		SessionIdType createdSessionId = static_cast<SessionIdType>(socketNumber);
-		unusedSessionList.emplace_back(RUDPSession::Create(createdSessionId, optSocket.value()));
+		unusedSessionList.emplace_back(RUDPSession::Create(createdSessionId, optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber)));
 	}
 
 	return true;
@@ -140,11 +140,57 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socke
 void MultiSocketRUDPCore::CloseAllSessions()
 {
 	{
-		std::unique_lock lock(usingRUDPSessionMapLock);
-		usingRUDPSessionMap.clear();
+		std::unique_lock lock(usingSessionMapLock);
+		usingSessionMap.clear();
 	}
 	{
-		std::lock_guard lock(unusedSessionListLock);
+		std::scoped_lock lock(unusedSessionListLock);
 		unusedSessionList.clear();
+	}
+}
+
+std::shared_ptr<RUDPSession> MultiSocketRUDPCore::AcquireSession()
+{
+	std::shared_ptr<RUDPSession> session = nullptr;
+	{
+		std::scoped_lock lock(unusedSessionListLock);
+		
+		if (unusedSessionList.empty() == true)
+		{
+			return nullptr;
+		}
+
+		session = unusedSessionList.front();
+		unusedSessionList.pop_front();
+	}
+
+	session->isUsingSession = true;
+
+	{
+		std::unique_lock lock(usingSessionMapLock);
+		usingSessionMap.insert({ session->sessionId, session });
+	}
+
+	return session;
+}
+
+void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
+{
+	if (session == nullptr)
+	{
+		std::cout << "ReleaseSession() : session is nullptr" << std::endl;
+		return;
+	}
+	
+	{
+		std::unique_lock lock(usingSessionMapLock);
+		usingSessionMap.erase(session->sessionId);
+	}
+	
+	session->isUsingSession = false;
+
+	{
+		std::scoped_lock lock(unusedSessionListLock);
+		unusedSessionList.push_back(session);
 	}
 }
