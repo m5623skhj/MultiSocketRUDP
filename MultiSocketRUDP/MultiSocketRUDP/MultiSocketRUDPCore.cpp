@@ -73,7 +73,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 	}
 
 	unusedSessionList.reserve(numOfSockets);
-	usingRUDPSocketMap.reserve(numOfSockets);
+	usingRUDPSessionMap.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
 		auto optSocket = CreateRUDPSocket(socketNumber);
@@ -139,6 +139,12 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socke
 
 void MultiSocketRUDPCore::CloseAllSessions()
 {
-	usingRUDPSocketMap.clear();
-	unusedSessionList.clear();
+	{
+		std::unique_lock lock(usingRUDPSessionMapLock);
+		usingRUDPSessionMap.clear();
+	}
+	{
+		std::lock_guard lock(unusedSessionListLock);
+		unusedSessionList.clear();
+	}
 }

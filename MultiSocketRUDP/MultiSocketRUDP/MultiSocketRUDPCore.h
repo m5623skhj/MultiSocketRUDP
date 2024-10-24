@@ -6,6 +6,7 @@
 #include "NetServerSerializeBuffer.h"
 #include "CoreType.h"
 #include <unordered_map>
+#include <shared_mutex>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -75,8 +76,15 @@ private:
 	PortType portStartNumber{};
 	PortType sessionBrokerPort{};
 	std::string ip{};
-	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingRUDPSocketMap;
+
+public:
+	
+
+private:
+	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingRUDPSessionMap;
+	std::shared_mutex usingRUDPSessionMapLock;
 	std::vector<std::shared_ptr<RUDPSession>> unusedSessionList;
+	std::recursive_mutex unusedSessionListLock;
 
 private:
 #if USE_IOCP_SESSION_BROKER
