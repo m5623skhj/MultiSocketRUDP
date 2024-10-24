@@ -89,8 +89,9 @@ private:
 	std::list<std::shared_ptr<RUDPSession>> unusedSessionList;
 	std::recursive_mutex unusedSessionListLock;
 
-private:
+#pragma region thread
 #if USE_IOCP_SESSION_BROKER
+private:
 	class RUDPSessionBroker : public CNetServer
 	{
 		friend MultiSocketRUDPCore;
@@ -119,9 +120,19 @@ private:
 	};
 	RUDPSessionBroker sessionBroker;
 #else
+private:
 	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
 
 private:
 	std::thread sessionBrokerThread{};
 #endif
+
+private:
+	void RunWorkerThread(ThreadIdType threadId);
+
+private:
+	ThreadIdType numOfWorkerThread{};
+	std::vector<std::thread> workerThreads;
+
+#pragma endregion thread
 };

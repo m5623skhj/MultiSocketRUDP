@@ -93,6 +93,12 @@ bool MultiSocketRUDPCore::InitNetwork()
 bool MultiSocketRUDPCore::RunAllThreads()
 {
 	RunSessionBroker();
+	workerThreads.reserve(numOfWorkerThread);
+
+	for (ThreadIdType id = 0; id < numOfWorkerThread; ++id)
+	{
+		workerThreads.emplace_back([this, id]() { this->RunWorkerThread(id); });
+	}
 
 	return true;
 }
@@ -193,4 +199,14 @@ void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
 		std::scoped_lock lock(unusedSessionListLock);
 		unusedSessionList.push_back(session);
 	}
+}
+
+void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
+{
+	while (not threadStopFlag)
+	{
+
+	}
+
+	std::cout << "worker thread stopped" << std::endl;
 }
