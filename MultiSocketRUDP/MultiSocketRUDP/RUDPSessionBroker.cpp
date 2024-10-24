@@ -76,10 +76,11 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
-		PortType targetPort = invalidPort;
+		PortType targetPort = invalidPortNumber;
+		SessionIdType sessionId = invalidSessionId;
 
 		//Send rudp session infomation packet to client
-		buffer << rudpSessionIP << targetPort;
+		buffer << rudpSessionIP << targetPort << sessionId;
 
 		buffer.m_iWriteLast = buffer.m_iWrite;
 		buffer.m_iWrite = 0;
