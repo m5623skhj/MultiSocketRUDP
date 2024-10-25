@@ -2,22 +2,6 @@
 #include <WinSock2.h>
 #include "MultiSocketRUDPCore.h"
 
-RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-	: sessionId(inSessionId)
-	, sock(inSock)
-	, port(inPort)
-{
-}
-
-RUDPSession::~RUDPSession()
-{
-	closesocket(sock);
-}
-
-void RUDPSession::OnRecv()
-{
-}
-
 MultiSocketRUDPCore::MultiSocketRUDPCore()
 {
 }

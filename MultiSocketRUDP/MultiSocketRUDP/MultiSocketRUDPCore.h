@@ -4,48 +4,11 @@
 #include <thread>
 #include "NetServer.h"
 #include "NetServerSerializeBuffer.h"
-#include "CoreType.h"
 #include <unordered_map>
 #include <shared_mutex>
+#include "RUDPSession.h"
 
 #pragma comment(lib, "ws2_32.lib")
-
-class MultiSocketRUDPCore;
-
-class RUDPSession
-{
-	friend MultiSocketRUDPCore;
-
-private:
-	RUDPSession() = delete;
-	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
-
-private:
-	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-	{
-		struct RUDPSessionCreator : public RUDPSession 
-		{ 
-			RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-				: RUDPSession(inSessionId, inSock, inPort)
-			{
-			}
-		};
-
-		return std::make_shared<RUDPSessionCreator>(inSessionId, inSock, inPort);
-	}
-
-public:
-	virtual ~RUDPSession();
-
-protected:
-	virtual void OnRecv();
-
-private:
-	SessionIdType sessionId;
-	PortType port;
-	SOCKET sock;
-	bool isUsingSession{};
-};
 
 class MultiSocketRUDPCore
 {
