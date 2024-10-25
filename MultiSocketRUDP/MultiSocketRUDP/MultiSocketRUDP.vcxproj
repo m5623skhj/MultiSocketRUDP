@@ -25,12 +25,14 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
+    <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CoreType.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
+    <ClInclude Include="RUDPSession.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

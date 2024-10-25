@@ -42,6 +42,9 @@
     <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPSession.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
@@ -52,6 +55,9 @@
     </ClInclude>
     <ClInclude Include="BuildConfig.h">
       <Filter>소스 파일\MultiSocketRUDPCore\CoreType</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSession.h">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
