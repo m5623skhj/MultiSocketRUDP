@@ -9,6 +9,19 @@ RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPo
 {
 }
 
+std::shared_ptr<RUDPSession> RUDPSession::Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
+{
+	struct RUDPSessionCreator : public RUDPSession
+	{
+		RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
+			: RUDPSession(inSessionId, inSock, inPort)
+		{
+		}
+	};
+
+	return std::make_shared<RUDPSessionCreator>(inSessionId, inSock, inPort);
+}
+
 RUDPSession::~RUDPSession()
 {
 	closesocket(sock);

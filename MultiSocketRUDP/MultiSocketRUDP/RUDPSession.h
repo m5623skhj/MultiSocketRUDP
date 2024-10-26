@@ -11,19 +11,7 @@ private:
 	RUDPSession() = delete;
 	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
 
-private:
-	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-	{
-		struct RUDPSessionCreator : public RUDPSession
-		{
-			RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-				: RUDPSession(inSessionId, inSock, inPort)
-			{
-			}
-		};
-
-		return std::make_shared<RUDPSessionCreator>(inSessionId, inSock, inPort);
-	}
+	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
 
 public:
 	virtual ~RUDPSession();
