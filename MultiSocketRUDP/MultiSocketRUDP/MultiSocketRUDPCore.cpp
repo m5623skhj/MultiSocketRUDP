@@ -1,6 +1,6 @@
 #include "PreCompile.h"
-#include <WinSock2.h>
 #include "MultiSocketRUDPCore.h"
+#include "BuildConfig.h"
 
 MultiSocketRUDPCore::MultiSocketRUDPCore()
 {
@@ -17,8 +17,16 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& optionFilePath, const 
 		return false;
 	}
 
+	if (not InitRIO())
+	{
+		CloseAllSessions();
+		std::cout << "InitRIO failed" << std::endl;
+		return false;
+	}
+
 	if (not RunAllThreads())
 	{
+		CloseAllSessions();
 		StopServer();
 		std::cout << "RunAllThreads() failed" << std::endl;
 		return false;
@@ -69,6 +77,35 @@ bool MultiSocketRUDPCore::InitNetwork()
 
 		SessionIdType createdSessionId = static_cast<SessionIdType>(socketNumber);
 		unusedSessionList.emplace_back(RUDPSession::Create(createdSessionId, optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber)));
+	}
+
+	return true;
+}
+
+bool MultiSocketRUDPCore::InitRIO()
+{
+	GUID functionTableId = WSAID_MULTIPLE_RIO;
+	DWORD bytes = 0;
+
+	auto itor = usingSessionMap.begin();
+	if (itor == usingSessionMap.end())
+	{
+		std::cout << "InitRIO failed. Session map is not initilazed" << std::endl;
+		return false;
+	}
+
+	// For the purpose of obtaining the function table, any of the created sessions selected
+	if (WSAIoctl(itor->second->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &functionTableId, sizeof(GUID)
+		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
+	{
+		std::cout << "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER" << std::endl;
+		return false;
+	}
+
+	rioCQList = new RIO_CQ[numOfWorkerThread];
+	if (rioCQList == nullptr)
+	{
+		return false;
 	}
 
 	return true;
@@ -187,10 +224,40 @@ void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
 
 void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 {
+	RIORESULT rioResults[MAX_RIO_RESULT];
+	rioCQList[threadId] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * MAX_SEND_BUFFER_SIZE, nullptr);
+	ULONG numOfResults = 0;
+
+	TickSet tickSet;
+	tickSet.nowTick = GetTickCount64();
+	tickSet.beforeTick = tickSet.nowTick;
+
 	while (not threadStopFlag)
 	{
+		ZeroMemory(rioResults, sizeof(rioResults));
 
+		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
+		for (ULONG i = 0; i < numOfResults; ++i)
+		{
+		}
+
+#if USE_SLEEP_FOR_FRAME
+		SleepRemainingFrameTime(tickSet);
+#endif
 	}
 
 	std::cout << "worker thread stopped" << std::endl;
+}
+
+void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
+{
+	tickSet.nowTick = GetTickCount64();
+	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
+
+	if (deltaTick < ONE_FRAME && deltaTick > 0)
+	{
+		Sleep(ONE_FRAME - static_cast<DWORD>(deltaTick));
+	}
+
+	tickSet.beforeTick = tickSet.nowTick;
 }

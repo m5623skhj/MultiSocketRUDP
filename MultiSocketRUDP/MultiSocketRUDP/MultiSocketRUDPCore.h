@@ -2,6 +2,7 @@
 #include <optional>
 #include <list>
 #include <thread>
+#include <MSWSock.h>
 #include "NetServer.h"
 #include "NetServerSerializeBuffer.h"
 #include <unordered_map>
@@ -9,6 +10,12 @@
 #include "RUDPSession.h"
 
 #pragma comment(lib, "ws2_32.lib")
+
+struct TickSet
+{
+	UINT64 nowTick = 0;
+	UINT64 beforeTick = 0;
+};
 
 class MultiSocketRUDPCore
 {
@@ -27,6 +34,7 @@ public:
 private:
 	[[nodiscard]]
 	bool InitNetwork();
+	bool InitRIO();
 	bool RunAllThreads();
 	void RunSessionBroker();
 	std::optional<SOCKET> CreateRUDPSocket(unsigned short socketNumber);
@@ -92,10 +100,18 @@ private:
 
 private:
 	void RunWorkerThread(ThreadIdType threadId);
+	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet);
 
 private:
 	ThreadIdType numOfWorkerThread{};
 	std::vector<std::thread> workerThreads;
 
 #pragma endregion thread
+
+#pragma region RIO
+private:
+	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable;
+	RIO_CQ* rioCQList;
+
+#pragma endregion RIO
 };
