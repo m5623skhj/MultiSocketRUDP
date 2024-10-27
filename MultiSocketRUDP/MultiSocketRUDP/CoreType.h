@@ -12,3 +12,10 @@ using ThreadIdType = unsigned char;
 #define MAX_SEND_BUFFER_SIZE 16384
 #define ONE_FRAME 10
 
+enum class RIO_OPERATION_TYPE : INT8
+{
+	OP_ERROR = 0
+	, OP_RECV
+	, OP_SEND
+	, OP_SEND_REQUEST
+};

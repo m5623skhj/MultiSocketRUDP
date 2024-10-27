@@ -3,6 +3,7 @@
 #include "BuildConfig.h"
 
 MultiSocketRUDPCore::MultiSocketRUDPCore()
+	: contextPool(2, false)
 {
 }
 
@@ -87,15 +88,15 @@ bool MultiSocketRUDPCore::InitRIO()
 	GUID functionTableId = WSAID_MULTIPLE_RIO;
 	DWORD bytes = 0;
 
-	auto itor = usingSessionMap.begin();
-	if (itor == usingSessionMap.end())
+	auto itor = unusedSessionList.begin();
+	if (itor == unusedSessionList.end())
 	{
 		std::cout << "InitRIO failed. Session map is not initilazed" << std::endl;
 		return false;
 	}
 
 	// For the purpose of obtaining the function table, any of the created sessions selected
-	if (WSAIoctl(itor->second->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &functionTableId, sizeof(GUID)
+	if (WSAIoctl((*itor)->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &functionTableId, sizeof(GUID)
 		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 	{
 		std::cout << "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER" << std::endl;
@@ -106,6 +107,14 @@ bool MultiSocketRUDPCore::InitRIO()
 	if (rioCQList == nullptr)
 	{
 		return false;
+	}
+
+	for (auto& session : unusedSessionList)
+	{
+		if (session->InitializeRIO(rioFunctionTable, rioCQList[session->sessionId % numOfWorkerThread], rioCQList[session->sessionId % numOfWorkerThread]) == false)
+		{
+			return false;
+		}
 	}
 
 	return true;

@@ -110,8 +110,10 @@ private:
 
 #pragma region RIO
 private:
-	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable;
-	RIO_CQ* rioCQList;
+	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
+	RIO_CQ* rioCQList = nullptr;
 
+private:
+	CTLSMemoryPool<IOContext> contextPool;
 #pragma endregion RIO
 };
