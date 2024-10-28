@@ -59,5 +59,8 @@
     <ClInclude Include="RUDPSession.h">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClInclude>
+    <ClInclude Include="Protocol.h">
+      <Filter>소스 파일\Protocol</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
