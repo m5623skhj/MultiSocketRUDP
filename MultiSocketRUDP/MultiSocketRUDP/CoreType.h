@@ -8,9 +8,10 @@ constexpr SessionIdType invalidSessionId = -1;
 
 using ThreadIdType = unsigned char;
 
-#define MAX_RIO_RESULT 256
-#define MAX_SEND_BUFFER_SIZE 16384
-#define ONE_FRAME 10
+constexpr unsigned short maxRIOResult = 256;
+constexpr unsigned int maxSendBufferSize = 16384;
+constexpr unsigned short oneFrame = 10;
+
 #define OUT
 
 enum class RIO_OPERATION_TYPE : INT8

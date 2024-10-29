@@ -41,7 +41,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 		return false;
 	}
 
-	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, MAX_SEND_BUFFER_SIZE);
+	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
 		std::cout << "Send RIORegisterBuffer failed" << std::endl;

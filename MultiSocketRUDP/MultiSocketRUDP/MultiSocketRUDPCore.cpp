@@ -233,8 +233,8 @@ void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
 
 void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 {
-	RIORESULT rioResults[MAX_RIO_RESULT];
-	rioCQList[threadId] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * MAX_SEND_BUFFER_SIZE, nullptr);
+	RIORESULT rioResults[maxRIOResult];
+	rioCQList[threadId] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * maxSendBufferSize, nullptr);
 	ULONG numOfResults = 0;
 
 	TickSet tickSet;
@@ -245,7 +245,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 	{
 		ZeroMemory(rioResults, sizeof(rioResults));
 
-		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
+		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, maxRIOResult);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
 		}
@@ -263,9 +263,9 @@ void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
 	tickSet.nowTick = GetTickCount64();
 	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
 
-	if (deltaTick < ONE_FRAME && deltaTick > 0)
+	if (deltaTick < oneFrame && deltaTick > 0)
 	{
-		Sleep(ONE_FRAME - static_cast<DWORD>(deltaTick));
+		Sleep(oneFrame - static_cast<DWORD>(deltaTick));
 	}
 
 	tickSet.beforeTick = tickSet.nowTick;

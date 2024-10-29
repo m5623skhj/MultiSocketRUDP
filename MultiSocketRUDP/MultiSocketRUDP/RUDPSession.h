@@ -28,7 +28,7 @@ struct SendBuffer
 {
 	WORD bufferCount = 0;
 	CLockFreeQueue<NetBuffer*> sendQueue;
-	char rioSendBuffer[MAX_SEND_BUFFER_SIZE];
+	char rioSendBuffer[maxSendBufferSize];
 	RIO_BUFFERID sendBufferId;
 };
 
