@@ -9,10 +9,10 @@ void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE i
 	ioType = inIOType;
 }
 
-RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
+RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort)
 	: sessionId(inSessionId)
 	, sock(inSock)
-	, port(inPort)
+	, serverPort(inServerPort)
 {
 }
 

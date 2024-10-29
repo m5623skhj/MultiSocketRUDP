@@ -83,7 +83,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
-		PortType targetPort = session->port;
+		PortType targetPort = session->serverPort;
 		SessionIdType sessionId = session->sessionId;
 
 		//Send rudp session infomation packet to client

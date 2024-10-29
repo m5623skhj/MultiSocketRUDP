@@ -15,6 +15,7 @@ struct IOContext : RIO_BUF
 	void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
 
 	SessionIdType ownerSessionId = invalidSessionId;
+	sockaddr_in clientAddr{};
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 };
 
@@ -38,7 +39,7 @@ class RUDPSession
 
 private:
 	RUDPSession() = delete;
-	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
+	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort);
 
 	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
@@ -51,7 +52,13 @@ protected:
 
 private:
 	SessionIdType sessionId;
-	PortType port;
+	// connectKey가 필요해 보임
+	// TCP로 연결한 곳에서 키를 생성해서 저장하고
+	// 패킷에다가 생성된 키를 넣어서 송신한 후
+	// connectKey와 대조해서 정상 키라고 판단되면
+	// 아래의 clientAddr에 클라이언트의 정보를 넣음
+	sockaddr_in clientAddr{};
+	PortType serverPort;
 	SOCKET sock;
 	bool isUsingSession{};
 
