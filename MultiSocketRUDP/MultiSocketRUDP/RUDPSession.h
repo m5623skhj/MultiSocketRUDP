@@ -52,11 +52,12 @@ protected:
 
 private:
 	SessionIdType sessionId;
-	// connectKey가 필요해 보임
-	// TCP로 연결한 곳에서 키를 생성해서 저장하고
-	// 패킷에다가 생성된 키를 넣어서 송신한 후
-	// connectKey와 대조해서 정상 키라고 판단되면
-	// 아래의 clientAddr에 클라이언트의 정보를 넣음
+	// a connectKey seems to be necessary
+	// generate and store a key on the TCP connection side,
+	// then insert the generated key into the packet and send it
+	// if the connectKey matches, verifying it as a valid key,
+	// insert the client information into clientAddr below
+	std::string sessionKey{};
 	sockaddr_in clientAddr{};
 	PortType serverPort;
 	SOCKET sock;

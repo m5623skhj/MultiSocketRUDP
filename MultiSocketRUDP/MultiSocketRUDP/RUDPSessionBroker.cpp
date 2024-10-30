@@ -1,5 +1,9 @@
 #include "PreCompile.h"
 #include <WinSock2.h>
+#include <random>
+#include <sstream>
+#include <iomanip>
+#include <array>
 #include "MultiSocketRUDPCore.h"
 
 #if USE_IOCP_SESSION_BROKER
@@ -40,7 +44,6 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 
 }
 #else
-
 void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP)
 {
 	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
@@ -82,17 +85,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			std::cout << "Server is full of users" << std::endl;
 			continue;
 		}
-
-		PortType targetPort = session->serverPort;
-		SessionIdType sessionId = session->sessionId;
-
-		//Send rudp session infomation packet to client
-		buffer << rudpSessionIP << targetPort << sessionId;
-
-		buffer.m_iWriteLast = buffer.m_iWrite;
-		buffer.m_iWrite = 0;
-		buffer.m_iRead = 0;
-		buffer.Encode();
+		
+		SetSessionKey(session);
+		SetSessionInfoToBuffer(session, rudpSessionIP, buffer);
 
 		int result = send(clientSocket, buffer.GetBufferPtr(), buffer.GetUseSize() + df_HEADER_SIZE, 0);
 		if (result == SOCKET_ERROR)
@@ -108,4 +103,50 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 	closesocket(listenSocket);
 	std::cout << "Session broker thread stopped" << std::endl;
 }
+
+void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session)
+{
+	auto MakeSessionKey = []() -> std::string
+	{
+		std::array<unsigned char, 16> keyData;
+
+		auto now = std::chrono::system_clock::now();
+		auto duration = now.time_since_epoch();
+		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+
+		std::seed_seq seed { static_cast<unsigned int>(millis & 0xFFFFFFFF), static_cast<unsigned int>((millis >> 32) & 0xFFFFFFFF) };
+		std::mt19937 gen(seed);
+		std::uniform_int_distribution<int> dist(0, 255);
+
+		for (auto& byte : keyData)
+		{
+			byte = static_cast<unsigned char>(dist(gen));
+		}
+
+		std::stringstream ss;
+		for (auto byte : keyData)
+		{
+			ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+		}
+
+		return ss.str();
+	};
+	session->sessionKey = MakeSessionKey();
+}
+
+void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
+{
+	PortType targetPort = session->serverPort;
+	SessionIdType sessionId = session->sessionId;
+	std::string sessionKey = session->sessionKey;
+
+	//Send rudp session infomation packet to client
+	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
+
+	buffer.m_iWriteLast = buffer.m_iWrite;
+	buffer.m_iWrite = 0;
+	buffer.m_iRead = 0;
+	buffer.Encode();
+}
+
 #endif
