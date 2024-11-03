@@ -348,7 +348,6 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUD
 	return false;
 }
 
-
 bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
 {
 	return true;

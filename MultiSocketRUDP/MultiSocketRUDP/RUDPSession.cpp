@@ -52,6 +52,13 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	return true;
 }
 
+void RUDPSession::InitializeSession()
+{
+	sessionKey = {};
+	isUsingSession = {};
+	ioCancle = {};
+}
+
 RUDPSession::~RUDPSession()
 {
 	closesocket(sock);
