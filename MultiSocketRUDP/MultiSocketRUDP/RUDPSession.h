@@ -7,16 +7,10 @@
 
 class MultiSocketRUDPCore;
 
-struct IOContext : RIO_BUF
+enum class IO_MODE : LONG
 {
-	IOContext() = default;
-	~IOContext() = default;
-
-	void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
-
-	SessionIdType ownerSessionId = invalidSessionId;
-	sockaddr_in clientAddr{};
-	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
+	IO_NONE_SENDING = 0
+	, IO_SENDING
 };
 
 struct RecvBuffer
@@ -31,6 +25,7 @@ struct SendBuffer
 	CLockFreeQueue<NetBuffer*> sendQueue;
 	char rioSendBuffer[maxSendBufferSize];
 	RIO_BUFFERID sendBufferId;
+	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
 };
 
 class RUDPSession
@@ -62,6 +57,7 @@ private:
 	PortType serverPort;
 	SOCKET sock;
 	bool isUsingSession{};
+	bool ioCancle{};
 
 private:
 	RecvBuffer recvBuffer;

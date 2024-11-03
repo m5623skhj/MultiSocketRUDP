@@ -17,6 +17,24 @@ struct TickSet
 	UINT64 beforeTick = 0;
 };
 
+struct IOContext : RIO_BUF
+{
+	IOContext() = default;
+	~IOContext() = default;
+
+	void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
+
+	SessionIdType ownerSessionId = invalidSessionId;
+	sockaddr_in clientAddr{};
+	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
+};
+
+struct IOContextResult
+{
+	IOContext* ioContext;
+	std::shared_ptr<RUDPSession> session;
+};
+
 class MultiSocketRUDPCore
 {
 public:
@@ -52,6 +70,7 @@ private:
 
 private:
 	std::shared_ptr<RUDPSession> AcquireSession();
+	std::shared_ptr<RUDPSession> GetUsingSession(SessionIdType sessionId);
 	void ReleaseSession(std::shared_ptr<RUDPSession> session);
 
 private:
@@ -112,6 +131,11 @@ private:
 
 #pragma region RIO
 private:
+	std::optional<IOContextResult> GetIOCompletedContext(RIORESULT& rioResult);
+	bool IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId);
+
+	bool RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
+	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};

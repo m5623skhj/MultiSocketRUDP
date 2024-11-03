@@ -2,6 +2,12 @@
 #include "MultiSocketRUDPCore.h"
 #include "BuildConfig.h"
 
+void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
+{
+	ownerSessionId = inOwnerSessionId;
+	ioType = inIOType;
+}
+
 MultiSocketRUDPCore::MultiSocketRUDPCore()
 	: contextPool(2, false)
 {
@@ -210,6 +216,18 @@ std::shared_ptr<RUDPSession> MultiSocketRUDPCore::AcquireSession()
 	return session;
 }
 
+std::shared_ptr<RUDPSession> MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId)
+{
+	std::unique_lock lock(usingSessionMapLock);
+	auto itor = usingSessionMap.find(sessionId);
+	if (itor == usingSessionMap.end())
+	{
+		return nullptr;
+	}
+
+	return itor->second;
+}
+
 void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
 {
 	if (session == nullptr)
@@ -248,6 +266,20 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, maxRIOResult);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
+			auto contextResult = GetIOCompletedContext(rioResults[i]);
+			if (contextResult == std::nullopt)
+			{
+				continue;
+			}
+
+			if (not IOCompleted(*contextResult->ioContext, rioResults[i].BytesTransferred, *contextResult->session, threadId))
+			{
+				continue;
+			}
+			else
+			{
+				// error handling?
+			}
 		}
 
 #if USE_SLEEP_FOR_FRAME
@@ -269,4 +301,61 @@ void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
 	}
 
 	tickSet.beforeTick = tickSet.nowTick;
+}
+
+std::optional<IOContextResult> MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
+{
+	IOContext* context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
+	if (context == nullptr)
+	{
+		return std::nullopt;
+	}
+
+	IOContextResult result;
+	result.session = GetUsingSession(context->ownerSessionId);
+	if (result.session == nullptr)
+	{
+		return std::nullopt;
+	}
+
+	if (rioResult.BytesTransferred == 0 || result.session->ioCancle == true)
+	{
+		contextPool.Free(context);
+		return std::nullopt;
+	}
+
+	return result;
+}
+
+bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId)
+{
+	switch (context.ioType)
+	{
+	case RIO_OPERATION_TYPE::OP_RECV:
+	{
+		return RecvIOCompleted(transferred, session, threadId);
+	}
+	break;
+	case RIO_OPERATION_TYPE::OP_SEND:
+	{
+		return SendIOCompleted(transferred, session, threadId);
+	}
+	break;
+	default:
+		contextPool.Free(&context);
+	}
+
+	return false;
+}
+
+
+bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
+{
+	return true;
+}
+
+bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
+{
+	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	return true;
 }

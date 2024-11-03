@@ -3,12 +3,6 @@
 #include <WinSock2.h>
 #include "NetServerSerializeBuffer.h"
 
-void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
-{
-	ownerSessionId = inOwnerSessionId;
-	ioType = inIOType;
-}
-
 RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort)
 	: sessionId(inSessionId)
 	, sock(inSock)
