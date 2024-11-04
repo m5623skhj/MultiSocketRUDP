@@ -135,9 +135,9 @@ private:
 	bool IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId);
 
 	bool RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
-	bool DoRecv(OUT RUDPSession& session, OUT RUDPSession& recvBuffer);
+	bool DoRecv(OUT RUDPSession& session);
 	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
-	bool DoSend(OUT RUDPSession& session, OUT RUDPSession& recvBuffer);
+	bool DoSend(OUT RUDPSession& session);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};

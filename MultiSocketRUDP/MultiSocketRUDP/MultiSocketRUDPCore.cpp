@@ -355,8 +355,10 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session, OUT RUDPSession& recvBuffer)
+bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
 {
+
+
 	return true;
 }
 
@@ -366,7 +368,7 @@ bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& sessio
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, OUT RUDPSession& recvBuffer)
+bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 {
 	return true;
 }
