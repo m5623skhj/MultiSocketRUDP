@@ -357,7 +357,13 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 
 bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
 {
+	auto context = contextPool.Alloc();
+	context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_RECV);
+	context->BufferId = session.recvBuffer.recvBufferId;
+	context->Length = recvBufferSize;
+	context->Offset = 0;
 
+	// TODO : rioFunctionTable.RIOReceiveEx()
 
 	return true;
 }

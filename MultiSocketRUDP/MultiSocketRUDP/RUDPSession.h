@@ -14,7 +14,7 @@ enum class IO_MODE : LONG
 
 struct RecvBuffer
 {
-	NetBuffer* buffer;
+	char buffer[recvBufferSize];
 	RIO_BUFFERID recvBufferId;
 };
 

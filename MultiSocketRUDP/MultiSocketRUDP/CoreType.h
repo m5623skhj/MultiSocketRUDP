@@ -11,6 +11,7 @@ using ThreadIdType = unsigned char;
 constexpr unsigned short maxRIOResult = 256;
 constexpr unsigned int maxSendBufferSize = 16384;
 constexpr unsigned short oneFrame = 10;
+constexpr int recvBufferSize = 8192;
 
 #define OUT
 
