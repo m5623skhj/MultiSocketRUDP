@@ -350,11 +350,23 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUD
 
 bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
 {
+
+
+	return true;
+}
+
+bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session, OUT RUDPSession& recvBuffer)
+{
 	return true;
 }
 
 bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
 {
 	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	return true;
+}
+
+bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, OUT RUDPSession& recvBuffer)
+{
 	return true;
 }

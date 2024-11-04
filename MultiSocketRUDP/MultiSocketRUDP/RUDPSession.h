@@ -1,6 +1,5 @@
 #pragma once
 #include "CoreType.h"
-#include "Ringbuffer.h"
 #include <MSWSock.h>
 #include "LockFreeQueue.h"
 #include "NetServerSerializeBuffer.h"
@@ -15,7 +14,7 @@ enum class IO_MODE : LONG
 
 struct RecvBuffer
 {
-	CRingbuffer recvRingBuffer;
+	NetBuffer* buffer;
 	RIO_BUFFERID recvBufferId;
 };
 

@@ -10,36 +10,36 @@ using PacketId = unsigned int;
 #define GET_PACKET_ID(packetId) virtual PacketId GetPacketId() const override { return static_cast<PacketId>(packetId); }
 
 template<typename T>
-void SetBufferToParameters(OUT NetBuffer& buffer, T& param)
+void SetBufferToParameters(OUT NetBuffer& recvBuffer, T& param)
 {
-	buffer >> param;
+	recvBuffer >> param;
 }
 
 template<typename T, typename... Args>
-void SetBufferToParameters(OUT NetBuffer& buffer, T& param, Args&... argList)
+void SetBufferToParameters(OUT NetBuffer& recvBuffer, T& param, Args&... argList)
 {
-	buffer >> param;
-	SetBufferToParameters(buffer, argList...);
+	recvBuffer >> param;
+	SetBufferToParameters(recvBuffer, argList...);
 }
 
 template<typename T>
-void SetParametersToBuffer(OUT NetBuffer& buffer, T& param)
+void SetParametersToBuffer(OUT NetBuffer& recvBuffer, T& param)
 {
-	buffer << param;
+	recvBuffer << param;
 }
 
 template<typename T, typename... Args>
-void SetParametersToBuffer(OUT NetBuffer& buffer, T& param, Args&... argList)
+void SetParametersToBuffer(OUT NetBuffer& recvBuffer, T& param, Args&... argList)
 {
-	buffer << param;
-	SetParametersToBuffer(buffer, argList...);
+	recvBuffer << param;
+	SetParametersToBuffer(recvBuffer, argList...);
 }
 
 #define SET_BUFFER_TO_PARAMETERS(...)\
-virtual void BufferToPacket(OUT NetBuffer& buffer) override { SetBufferToParameters(buffer, __VA_ARGS__); }
+virtual void BufferToPacket(OUT NetBuffer& recvBuffer) override { SetBufferToParameters(recvBuffer, __VA_ARGS__); }
 
 #define SET_PARAMETERS_TO_BUFFER(...)\
-virtual void PacketToBuffer(OUT NetBuffer& buffer) override { SetParametersToBuffer(buffer, __VA_ARGS__); }
+virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersToBuffer(recvBuffer, __VA_ARGS__); }
 
 // This function assembles the packet based on the order of the defined parameters
 #define SET_PARAMETERS(...)\

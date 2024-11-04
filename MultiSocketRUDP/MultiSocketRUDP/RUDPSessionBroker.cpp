@@ -68,7 +68,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		return;
 	}
 
-	auto &buffer = *NetBuffer::Alloc();
+	auto &recvBuffer = *NetBuffer::Alloc();
 	listen(listenSocket, SOMAXCONN);
 	while (not threadStopFlag)
 	{
@@ -87,9 +87,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		}
 		
 		SetSessionKey(session);
-		SetSessionInfoToBuffer(session, rudpSessionIP, buffer);
+		SetSessionInfoToBuffer(session, rudpSessionIP, recvBuffer);
 
-		int result = send(clientSocket, buffer.GetBufferPtr(), buffer.GetUseSize() + df_HEADER_SIZE, 0);
+		int result = send(clientSocket, recvBuffer.GetBufferPtr(), recvBuffer.GetUseSize() + df_HEADER_SIZE, 0);
 		if (result == SOCKET_ERROR)
 		{
 			std::cout << "RunSessionBrokerThread send failed with error " << WSAGetLastError() << std::endl;
@@ -97,7 +97,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		}
 
 		closesocket(clientSocket);
-		buffer.Init();
+		recvBuffer.Init();
 	}
 
 	closesocket(listenSocket);
@@ -134,19 +134,19 @@ void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session
 	session->sessionKey = MakeSessionKey();
 }
 
-void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
+void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& recvBuffer)
 {
 	PortType targetPort = session->serverPort;
 	SessionIdType sessionId = session->sessionId;
 	std::string sessionKey = session->sessionKey;
 
 	//Send rudp session infomation packet to client
-	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
+	recvBuffer << rudpSessionIP << targetPort << sessionId << sessionKey;
 
-	buffer.m_iWriteLast = buffer.m_iWrite;
-	buffer.m_iWrite = 0;
-	buffer.m_iRead = 0;
-	buffer.Encode();
+	recvBuffer.m_iWriteLast = recvBuffer.m_iWrite;
+	recvBuffer.m_iWrite = 0;
+	recvBuffer.m_iRead = 0;
+	recvBuffer.Encode();
 }
 
 #endif

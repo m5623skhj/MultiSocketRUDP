@@ -28,7 +28,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	u_long nonBlocking = 1;
 	ioctlsocket(sock, FIONBIO, &nonBlocking);
 
-	recvBuffer.recvBufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.recvRingBuffer.GetBufferPtr(), DEFAULT_RINGBUFFER_MAX);
+	recvBuffer.recvBufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer->GetBufferPtr(), dfDEFAULTSIZE);
 	if (recvBuffer.recvBufferId == RIO_INVALID_BUFFERID)
 	{
 		std::cout << "Recv RIORegisterBuffer failed" << std::endl;

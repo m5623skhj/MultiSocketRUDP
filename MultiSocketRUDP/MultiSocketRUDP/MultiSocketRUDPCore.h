@@ -113,7 +113,7 @@ private:
 private:
 	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
 	void SetSessionKey(OUT std::shared_ptr<RUDPSession> session);
-	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
+	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& recvBuffer);
 
 private:
 	std::thread sessionBrokerThread{};
@@ -135,7 +135,9 @@ private:
 	bool IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId);
 
 	bool RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
+	bool DoRecv(OUT RUDPSession& session, OUT RUDPSession& recvBuffer);
 	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
+	bool DoSend(OUT RUDPSession& session, OUT RUDPSession& recvBuffer);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
