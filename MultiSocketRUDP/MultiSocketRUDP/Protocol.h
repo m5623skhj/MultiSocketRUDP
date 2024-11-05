@@ -52,6 +52,18 @@ virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersT
 ////////////////////////////////////////////////////////////////////////////////////
 
 #pragma pack(push, 1)
+class IPacket
+{
+public:
+	IPacket() = default;
+	virtual ~IPacket() = default;
+
+	virtual PacketId GetPacketId() const = 0;
+
+public:
+	virtual void BufferToPacket(OUT NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
+	virtual void PacketToBuffer(OUT NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
+};
 
 #pragma pack(pop)
 

@@ -350,9 +350,33 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUD
 
 bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
 {
+	auto& buffer = *NetBuffer::Alloc();
+	do
+	{
+		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session.recvBuffer.buffer, transferred) != 0)
+		{
+			break;
+		}
 
+		WORD payloadLength = GetPayloadLength(buffer);
+		if (payloadLength == 0)
+		{
+			break;
+		}
+		else if (payloadLength > recvBufferSize)
+		{
+			break;
+		}
 
-	return true;
+		session.OnRecvPacket(buffer);
+		NetBuffer::Free(&buffer);
+
+		return DoRecv(session);
+	} while (false);
+
+	// release session
+	NetBuffer::Free(&buffer);
+	return false;
 }
 
 bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
@@ -378,3 +402,19 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 {
 	return true;
 }
+
+WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer)
+{
+	BYTE code;
+	WORD payloadLength;
+	buffer >> code >> payloadLength;
+
+	if (code != NetBuffer::m_byHeaderCode)
+	{
+		std::cout << "code : " << code << std::endl;
+		return 0;
+	}
+
+	return payloadLength;
+}
+

@@ -1,7 +1,8 @@
 #include "PreCompile.h"
 #include "RUDPSession.h"
-#include <WinSock2.h>
 #include "NetServerSerializeBuffer.h"
+#include "PacketManager.h"
+#include "Protocol.h"
 
 RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort)
 	: sessionId(inSessionId)
@@ -64,6 +65,24 @@ RUDPSession::~RUDPSession()
 	closesocket(sock);
 }
 
-void RUDPSession::OnRecv()
+void RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
+	PacketId packetId;
+	recvPacket >> packetId;
+
+	auto packetHandler = PacketManager::GetInst().GetPacketHandler(packetId);
+	if (packetHandler == nullptr)
+	{
+		return;
+	}
+
+	auto packet = PacketManager::GetInst().MakePacket(packetId);
+	if (packet == nullptr)
+	{
+		return;
+	}
+
+	char* targetPtr = reinterpret_cast<char*>(packet.get()) + sizeof(char*);
+	std::any anyPacket = std::any(packet.get());
+	packetHandler(*this, recvPacket, anyPacket);
 }

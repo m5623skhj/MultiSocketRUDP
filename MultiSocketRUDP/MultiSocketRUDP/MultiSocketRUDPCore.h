@@ -146,4 +146,7 @@ private:
 private:
 	CTLSMemoryPool<IOContext> contextPool;
 #pragma endregion RIO
+
+private:
+	WORD GetPayloadLength(OUT NetBuffer& buffer);
 };

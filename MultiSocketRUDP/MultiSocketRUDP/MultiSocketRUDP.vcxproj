@@ -25,6 +25,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
+    <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
   </ItemGroup>
@@ -32,6 +33,7 @@
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CoreType.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
+    <ClInclude Include="PacketManager.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="RUDPSession.h" />
   </ItemGroup>

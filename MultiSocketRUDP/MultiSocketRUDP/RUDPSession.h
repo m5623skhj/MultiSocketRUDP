@@ -42,8 +42,8 @@ private:
 public:
 	virtual ~RUDPSession();
 
-protected:
-	virtual void OnRecv();
+private:
+	void OnRecvPacket(NetBuffer& recvPacket);
 
 private:
 	SessionIdType sessionId;
