@@ -22,3 +22,12 @@ enum class RIO_OPERATION_TYPE : INT8
 	, OP_SEND
 	, OP_SEND_REQUEST
 };
+
+enum class PACKET_TYPE : unsigned char
+{
+	InvalidType = 0
+	, ConnectType
+	, DisconnectType
+	, SendType
+	, SendReplyType
+};

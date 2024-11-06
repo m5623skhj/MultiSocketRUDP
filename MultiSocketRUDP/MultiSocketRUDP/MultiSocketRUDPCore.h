@@ -135,6 +135,7 @@ private:
 	bool IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId);
 
 	bool RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
+	bool ProcessByPacketType(RUDPSession& session, NetBuffer& recvPacket);
 	bool DoRecv(OUT RUDPSession& session);
 	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
 	bool DoSend(OUT RUDPSession& session);

@@ -363,12 +363,16 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 		{
 			break;
 		}
-		else if (payloadLength > recvBufferSize)
+		else if (buffer.GetUseSize() != payloadLength)
+		{
+			break;
+		}
+		else if (buffer.Decode() == false)
 		{
 			break;
 		}
 
-		session.OnRecvPacket(buffer);
+		ProcessByPacketType(session, buffer);
 		NetBuffer::Free(&buffer);
 
 		return DoRecv(session);
@@ -377,6 +381,40 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 	// release session
 	NetBuffer::Free(&buffer);
 	return false;
+}
+
+bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, NetBuffer& recvPacket)
+{
+	PACKET_TYPE packetType;
+	recvPacket >> packetType;
+
+	switch (packetType)
+	{
+	case PACKET_TYPE::ConnectType:
+	{
+
+	}
+	break;
+	case PACKET_TYPE::DisconnectType:
+	{
+
+	}
+	break;
+	case PACKET_TYPE::SendType:
+	{
+		session.OnRecvPacket(recvPacket);
+	}
+	break;
+	case PACKET_TYPE::SendReplyType:
+	{
+
+	}
+	break;
+	default:
+		break;
+	}
+
+	return true;
 }
 
 bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
