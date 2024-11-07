@@ -76,7 +76,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
 		auto optSocket = CreateRUDPSocket(socketNumber);
-		if (optSocket.has_value() == false)
+		if (not optSocket.has_value())
 		{
 			WSACleanup();
 			return false;
@@ -117,7 +117,7 @@ bool MultiSocketRUDPCore::InitRIO()
 
 	for (auto& session : unusedSessionList)
 	{
-		if (session->InitializeRIO(rioFunctionTable, rioCQList[session->sessionId % numOfWorkerThread], rioCQList[session->sessionId % numOfWorkerThread]) == false)
+		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->sessionId % numOfWorkerThread], rioCQList[session->sessionId % numOfWorkerThread]))
 		{
 			return false;
 		}
@@ -272,7 +272,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 				continue;
 			}
 
-			if (not IOCompleted(*contextResult->ioContext, rioResults[i].BytesTransferred, *contextResult->session, threadId))
+			if (not IOCompleted(*contextResult->ioContext, rioResults[i].BytesTransferred, contextResult->session, threadId))
 			{
 				continue;
 			}
@@ -327,7 +327,7 @@ std::optional<IOContextResult> MultiSocketRUDPCore::GetIOCompletedContext(RIORES
 	return result;
 }
 
-bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId)
+bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
 	switch (context.ioType)
 	{
@@ -348,12 +348,12 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, RUD
 	return false;
 }
 
-bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
+bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
 	auto& buffer = *NetBuffer::Alloc();
 	do
 	{
-		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session.recvBuffer.buffer, transferred) != 0)
+		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session->recvBuffer.buffer, transferred) != 0)
 		{
 			break;
 		}
@@ -367,12 +367,16 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 		{
 			break;
 		}
-		else if (buffer.Decode() == false)
+		else if (not buffer.Decode())
 		{
 			break;
 		}
 
-		ProcessByPacketType(session, buffer);
+		if (not ProcessByPacketType(session, buffer))
+		{
+			break;
+		}
+
 		NetBuffer::Free(&buffer);
 
 		return DoRecv(session);
@@ -383,7 +387,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, RUDPSession& sessio
 	return false;
 }
 
-bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, NetBuffer& recvPacket)
+bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, NetBuffer& recvPacket)
 {
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
@@ -392,17 +396,20 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, NetBuffer& r
 	{
 	case PACKET_TYPE::ConnectType:
 	{
-
+		return session->OnConnect(recvPacket);
 	}
 	break;
 	case PACKET_TYPE::DisconnectType:
 	{
+		session->OnDisconnect(recvPacket);
+		ReleaseSession(session);
 
+		return true;
 	}
 	break;
 	case PACKET_TYPE::SendType:
 	{
-		session.OnRecvPacket(recvPacket);
+		return session->OnRecvPacket(recvPacket);
 	}
 	break;
 	case PACKET_TYPE::SendReplyType:
@@ -411,17 +418,18 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, NetBuffer& r
 	}
 	break;
 	default:
-		break;
+		// TODO : Write log
+		return false;
 	}
 
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
+bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 {
 	auto context = contextPool.Alloc();
-	context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_RECV);
-	context->BufferId = session.recvBuffer.recvBufferId;
+	context->InitContext(session->sessionId, RIO_OPERATION_TYPE::OP_RECV);
+	context->BufferId = session->recvBuffer.recvBufferId;
 	context->Length = recvBufferSize;
 	context->Offset = 0;
 
@@ -430,13 +438,13 @@ bool MultiSocketRUDPCore::DoRecv(OUT RUDPSession& session)
 	return true;
 }
 
-bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
+bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
-	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
+bool MultiSocketRUDPCore::DoSend(std::shared_ptr<RUDPSession> session)
 {
 	return true;
 }

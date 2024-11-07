@@ -65,7 +65,19 @@ RUDPSession::~RUDPSession()
 	closesocket(sock);
 }
 
-void RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
+bool RUDPSession::OnConnect(NetBuffer& recvPacket)
+{
+
+
+	return true;
+}
+
+void RUDPSession::OnDisconnect(NetBuffer& recvPacket)
+{
+
+}
+
+bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketId packetId;
 	recvPacket >> packetId;
@@ -73,16 +85,16 @@ void RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	auto packetHandler = PacketManager::GetInst().GetPacketHandler(packetId);
 	if (packetHandler == nullptr)
 	{
-		return;
+		return false;
 	}
 
 	auto packet = PacketManager::GetInst().MakePacket(packetId);
 	if (packet == nullptr)
 	{
-		return;
+		return false;
 	}
 
 	char* targetPtr = reinterpret_cast<char*>(packet.get()) + sizeof(char*);
 	std::any anyPacket = std::any(packet.get());
-	packetHandler(*this, recvPacket, anyPacket);
+	return packetHandler(*this, recvPacket, anyPacket);
 }

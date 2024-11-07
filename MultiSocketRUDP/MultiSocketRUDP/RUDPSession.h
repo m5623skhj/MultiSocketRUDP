@@ -43,7 +43,9 @@ public:
 	virtual ~RUDPSession();
 
 private:
-	void OnRecvPacket(NetBuffer& recvPacket);
+	bool OnConnect(NetBuffer& recvPacket);
+	void OnDisconnect(NetBuffer& recvPacket);
+	bool OnRecvPacket(NetBuffer& recvPacket);
 
 private:
 	SessionIdType sessionId;

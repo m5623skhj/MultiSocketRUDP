@@ -132,13 +132,13 @@ private:
 #pragma region RIO
 private:
 	std::optional<IOContextResult> GetIOCompletedContext(RIORESULT& rioResult);
-	bool IOCompleted(IOContext& context, ULONG transferred, RUDPSession& session, BYTE threadId);
+	bool IOCompleted(IOContext& context, ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
 
-	bool RecvIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
-	bool ProcessByPacketType(RUDPSession& session, NetBuffer& recvPacket);
-	bool DoRecv(OUT RUDPSession& session);
-	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
-	bool DoSend(OUT RUDPSession& session);
+	bool RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
+	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, NetBuffer& recvPacket);
+	bool DoRecv(std::shared_ptr<RUDPSession> session);
+	bool SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
+	bool DoSend(std::shared_ptr<RUDPSession> session);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
