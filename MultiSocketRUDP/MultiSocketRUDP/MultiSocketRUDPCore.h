@@ -113,7 +113,7 @@ private:
 private:
 	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
 	void SetSessionKey(OUT std::shared_ptr<RUDPSession> session);
-	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& recvBuffer);
+	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 
 private:
 	std::thread sessionBrokerThread{};

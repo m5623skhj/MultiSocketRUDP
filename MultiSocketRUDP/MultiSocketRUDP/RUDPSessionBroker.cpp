@@ -108,7 +108,7 @@ void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session
 {
 	auto MakeSessionKey = []() -> std::string
 	{
-		std::array<unsigned char, 16> keyData;
+		std::array<unsigned char, sessionKeySize> keyData;
 
 		auto now = std::chrono::system_clock::now();
 		auto duration = now.time_since_epoch();
@@ -134,19 +134,19 @@ void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session
 	session->sessionKey = MakeSessionKey();
 }
 
-void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& recvBuffer)
+void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
 {
 	PortType targetPort = session->serverPort;
 	SessionIdType sessionId = session->sessionId;
 	std::string sessionKey = session->sessionKey;
 
 	//Send rudp session infomation packet to client
-	recvBuffer << rudpSessionIP << targetPort << sessionId << sessionKey;
+	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
 
-	recvBuffer.m_iWriteLast = recvBuffer.m_iWrite;
-	recvBuffer.m_iWrite = 0;
-	recvBuffer.m_iRead = 0;
-	recvBuffer.Encode();
+	buffer.m_iWriteLast = buffer.m_iWrite;
+	buffer.m_iWrite = 0;
+	buffer.m_iRead = 0;
+	buffer.Encode();
 }
 
 #endif

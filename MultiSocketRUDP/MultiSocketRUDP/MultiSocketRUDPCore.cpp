@@ -382,7 +382,6 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUD
 		return DoRecv(session);
 	} while (false);
 
-	// release session
 	NetBuffer::Free(&buffer);
 	return false;
 }
@@ -396,30 +395,35 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 	{
 	case PACKET_TYPE::ConnectType:
 	{
-		return session->OnConnect(recvPacket);
+		session->TryConnect(recvPacket);
+		break;
 	}
 	break;
 	case PACKET_TYPE::DisconnectType:
 	{
-		session->OnDisconnect(recvPacket);
-		ReleaseSession(session);
+		if (session->TryDisconnect(recvPacket) == true)
+		{
+			ReleaseSession(session);
+			return false;
+		}
 
-		return true;
+		break;
 	}
 	break;
 	case PACKET_TYPE::SendType:
 	{
-		return session->OnRecvPacket(recvPacket);
+		session->OnRecvPacket(recvPacket);
+		break;
 	}
 	break;
 	case PACKET_TYPE::SendReplyType:
 	{
-
+		break;
 	}
 	break;
 	default:
 		// TODO : Write log
-		return false;
+		break;
 	}
 
 	return true;

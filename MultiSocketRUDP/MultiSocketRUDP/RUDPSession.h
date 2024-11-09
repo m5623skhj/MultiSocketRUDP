@@ -42,12 +42,17 @@ private:
 public:
 	virtual ~RUDPSession();
 
+protected:
+	virtual void OnConnected(SessionIdType connectedSessionId) {}
+	virtual void OnDisconnected() {}
+
 private:
-	bool OnConnect(NetBuffer& recvPacket);
-	void OnDisconnect(NetBuffer& recvPacket);
+	void TryConnect(NetBuffer& recvPacket);
+	bool TryDisconnect(NetBuffer& recvPacket);
 	bool OnRecvPacket(NetBuffer& recvPacket);
 
 private:
+	bool isConnected{};
 	SessionIdType sessionId;
 	// a connectKey seems to be necessary
 	// generate and store a key on the TCP connection side,

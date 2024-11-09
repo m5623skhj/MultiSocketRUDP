@@ -55,6 +55,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 void RUDPSession::InitializeSession()
 {
+	isConnected = {};
 	sessionKey = {};
 	clientAddr = {};
 	isUsingSession = {};
@@ -75,16 +76,31 @@ RUDPSession::~RUDPSession()
 	closesocket(sock);
 }
 
-bool RUDPSession::OnConnect(NetBuffer& recvPacket)
+void RUDPSession::TryConnect(NetBuffer& recvPacket)
 {
+	if (isConnected)
+	{
+		return;
+	}
 
+	SessionIdType inputSessionId;
+	std::string inputSessionKey;
 
-	return true;
+	recvPacket >> inputSessionId >> inputSessionKey;
+	if (sessionId != inputSessionId || sessionKey != inputSessionKey)
+	{
+		return;
+	}
+
+	OnConnected(sessionId);
+	isConnected = true;
 }
 
-void RUDPSession::OnDisconnect(NetBuffer& recvPacket)
+bool RUDPSession::TryDisconnect(NetBuffer& recvPacket)
 {
+	OnDisconnected();
 
+	return true;
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
