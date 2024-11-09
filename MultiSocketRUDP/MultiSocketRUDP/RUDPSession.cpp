@@ -56,8 +56,18 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 void RUDPSession::InitializeSession()
 {
 	sessionKey = {};
+	clientAddr = {};
 	isUsingSession = {};
 	ioCancle = {};
+	
+	for (int i = 0; i < sendBuffer.sendQueue.GetRestSize(); ++i)
+	{
+		NetBuffer* eraseBuffer = nullptr;
+		if (sendBuffer.sendQueue.Dequeue(&eraseBuffer))
+		{
+			NetBuffer::Free(eraseBuffer);
+		}
+	}
 }
 
 RUDPSession::~RUDPSession()
