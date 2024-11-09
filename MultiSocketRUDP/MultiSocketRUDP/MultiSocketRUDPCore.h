@@ -27,6 +27,7 @@ struct IOContext : RIO_BUF
 	SessionIdType ownerSessionId = invalidSessionId;
 	sockaddr_in clientAddr{};
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
+	RIO_BUF addrBuffer{};
 };
 
 struct IOContextResult

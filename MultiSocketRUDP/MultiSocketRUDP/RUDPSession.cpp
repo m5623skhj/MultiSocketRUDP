@@ -8,6 +8,8 @@ RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort)
 	: sock(inSock)
 	, serverPort(inServerPort)
 {
+	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
+	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
 std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort)

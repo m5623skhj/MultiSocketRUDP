@@ -436,7 +436,11 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	context->Length = recvBufferSize;
 	context->Offset = 0;
 
-	// TODO : rioFunctionTable.RIOReceiveEx()
+	if (rioFunctionTable.RIOReceiveEx(session->rioRQ, context, 1, nullptr, &context->addrBuffer, nullptr, nullptr, 0, nullptr) == false)
+	{
+		std::cout << "RIOReceiveEx() failed with " << WSAGetLastError() << std::endl;
+		return false;
+	}
 
 	return true;
 }

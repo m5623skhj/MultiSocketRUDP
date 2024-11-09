@@ -15,7 +15,7 @@ enum class IO_MODE : LONG
 struct RecvBuffer
 {
 	char buffer[recvBufferSize];
-	RIO_BUFFERID recvBufferId;
+	RIO_BUFFERID recvBufferId{};
 };
 
 struct SendBuffer
@@ -61,8 +61,8 @@ private:
 	// insert the client information into clientAddr below
 	std::string sessionKey{};
 	sockaddr_in clientAddr{};
-	PortType serverPort;
-	SOCKET sock;
+	PortType serverPort{ invalidPortNumber };
+	SOCKET sock{};
 	bool isUsingSession{};
 	bool ioCancle{};
 
