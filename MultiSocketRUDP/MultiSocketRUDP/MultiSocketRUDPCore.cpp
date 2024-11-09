@@ -82,8 +82,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 			return false;
 		}
 
-		SessionIdType createdSessionId = static_cast<SessionIdType>(socketNumber);
-		unusedSessionList.emplace_back(RUDPSession::Create(createdSessionId, optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber)));
+		unusedSessionList.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber)));
 	}
 
 	return true;

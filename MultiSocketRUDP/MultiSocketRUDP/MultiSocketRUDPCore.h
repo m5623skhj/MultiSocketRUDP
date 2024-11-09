@@ -35,6 +35,13 @@ struct IOContextResult
 	std::shared_ptr<RUDPSession> session;
 };
 
+struct SendPacketInfo
+{
+	NetBuffer* sendPacket{};
+	std::shared_ptr<RUDPSession> owner{};
+	SessionIdType sessionIdType{};
+};
+
 class MultiSocketRUDPCore
 {
 public:
@@ -112,11 +119,13 @@ private:
 #else
 private:
 	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
+	bool SetSessionId(OUT std::shared_ptr<RUDPSession> session);
 	void SetSessionKey(OUT std::shared_ptr<RUDPSession> session);
 	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 
 private:
 	std::thread sessionBrokerThread{};
+	std::atomic<SessionIdType> sessionIdGenerator = 0;
 #endif
 
 private:

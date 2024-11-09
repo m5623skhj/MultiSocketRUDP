@@ -33,9 +33,9 @@ class RUDPSession
 
 private:
 	RUDPSession() = delete;
-	explicit RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort);
+	explicit RUDPSession(SOCKET inSock, PortType inServerPort);
 
-	static std::shared_ptr<RUDPSession> Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort);
+	static std::shared_ptr<RUDPSession> Create(SOCKET inSock, PortType inPort);
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
 	void InitializeSession();
 
@@ -53,7 +53,7 @@ private:
 
 private:
 	bool isConnected{};
-	SessionIdType sessionId;
+	SessionIdType sessionId = invalidSessionId;
 	// a connectKey seems to be necessary
 	// generate and store a key on the TCP connection side,
 	// then insert the generated key into the packet and send it

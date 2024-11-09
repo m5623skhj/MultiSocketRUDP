@@ -4,24 +4,23 @@
 #include "PacketManager.h"
 #include "Protocol.h"
 
-RUDPSession::RUDPSession(SessionIdType inSessionId, SOCKET inSock, PortType inServerPort)
-	: sessionId(inSessionId)
-	, sock(inSock)
+RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort)
+	: sock(inSock)
 	, serverPort(inServerPort)
 {
 }
 
-std::shared_ptr<RUDPSession> RUDPSession::Create(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
+std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort)
 {
 	struct RUDPSessionCreator : public RUDPSession
 	{
-		RUDPSessionCreator(SessionIdType inSessionId, SOCKET inSock, PortType inPort)
-			: RUDPSession(inSessionId, inSock, inPort)
+		RUDPSessionCreator(SOCKET inSock, PortType inPort)
+			: RUDPSession(inSock, inPort)
 		{
 		}
 	};
 
-	return std::make_shared<RUDPSessionCreator>(inSessionId, inSock, inPort);
+	return std::make_shared<RUDPSessionCreator>(inSock, inPort);
 }
 
 bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ)
@@ -55,6 +54,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 void RUDPSession::InitializeSession()
 {
+	sessionId = invalidSessionId;
 	isConnected = {};
 	sessionKey = {};
 	clientAddr = {};
