@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDPServer", "Mu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentsServer", "ContentsServer\ContentsServer.vcxproj", "{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDPClient", "MultiSocketRUDPClient\MultiSocketRUDPClient.vcxproj", "{F3949482-754B-4097-AE29-AA14E700FEC3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x64.Build.0 = Release|x64
 		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x86.ActiveCfg = Release|Win32
 		{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}.Release|x86.Build.0 = Release|Win32
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Debug|x64.ActiveCfg = Debug|x64
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Debug|x64.Build.0 = Debug|x64
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Debug|x86.ActiveCfg = Debug|Win32
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Debug|x86.Build.0 = Debug|Win32
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Release|x64.ActiveCfg = Release|x64
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Release|x64.Build.0 = Release|x64
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Release|x86.ActiveCfg = Release|Win32
+		{F3949482-754B-4097-AE29-AA14E700FEC3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
