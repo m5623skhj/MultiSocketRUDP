@@ -332,7 +332,7 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std
 	{
 	case RIO_OPERATION_TYPE::OP_RECV:
 	{
-		return RecvIOCompleted(transferred, session, threadId);
+		return RecvIOCompleted(transferred, session, context.clientAddr, threadId);
 	}
 	break;
 	case RIO_OPERATION_TYPE::OP_SEND:
@@ -347,26 +347,26 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std
 	return false;
 }
 
-bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
+bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, BYTE threadId)
 {
 	auto& buffer = *NetBuffer::Alloc();
 	do
 	{
+		if (not session->CheckMyClient(clientAddr))
+		{
+			break;
+		}
+
 		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session->recvBuffer.buffer, transferred) != 0)
 		{
 			break;
 		}
 
-		WORD payloadLength = GetPayloadLength(buffer);
-		if (payloadLength == 0)
+		if (not buffer.Decode())
 		{
 			break;
 		}
-		else if (buffer.GetUseSize() != payloadLength)
-		{
-			break;
-		}
-		else if (not buffer.Decode())
+		else if (buffer.GetUseSize() != GetPayloadLength(buffer))
 		{
 			break;
 		}

@@ -52,6 +52,9 @@ private:
 	bool OnRecvPacket(NetBuffer& recvPacket);
 
 private:
+	bool CheckMyClient(const sockaddr_in& targetClientAddr);
+
+private:
 	bool isConnected{};
 	SessionIdType sessionId = invalidSessionId;
 	// a connectKey seems to be necessary

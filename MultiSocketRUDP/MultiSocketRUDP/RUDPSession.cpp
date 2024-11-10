@@ -126,3 +126,14 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	std::any anyPacket = std::any(packet.get());
 	return packetHandler(*this, recvPacket, anyPacket);
 }
+
+bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)
+{
+	if (clientAddr.sin_addr.S_un.S_addr != targetClientAddr.sin_addr.S_un.S_addr ||
+		clientAddr.sin_port != targetClientAddr.sin_port)
+	{
+		return false;
+	}
+
+	return true;
+}
