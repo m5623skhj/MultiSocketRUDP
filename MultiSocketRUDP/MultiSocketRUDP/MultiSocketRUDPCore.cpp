@@ -273,12 +273,12 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 
 			if (not IOCompleted(*contextResult->ioContext, rioResults[i].BytesTransferred, contextResult->session, threadId))
 			{
+				contextPool.Free(contextResult->ioContext);
+				// error handling
 				continue;
 			}
-			else
-			{
-				// error handling?
-			}
+
+			contextPool.Free(contextResult->ioContext);
 		}
 
 #if USE_SLEEP_FOR_FRAME
@@ -341,7 +341,9 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std
 	}
 	break;
 	default:
-		contextPool.Free(&context);
+	{
+	}
+	break;
 	}
 
 	return false;
@@ -457,7 +459,7 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 
 bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
-	InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	//InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 	return true;
 }
 
