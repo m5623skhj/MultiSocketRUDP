@@ -352,11 +352,6 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUD
 	auto& buffer = *NetBuffer::Alloc();
 	do
 	{
-		if (not session->CheckMyClient(clientAddr))
-		{
-			break;
-		}
-
 		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session->recvBuffer.buffer, transferred) != 0)
 		{
 			break;
@@ -371,7 +366,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUD
 			break;
 		}
 
-		if (not ProcessByPacketType(session, buffer))
+		if (not ProcessByPacketType(session, clientAddr, buffer))
 		{
 			break;
 		}
@@ -385,7 +380,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUD
 	return false;
 }
 
-bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, NetBuffer& recvPacket)
+bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
 {
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
@@ -400,6 +395,11 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 	break;
 	case PACKET_TYPE::DisconnectType:
 	{
+		if (not session->CheckMyClient(clientAddr))
+		{
+			break;
+		}
+
 		if (session->TryDisconnect(recvPacket) == true)
 		{
 			ReleaseSession(session);
@@ -411,12 +411,22 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 	break;
 	case PACKET_TYPE::SendType:
 	{
+		if (not session->CheckMyClient(clientAddr))
+		{
+			break;
+		}
+
 		session->OnRecvPacket(recvPacket);
 		break;
 	}
 	break;
 	case PACKET_TYPE::SendReplyType:
 	{
+		if (not session->CheckMyClient(clientAddr))
+		{
+			break;
+		}
+
 		break;
 	}
 	break;

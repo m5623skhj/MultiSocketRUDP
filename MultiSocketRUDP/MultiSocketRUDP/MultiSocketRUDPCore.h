@@ -145,7 +145,7 @@ private:
 	bool IOCompleted(IOContext& context, ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
 
 	bool RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, BYTE threadId);
-	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, NetBuffer& recvPacket);
+	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(std::shared_ptr<RUDPSession> session);
 	bool SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
 	bool DoSend(std::shared_ptr<RUDPSession> session);
