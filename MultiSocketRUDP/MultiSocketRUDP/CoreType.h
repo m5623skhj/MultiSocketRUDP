@@ -13,6 +13,7 @@ constexpr unsigned int maxSendBufferSize = 16384;
 constexpr unsigned short oneFrame = 10;
 constexpr int recvBufferSize = 8192;
 constexpr unsigned char sessionKeySize = 16;
+constexpr unsigned int logicThreadStopSleepTime = 10000;
 
 #define OUT
 

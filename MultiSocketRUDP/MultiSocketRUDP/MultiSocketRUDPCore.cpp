@@ -127,18 +127,30 @@ bool MultiSocketRUDPCore::InitRIO()
 
 bool MultiSocketRUDPCore::RunAllThreads()
 {
-	RunSessionBroker();
-	workerThreads.reserve(numOfWorkerThread);
-
-	for (ThreadIdType id = 0; id < numOfWorkerThread; ++id)
+	if (not RunSessionBroker())
 	{
-		workerThreads.emplace_back([this, id]() { this->RunWorkerThread(id); });
+		std::cout << "RunSessionBroker() failed" << std::endl;
+		return false;
+	}
+
+	ioWorkerThreads.reserve(numOfWorkerThread);
+	logicWorkerThreads.reserve(numOfWorkerThread);
+
+	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
+	logicThreadEventHandles.reserve(numOfWorkerThread);
+
+	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
+	{
+		logicThreadEventHandles.emplace_back(CreateEvent(NULL, TRUE, FALSE, NULL));
+
+		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
+		logicWorkerThreads.emplace_back([this, id]() { this->RunLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	return true;
 }
 
-void MultiSocketRUDPCore::RunSessionBroker()
+bool MultiSocketRUDPCore::RunSessionBroker()
 {
 #if USE_IOCP_SESSION_BROKER
 	if (not sessionBroker.Start(sessionBrokerOptionFilePath))
@@ -150,6 +162,8 @@ void MultiSocketRUDPCore::RunSessionBroker()
 #else
 	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, ip); });
 #endif
+
+	return true;
 }
 
 std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socketNumber)
@@ -281,12 +295,47 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 			contextPool.Free(contextResult->ioContext);
 		}
 
-#if USE_SLEEP_FOR_FRAME
+#if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
 		SleepRemainingFrameTime(tickSet);
 #endif
 	}
 
 	std::cout << "worker thread stopped" << std::endl;
+}
+
+void MultiSocketRUDPCore::RunLogicWorkerThread(ThreadIdType threadId)
+{
+	TickSet tickSet;
+	tickSet.nowTick = GetTickCount64();
+	tickSet.beforeTick = tickSet.nowTick;
+
+	HANDLE eventHandles[2] = { logicThreadEventHandles[threadId], logicThreadEventStopHandle };
+	while (not threadStopFlag)
+	{
+		const auto waitResult = WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE);
+		switch (waitResult)
+		{
+		case WAIT_OBJECT_0:
+		{
+			// RecvFromClient();
+		}
+		break;
+		case WAIT_OBJECT_0 + 1:
+		{
+			Sleep(logicThreadStopSleepTime);
+			// RecvFromClient();
+			std::cout << "Logic thread stop. ThreadId is " << threadId << std::endl;
+			break;
+		}
+		break;
+		default:
+		{
+			std::cout << "Invalid logic thread wait result. Error is " << WSAGetLastError() << std::endl;
+			g_Dump.Crash();
+		}
+		break;
+		}
+	}
 }
 
 void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
@@ -332,6 +381,7 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std
 	{
 	case RIO_OPERATION_TYPE::OP_RECV:
 	{
+
 		return RecvIOCompleted(transferred, session, context.clientAddr, threadId);
 	}
 	break;

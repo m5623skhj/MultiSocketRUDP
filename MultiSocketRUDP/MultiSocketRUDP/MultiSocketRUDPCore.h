@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <shared_mutex>
 #include "RUDPSession.h"
+#include "Queue.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -62,7 +63,7 @@ private:
 	bool InitNetwork();
 	bool InitRIO();
 	bool RunAllThreads();
-	void RunSessionBroker();
+	bool RunSessionBroker();
 	std::optional<SOCKET> CreateRUDPSocket(unsigned short socketNumber);
 
 private:
@@ -131,11 +132,21 @@ private:
 
 private:
 	void RunWorkerThread(ThreadIdType threadId);
+	void RunLogicWorkerThread(ThreadIdType threadId);
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet);
 
 private:
-	ThreadIdType numOfWorkerThread{};
-	std::vector<std::thread> workerThreads;
+	unsigned char numOfWorkerThread{};
+	HANDLE logicThreadEventStopHandle{};
+
+	// threads
+	std::vector<std::thread> ioWorkerThreads;
+	std::vector<std::thread> logicWorkerThreads;
+
+	// event handles
+	std::vector<HANDLE> logicThreadEventHandles;
+
+	// objects
 
 #pragma endregion thread
 
