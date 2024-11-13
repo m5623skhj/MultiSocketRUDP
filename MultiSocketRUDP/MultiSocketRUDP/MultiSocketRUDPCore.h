@@ -29,12 +29,7 @@ struct IOContext : RIO_BUF
 	sockaddr_in clientAddr{};
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 	RIO_BUF addrBuffer{};
-};
-
-struct IOContextResult
-{
-	IOContext* ioContext;
-	std::shared_ptr<RUDPSession> session;
+	std::shared_ptr<RUDPSession> session = nullptr;
 };
 
 struct SendPacketInfo
@@ -132,7 +127,7 @@ private:
 
 private:
 	void RunWorkerThread(ThreadIdType threadId);
-	void RunLogicWorkerThread(ThreadIdType threadId);
+	void RunRecvLogicWorkerThread(ThreadIdType threadId);
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet);
 
 private:
@@ -141,24 +136,26 @@ private:
 
 	// threads
 	std::vector<std::thread> ioWorkerThreads;
-	std::vector<std::thread> logicWorkerThreads;
+	std::vector<std::thread> recvLogicWorkerThreads;
 
 	// event handles
-	std::vector<HANDLE> logicThreadEventHandles;
+	std::vector<HANDLE> recvLogicThreadEventHandles;
 
 	// objects
+	std::vector<CListBaseQueue<IOContext*>> ioCompletedContexts;
 
 #pragma endregion thread
 
 #pragma region RIO
 private:
-	std::optional<IOContextResult> GetIOCompletedContext(RIORESULT& rioResult);
-	bool IOCompleted(IOContext& context, ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
+	IOContext* GetIOCompletedContext(RIORESULT& rioResult);
+	bool IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
+	bool RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
+	bool SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
 
-	bool RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, BYTE threadId);
+	void OnRecvPacket(BYTE threadId);
 	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(std::shared_ptr<RUDPSession> session);
-	bool SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
 	bool DoSend(std::shared_ptr<RUDPSession> session);
 
 private:

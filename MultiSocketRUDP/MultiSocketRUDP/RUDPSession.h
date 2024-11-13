@@ -3,6 +3,7 @@
 #include <MSWSock.h>
 #include "LockFreeQueue.h"
 #include "NetServerSerializeBuffer.h"
+#include "Queue.h"
 
 class MultiSocketRUDPCore;
 
@@ -16,6 +17,7 @@ struct RecvBuffer
 {
 	char buffer[recvBufferSize];
 	RIO_BUFFERID recvBufferId{};
+	CListBaseQueue<NetBuffer*> recvBufferList;
 };
 
 struct SendBuffer

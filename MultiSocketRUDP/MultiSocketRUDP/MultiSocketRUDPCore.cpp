@@ -134,17 +134,18 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	}
 
 	ioWorkerThreads.reserve(numOfWorkerThread);
-	logicWorkerThreads.reserve(numOfWorkerThread);
+	recvLogicWorkerThreads.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
-	logicThreadEventHandles.reserve(numOfWorkerThread);
+	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
+	ioCompletedContexts.reserve(numOfWorkerThread);
 
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
-		logicThreadEventHandles.emplace_back(CreateEvent(NULL, TRUE, FALSE, NULL));
+		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, TRUE, FALSE, NULL));
 
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
-		logicWorkerThreads.emplace_back([this, id]() { this->RunLogicWorkerThread(static_cast<ThreadIdType>(id)); });
+		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	return true;
@@ -279,20 +280,18 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, maxRIOResult);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
-			auto contextResult = GetIOCompletedContext(rioResults[i]);
-			if (contextResult == std::nullopt)
+			auto context = GetIOCompletedContext(rioResults[i]);
+			if (context == nullptr)
 			{
 				continue;
 			}
 
-			if (not IOCompleted(*contextResult->ioContext, rioResults[i].BytesTransferred, contextResult->session, threadId))
+			if (not IOCompleted(context, rioResults[i].BytesTransferred, threadId))
 			{
-				contextPool.Free(contextResult->ioContext);
+				contextPool.Free(context);
 				// error handling
 				continue;
 			}
-
-			contextPool.Free(contextResult->ioContext);
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
@@ -303,13 +302,13 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 	std::cout << "worker thread stopped" << std::endl;
 }
 
-void MultiSocketRUDPCore::RunLogicWorkerThread(ThreadIdType threadId)
+void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 	tickSet.beforeTick = tickSet.nowTick;
 
-	HANDLE eventHandles[2] = { logicThreadEventHandles[threadId], logicThreadEventStopHandle };
+	HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
 	while (not threadStopFlag)
 	{
 		const auto waitResult = WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE);
@@ -317,13 +316,13 @@ void MultiSocketRUDPCore::RunLogicWorkerThread(ThreadIdType threadId)
 		{
 		case WAIT_OBJECT_0:
 		{
-			// RecvFromClient();
+			OnRecvPacket(threadId);
 		}
 		break;
 		case WAIT_OBJECT_0 + 1:
 		{
 			Sleep(logicThreadStopSleepTime);
-			// RecvFromClient();
+			OnRecvPacket(threadId);
 			std::cout << "Logic thread stop. ThreadId is " << threadId << std::endl;
 			break;
 		}
@@ -351,43 +350,51 @@ void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
 	tickSet.beforeTick = tickSet.nowTick;
 }
 
-std::optional<IOContextResult> MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
+IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 {
 	IOContext* context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
 	if (context == nullptr)
 	{
-		return std::nullopt;
+		return nullptr;
 	}
 
-	IOContextResult result;
-	result.session = GetUsingSession(context->ownerSessionId);
-	if (result.session == nullptr)
-	{
-		return std::nullopt;
-	}
-
-	if (rioResult.BytesTransferred == 0 || result.session->ioCancle == true)
+	context->session = GetUsingSession(context->ownerSessionId);
+	if (context->session == nullptr)
 	{
 		contextPool.Free(context);
-		return std::nullopt;
+		return nullptr;
 	}
 
-	return result;
+	if (rioResult.BytesTransferred == 0 || context->session->ioCancle == true)
+	{
+		contextPool.Free(context);
+		return nullptr;
+	}
+
+	return context;
 }
 
-bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
+bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId)
 {
-	switch (context.ioType)
+	if (contextResult == nullptr)
+	{
+		return false;
+	}
+
+	switch (contextResult->ioType)
 	{
 	case RIO_OPERATION_TYPE::OP_RECV:
 	{
-
-		return RecvIOCompleted(transferred, session, context.clientAddr, threadId);
+		if (RecvIOCompleted(contextResult, transferred, threadId))
+		{
+			// Release session?
+		}
+		return true;
 	}
 	break;
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		return SendIOCompleted(transferred, session, threadId);
+		//return SendIOCompleted(transferred, session, threadId);
 	}
 	break;
 	default:
@@ -399,37 +406,58 @@ bool MultiSocketRUDPCore::IOCompleted(IOContext& context, ULONG transferred, std
 	return false;
 }
 
-bool MultiSocketRUDPCore::RecvIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, BYTE threadId)
+bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId)
 {
-	auto& buffer = *NetBuffer::Alloc();
+	auto buffer = NetBuffer::Alloc();
+	if (memcpy_s(buffer->m_pSerializeBuffer, recvBufferSize, contextResult->session->recvBuffer.buffer, transferred) != 0)
+	{
+		return false;
+	}
+
+	contextResult->session->recvBuffer.recvBufferList.Enqueue(buffer);
+	ioCompletedContexts[threadId].Enqueue(contextResult);
+	SetEvent(recvLogicThreadEventHandles[threadId]);
+
+	return DoRecv(contextResult->session);
+}
+
+bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
+{
+	//InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	return true;
+}
+
+void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
+{
+	IOContext* context = nullptr;
+	if (ioCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
+	{
+		return;
+	}
+
+	NetBuffer* buffer = nullptr;
 	do
 	{
-		if (memcpy_s(buffer.m_pSerializeBuffer, recvBufferSize, session->recvBuffer.buffer, transferred) != 0)
+		if (context->session->recvBuffer.recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
+		{
+			contextPool.Free(context);
+			return;
+		}
+
+		if (not buffer->Decode())
+		{
+			break;
+		}
+		else if (buffer->GetUseSize() != GetPayloadLength(*buffer))
 		{
 			break;
 		}
 
-		if (not buffer.Decode())
-		{
-			break;
-		}
-		else if (buffer.GetUseSize() != GetPayloadLength(buffer))
-		{
-			break;
-		}
-
-		if (not ProcessByPacketType(session, clientAddr, buffer))
-		{
-			break;
-		}
-
-		NetBuffer::Free(&buffer);
-
-		return DoRecv(session);
+		ProcessByPacketType(context->session, context->clientAddr, *buffer);
 	} while (false);
 
-	NetBuffer::Free(&buffer);
-	return false;
+	NetBuffer::Free(buffer);
+	contextPool.Free(context);
 }
 
 bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
@@ -504,12 +532,6 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 		return false;
 	}
 
-	return true;
-}
-
-bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
-{
-	//InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 	return true;
 }
 
