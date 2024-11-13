@@ -399,6 +399,8 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transf
 	break;
 	default:
 	{
+		std::cout << "Invalid rio operation type. Type is " << static_cast<unsigned char>(contextResult->ioType) << std::endl;
+		g_Dump.Crash();
 	}
 	break;
 	}
