@@ -131,6 +131,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\Log.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetClient.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
     <ClCompile Include="MultiSocketClientCore.cpp" />
   </ItemGroup>
   <ItemGroup>
