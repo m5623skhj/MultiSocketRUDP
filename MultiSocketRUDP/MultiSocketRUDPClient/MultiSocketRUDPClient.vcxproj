@@ -138,10 +138,10 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="UDPClientCore.cpp" />
+    <ClCompile Include="RUDPClientCore.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="UDPClientCore.h" />
+    <ClInclude Include="RUDPClientCore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

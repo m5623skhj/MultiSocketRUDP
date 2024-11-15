@@ -1,6 +1,6 @@
 #include "PreCompile.h"
 #include <iostream>
-#include "UDPClientCore.h"
+#include "RUDPClientCore.h"
 
 int main()
 {
