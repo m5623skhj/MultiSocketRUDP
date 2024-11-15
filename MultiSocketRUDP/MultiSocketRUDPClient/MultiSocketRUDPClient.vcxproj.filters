@@ -19,9 +19,12 @@
     <Filter Include="소스 파일\lib">
       <UniqueIdentifier>{fb2376d3-f29d-4e31-838e-a7aa470ecdc3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\main">
+      <UniqueIdentifier>{941b7d41-61a3-40b4-ac19-531f4661545b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MultiSocketClientCore.cpp">
+    <ClCompile Include="UDPClientCore.cpp">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Log.cpp">
@@ -42,9 +45,12 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>소스 파일\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MultiSocketClientCore.h">
+    <ClInclude Include="UDPClientCore.h">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClInclude>
   </ItemGroup>

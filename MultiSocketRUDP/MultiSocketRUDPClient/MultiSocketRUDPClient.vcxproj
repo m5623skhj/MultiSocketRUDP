@@ -137,10 +137,11 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
-    <ClCompile Include="MultiSocketClientCore.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="UDPClientCore.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MultiSocketClientCore.h" />
+    <ClInclude Include="UDPClientCore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
