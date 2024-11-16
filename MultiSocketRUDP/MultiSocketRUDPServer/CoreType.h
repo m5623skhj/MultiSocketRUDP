@@ -14,6 +14,7 @@ constexpr unsigned short oneFrame = 10;
 constexpr int recvBufferSize = 8192;
 constexpr unsigned char sessionKeySize = 16;
 constexpr unsigned int logicThreadStopSleepTime = 10000;
+constexpr unsigned char sessionInfoSize = 16 + sessionKeySize + sizeof(PortType) + sizeof(SessionIdType);
 
 #define OUT
 
