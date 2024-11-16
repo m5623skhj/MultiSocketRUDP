@@ -142,7 +142,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
-		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, TRUE, FALSE, NULL));
+		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
 
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
