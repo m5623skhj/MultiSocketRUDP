@@ -68,7 +68,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		return;
 	}
 
-	auto &recvBuffer = *NetBuffer::Alloc();
+	auto& sendBuffer = *NetBuffer::Alloc();
 	listen(listenSocket, SOMAXCONN);
 	while (not threadStopFlag)
 	{
@@ -99,9 +99,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		}
 
 		SetSessionKey(session);
-		SetSessionInfoToBuffer(session, rudpSessionIP, recvBuffer);
+		SetSessionInfoToBuffer(session, rudpSessionIP, sendBuffer);
 
-		int result = send(clientSocket, recvBuffer.GetBufferPtr(), recvBuffer.GetUseSize() + df_HEADER_SIZE, 0);
+		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetUseSize() + df_HEADER_SIZE, 0);
 		if (result == SOCKET_ERROR)
 		{
 			std::cout << "RunSessionBrokerThread send failed with error " << WSAGetLastError() << std::endl;
@@ -109,7 +109,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		}
 
 		closesocket(clientSocket);
-		recvBuffer.Init();
+		sendBuffer.Init();
 	}
 
 	closesocket(listenSocket);
