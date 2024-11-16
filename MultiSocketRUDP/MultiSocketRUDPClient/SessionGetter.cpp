@@ -112,12 +112,12 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
-	sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(sessionBrokerPort);
-	InetPton(AF_INET, sessionBrokerIP, &serverAddr.sin_addr);
+	sockaddr_in sessionGetterAddr;
+	sessionGetterAddr.sin_family = AF_INET;
+	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
+	InetPton(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr);
 
-	if (connect(sessionBrokerSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+	if (connect(sessionBrokerSocket, (struct sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
 	{
 		std::cout << "Connection failed in GetSessionFromServer() with error code " << WSAGetLastError() << std::endl;
 		closesocket(sessionBrokerSocket);

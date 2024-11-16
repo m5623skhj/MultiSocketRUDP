@@ -3,6 +3,9 @@
 #include "NetClient.h"
 #include "../MultiSocketRUDPServer/BuildConfig.h"
 #include "../MultiSocketRUDPServer/CoreType.h"
+#include <thread>
+#include <array>
+#include "Queue.h"
 
 class RUDPClientCore
 {
@@ -19,6 +22,15 @@ public:
 	bool Start(const std::wstring& optionFilePath);
 	void Stop();
 
+	bool IsStopped();
+
+private:
+	bool ConnectToServer();
+
+private:
+	bool isStopped{};
+
+#pragma region SessionBroker
 #if USE_IOCP_SESSION_BROKER
 private:
 	class SessionGetter : public CNetClient
@@ -58,4 +70,30 @@ private:
 	PortType port{};
 	SessionIdType sessionId{};
 	std::string sessionKey{};
+
+#pragma endregion SessionBroker
+
+#pragma region RUDP
+private:
+	void RunThreads();
+	void RunRecvThread();
+	void RunSendThread();
+
+private:
+	SOCKET rudpSocket{};
+	sockaddr_in serverAddr{};
+
+	std::thread recvThread{};
+	std::thread sendThread{};
+	std::array<HANDLE, 2> sendEventHandles{};
+
+#pragma endregion RUDP
+
+public:
+	unsigned int GetRemainPacketSize();
+	NetBuffer* GetReceivedPacket();
+
+private:
+	CListBaseQueue<NetBuffer*> recvBufferQueue;
+
 };
