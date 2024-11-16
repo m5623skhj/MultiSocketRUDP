@@ -141,6 +141,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="RUDPClientCore.cpp" />
+    <ClCompile Include="SessionGetter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RUDPClientCore.h" />

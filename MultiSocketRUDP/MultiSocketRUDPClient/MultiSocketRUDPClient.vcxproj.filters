@@ -48,6 +48,9 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일\main</Filter>
     </ClCompile>
+    <ClCompile Include="SessionGetter.cpp">
+      <Filter>소스 파일\MultiSocketClientCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RUDPClientCore.h">
