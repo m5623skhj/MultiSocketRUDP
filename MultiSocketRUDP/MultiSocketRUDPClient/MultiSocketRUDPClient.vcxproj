@@ -137,7 +137,9 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="main.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="RUDPClientCore.cpp" />
   </ItemGroup>
   <ItemGroup>
