@@ -42,6 +42,11 @@ bool RUDPClientCore::IsStopped()
 	return isStopped;
 }
 
+bool RUDPClientCore::IsConnected()
+{
+	return isConnected;
+}
+
 bool RUDPClientCore::ConnectToServer()
 {
 	serverAddr.sin_family = AF_INET;
@@ -53,6 +58,12 @@ bool RUDPClientCore::ConnectToServer()
 		std::cout << "bind() failed with error " << WSAGetLastError();
 		return false;
 	}
+
+	NetBuffer& connectPacket = *NetBuffer::Alloc();
+	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
+	
+	connectPacket << packetType << sessionId << sessionKey;
+	SendPacket(connectPacket);
 
 	return true;
 }
@@ -104,11 +115,12 @@ void RUDPClientCore::RunSendThread()
 		{
 		case WAIT_OBJECT_0:
 		{
-			// do send
+			DoSend();
 		}
 		break;
 		case WAIT_OBJECT_0 + 1:
 		{
+			DoSend();
 			std::cout << "Send thread stopped" << std::endl;
 			break;
 		}
@@ -119,6 +131,26 @@ void RUDPClientCore::RunSendThread()
 			g_Dump.Crash();
 		}
 		break;
+		}
+	}
+}
+
+void RUDPClientCore::DoSend()
+{
+	while (sendBufferQueue.GetRestSize() > 0)
+	{
+		NetBuffer* packet = nullptr;
+		if (not sendBufferQueue.Dequeue(&packet))
+		{
+			std::cout << "sendBufferQueue.Dequeue() failed" << std::endl;
+			continue;
+		}
+
+		EncodePacket(*packet);
+		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+		{
+			std::cout << "sendto() failed with error code " << WSAGetLastError() << std::endl;
+			continue;
 		}
 	}
 }
@@ -134,4 +166,25 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	recvBufferQueue.Dequeue(&buffer);
 
 	return buffer;
+}
+
+void RUDPClientCore::SendPacket(OUT NetBuffer& packet)
+{
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		sendBufferQueue.Enqueue(&packet);
+	}
+
+	SetEvent(sendEventHandles[0]);
+}
+
+void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
+{
+	if (packet.m_bIsEncoded == false)
+	{
+		packet.m_iWriteLast = packet.m_iWrite;
+		packet.m_iWrite = 0;
+		packet.m_iRead = 0;
+		packet.Encode();
+	}
 }

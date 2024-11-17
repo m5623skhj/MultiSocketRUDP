@@ -4,6 +4,7 @@
 #include "../MultiSocketRUDPServer/BuildConfig.h"
 #include "../MultiSocketRUDPServer/CoreType.h"
 #include <thread>
+#include <mutex>
 #include <array>
 #include "Queue.h"
 
@@ -23,12 +24,14 @@ public:
 	void Stop();
 
 	bool IsStopped();
+	bool IsConnected();
 
 private:
 	bool ConnectToServer();
 
 private:
 	bool isStopped{};
+	bool isConnected{};
 
 #pragma region SessionBroker
 #if USE_IOCP_SESSION_BROKER
@@ -79,6 +82,8 @@ private:
 	void RunRecvThread();
 	void RunSendThread();
 
+	void DoSend();
+
 private:
 	SOCKET rudpSocket{};
 	sockaddr_in serverAddr{};
@@ -92,8 +97,13 @@ private:
 public:
 	unsigned int GetRemainPacketSize();
 	NetBuffer* GetReceivedPacket();
+	void SendPacket(OUT NetBuffer& packet);
+
+private:
+	void EncodePacket(OUT NetBuffer& packet);
 
 private:
 	CListBaseQueue<NetBuffer*> recvBufferQueue;
-
+	CListBaseQueue<NetBuffer*> sendBufferQueue;
+	std::mutex sendBufferQueueLock;
 };
