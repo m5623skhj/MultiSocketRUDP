@@ -165,11 +165,7 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> se
 
 	//Send rudp session infomation packet to client
 	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
-
-	buffer.m_iWriteLast = buffer.m_iWrite;
-	buffer.m_iWrite = 0;
-	buffer.m_iRead = 0;
-	buffer.Encode();
+	EncodePacket(buffer);
 }
 
 #endif

@@ -557,3 +557,13 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer)
 	return payloadLength;
 }
 
+void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet)
+{
+	if (packet.m_bIsEncoded == false)
+	{
+		packet.m_iWriteLast = packet.m_iWrite;
+		packet.m_iWrite = 0;
+		packet.m_iRead = 0;
+		packet.Encode();
+	}
+}

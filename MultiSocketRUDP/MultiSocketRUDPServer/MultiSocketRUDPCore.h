@@ -167,5 +167,6 @@ private:
 #pragma endregion RIO
 
 private:
+	void EncodePacket(OUT NetBuffer& packet);
 	WORD GetPayloadLength(OUT NetBuffer& buffer);
 };
