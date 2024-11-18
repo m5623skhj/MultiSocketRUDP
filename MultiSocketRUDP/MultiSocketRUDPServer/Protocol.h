@@ -65,6 +65,25 @@ public:
 	virtual void PacketToBuffer(OUT NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
 };
 
+class Ping : public IPacket
+{
+public:
+	Ping() = default;
+	virtual ~Ping() override = default;
+
+public:
+	GET_PACKET_ID(PACKET_ID::Ping)
+};
+
+class Pong : public IPacket
+{
+public:
+	Pong() = default;
+	virtual ~Pong() override = default;
+
+public:
+	GET_PACKET_ID(PACKET_ID::Pong);
+};
 #pragma pack(pop)
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -81,8 +100,10 @@ public:
 	static bool HandlePacket(RUDPSession& session, PacketType& packet);\
 
 #define DECLARE_ALL_HANDLER()\
+	DECLARE_HANDLE_PACKET(Ping)\
 
 #define REGISTER_PACKET_LIST(){\
+	REGISTER_PACKET(Ping)\
 }
 
 #pragma endregion PacketHandler
