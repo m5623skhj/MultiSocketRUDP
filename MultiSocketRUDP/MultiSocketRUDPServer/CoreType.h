@@ -34,3 +34,10 @@ enum class PACKET_TYPE : unsigned char
 	, SendType
 	, SendReplyType
 };
+
+enum class PACKET_ID : unsigned int
+{
+	InvalidPacketId = 0
+	, Ping
+	, Pong
+};
