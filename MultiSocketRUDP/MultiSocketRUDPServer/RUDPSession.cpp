@@ -121,7 +121,6 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 		return false;
 	}
 
-	char* targetPtr = reinterpret_cast<char*>(packet.get()) + sizeof(char*);
 	std::any realPacket = std::any(packet.get());
 	if (not PacketManager::GetInst().BufferToPacket(packetId, recvPacket, realPacket))
 	{
