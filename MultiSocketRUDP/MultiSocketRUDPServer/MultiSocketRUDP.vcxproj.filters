@@ -22,9 +22,6 @@
     <Filter Include="소스 파일\MultiSocketRUDPCore\CoreType">
       <UniqueIdentifier>{9fa1f85a-84c2-4b97-8d12-a5bdb0e0513f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\Protocol">
-      <UniqueIdentifier>{90e377ca-e90d-4e82-bbd6-62c571911009}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\PacketManager">
       <UniqueIdentifier>{314e01ef-91d4-4000-b448-c39baca6d21f}</UniqueIdentifier>
     </Filter>
@@ -64,9 +61,6 @@
     </ClInclude>
     <ClInclude Include="RUDPSession.h">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClInclude>
-    <ClInclude Include="Protocol.h">
-      <Filter>소스 파일\Protocol</Filter>
     </ClInclude>
     <ClInclude Include="PacketManager.h">
       <Filter>소스 파일\PacketManager</Filter>

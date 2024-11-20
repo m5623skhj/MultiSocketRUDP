@@ -2,7 +2,6 @@
 #include "RUDPSession.h"
 #include "NetServerSerializeBuffer.h"
 #include "PacketManager.h"
-#include "Protocol.h"
 
 RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort)
 	: sock(inSock)
@@ -123,8 +122,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	}
 
 	char* targetPtr = reinterpret_cast<char*>(packet.get()) + sizeof(char*);
-	std::any anyPacket = std::any(packet.get());
-	return packetHandler(*this, recvPacket, anyPacket);
+	std::any realPacket = std::any(packet.get());
+	if (not PacketManager::GetInst().BufferToPacket(packetId, recvPacket, realPacket))
+	{
+		return false;
+	}
+
+	return packetHandler(*this, (IPacket&)realPacket);
 }
 
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)

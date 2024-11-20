@@ -2,34 +2,42 @@
 
 #include <string>
 #include <functional>
-#include "CoreType.h"
 #include "NetServerSerializeBuffer.h"
+#include "../MultiSocketRUDPServer/PacketManager.h"
 
-using PacketId = unsigned int;
+////////////////////////////////////////////////////////////////////////////////////
+// Packet id type
+////////////////////////////////////////////////////////////////////////////////////
+enum class PACKET_ID : unsigned int
+{
+	InvalidPacketId = 0
+	, Ping
+	, Pong
+};
 
 #define GET_PACKET_ID(packetId) virtual PacketId GetPacketId() const override { return static_cast<PacketId>(packetId); }
 
 template<typename T>
-void SetBufferToParameters(OUT NetBuffer& recvBuffer, T& param)
+void SetBufferToParameters(NetBuffer& recvBuffer, T& param)
 {
 	recvBuffer >> param;
 }
 
 template<typename T, typename... Args>
-void SetBufferToParameters(OUT NetBuffer& recvBuffer, T& param, Args&... argList)
+void SetBufferToParameters(NetBuffer& recvBuffer, T& param, Args&... argList)
 {
 	recvBuffer >> param;
 	SetBufferToParameters(recvBuffer, argList...);
 }
 
 template<typename T>
-void SetParametersToBuffer(OUT NetBuffer& recvBuffer, T& param)
+void SetParametersToBuffer(NetBuffer& recvBuffer, T& param)
 {
 	recvBuffer << param;
 }
 
 template<typename T, typename... Args>
-void SetParametersToBuffer(OUT NetBuffer& recvBuffer, T& param, Args&... argList)
+void SetParametersToBuffer(NetBuffer& recvBuffer, T& param, Args&... argList)
 {
 	recvBuffer << param;
 	SetParametersToBuffer(recvBuffer, argList...);
@@ -52,19 +60,6 @@ virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersT
 ////////////////////////////////////////////////////////////////////////////////////
 
 #pragma pack(push, 1)
-class IPacket
-{
-public:
-	IPacket() = default;
-	virtual ~IPacket() = default;
-
-	virtual PacketId GetPacketId() const = 0;
-
-public:
-	virtual void BufferToPacket(OUT NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
-	virtual void PacketToBuffer(OUT NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
-};
-
 class Ping : public IPacket
 {
 public:
@@ -91,9 +86,10 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////
 
 #pragma region PacketHandler
-#define REGISTER_PACKET(PacketType){\
-	RegisterPacket<PacketType>();\
-	RegisterPacketHandler<PacketType>();\
+#define REGISTER_PACKET(PacketType, Handler){\
+	PacketManager::GetInst().RegisterPacket<PacketType>();\
+	PacketManager::GetInst().RegisterPacketHandler<PacketType>(Handler);\
+	PacketManager::GetInst().BufferToPacket<PacketType>();\
 }
 
 #define DECLARE_HANDLE_PACKET(PacketType)\
@@ -102,8 +98,8 @@ public:
 #define DECLARE_ALL_HANDLER()\
 	DECLARE_HANDLE_PACKET(Ping)\
 
-#define REGISTER_PACKET_LIST(){\
-	REGISTER_PACKET(Ping)\
+#define REGISTER_PACKET_LIST(Handler){\
+	REGISTER_PACKET(Ping, Handler)\
 }
 
 #pragma endregion PacketHandler

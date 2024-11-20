@@ -34,7 +34,6 @@
     <ClInclude Include="CoreType.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
     <ClInclude Include="PacketManager.h" />
-    <ClInclude Include="Protocol.h" />
     <ClInclude Include="RUDPSession.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

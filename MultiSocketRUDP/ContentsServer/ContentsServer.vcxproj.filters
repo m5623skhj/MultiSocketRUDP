@@ -25,4 +25,12 @@
       <Filter>소스 파일\Protocol</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PacketHandler.h">
+      <Filter>소스 파일\Protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="Protocol.h">
+      <Filter>소스 파일\Protocol</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

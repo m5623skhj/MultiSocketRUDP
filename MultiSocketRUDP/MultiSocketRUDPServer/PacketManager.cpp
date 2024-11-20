@@ -10,7 +10,6 @@ PacketManager& PacketManager::GetInst()
 
 void PacketManager::Init()
 {
-	REGISTER_PACKET_LIST();
 }
 
 std::shared_ptr<IPacket> PacketManager::MakePacket(PacketId packetId)
@@ -34,4 +33,16 @@ PacketHandler PacketManager::GetPacketHandler(PacketId packetId)
 	}
 
 	return iter->second;
+}
+
+bool PacketManager::BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet)
+{
+	auto iter = packetToBufferFunctionMap.find(packetId);
+	if (iter == packetToBufferFunctionMap.end())
+	{
+		return false;
+	}
+
+	iter->second(buffer, packet);
+	return true;
 }
