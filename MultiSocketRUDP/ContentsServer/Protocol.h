@@ -89,9 +89,11 @@ public:
 #define REGISTER_PACKET(PacketType, Handler){\
 	PacketManager::GetInst().RegisterPacket<PacketType>();\
 	PacketManager::GetInst().RegisterPacketHandler<PacketType>(Handler);\
-	PacketManager::GetInst().BufferToPacket<PacketType>();\
+	PacketManager::GetInst().RegisterBufferToPacketType<PacketType>();\
 }
 
+// deprecated
+/*
 #define DECLARE_HANDLE_PACKET(PacketType)\
 	static bool HandlePacket(RUDPSession& session, PacketType& packet);\
 
@@ -101,5 +103,6 @@ public:
 #define REGISTER_PACKET_LIST(Handler){\
 	REGISTER_PACKET(Ping, Handler)\
 }
+*/
 
 #pragma endregion PacketHandler

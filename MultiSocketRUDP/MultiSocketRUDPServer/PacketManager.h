@@ -50,6 +50,7 @@ public:
 	void RegisterPacket()
 	{
 		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacket() : PacketType must inherit from IPacket");
+
 		PacketFactoryFunction factoryFunc = []()
 		{
 			return std::make_shared<PacketType>();
@@ -59,35 +60,6 @@ public:
 		packetFactoryFunctionMap[packetType.GetPacketId()] = factoryFunc;
 	}
 
-	//template <typename PacketType>
-	//void RegisterPacketHandler()
-	//{
-	//	static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
-	//	auto handler = [](RUDPSession& session, NetBuffer& buffer, std::any& packet)
-	//	{
-	//		auto realPacket = static_cast<PacketType*>(std::any_cast<IPacket*>(packet));
-	//		realPacket->BufferToPacket(buffer);
-	//		return HandlePacket(session, *realPacket);
-	//	};
-
-	//	PacketType packetType;
-	//	packetHandlerMap[packetType.GetPacketId()] = handler;
-	//}
-
-	template <typename PacketType>
-	void BufferToPacketType(NetBuffer& buffer, std::any& packet)
-	{
-		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
-		void packetToBufferFunction = [](NetBuffer& buffer, std::any& packet)
-		{
-			auto realPacket = static_cast<PacketType*>(std::any_cast<IPacket*>(packet));
-			realPacket->BufferToPacket(buffer);
-		};
-
-		PacketType packetType;
-		packetToBufferFunctionMap[packetType.GetPacketId()] = packetToBufferFunction;
-	}
-
 	template <typename PacketType>
 	void RegisterPacketHandler(PacketHandler& handler)
 	{
@@ -95,6 +67,21 @@ public:
 
 		PacketType packetType;
 		packetHandlerMap[packetType.GetPacketId()] = handler;
+	}
+
+	template <typename PacketType>
+	void RegisterBufferToPacketType()
+	{
+		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
+
+		auto packetToBufferFunction = [](NetBuffer& buffer, std::any& packet)
+		{
+			auto realPacket = static_cast<PacketType*>(std::any_cast<IPacket*>(packet));
+			realPacket->BufferToPacket(buffer);
+		};
+
+		PacketType packetType;
+		packetToBufferFunctionMap[packetType.GetPacketId()] = packetToBufferFunction;
 	}
 
 private:
