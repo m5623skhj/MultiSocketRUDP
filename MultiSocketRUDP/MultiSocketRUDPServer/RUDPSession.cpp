@@ -77,6 +77,11 @@ RUDPSession::~RUDPSession()
 	closesocket(sock);
 }
 
+void RUDPSession::Disconnect()
+{
+
+}
+
 void RUDPSession::TryConnect(NetBuffer& recvPacket)
 {
 	if (isConnected)

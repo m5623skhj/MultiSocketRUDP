@@ -53,6 +53,9 @@ public:
 	[[nodiscard]]
 	bool IsServerStopped();
 
+public:
+	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
+
 private:
 	[[nodiscard]]
 	bool InitNetwork();

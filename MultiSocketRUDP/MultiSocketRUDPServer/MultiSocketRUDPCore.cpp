@@ -62,6 +62,11 @@ bool MultiSocketRUDPCore::IsServerStopped()
 	return isServerStopped;
 }
 
+void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
+{
+
+}
+
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;

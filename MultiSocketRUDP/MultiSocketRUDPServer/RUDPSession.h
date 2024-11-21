@@ -48,6 +48,9 @@ protected:
 	virtual void OnConnected(SessionIdType connectedSessionId) {}
 	virtual void OnDisconnected() {}
 
+protected:
+	void Disconnect();
+
 private:
 	void TryConnect(NetBuffer& recvPacket);
 	bool TryDisconnect(NetBuffer& recvPacket);
