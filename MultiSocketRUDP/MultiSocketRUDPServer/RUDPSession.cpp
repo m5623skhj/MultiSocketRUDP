@@ -2,26 +2,28 @@
 #include "RUDPSession.h"
 #include "NetServerSerializeBuffer.h"
 #include "PacketManager.h"
+#include "MultiSocketRUDPCore.h"
 
-RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort)
+RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore)
 	: sock(inSock)
 	, serverPort(inServerPort)
+	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
-std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort)
+std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore)
 {
 	struct RUDPSessionCreator : public RUDPSession
 	{
-		RUDPSessionCreator(SOCKET inSock, PortType inPort)
-			: RUDPSession(inSock, inPort)
+		RUDPSessionCreator(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore)
+			: RUDPSession(inSock, inPort, inCore)
 		{
 		}
 	};
 
-	return std::make_shared<RUDPSessionCreator>(inSock, inPort);
+	return std::make_shared<RUDPSessionCreator>(inSock, inPort, inCore);
 }
 
 bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ)
@@ -79,7 +81,7 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
-
+	core.DisconnectSession(sessionId);
 }
 
 void RUDPSession::TryConnect(NetBuffer& recvPacket)

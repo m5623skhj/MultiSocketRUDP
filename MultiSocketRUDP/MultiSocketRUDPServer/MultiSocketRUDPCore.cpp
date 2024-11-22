@@ -87,7 +87,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 			return false;
 		}
 
-		unusedSessionList.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber)));
+		unusedSessionList.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
 	}
 
 	return true;
