@@ -56,7 +56,7 @@ private:
 
 private:
 	void TryConnect(NetBuffer& recvPacket);
-	bool TryDisconnect(NetBuffer& recvPacket);
+	void Disconnect(NetBuffer& recvPacket);
 	bool OnRecvPacket(NetBuffer& recvPacket);
 
 private:

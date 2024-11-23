@@ -145,11 +145,9 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 	isConnected = true;
 }
 
-bool RUDPSession::TryDisconnect(NetBuffer& recvPacket)
+void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
 	OnDisconnected();
-
-	return true;
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)

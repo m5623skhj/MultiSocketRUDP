@@ -492,13 +492,9 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 			break;
 		}
 
-		if (session->TryDisconnect(recvPacket) == true)
-		{
-			ReleaseSession(session);
-			return false;
-		}
-
-		break;
+		session->Disconnect(recvPacket);
+		ReleaseSession(session);
+		return false;
 	}
 	break;
 	case PACKET_TYPE::SendType:
