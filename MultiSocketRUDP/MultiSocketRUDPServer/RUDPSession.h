@@ -6,6 +6,7 @@
 #include "Queue.h"
 
 class MultiSocketRUDPCore;
+class IPacket;
 
 enum class IO_MODE : LONG
 {
@@ -44,12 +45,14 @@ private:
 public:
 	virtual ~RUDPSession();
 
-protected:
-	virtual void OnConnected(SessionIdType connectedSessionId) {}
-	virtual void OnDisconnected() {}
-
-protected:
+public:
 	void Disconnect();
+	void SendPacket(IPacket& packet);
+
+private:
+	void OnConnected(SessionIdType sessionId);
+	void OnDisconnected();
+	inline void SendPacket(NetBuffer& buffer);
 
 private:
 	void TryConnect(NetBuffer& recvPacket);
@@ -58,6 +61,10 @@ private:
 
 private:
 	bool CheckMyClient(const sockaddr_in& targetClientAddr);
+
+public:
+
+	sockaddr_in GetSocketAddress();
 
 private:
 	bool isConnected{};
@@ -73,6 +80,7 @@ private:
 	SOCKET sock{};
 	bool isUsingSession{};
 	bool ioCancle{};
+	std::atomic<PacketSequence> lastSendPacketSequence{};
 
 private:
 	RecvBuffer recvBuffer;

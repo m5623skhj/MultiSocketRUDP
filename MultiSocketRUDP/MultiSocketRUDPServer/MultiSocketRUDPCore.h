@@ -35,8 +35,14 @@ struct IOContext : RIO_BUF
 struct SendPacketInfo
 {
 	NetBuffer* sendPacket{};
-	std::shared_ptr<RUDPSession> owner{};
-	SessionIdType sessionIdType{};
+	RUDPSession* owner{};
+
+	void Initialize(RUDPSession* inOwner, NetBuffer* inPacket)
+	{
+		owner = inOwner;
+		sendPacket = inPacket;
+		NetBuffer::AddRefCount(inPacket);
+	}
 };
 
 class MultiSocketRUDPCore
@@ -54,6 +60,7 @@ public:
 	bool IsServerStopped();
 
 public:
+	void SendPacket(SendPacketInfo* sendPacketInfo);
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 
 private:
@@ -173,3 +180,5 @@ private:
 	void EncodePacket(OUT NetBuffer& packet);
 	WORD GetPayloadLength(OUT NetBuffer& buffer);
 };
+
+static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);

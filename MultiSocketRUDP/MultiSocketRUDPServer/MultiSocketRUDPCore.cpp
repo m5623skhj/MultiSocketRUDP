@@ -62,6 +62,11 @@ bool MultiSocketRUDPCore::IsServerStopped()
 	return isServerStopped;
 }
 
+void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
+{
+
+}
+
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
 {
 

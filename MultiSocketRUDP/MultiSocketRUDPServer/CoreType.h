@@ -7,6 +7,7 @@ using SessionIdType = unsigned short;
 constexpr SessionIdType invalidSessionId = -1;
 
 using ThreadIdType = unsigned char;
+using PacketSequence = unsigned long long;
 
 constexpr unsigned short maxRIOResult = 256;
 constexpr unsigned int maxSendBufferSize = 16384;

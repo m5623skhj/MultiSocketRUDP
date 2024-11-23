@@ -84,6 +84,47 @@ void RUDPSession::Disconnect()
 	core.DisconnectSession(sessionId);
 }
 
+void RUDPSession::SendPacket(IPacket& packet)
+{
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		std::cout << "Buffer is nullptr in RUDPSession::SendPacket()" << std::endl;
+		return;
+	}
+
+	PACKET_TYPE packetType = PACKET_TYPE::SendType;
+	unsigned long long packetSequence = ++lastSendPacketSequence;
+	*buffer << packetType << packetSequence << packet.GetPacketId();
+	packet.PacketToBuffer(*buffer);
+
+	SendPacket(*buffer);
+}
+
+void RUDPSession::OnConnected(SessionIdType sessionId)
+{
+
+}
+
+void RUDPSession::OnDisconnected()
+{
+
+}
+
+void RUDPSession::SendPacket(NetBuffer& buffer)
+{
+	auto sendPacketInfo = sendPacketInfoPool->Alloc();
+	if (sendPacketInfo == nullptr)
+	{
+		std::cout << "SendPacketInfo is nullptr in RUDPSession::SendPacket()" << std::endl;
+		NetBuffer::Free(&buffer);
+		return;
+	}
+
+	sendPacketInfo->Initialize(this, &buffer);
+	core.SendPacket(sendPacketInfo);
+}
+
 void RUDPSession::TryConnect(NetBuffer& recvPacket)
 {
 	if (isConnected)
@@ -135,6 +176,11 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	}
 
 	return packetHandler(*this, (IPacket&)realPacket);
+}
+
+sockaddr_in RUDPSession::GetSocketAddress()
+{
+	return clientAddr;
 }
 
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)
