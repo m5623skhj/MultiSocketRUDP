@@ -24,10 +24,8 @@ struct RecvBuffer
 struct SendBuffer
 {
 	WORD bufferCount = 0;
-	CLockFreeQueue<NetBuffer*> sendQueue;
 	char rioSendBuffer[maxSendBufferSize];
 	RIO_BUFFERID sendBufferId;
-	//IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
 };
 
 class RUDPSession

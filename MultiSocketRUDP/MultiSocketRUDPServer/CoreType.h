@@ -9,6 +9,9 @@ constexpr SessionIdType invalidSessionId = -1;
 using ThreadIdType = unsigned char;
 using PacketSequence = unsigned long long;
 
+using PacketRetransmissionCount = unsigned short;
+const PacketRetransmissionCount maxPacketRetransmissionCount = 8;
+
 constexpr unsigned short maxRIOResult = 256;
 constexpr unsigned int maxSendBufferSize = 16384;
 constexpr unsigned short oneFrame = 10;

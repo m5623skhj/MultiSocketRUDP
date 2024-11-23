@@ -63,15 +63,6 @@ void RUDPSession::InitializeSession()
 	clientAddr = {};
 	isUsingSession = {};
 	ioCancle = {};
-	
-	for (int i = 0; i < sendBuffer.sendQueue.GetRestSize(); ++i)
-	{
-		NetBuffer* eraseBuffer = nullptr;
-		if (sendBuffer.sendQueue.Dequeue(&eraseBuffer))
-		{
-			NetBuffer::Free(eraseBuffer);
-		}
-	}
 }
 
 RUDPSession::~RUDPSession()

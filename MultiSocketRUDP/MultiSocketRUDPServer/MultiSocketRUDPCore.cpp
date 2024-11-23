@@ -64,7 +64,21 @@ bool MultiSocketRUDPCore::IsServerStopped()
 
 void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 {
+	auto buffer = sendPacketInfo->GetBuffer();
 
+	if (buffer->m_bIsEncoded == false)
+	{
+		buffer->m_iWriteLast = buffer->m_iWrite;
+		buffer->m_iWrite = 0;
+		buffer->m_iRead = 0;
+		buffer->Encode();
+	}
+
+	if (not DoSend(sendPacketInfo))
+	{
+		NetBuffer::Free(buffer);
+		sendPacketInfoPool->Free(sendPacketInfo);
+	}
 }
 
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
@@ -543,8 +557,16 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(std::shared_ptr<RUDPSession> session)
+bool MultiSocketRUDPCore::DoSend(SendPacketInfo* sendPacketInfo)
 {
+	//if (rioFunctionTable.RIOSendEx(sendPacketInfo->owner->rioRQ, rioBuffer, 1, nullptr, sendPacketInfo->owner->clientAddr, nullptr, nullptr, 0, nullptr) == false)
+	//{
+	//	std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
+	//	return false;
+	//}
+
+	// store sendPacketInfo
+
 	return true;
 }
 

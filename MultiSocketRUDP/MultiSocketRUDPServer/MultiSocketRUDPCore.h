@@ -34,15 +34,19 @@ struct IOContext : RIO_BUF
 
 struct SendPacketInfo
 {
-	NetBuffer* sendPacket{};
+	NetBuffer* buffer{};
 	RUDPSession* owner{};
+	PacketRetransmissionCount retransmissionCount{};
 
-	void Initialize(RUDPSession* inOwner, NetBuffer* inPacket)
+	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer)
 	{
 		owner = inOwner;
-		sendPacket = inPacket;
-		NetBuffer::AddRefCount(inPacket);
+		buffer = inBuffer;
+		NetBuffer::AddRefCount(inBuffer);
 	}
+
+	[[nodiscard]]
+	NetBuffer* GetBuffer() { return buffer; }
 };
 
 class MultiSocketRUDPCore
@@ -166,7 +170,7 @@ private:
 	void OnRecvPacket(BYTE threadId);
 	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(std::shared_ptr<RUDPSession> session);
-	bool DoSend(std::shared_ptr<RUDPSession> session);
+	bool DoSend(SendPacketInfo* sendPacketInfo);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
