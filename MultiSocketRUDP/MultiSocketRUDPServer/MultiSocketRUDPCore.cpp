@@ -74,7 +74,10 @@ void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 		buffer->Encode();
 	}
 
-	if (not DoSend(sendPacketInfo))
+	// store sendPacketInfo 
+	sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.Enqueue(sendPacketInfo);
+
+	if (not DoSend(*sendPacketInfo->owner))
 	{
 		NetBuffer::Free(buffer);
 		sendPacketInfoPool->Free(sendPacketInfo);
@@ -418,7 +421,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transf
 	break;
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		//return SendIOCompleted(transferred, session, threadId);
+		return SendIOCompleted(transferred, contextResult->session, threadId);
 	}
 	break;
 	default:
@@ -449,8 +452,8 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG tr
 
 bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
-	//InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
-	return true;
+	InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	return DoSend(*session);
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
@@ -557,15 +560,41 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(SendPacketInfo* sendPacketInfo)
+bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 {
-	//if (rioFunctionTable.RIOSendEx(sendPacketInfo->owner->rioRQ, rioBuffer, 1, nullptr, sendPacketInfo->owner->clientAddr, nullptr, nullptr, 0, nullptr) == false)
-	//{
-	//	std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
-	//	return false;
-	//}
+	while (1)
+	{
+		if (InterlockedCompareExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_SENDING, (UINT)IO_MODE::IO_NONE_SENDING))
+		{
+			break;
+		}
 
-	// store sendPacketInfo
+		if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() == 0)
+		{
+			InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+			if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() > 0)
+			{
+				continue;
+			}
+			break;
+		}
+
+		int contextCount = 1;
+		IOContext* context = contextPool.Alloc();
+		context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_SEND);
+		context->BufferId = session.sendBuffer.sendBufferId;
+		context->Offset = 0;
+		context->ioType = RIO_OPERATION_TYPE::OP_SEND;
+		//context->Length = MakeSendStream(session, context);
+
+		//if (rioFunctionTable.RIOSendEx(sendPacketInfo->owner->rioRQ, rioBuffer, 1, nullptr, sendPacketInfo->owner->clientAddr, nullptr, nullptr, 0, nullptr) == false)
+		//{
+		//	std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
+		//	return false;
+		//}
+
+		break;
+	}
 
 	return true;
 }

@@ -8,6 +8,8 @@
 class MultiSocketRUDPCore;
 class IPacket;
 
+struct SendPacketInfo;
+
 enum class IO_MODE : LONG
 {
 	IO_NONE_SENDING = 0
@@ -24,8 +26,10 @@ struct RecvBuffer
 struct SendBuffer
 {
 	WORD bufferCount = 0;
+	CLockFreeQueue<SendPacketInfo*> sendPacketInfoQueue;
 	char rioSendBuffer[maxSendBufferSize];
 	RIO_BUFFERID sendBufferId;
+	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
 };
 
 class RUDPSession

@@ -170,7 +170,8 @@ private:
 	void OnRecvPacket(BYTE threadId);
 	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(std::shared_ptr<RUDPSession> session);
-	bool DoSend(SendPacketInfo* sendPacketInfo);
+	bool DoSend(OUT RUDPSession& session);
+	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
