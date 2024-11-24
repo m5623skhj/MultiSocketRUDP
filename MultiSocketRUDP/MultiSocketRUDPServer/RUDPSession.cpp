@@ -63,6 +63,8 @@ void RUDPSession::InitializeSession()
 	clientAddr = {};
 	isUsingSession = {};
 	ioCancle = {};
+	lastSendPacketSequence = {};
+	sendPacketInfoMap.clear();
 }
 
 RUDPSession::~RUDPSession()

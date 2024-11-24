@@ -569,7 +569,8 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 			break;
 		}
 
-		if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() == 0)
+		if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() == 0 &&
+			session.sendBuffer.reservedSendPacketInfo == nullptr)
 		{
 			InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 			if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() > 0)
@@ -585,7 +586,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 		context->BufferId = session.sendBuffer.sendBufferId;
 		context->Offset = 0;
 		context->ioType = RIO_OPERATION_TYPE::OP_SEND;
-		//context->Length = MakeSendStream(session, context);
+		context->Length = MakeSendStream(session, context);
 
 		//if (rioFunctionTable.RIOSendEx(sendPacketInfo->owner->rioRQ, rioBuffer, 1, nullptr, sendPacketInfo->owner->clientAddr, nullptr, nullptr, 0, nullptr) == false)
 		//{
@@ -597,6 +598,57 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 	}
 
 	return true;
+}
+
+int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context)
+{
+	int totalSendSize = 0;
+	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
+	char* bufferPositionPointer = session.sendBuffer.rioSendBuffer;
+
+	if (session.sendBuffer.reservedSendPacketInfo != nullptr)
+	{
+		int useSize = session.sendBuffer.reservedSendPacketInfo->buffer->GetAllUseSize();
+		if (useSize < maxSendBufferSize)
+		{
+			std::cout << "MakeSendStream() : useSize over with " << maxSendBufferSize << std::endl;
+			// call g_Dump.Crash() ?
+			return 0;
+		}
+
+		memcpy_s(bufferPositionPointer, maxSendBufferSize
+			, session.sendBuffer.reservedSendPacketInfo->buffer->GetBufferPtr(), useSize);
+
+		totalSendSize += useSize;
+		bufferPositionPointer += totalSendSize;
+		session.sendBuffer.reservedSendPacketInfo = nullptr;
+	}
+
+	SendPacketInfo* sendPacketInfo;
+	for (int i = 0; i < bufferCount; ++i)
+	{
+		session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
+
+		int useSize = sendPacketInfo->buffer->GetAllUseSize();
+		if (useSize < maxSendBufferSize)
+		{
+			std::cout << "MakeSendStream() : useSize over with " << maxSendBufferSize << std::endl;
+			// call g_Dump.Crash() ?
+			return 0;
+		}
+
+		totalSendSize += useSize;
+		if (totalSendSize >= maxSendBufferSize)
+		{
+			session.sendBuffer.reservedSendPacketInfo = sendPacketInfo;
+			break;
+		}
+
+		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
+			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
+	}
+
+	return totalSendSize;
 }
 
 WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer)

@@ -4,6 +4,8 @@
 #include "LockFreeQueue.h"
 #include "NetServerSerializeBuffer.h"
 #include "Queue.h"
+#include <shared_mutex>
+#include <unordered_map>
 
 class MultiSocketRUDPCore;
 class IPacket;
@@ -27,6 +29,7 @@ struct SendBuffer
 {
 	WORD bufferCount = 0;
 	CLockFreeQueue<SendPacketInfo*> sendPacketInfoQueue;
+	SendPacketInfo* reservedSendPacketInfo;
 	char rioSendBuffer[maxSendBufferSize];
 	RIO_BUFFERID sendBufferId;
 	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
@@ -83,6 +86,9 @@ private:
 	bool isUsingSession{};
 	bool ioCancle{};
 	std::atomic<PacketSequence> lastSendPacketSequence{};
+
+	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+	std::shared_mutex sendPacketInfoMapLock;
 
 private:
 	RecvBuffer recvBuffer;
