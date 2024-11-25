@@ -74,7 +74,6 @@ void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 		buffer->Encode();
 	}
 
-	// store sendPacketInfo 
 	sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.Enqueue(sendPacketInfo);
 
 	if (not DoSend(*sendPacketInfo->owner))
@@ -588,11 +587,13 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 		context->ioType = RIO_OPERATION_TYPE::OP_SEND;
 		context->Length = MakeSendStream(session, context);
 
-		//if (rioFunctionTable.RIOSendEx(sendPacketInfo->owner->rioRQ, rioBuffer, 1, nullptr, sendPacketInfo->owner->clientAddr, nullptr, nullptr, 0, nullptr) == false)
-		//{
-		//	std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
-		//	return false;
-		//}
+		//context->addrBuffer.
+
+		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->addrBuffer, nullptr, nullptr, 0, nullptr) == false)
+		{
+			std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
+			return false;
+		}
 
 		break;
 	}
