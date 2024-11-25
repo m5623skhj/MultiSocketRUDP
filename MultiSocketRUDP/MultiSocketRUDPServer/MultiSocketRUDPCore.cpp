@@ -116,7 +116,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 
 bool MultiSocketRUDPCore::InitRIO()
 {
-	GUID functionTableId = WSAID_MULTIPLE_RIO;
+	GUID guid = WSAID_MULTIPLE_RIO;
 	DWORD bytes = 0;
 
 	auto itor = unusedSessionList.begin();
@@ -127,7 +127,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	}
 
 	// For the purpose of obtaining the function table, any of the created sessions selected
-	if (WSAIoctl((*itor)->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &functionTableId, sizeof(GUID)
+	if (WSAIoctl((*itor)->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
 		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 	{
 		std::cout << "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER" << std::endl;
@@ -584,7 +584,6 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 		context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_SEND);
 		context->BufferId = session.sendBuffer.sendBufferId;
 		context->Offset = 0;
-		context->ioType = RIO_OPERATION_TYPE::OP_SEND;
 		context->Length = MakeSendStream(session, context);
 
 		//context->addrBuffer.
