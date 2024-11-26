@@ -26,10 +26,10 @@ struct IOContext : RIO_BUF
 	void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
 
 	SessionIdType ownerSessionId = invalidSessionId;
-	sockaddr_in clientAddr{};
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
-	RIO_BUF addrBuffer{};
 	std::shared_ptr<RUDPSession> session = nullptr;
+	RIO_BUFFERID clientAddrBufferId{ RIO_INVALID_BUFFERID };
+	char clientAddrBuffer[sizeof(sockaddr_in)];
 };
 
 struct SendPacketInfo
@@ -70,9 +70,15 @@ public:
 private:
 	[[nodiscard]]
 	bool InitNetwork();
+	[[nodiscard]]
 	bool InitRIO();
+	[[nodiscard]]
+	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, unsigned int targetBuffersize);
+	[[nodiscard]]
 	bool RunAllThreads();
+	[[nodiscard]]
 	bool RunSessionBroker();
+	[[nodiscard]]
 	std::optional<SOCKET> CreateRUDPSocket(unsigned short socketNumber);
 
 private:

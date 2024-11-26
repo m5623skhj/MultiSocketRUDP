@@ -151,6 +151,22 @@ bool MultiSocketRUDPCore::InitRIO()
 	return true;
 }
 
+RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, unsigned int targetBuffersize)
+{
+	if (targetBuffer == nullptr)
+	{
+		return RIO_INVALID_BUFFERID;
+	}
+
+	RIO_BUFFERID clientAddrBufferId = rioFunctionTable.RIORegisterBuffer(targetBuffer, targetBuffersize);
+	if (clientAddrBufferId == RIO_INVALID_BUFFERID)
+	{
+		std::cout << "Send RIORegisterBuffer failed with error code " << WSAGetLastError() << std::endl;
+	}
+
+	return clientAddrBufferId;
+}
+
 bool MultiSocketRUDPCore::RunAllThreads()
 {
 	if (not RunSessionBroker())
@@ -481,7 +497,9 @@ void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
 			break;
 		}
 
-		ProcessByPacketType(context->session, context->clientAddr, *buffer);
+		sockaddr_in clientAddr;
+		std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(context->clientAddrBuffer));
+		ProcessByPacketType(context->session, clientAddr, *buffer);
 	} while (false);
 
 	NetBuffer::Free(buffer);
@@ -550,7 +568,19 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	context->Length = recvBufferSize;
 	context->Offset = 0;
 
-	if (rioFunctionTable.RIOReceiveEx(session->rioRQ, context, 1, nullptr, &context->addrBuffer, nullptr, nullptr, 0, nullptr) == false)
+	if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
+		(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
+	{
+		std::cout << "DoRecv() : clientAddrBufferId is RIO_INVALID_BUFFERID" << std::endl;
+		return false;
+	}
+
+	RIO_BUF clientAddrBuffer;
+	clientAddrBuffer.BufferId = context->clientAddrBufferId;
+	clientAddrBuffer.Length = sizeof(sockaddr_in);
+	clientAddrBuffer.Offset = 0;
+
+	if (rioFunctionTable.RIOReceiveEx(session->rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
 	{
 		std::cout << "RIOReceiveEx() failed with " << WSAGetLastError() << std::endl;
 		return false;
@@ -586,9 +616,19 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 		context->Offset = 0;
 		context->Length = MakeSendStream(session, context);
 
-		//context->addrBuffer.
+		if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
+			(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
+		{
+			std::cout << "DoSend() : clientAddrBufferId is RIO_INVALID_BUFFERID" << std::endl;
+			return false;
+		}
 
-		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->addrBuffer, nullptr, nullptr, 0, nullptr) == false)
+		RIO_BUF clientAddrBuffer;
+		clientAddrBuffer.BufferId = context->clientAddrBufferId;
+		clientAddrBuffer.Length = sizeof(sockaddr_in);
+		clientAddrBuffer.Offset = 0;
+
+		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
 		{
 			std::cout << "RIOSendEx() failed with " << WSAGetLastError() << std::endl;
 			return false;
