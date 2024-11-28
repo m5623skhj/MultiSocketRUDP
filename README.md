@@ -14,15 +14,20 @@
 
 위의 경우, 소켓에 너무 많은 부하가 발생 될 것으로 예상되어, 클라이언트와 소켓이 1:1 대응이 되도록 수정하였습니다.
 
-위 프로젝트에서 사용해보지 못한 RIO도 같이 사용할 예정입니다.
-
 ---
 
 2. 구성
 
 * MultiSocketRUDPCore
+  * UDP와 RIO를 사용하는 서버의 본체입니다.
+  * 스레드는 아래와 같이 구성됩니다.
+    * WorkerThread
+    * RecvLogicThread
+    * SessionBrokerThread
   
 * RUDPSession
+  * Core에서 관리되고 있는 각 세션의 정보를 담고 있는 객체입니다.
+  * 하나의 UDP 소켓을 가지고 있으며, 논리적으로는 1개의 클라이언트를 연결합니다.
   
 * RUDPSessionBroker
   * 최초로 클라이언트와 연결하여, 유저에게 실제로 연결될 소켓을 알려주는 역할을 담당합니다.
