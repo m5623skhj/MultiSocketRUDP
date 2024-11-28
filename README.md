@@ -21,9 +21,9 @@
 * MultiSocketRUDPCore
   * UDP와 RIO를 사용하는 서버의 본체입니다.
   * 스레드는 아래와 같이 구성됩니다.
-    * WorkerThread
-    * RecvLogicThread
-    * SessionBrokerThread
+    * WorkerThread : IO 처리를 담당합니다.
+    * RecvLogicThread : 클라이언트에게 받은 패킷을 바탕으로 연결, 연결 해제, 패킷 핸들러 호출 등을 담당합니다.
+    * SessionBrokerThread : 클라이언트가 어떤 소켓에 연결을 할 것인지 알 수 있도록 지원해주는 스레드입니다.
   
 * RUDPSession
   * Core에서 관리되고 있는 각 세션의 정보를 담고 있는 객체입니다.
