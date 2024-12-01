@@ -52,12 +52,12 @@ public:
 
 public:
 	void Disconnect();
-	void SendPacket(IPacket& packet);
+	inline bool SendPacket(IPacket& packet);
 
 private:
 	void OnConnected(SessionIdType sessionId);
 	void OnDisconnected();
-	inline void SendPacket(NetBuffer& buffer);
+	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence);
 
 private:
 	void TryConnect(NetBuffer& recvPacket);

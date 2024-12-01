@@ -77,13 +77,13 @@ void RUDPSession::Disconnect()
 	core.DisconnectSession(sessionId);
 }
 
-void RUDPSession::SendPacket(IPacket& packet)
+bool RUDPSession::SendPacket(IPacket& packet)
 {
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
 		std::cout << "Buffer is nullptr in RUDPSession::SendPacket()" << std::endl;
-		return;
+		return false;
 	}
 
 	PACKET_TYPE packetType = PACKET_TYPE::SendType;
@@ -91,7 +91,7 @@ void RUDPSession::SendPacket(IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	SendPacket(*buffer);
+	return SendPacket(*buffer, packetSequence);
 }
 
 void RUDPSession::OnConnected(SessionIdType sessionId)
@@ -104,18 +104,31 @@ void RUDPSession::OnDisconnected()
 
 }
 
-void RUDPSession::SendPacket(NetBuffer& buffer)
+bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence)
 {
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
 		std::cout << "SendPacketInfo is nullptr in RUDPSession::SendPacket()" << std::endl;
 		NetBuffer::Free(&buffer);
-		return;
+		return false;
 	}
 
-	sendPacketInfo->Initialize(this, &buffer);
-	core.SendPacket(sendPacketInfo);
+	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence);
+	{
+		std::unique_lock lock(sendPacketInfoMapLock);
+		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
+	}
+
+	if (not core.SendPacket(sendPacketInfo))
+	{
+		std::unique_lock lock(sendPacketInfoMapLock);
+		sendPacketInfoMap.erase(inSendPacketSequence);
+
+		return false;
+	}
+
+	return true;
 }
 
 void RUDPSession::TryConnect(NetBuffer& recvPacket)

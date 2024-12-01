@@ -62,7 +62,7 @@ bool MultiSocketRUDPCore::IsServerStopped()
 	return isServerStopped;
 }
 
-void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
+bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 {
 	auto buffer = sendPacketInfo->GetBuffer();
 
@@ -80,7 +80,11 @@ void MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 	{
 		NetBuffer::Free(buffer);
 		sendPacketInfoPool->Free(sendPacketInfo);
+		
+		return false;
 	}
+
+	return true;
 }
 
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)

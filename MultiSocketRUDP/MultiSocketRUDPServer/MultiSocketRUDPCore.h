@@ -37,11 +37,13 @@ struct SendPacketInfo
 	NetBuffer* buffer{};
 	RUDPSession* owner{};
 	PacketRetransmissionCount retransmissionCount{};
+	PacketSequence sendPacektSequence{};
 
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer)
+	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
 		owner = inOwner;
 		buffer = inBuffer;
+		sendPacektSequence = inSendPacketSequence;
 		NetBuffer::AddRefCount(inBuffer);
 	}
 
@@ -64,7 +66,7 @@ public:
 	bool IsServerStopped();
 
 public:
-	void SendPacket(SendPacketInfo* sendPacketInfo);
+	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 
 private:
