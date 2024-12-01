@@ -8,6 +8,7 @@ constexpr SessionIdType invalidSessionId = -1;
 
 using ThreadIdType = unsigned char;
 using PacketSequence = unsigned long long;
+const PacketSequence loginPacketSequence = 0;
 
 using PacketRetransmissionCount = unsigned short;
 const PacketRetransmissionCount maxPacketRetransmissionCount = 8;

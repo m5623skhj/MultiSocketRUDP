@@ -6,11 +6,24 @@
 #include "Queue.h"
 #include <shared_mutex>
 #include <unordered_map>
+#include <queue>
 
 class MultiSocketRUDPCore;
 class IPacket;
 
 struct SendPacketInfo;
+
+struct RecvPacketInfo
+{
+	explicit RecvPacketInfo(NetBuffer* inBuffer, PacketSequence inPacketSequence)
+		: buffer(inBuffer)
+		, packetSequence(inPacketSequence)
+	{
+	}
+
+	NetBuffer* buffer{};
+	PacketSequence packetSequence{};
+};
 
 enum class IO_MODE : LONG
 {
@@ -85,10 +98,21 @@ private:
 	SOCKET sock{};
 	bool isUsingSession{};
 	bool ioCancle{};
-	std::atomic<PacketSequence> lastSendPacketSequence{};
 
+	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
 	std::shared_mutex sendPacketInfoMapLock;
+
+	std::atomic<PacketSequence> lastReceivedPacketSequence{};
+	struct RecvPacketInfoPriority
+	{
+		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh)
+		{
+			return lfh.packetSequence > rfh.packetSequence;
+		}
+	};
+	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
+	std::shared_mutex recvPacketHolderQueueLock;
 
 private:
 	RecvBuffer recvBuffer;

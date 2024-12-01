@@ -138,11 +138,12 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 		return;
 	}
 
+	PacketSequence packetSequence;
 	SessionIdType inputSessionId;
 	std::string inputSessionKey;
 
-	recvPacket >> inputSessionId >> inputSessionKey;
-	if (sessionId != inputSessionId || sessionKey != inputSessionKey)
+	recvPacket >> packetSequence >> inputSessionId >> inputSessionKey;
+	if (packetSequence != loginPacketSequence || sessionId != inputSessionId || sessionKey != inputSessionKey)
 	{
 		return;
 	}
@@ -159,6 +160,19 @@ void RUDPSession::Disconnect(NetBuffer& recvPacket)
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
+	PacketSequence packetSequece;
+	recvPacket >> packetSequece;
+
+	if (lastReceivedPacketSequence != packetSequece)
+	{
+		std::unique_lock lock(recvPacketHolderQueueLock);
+
+		NetBuffer::AddRefCount(&recvPacket);
+		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequece });
+
+		return false;
+	}
+	
 	PacketId packetId;
 	recvPacket >> packetId;
 

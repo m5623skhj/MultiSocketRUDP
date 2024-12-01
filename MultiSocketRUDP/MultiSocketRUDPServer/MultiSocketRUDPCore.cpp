@@ -542,7 +542,10 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 			break;
 		}
 
-		session->OnRecvPacket(recvPacket);
+		if (session->OnRecvPacket(recvPacket) == true)
+		{
+			++session->lastReceivedPacketSequence;
+		}
 		break;
 	}
 	break;
