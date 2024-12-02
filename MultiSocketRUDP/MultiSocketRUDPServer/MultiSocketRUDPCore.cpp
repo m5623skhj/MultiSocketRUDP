@@ -181,6 +181,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 
 	ioWorkerThreads.reserve(numOfWorkerThread);
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
+	retransmissionThread.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
@@ -192,6 +193,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
+		retransmissionThread.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	return true;
@@ -341,7 +343,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
-		SleepRemainingFrameTime(tickSet, workerThreadOneFrame);
+		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMillisecond);
 #endif
 	}
 
@@ -379,7 +381,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::RunRetransmissionThread()
+void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
