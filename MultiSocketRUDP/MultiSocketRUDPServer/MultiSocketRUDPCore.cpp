@@ -341,7 +341,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
-		SleepRemainingFrameTime(tickSet);
+		SleepRemainingFrameTime(tickSet, workerThreadOneFrame);
 #endif
 	}
 
@@ -350,10 +350,6 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 
 void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
 {
-	TickSet tickSet;
-	tickSet.nowTick = GetTickCount64();
-	tickSet.beforeTick = tickSet.nowTick;
-
 	HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
 	while (not threadStopFlag)
 	{
@@ -383,14 +379,28 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet)
+void MultiSocketRUDPCore::RunRetransmissionThread()
+{
+	TickSet tickSet;
+	tickSet.nowTick = GetTickCount64();
+	tickSet.beforeTick = tickSet.nowTick;
+
+	while (not threadStopFlag)
+	{
+
+
+		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMillisecond);
+	}
+}
+
+void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMillisecond)
 {
 	tickSet.nowTick = GetTickCount64();
 	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
 
-	if (deltaTick < oneFrame && deltaTick > 0)
+	if (deltaTick < intervalMillisecond && deltaTick > 0)
 	{
-		Sleep(oneFrame - static_cast<DWORD>(deltaTick));
+		Sleep(intervalMillisecond - static_cast<DWORD>(deltaTick));
 	}
 
 	tickSet.beforeTick = tickSet.nowTick;

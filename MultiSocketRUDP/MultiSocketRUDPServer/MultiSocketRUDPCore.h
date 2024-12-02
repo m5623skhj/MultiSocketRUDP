@@ -150,7 +150,8 @@ private:
 private:
 	void RunWorkerThread(ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(ThreadIdType threadId);
-	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet);
+	void RunRetransmissionThread();
+	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMillisecond);
 
 private:
 	unsigned char numOfWorkerThread{};
@@ -159,6 +160,7 @@ private:
 	// threads
 	std::vector<std::thread> ioWorkerThreads;
 	std::vector<std::thread> recvLogicWorkerThreads;
+	std::thread retransmissionThread;
 
 	// event handles
 	std::vector<HANDLE> recvLogicThreadEventHandles;
