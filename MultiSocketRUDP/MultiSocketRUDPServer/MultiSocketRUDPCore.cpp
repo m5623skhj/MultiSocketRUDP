@@ -75,6 +75,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 	}
 
 	sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.Enqueue(sendPacketInfo);
+	sendPacketInfo->sendTimeStamp = GetTickCount64();
 
 	if (not DoSend(*sendPacketInfo->owner))
 	{
@@ -146,7 +147,8 @@ bool MultiSocketRUDPCore::InitRIO()
 
 	for (auto& session : unusedSessionList)
 	{
-		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->sessionId % numOfWorkerThread], rioCQList[session->sessionId % numOfWorkerThread]))
+		session->threadIdType = session->sessionId % numOfWorkerThread;
+		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadIdType], rioCQList[session->threadIdType]))
 		{
 			return false;
 		}

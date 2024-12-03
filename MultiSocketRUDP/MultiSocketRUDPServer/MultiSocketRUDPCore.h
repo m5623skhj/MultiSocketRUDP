@@ -38,6 +38,7 @@ struct SendPacketInfo
 	RUDPSession* owner{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
+	unsigned long long sendTimeStamp{};
 
 	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
