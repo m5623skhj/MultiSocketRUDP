@@ -98,7 +98,7 @@ private:
 	SOCKET sock{};
 	bool isUsingSession{};
 	bool ioCancle{};
-	ThreadIdType threadIdType{};
+	ThreadIdType threadId{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;

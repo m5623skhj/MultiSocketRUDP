@@ -75,9 +75,8 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 	}
 
 	sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.Enqueue(sendPacketInfo);
-	sendPacketInfo->sendTimeStamp = GetTickCount64();
 
-	if (not DoSend(*sendPacketInfo->owner))
+	if (not DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
 		NetBuffer::Free(buffer);
 		sendPacketInfoPool->Free(sendPacketInfo);
@@ -164,8 +163,8 @@ bool MultiSocketRUDPCore::InitRIO()
 
 	for (auto& session : unusedSessionList)
 	{
-		session->threadIdType = session->sessionId % numOfWorkerThread;
-		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadIdType], rioCQList[session->threadIdType]))
+		session->threadId = session->sessionId % numOfWorkerThread;
+		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadId], rioCQList[session->threadId]))
 		{
 			return false;
 		}
@@ -406,6 +405,9 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 	tickSet.nowTick = GetTickCount64();
 	tickSet.beforeTick = tickSet.nowTick;
 
+	auto& thisThreadSendedPacketList = sendedPacketList[threadId];
+	auto& thisThreadSendedPacketListLock = sendedPacketListLock[threadId];
+
 	while (not threadStopFlag)
 	{
 
@@ -503,7 +505,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG tr
 bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
 {
 	InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
-	return DoSend(*session);
+	return DoSend(*session, threadId);
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
@@ -627,7 +629,7 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
+bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, ThreadIdType threadId)
 {
 	while (1)
 	{
@@ -652,7 +654,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 		context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_SEND);
 		context->BufferId = session.sendBuffer.sendBufferId;
 		context->Offset = 0;
-		context->Length = MakeSendStream(session, context);
+		context->Length = MakeSendStream(session, context, threadId);
 
 		if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
 			(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
@@ -678,7 +680,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session)
 	return true;
 }
 
-int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context)
+int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId)
 {
 	int totalSendSize = 0;
 	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
@@ -722,6 +724,11 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			break;
 		}
 
+		sendPacketInfo->sendTimeStamp = GetTickCount64();
+		{
+			std::scoped_lock lock(sendedPacketListLock[threadId]);
+			sendedPacketList[threadId].push_back(sendPacketInfo);
+		}
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	}

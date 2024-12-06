@@ -106,6 +106,10 @@ private:
 	std::list<std::shared_ptr<RUDPSession>> unusedSessionList;
 	std::recursive_mutex unusedSessionListLock;
 
+private:
+	std::vector<std::list<SendPacketInfo*>> sendedPacketList;
+	std::vector<std::mutex> sendedPacketListLock;
+
 #pragma region thread
 #if USE_IOCP_SESSION_BROKER
 private:
@@ -181,8 +185,8 @@ private:
 	void OnRecvPacket(BYTE threadId);
 	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(std::shared_ptr<RUDPSession> session);
-	bool DoSend(OUT RUDPSession& session);
-	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context);
+	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
+	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
