@@ -90,7 +90,24 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
 {
+	std::shared_ptr<RUDPSession> disconnectedSession = nullptr;
+	{
+		std::shared_lock lock(usingSessionMapLock);
+		auto itor = usingSessionMap.find(disconnectTargetSessionId);
+		if (itor == usingSessionMap.end())
+		{
+			return;
+		}
+		disconnectedSession = itor->second;
 
+		usingSessionMap.erase(itor);
+	}
+
+	{
+		std::unique_lock lock(unusedSessionListLock);
+		unusedSessionList.push_back(disconnectedSession);
+	}
+	std::cout << "Session id " << disconnectTargetSessionId << " is disconnected" << std::endl;
 }
 
 bool MultiSocketRUDPCore::InitNetwork()
