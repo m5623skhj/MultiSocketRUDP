@@ -405,8 +405,8 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 	tickSet.nowTick = GetTickCount64();
 	tickSet.beforeTick = tickSet.nowTick;
 
-	auto& thisThreadSendedPacketList = sendedPacketList[threadId];
-	auto& thisThreadSendedPacketListLock = sendedPacketListLock[threadId];
+	auto& thisThreadSendedPacketInfoList = sendedPacketInfoList[threadId];
+	auto& thisThreadSendedPacketInfoListLock = sendedPacketInfoListLock[threadId];
 
 	while (not threadStopFlag)
 	{
@@ -726,8 +726,8 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 		sendPacketInfo->sendTimeStamp = GetTickCount64();
 		{
-			std::scoped_lock lock(sendedPacketListLock[threadId]);
-			sendedPacketList[threadId].push_back(sendPacketInfo);
+			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
+			sendedPacketInfoList[threadId].push_back(sendPacketInfo);
 		}
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);

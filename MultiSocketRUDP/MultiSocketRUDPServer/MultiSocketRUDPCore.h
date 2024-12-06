@@ -107,8 +107,8 @@ private:
 	std::recursive_mutex unusedSessionListLock;
 
 private:
-	std::vector<std::list<SendPacketInfo*>> sendedPacketList;
-	std::vector<std::mutex> sendedPacketListLock;
+	std::vector<std::list<SendPacketInfo*>> sendedPacketInfoList;
+	std::vector<std::mutex> sendedPacketInfoListLock;
 
 #pragma region thread
 #if USE_IOCP_SESSION_BROKER
