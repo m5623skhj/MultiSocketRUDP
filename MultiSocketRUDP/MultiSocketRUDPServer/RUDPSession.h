@@ -76,6 +76,7 @@ private:
 	void TryConnect(NetBuffer& recvPacket);
 	void Disconnect(NetBuffer& recvPacket);
 	bool OnRecvPacket(NetBuffer& recvPacket);
+	void OnSendReply(NetBuffer& recvPacket);
 
 private:
 	bool CheckMyClient(const sockaddr_in& targetClientAddr);
@@ -85,7 +86,7 @@ public:
 	sockaddr_in GetSocketAddress();
 
 private:
-	bool isConnected{};
+	std::atomic_bool isConnected{};
 	SessionIdType sessionId = invalidSessionId;
 	// a connectKey seems to be necessary
 	// generate and store a key on the TCP connection side,

@@ -197,6 +197,31 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	return packetHandler(*this, (IPacket&)realPacket);
 }
 
+void RUDPSession::OnSendReply(NetBuffer& recvPacket)
+{
+	PacketSequence packetSequence;
+	recvPacket >> packetSequence;
+
+	if (lastSendPacketSequence < packetSequence)
+	{
+		return;
+	}
+
+	SendPacketInfo* sendedPacketInfo = nullptr;
+	{
+		std::unique_lock lock(sendPacketInfoMapLock);
+		auto itor = sendPacketInfoMap.find(packetSequence);
+		if (itor != sendPacketInfoMap.end())
+		{
+			sendedPacketInfo = itor->second;
+		}
+
+		sendPacketInfoMap.erase(packetSequence);
+	}
+
+	core.EraseSendPacketInfo(sendedPacketInfo, threadId);
+}
+
 sockaddr_in RUDPSession::GetSocketAddress()
 {
 	return clientAddr;

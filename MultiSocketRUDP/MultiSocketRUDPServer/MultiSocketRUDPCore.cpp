@@ -109,6 +109,29 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 	std::cout << "Session id " << disconnectTargetSessionId << " is disconnected" << std::endl;
 }
 
+void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId)
+{
+	if (eraseTarget == nullptr)
+	{
+		return;
+	}
+
+	do
+	{
+		if (eraseTarget->owner == nullptr)
+		{
+			break;
+		}
+
+		{
+			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
+			sendedPacketInfoList[threadId].erase(eraseTarget->listItor);
+		}
+	} while (false);
+
+	sendPacketInfoPool->Free(eraseTarget);
+}
+
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;
@@ -413,10 +436,25 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 	while (not threadStopFlag)
 	{
 		{
-			std::scoped_lock lock(sendedPacketInfoListLock);
+			std::scoped_lock lock(thisThreadSendedPacketInfoListLock);
 			copyList.assign(thisThreadSendedPacketInfoList.begin(), thisThreadSendedPacketInfoList.end());
 		}
 		
+		for (auto& sendedPacketInfo : copyList)
+		{
+			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick)
+			{
+				continue;
+			}
+
+			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+			{
+				DisconnectSession(sendedPacketInfo->owner->sessionId);
+				continue;
+			}
+
+			SendPacket(sendedPacketInfo);
+		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMillisecond);
 	}
@@ -595,6 +633,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 			break;
 		}
 
+		session->OnSendReply(recvPacket);
 		break;
 	}
 	break;
@@ -730,10 +769,11 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			break;
 		}
 
-		sendPacketInfo->sendTimeStamp = GetTickCount64();
+		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMillisecond;
 		{
 			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
-			sendedPacketInfoList[threadId].push_back(sendPacketInfo);
+			auto itor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
+			sendPacketInfo->listItor = itor;
 		}
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);

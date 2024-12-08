@@ -39,6 +39,7 @@ struct SendPacketInfo
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
 	unsigned long long sendTimeStamp{};
+	std::list<SendPacketInfo*>::iterator listItor;
 
 	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
@@ -69,6 +70,7 @@ public:
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
+	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 
 private:
 	[[nodiscard]]
