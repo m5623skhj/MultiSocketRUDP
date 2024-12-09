@@ -165,13 +165,61 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 
 	if (lastReceivedPacketSequence != packetSequece)
 	{
-		std::unique_lock lock(recvPacketHolderQueueLock);
+		std::scoped_lock lock(recvPacketHolderQueueLock);
 
 		NetBuffer::AddRefCount(&recvPacket);
 		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequece });
 
 		return false;
 	}
+	
+	if (ProcessPacket(recvPacket) == false)
+	{
+		return false;
+	}
+
+	return ProcessHoldingPacket();
+}
+
+bool RUDPSession::ProcessHoldingPacket()
+{
+	PacketSequence packetSequece;
+	size_t queueRestSize = 0;
+
+	{
+		std::scoped_lock lock(recvPacketHolderQueueLock);
+		queueRestSize = recvPacketHolderQueue.size();
+	}
+
+	while (queueRestSize > 0)
+	{
+		NetBuffer* storedBuffer = nullptr;
+		{
+			std::scoped_lock lock(recvPacketHolderQueueLock);
+			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
+			if (recvPacketHolderTop.packetSequence != lastSendPacketSequence)
+			{
+				break;
+			}
+
+			packetSequece = recvPacketHolderTop.packetSequence;
+			storedBuffer = recvPacketHolderTop.buffer;
+			recvPacketHolderQueue.pop();
+		}
+
+		if (ProcessPacket(*storedBuffer) == false)
+		{
+			return false;
+		}
+		--queueRestSize;
+	}
+
+	return true;
+}
+
+bool RUDPSession::ProcessPacket(NetBuffer& recvPacket)
+{
+	++lastReceivedPacketSequence;
 	
 	PacketId packetId;
 	recvPacket >> packetId;

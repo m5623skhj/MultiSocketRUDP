@@ -76,6 +76,8 @@ private:
 	void TryConnect(NetBuffer& recvPacket);
 	void Disconnect(NetBuffer& recvPacket);
 	bool OnRecvPacket(NetBuffer& recvPacket);
+	bool ProcessPacket(NetBuffer& recvPacket);
+	bool ProcessHoldingPacket();
 	void OnSendReply(NetBuffer& recvPacket);
 
 private:
@@ -114,7 +116,7 @@ private:
 		}
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
-	std::shared_mutex recvPacketHolderQueueLock;
+	std::recursive_mutex recvPacketHolderQueueLock;
 
 private:
 	RecvBuffer recvBuffer;
