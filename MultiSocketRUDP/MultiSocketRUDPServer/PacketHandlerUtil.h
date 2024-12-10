@@ -24,4 +24,11 @@ namespace PacketHandlerUtil
 			return targetFunction(session, *packet);
 		};
 	}
+
+	template <typename PacketType>
+	void RegisterPacket(bool (*targetFunction)(RUDPSession&, PacketType&))
+	{
+		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::WappingHandler(targetFunction));
+		REGISTER_PACKET(PacketType, handler);
+	}
 }

@@ -9,15 +9,8 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
-	template <typename PacketType>
-	void RegisterPacket(bool (*targetFunction)(RUDPSession&, PacketType&))
-	{
-		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::WappingHandler(targetFunction));
-		REGISTER_PACKET(PacketType, handler);
-	}
-
 	void Init()
 	{
-		RegisterPacket<Ping>(HandlePacket);
+		PacketHandlerUtil::RegisterPacket<Ping>(HandlePacket);
 	}
 }
