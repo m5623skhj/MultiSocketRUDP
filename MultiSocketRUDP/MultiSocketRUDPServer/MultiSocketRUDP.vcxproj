@@ -21,9 +21,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
-    <ClCompile Include="main.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPSession.cpp" />

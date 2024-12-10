@@ -30,9 +30,6 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="MultiSocketRUDPCore.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
