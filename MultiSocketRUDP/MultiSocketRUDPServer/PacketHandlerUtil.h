@@ -31,4 +31,49 @@ namespace PacketHandlerUtil
 		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::WappingHandler(targetFunction));
 		REGISTER_PACKET(PacketType, handler);
 	}
+
+	class EssentialHandler
+	{
+	private:
+		EssentialHandler() = default;
+
+	public:
+		static EssentialHandler& GetInst();
+
+		static bool IsRegisteredConnectHandler() { return isRegisteredConnectHandler; }
+		static bool IsRegisteredDisconnectHandler() { return isRegisteredDisconnectHandler; }
+
+		static bool IsRegisteredAllEssentialHandler();
+
+	public:
+		template <typename PacketType>
+		static void RegisterConnectHandler(bool (*targetFunction)(RUDPSession&, PacketType&))
+		{
+			if (isRegisteredConnectHandler == true)
+			{
+				std::cout << "Connect handler already registered" << std::endl;
+				return;
+			}
+
+			isRegisteredConnectHandler = true;
+			RegisterPacket(targetFunction);
+		}
+
+		template <typename PacketType>
+		static void RegisterDisconnectHandler(bool (*targetFunction)(RUDPSession&, PacketType&))
+		{
+			if (isRegisteredDisconnectHandler == true)
+			{
+				std::cout << "Disconnect handler already registered" << std::endl;
+				return;
+			}
+
+			isRegisteredDisconnectHandler = true;
+			RegisterPacket(targetFunction);
+		}
+
+	private:
+		inline static bool isRegisteredConnectHandler{ false };
+		inline static bool isRegisteredDisconnectHandler{ false };
+	};
 }

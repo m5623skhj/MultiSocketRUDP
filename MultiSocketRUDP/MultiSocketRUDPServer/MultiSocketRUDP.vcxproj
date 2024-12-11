@@ -22,6 +22,7 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
+    <ClCompile Include="PacketHandlerUtil.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />

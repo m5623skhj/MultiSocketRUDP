@@ -45,6 +45,9 @@
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\PacketManager</Filter>
     </ClCompile>
+    <ClCompile Include="PacketHandlerUtil.cpp">
+      <Filter>소스 파일\PacketManager</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
