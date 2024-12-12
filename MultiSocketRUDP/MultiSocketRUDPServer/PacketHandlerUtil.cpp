@@ -1,6 +1,12 @@
 #include "PreCompile.h"
 #include "PacketHandlerUtil.h"
 
+PacketHandlerUtil::EssentialHandler::EssentialHandler()
+{
+	essentialHandlerChecker.insert({ EssentialHandlerType::ConnectHandlerType, std::make_unique<ConnectHandlerRegisterChecker>() });
+	essentialHandlerChecker.insert({ EssentialHandlerType::DisconnectHandlerType, std::make_unique<DisconnectHandlerRegisterChecker>() });
+}
+
 PacketHandlerUtil::EssentialHandler& PacketHandlerUtil::EssentialHandler::GetInst()
 {
 	static EssentialHandler instance;
@@ -9,10 +15,26 @@ PacketHandlerUtil::EssentialHandler& PacketHandlerUtil::EssentialHandler::GetIns
 
 bool PacketHandlerUtil::EssentialHandler::IsRegisteredAllEssentialHandler()
 {
-	bool isRegisteredAll{ true };
+	for (const auto& checker : essentialHandlerChecker)
+	{
+		if (not checker.second->IsRegisteredHandler())
+		{
+			return false;
+		}
+	}
 
-	isRegisteredAll &= IsRegisteredConnectHandler();
-	isRegisteredAll &= IsRegisteredDisconnectHandler();
+	return true;
+}
 
-	return isRegisteredAll;
+void PacketHandlerUtil::EssentialHandler::PrintUnregisteredEssentialHandler()
+{
+	for (const auto& checker : essentialHandlerChecker)
+	{
+		if (checker.second->IsRegisteredHandler())
+		{
+			continue;
+		}
+
+		std::cout << checker.second->GetHandlerType() << " is unregistered" << std::endl;
+	}
 }
