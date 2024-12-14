@@ -4,16 +4,11 @@
 #include <functional>
 #include "NetServerSerializeBuffer.h"
 #include "../MultiSocketRUDPServer/PacketManager.h"
+#include "PacketIdType.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet id type
 ////////////////////////////////////////////////////////////////////////////////////
-enum class PACKET_ID : unsigned int
-{
-	InvalidPacketId = 0
-	, Ping
-	, Pong
-};
 
 #define GET_PACKET_ID(packetId) virtual PacketId GetPacketId() const override { return static_cast<PacketId>(packetId); }
 
@@ -67,7 +62,8 @@ public:
 	virtual ~Ping() override = default;
 
 public:
-	GET_PACKET_ID(PACKET_ID::Ping)
+	virtual PacketId GetPacketId() const override;
+	//GET_PACKET_ID(PACKET_ID::Ping)
 };
 
 class Pong : public IPacket
@@ -77,8 +73,25 @@ public:
 	virtual ~Pong() override = default;
 
 public:
-	GET_PACKET_ID(PACKET_ID::Pong);
+	virtual PacketId GetPacketId() const override;
+	//GET_PACKET_ID(PACKET_ID::Pong);
 };
+
+class TestStringPacket : public IPacket
+{
+public:
+	TestStringPacket() = default;
+	~TestStringPacket() = default;
+
+public:
+	virtual PacketId GetPacketId() const override;
+	virtual void BufferToPacket(NetBuffer& buffer) override;
+	virtual void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	std::string testString;
+};
+
 #pragma pack(pop)
 
 ////////////////////////////////////////////////////////////////////////////////////
