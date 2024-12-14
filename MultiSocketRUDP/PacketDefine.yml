@@ -1,0 +1,10 @@
+Packet:
+  - Type: RequestPacket
+    PacketName: Ping
+  - Type: ReplyPacket
+    PacketName: Pong 
+  - Type: RequestPacket
+    PacketName: TestStringPacket
+    Items:
+      - Type: std::string
+        Name: testString
