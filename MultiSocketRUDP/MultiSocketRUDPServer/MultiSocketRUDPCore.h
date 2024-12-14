@@ -9,6 +9,7 @@
 #include <shared_mutex>
 #include "RUDPSession.h"
 #include "Queue.h"
+#include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -103,10 +104,10 @@ private:
 	void ReleaseSession(std::shared_ptr<RUDPSession> session);
 
 private:
-	std::unordered_map<SessionIdType, std::shared_ptr<RUDPSession>> usingSessionMap;
-	std::shared_mutex usingSessionMapLock;
-	std::list<std::shared_ptr<RUDPSession>> unusedSessionList;
-	std::recursive_mutex unusedSessionListLock;
+	// This container's size must not be increased any further
+	std::vector<std::shared_ptr<RUDPSession>> sessionArray;
+	std::list<SessionIdType> unusedSessionIdList;
+	std::recursive_mutex unusedSessionIdListLock;
 
 private:
 	std::vector<std::list<SendPacketInfo*>> sendedPacketInfoList;

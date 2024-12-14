@@ -97,23 +97,17 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
 {
-	std::shared_ptr<RUDPSession> disconnectedSession = nullptr;
+	if (disconnectTargetSessionId >= sessionArray.size() || not sessionArray[disconnectTargetSessionId]->isUsingSession)
 	{
-		std::shared_lock lock(usingSessionMapLock);
-		auto itor = usingSessionMap.find(disconnectTargetSessionId);
-		if (itor == usingSessionMap.end())
-		{
-			return;
-		}
-		disconnectedSession = itor->second;
-
-		usingSessionMap.erase(itor);
+		return;
 	}
 
 	{
-		std::unique_lock lock(unusedSessionListLock);
-		unusedSessionList.push_back(disconnectedSession);
+		std::scoped_lock lock(unusedSessionIdListLock);
+		unusedSessionIdList.emplace_back(disconnectTargetSessionId);
 	}
+	sessionArray[disconnectTargetSessionId]->isUsingSession = false;
+
 	std::cout << "Session id " << disconnectTargetSessionId << " is disconnected" << std::endl;
 }
 
@@ -150,7 +144,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		return false;
 	}
 
-	usingSessionMap.reserve(numOfSockets);
+	sessionArray.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
 		auto optSocket = CreateRUDPSocket(socketNumber);
@@ -160,7 +154,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 			return false;
 		}
 
-		unusedSessionList.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
+		sessionArray.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
 	}
 
 	return true;
@@ -171,15 +165,8 @@ bool MultiSocketRUDPCore::InitRIO()
 	GUID guid = WSAID_MULTIPLE_RIO;
 	DWORD bytes = 0;
 
-	auto itor = unusedSessionList.begin();
-	if (itor == unusedSessionList.end())
-	{
-		std::cout << "InitRIO failed. Session map is not initilazed" << std::endl;
-		return false;
-	}
-
 	// For the purpose of obtaining the function table, any of the created sessions selected
-	if (WSAIoctl((*itor)->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
+	if (WSAIoctl((sessionArray[0])->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
 		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 	{
 		std::cout << "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER" << std::endl;
@@ -192,7 +179,7 @@ bool MultiSocketRUDPCore::InitRIO()
 		return false;
 	}
 
-	for (auto& session : unusedSessionList)
+	for (auto& session : sessionArray)
 	{
 		session->threadId = session->sessionId % numOfWorkerThread;
 		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadId], rioCQList[session->threadId]))
@@ -293,50 +280,55 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socke
 void MultiSocketRUDPCore::CloseAllSessions()
 {
 	{
-		std::unique_lock lock(usingSessionMapLock);
-		usingSessionMap.clear();
+		std::scoped_lock lock(unusedSessionIdListLock);
+		unusedSessionIdList.clear();
 	}
+
 	{
-		std::scoped_lock lock(unusedSessionListLock);
-		unusedSessionList.clear();
+		for (auto& session : sessionArray)
+		{
+			closesocket(session->sock);
+		}
+
+		// need wait?
+		sessionArray.clear();
 	}
 }
 
 std::shared_ptr<RUDPSession> MultiSocketRUDPCore::AcquireSession()
 {
 	std::shared_ptr<RUDPSession> session = nullptr;
+	SessionIdType sessionId{};
 	{
-		std::scoped_lock lock(unusedSessionListLock);
-		
-		if (unusedSessionList.empty() == true)
+		std::scoped_lock lock(unusedSessionIdListLock);
+
+		if (unusedSessionIdList.empty() == true)
 		{
 			return nullptr;
 		}
 
-		session = unusedSessionList.front();
-		unusedSessionList.pop_front();
+		sessionId = unusedSessionIdList.front();
+		unusedSessionIdList.pop_front();
 	}
 
-	session->isUsingSession = true;
-
+	session = sessionArray[sessionId];
+	if (session->isUsingSession == true)
 	{
-		std::unique_lock lock(usingSessionMapLock);
-		usingSessionMap.insert({ session->sessionId, session });
+		return nullptr;
 	}
+	session->isUsingSession = true;
 
 	return session;
 }
 
 std::shared_ptr<RUDPSession> MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId)
 {
-	std::unique_lock lock(usingSessionMapLock);
-	auto itor = usingSessionMap.find(sessionId);
-	if (itor == usingSessionMap.end())
+	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->isUsingSession)
 	{
 		return nullptr;
 	}
 
-	return itor->second;
+	return sessionArray[sessionId];
 }
 
 void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
@@ -348,16 +340,10 @@ void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
 	}
 	
 	{
-		std::unique_lock lock(usingSessionMapLock);
-		usingSessionMap.erase(session->sessionId);
+		std::scoped_lock lock(unusedSessionIdListLock);
+		unusedSessionIdList.emplace_back(session->sessionId);
 	}
-	
 	session->isUsingSession = false;
-
-	{
-		std::scoped_lock lock(unusedSessionListLock);
-		unusedSessionList.push_back(session);
-	}
 }
 
 void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
