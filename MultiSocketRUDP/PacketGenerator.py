@@ -1,4 +1,46 @@
 import yaml
+import os
+import shutil
+
+def CopyPacketFiles():
+    try:
+        shutil.copy(packetTypeFilePath, packetTypeFilePath + "_new")
+        shutil.copy(packetFileHeaderPath, packetFileHeaderPath + "_new")
+        shutil.copy(packetFileCppPath, packetFileCppPath + "_new")
+        shutil.copy(packetHandlerFilePath, packetHandlerFilePath + "_new")
+    except FileNotFoundError as e:
+        print(f"File not found: {e.filename}")
+        return False
+    except OSError as e:
+        print(f"File copy failed: {e.strerror}")
+        return False
+    
+    return True
+
+
+def ReplacePacketFiled():
+    try:
+        ReplaceFile(packetTypeFilePath, packetTypeFilePath + "_new")
+        ReplaceFile(packetFileHeaderPath, packetFileHeaderPath + "_new")
+        ReplaceFile(packetFileCppPath, packetFileCppPath + "_new")
+        ReplaceFile(packetHandlerFilePath, packetHandlerFilePath + "_new")
+    except Exception as e:
+        return
+
+
+def ReplaceFile(originFile, newFile):
+    if os.path.exists(newFile):
+        try:
+            if os.path.exists(originFile):
+                os.remove(originFile)
+                print(f"Deleted original file: {originFile}")
+            
+            shutil.move(newFile, originFile)
+        except Exception as e:
+            print(f"Error during file replacement: {e}")
+    else:
+        print(f"New file does not exist: {newFile}")
+
 
 def DuplicateCheckAndAdd(packetDuplicateCheckerContainer, checkTarget):
     if checkTarget in packetDuplicateCheckerContainer:
@@ -59,7 +101,7 @@ def IsValidPacketTypeInYaml(yamlData):
     return returnValue
 
 
-def GeneratePacketType(packetTypeName, values):
+def GeneratePacketType(values):
     generatedCode = "#pragma once\n\n"
     generatedCode += "enum class PACKET_ID : unsigned int\n{\n\tInvalidPacketId = 0\n"
     
@@ -76,8 +118,8 @@ def GeneratePacket(values):
 
 def GeneratePacketHandler(values):
     return
-    
-    
+
+
 def ProcessPacketGenerate():
     with open(ymlFilePath, 'r') as file:
         ymlData = yaml.load(file, Loader=yaml.SafeLoader)
@@ -86,16 +128,22 @@ def ProcessPacketGenerate():
         print("Code genearate failed")
         exit()
         
+    if CopyPacketFiles() == False:
+        print("CopyPacketFiles() failed")
+        exit()
+        
     packetList = ymlData['Packet']
-    packetTypeCode = GeneratePacketType('PacketType', packetList)
-    with open(packetTypeFilePath, 'w') as file:
+    packetTypeCode = GeneratePacketType(packetList)
+    with open(packetTypeFilePath + "_new", 'w') as file:
         file.write(packetTypeCode)
             
-    with open(packetFileHeaderPath, 'w') as file:
+    with open(packetFileHeaderPath + "_new", 'w') as file:
         file.write(GeneratePacket(packetList))
                 
-    with open(packetHandlerFilePath, 'w') as file:
+    with open(packetHandlerFilePath + "_new", 'w') as file:
         file.write(GeneratePacketHandler(packetList))
+
+    ReplacePacketFiled()
 
 
 # Write file path here
