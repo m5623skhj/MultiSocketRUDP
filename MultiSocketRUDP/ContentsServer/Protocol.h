@@ -63,7 +63,6 @@ public:
 
 public:
 	virtual PacketId GetPacketId() const override;
-	//GET_PACKET_ID(PACKET_ID::Ping)
 };
 
 class Pong : public IPacket
@@ -74,14 +73,13 @@ public:
 
 public:
 	virtual PacketId GetPacketId() const override;
-	//GET_PACKET_ID(PACKET_ID::Pong);
 };
 
 class TestStringPacket : public IPacket
 {
 public:
 	TestStringPacket() = default;
-	~TestStringPacket() = default;
+	virtual ~TestStringPacket() override = default;
 
 public:
 	virtual PacketId GetPacketId() const override;

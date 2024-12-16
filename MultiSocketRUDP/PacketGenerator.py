@@ -34,7 +34,6 @@ def ReplaceFile(originFile, newFile):
         try:
             if os.path.exists(originFile):
                 os.remove(originFile)
-                print(f"Deleted original file: {originFile}")
             
             shutil.move(newFile, originFile)
         except Exception as e:
@@ -69,10 +68,10 @@ def IsValidPacketTypeInYaml(yamlData):
     uniqueTypePacketName = ''
     packetDuplicateChecker = set()
         
-    for value in yamlData:
-        packetType = value['Type']
-        packetName = value['PacketName']
-        items = value.get('Items')
+    for data in yamlData:
+        packetType = data['Type']
+        packetName = data['PacketName']
+        items = data.get('Items')
         
         if packetType == 'Unique':
             if checkedInvalidUniqueType == 0:
@@ -103,22 +102,26 @@ def IsValidPacketTypeInYaml(yamlData):
     return returnValue
 
 
-def GeneratePacketType(values):
+def GeneratePacketType(packetList):
     generatedCode = "#pragma once\n\n"
     generatedCode += "enum class PACKET_ID : unsigned int\n{\n\tInvalidPacketId = 0\n"
     
-    for value in values:
-        generatedCode += f"\t, {value['PacketName']}\n"
+    for packet in packetList:
+        generatedCode += f"\t, {packet['PacketName']}\n"
     
     generatedCode += "};"
-    return generatedCode
+    
+    with open(packetTypeFilePath + "_new", 'w') as file:
+        file.write(generatedCode)
+    
+    return True
 
 
-def MakePacketClasss(values):
+def MakePacketClasss(packetList):
     generatedCode = ""
-    for value in values:
-        packetName = value['PacketName']
-        items = value.get('Items')
+    for packet in packetList:
+        packetName = packet['PacketName']
+        items = packet.get('Items')
         
         generatedCode += f"class {packetName} : public IPacket\n" + "{\npublic:\n"
         generatedCode += f"\t{packetName}() = default;\n"
@@ -129,21 +132,24 @@ def MakePacketClasss(values):
             generatedCode += "\tvirtual void PacketToBuffer(NetBuffer& buffer) override;\n"
             generatedCode += "\npublic:\n"
             for item in items:
-                generatedCode += f"\t{item['Type']} {item['Name']}\n"
+                generatedCode += f"\t{item['Type']} {item['Name']};\n"
         generatedCode += "};\n\n"
     
     return generatedCode
 
 
-def GenerateProtocolHeader(values, targetFilePath):
+def GenerateProtocolHeader(packetList):
     pattern = r"#pragma pack\(push, 1\)(.*?)#pragma pack\(pop\)"
-    with open(targetFilePath, "r") as file:
+    with open(protocolHeaderPath, "r") as file:
         originCode = file.read()
     
-    modifiedCode = re.sub(pattern, f"#pragma pack(push, 1)\n{MakePacketClasss(values)}#pragma pack(pop)", originCode, flags=re.DOTALL)
+    modifiedCode = re.sub(pattern, f"#pragma pack(push, 1)\n{MakePacketClasss(packetList)}#pragma pack(pop)", originCode, flags=re.DOTALL)
     
+    targetFilePath = protocolHeaderPath + "_new"
     with open(targetFilePath, 'w') as file:
         file.write(modifiedCode)
+        
+    return True
 
 
 def GenerateInitInPacketHandlerCpp(packetList, originCode):
@@ -154,7 +160,7 @@ def GenerateInitInPacketHandlerCpp(packetList, originCode):
         print("Init function not found in the ContentsPacketHandler namespace")
         return False, None
 
-    targetCode = match.group(1)
+    targetCode = ""
     
     for packet in packetList:
         if packet['Type'] == 'ReplyPacket':
@@ -196,30 +202,8 @@ def GenerateHandlePacketInPacketHandlerCpp(packetList, originCode):
     return True, modifiedCode
 
 
-def GenerateProtocolCpp(packetList, targetFilePath):
-    with open(targetFilePath, 'r') as file:
-        originCode = file.read()
-    
-    state, modifiedCode = GenerateHandlePacketInPacketHandlerCpp(packetList, originCode)
-    if state == False:
-        return False
-    
-    state, modifiedCode = GenerateInitInPacketHandlerCpp(packetList, modifiedCode)
-    if state == False:
-        return False
-
-    with open(targetFilePath, 'w') as file:
-        file.write(modifiedCode)
-    return True
-
-
-def GeneratePacket(packetList):
-    GenerateProtocolHeader(packetList, protocolHeaderPath + "_new")
-    return GenerateProtocolCpp(packetList, packetHandlerFilePath + "_new")
-
-
-def GeneratePacketHandler(packetList):
-    with open(protocolCppFileCppPath + "_new", 'r') as file:
+def GenerateProtocolCpp(packetList):
+    with open(protocolCppFileCppPath, 'r') as file:
         originCode = file.read()
     
     pattern = r'#pragma region packet function\n(.*?)#pragma endregion packet function'
@@ -230,15 +214,13 @@ def GeneratePacketHandler(packetList):
         return False
 
     needWrite = False
-    modifiedCode = match.group(1)
+    modifiedCode = ""
     for packet in packetList:
-        if packet['Type'] == 'ReplyPacket':
-            continue
         
         packetName = packet['PacketName']
         candidateCode = f"PacketId {packetName}::GetPacketId() const\n"
         if candidateCode not in modifiedCode:
-            modifiedCode += f"{candidateCode}{{\n\treturn static_cast<{packetName}>(PACKET_ID::{packetName});\n}}\n"
+            modifiedCode += f"{candidateCode}{{\n\treturn static_cast<PacketId>(PACKET_ID::{packetName});\n}}\n"
             needWrite = True
         
         bufferToPacketCode = f"void {packetName}::BufferToPacket(NetBuffer& buffer)\n"
@@ -253,20 +235,39 @@ def GeneratePacketHandler(packetList):
             if bufferToPacketCode not in modifiedCode:
                 modifiedCode += bufferToPacketCode
                 modifiedCode += "{\n"
-                modifiedCode += f"\tSetBufferToParameters({parameters})\n"
+                modifiedCode += f"\tSetBufferToParameters({parameters});\n"
                 modifiedCode += "}\n"
                 needWrite = True
             if packetToBufferCode not in modifiedCode:
                 modifiedCode += packetToBufferCode
                 modifiedCode += "{\n"
-                modifiedCode += f"\tSetParametersToBuffer({parameters})\n"
+                modifiedCode += f"\tSetParametersToBuffer({parameters});\n"
                 modifiedCode += "}\n"
                 needWrite = True
 
     if needWrite == True:
         modifiedCode = re.sub(pattern, "#pragma region packet function\n" + modifiedCode + "#pragma endregion packet function", originCode, flags=re.DOTALL)
-        with open(protocolCppFileCppPath + "_new", 'w') as file:
+        targetFilePath = protocolCppFileCppPath + "_new"
+        with open(targetFilePath, 'w') as file:
             file.write(modifiedCode)
+    return True
+
+
+def GeneratePacketHandlerCpp(packetList):
+    with open(packetHandlerFilePath, 'r') as file:
+        originCode = file.read()
+    
+    state, modifiedCode = GenerateHandlePacketInPacketHandlerCpp(packetList, originCode)
+    if state == False:
+        return False
+    
+    state, modifiedCode = GenerateInitInPacketHandlerCpp(packetList, modifiedCode)
+    if state == False:
+        return False
+
+    targetFilePath = packetHandlerFilePath + "_new"
+    with open(targetFilePath, 'w') as file:
+        file.write(modifiedCode)
     return True
 
 
@@ -283,16 +284,20 @@ def ProcessPacketGenerate():
         exit()
         
     packetList = ymlData['Packet']
-    packetTypeCode = GeneratePacketType(packetList)
-    with open(packetTypeFilePath + "_new", 'w') as file:
-        file.write(packetTypeCode)
-        
-    if GeneratePacket(packetList) == False:
-        print("Generated packet failed")
+    if GeneratePacketType(packetList) == False:
+        print("Generate packet type failed")
         exit()
         
-    if GeneratePacketHandler(packetList) == False:
-        print("Generated packet handler failed")
+    if GenerateProtocolHeader(packetList) == False:
+        print("Generated protocol header failed")
+        exit()
+
+    if GenerateProtocolCpp(packetList) == False:
+        print("Generated protocol cpp failed")
+        exit()
+
+    if GeneratePacketHandlerCpp(packetList) == False:
+        print("Generate packet handler falied")
         exit()
         
     ReplacePacketFiled()
