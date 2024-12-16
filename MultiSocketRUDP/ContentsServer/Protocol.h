@@ -103,17 +103,4 @@ public:
 	PacketManager::GetInst().RegisterBufferToPacketType<PacketType>();\
 }
 
-// deprecated
-/*
-#define DECLARE_HANDLE_PACKET(PacketType)\
-	static bool HandlePacket(RUDPSession& session, PacketType& packet);\
-
-#define DECLARE_ALL_HANDLER()\
-	DECLARE_HANDLE_PACKET(Ping)\
-
-#define REGISTER_PACKET_LIST(Handler){\
-	REGISTER_PACKET(Ping, Handler)\
-}
-*/
-
 #pragma endregion PacketHandler
