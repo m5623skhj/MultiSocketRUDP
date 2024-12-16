@@ -3,12 +3,15 @@ import os
 import shutil
 import re
 
+import PacketItemsFilePath
+import MakePacketItemsOnce
+
 def CopyPacketFiles():
     try:
-        shutil.copy(packetTypeFilePath, packetTypeFilePath + "_new")
-        shutil.copy(protocolHeaderPath, protocolHeaderPath + "_new")
-        shutil.copy(protocolCppFileCppPath, protocolCppFileCppPath + "_new")
-        shutil.copy(packetHandlerFilePath, packetHandlerFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.packetTypeFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.protocolHeaderPath, PacketItemsFilePath.protocolHeaderPath + "_new")
+        shutil.copy(PacketItemsFilePath.protocolCppFileCppPath, PacketItemsFilePath.protocolCppFileCppPath + "_new")
+        shutil.copy(PacketItemsFilePath.packetHandlerFilePath, PacketItemsFilePath.packetHandlerFilePath + "_new")
     except FileNotFoundError as e:
         print(f"File not found: {e.filename}")
         return False
@@ -21,10 +24,10 @@ def CopyPacketFiles():
 
 def ReplacePacketFiled():
     try:
-        ReplaceFile(packetTypeFilePath, packetTypeFilePath + "_new")
-        ReplaceFile(protocolHeaderPath, protocolHeaderPath + "_new")
-        ReplaceFile(protocolCppFileCppPath, protocolCppFileCppPath + "_new")
-        ReplaceFile(packetHandlerFilePath, packetHandlerFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.packetTypeFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.protocolHeaderPath, PacketItemsFilePath.protocolHeaderPath + "_new")
+        ReplaceFile(PacketItemsFilePath.protocolCppFileCppPath, PacketItemsFilePath.protocolCppFileCppPath + "_new")
+        ReplaceFile(PacketItemsFilePath.packetHandlerFilePath, PacketItemsFilePath.packetHandlerFilePath + "_new")
     except Exception as e:
         return
 
@@ -111,7 +114,7 @@ def GeneratePacketType(packetList):
     
     generatedCode += "};"
     
-    with open(packetTypeFilePath + "_new", 'w') as file:
+    with open(PacketItemsFilePath.packetTypeFilePath + "_new", 'w') as file:
         file.write(generatedCode)
     
     return True
@@ -140,12 +143,12 @@ def MakePacketClasss(packetList):
 
 def GenerateProtocolHeader(packetList):
     pattern = r"#pragma pack\(push, 1\)(.*?)#pragma pack\(pop\)"
-    with open(protocolHeaderPath, "r") as file:
+    with open(PacketItemsFilePath.protocolHeaderPath, "r") as file:
         originCode = file.read()
     
     modifiedCode = re.sub(pattern, f"#pragma pack(push, 1)\n{MakePacketClasss(packetList)}#pragma pack(pop)", originCode, flags=re.DOTALL)
     
-    targetFilePath = protocolHeaderPath + "_new"
+    targetFilePath = PacketItemsFilePath.protocolHeaderPath + "_new"
     with open(targetFilePath, 'w') as file:
         file.write(modifiedCode)
         
@@ -199,11 +202,17 @@ def GenerateHandlePacketInPacketHandlerCpp(packetList, originCode):
     handlerCode += "\n\n\tvoid Init"
    
     modifiedCode = re.sub(namespacePattern, "namespace ContentsPacketHandler\n{" + handlerCode, originCode, flags=re.DOTALL)
+    
+    cleanCodePattern = "namespace ContentsPacketHandler\n\{\n\t\n"
+    match = re.search(cleanCodePattern, modifiedCode, re.DOTALL)
+    if match:
+        modifiedCode = re.sub(cleanCodePattern, "namespace ContentsPacketHandler\n{", modifiedCode, re.DOTALL)
+    
     return True, modifiedCode
 
 
 def GenerateProtocolCpp(packetList):
-    with open(protocolCppFileCppPath, 'r') as file:
+    with open(PacketItemsFilePath.protocolCppFileCppPath, 'r') as file:
         originCode = file.read()
     
     pattern = r'#pragma region packet function\n(.*?)#pragma endregion packet function'
@@ -247,14 +256,14 @@ def GenerateProtocolCpp(packetList):
 
     if needWrite == True:
         modifiedCode = re.sub(pattern, "#pragma region packet function\n" + modifiedCode + "#pragma endregion packet function", originCode, flags=re.DOTALL)
-        targetFilePath = protocolCppFileCppPath + "_new"
+        targetFilePath = PacketItemsFilePath.protocolCppFileCppPath + "_new"
         with open(targetFilePath, 'w') as file:
             file.write(modifiedCode)
     return True
 
 
 def GeneratePacketHandlerCpp(packetList):
-    with open(packetHandlerFilePath, 'r') as file:
+    with open(PacketItemsFilePath.packetHandlerFilePath, 'r') as file:
         originCode = file.read()
     
     state, modifiedCode = GenerateHandlePacketInPacketHandlerCpp(packetList, originCode)
@@ -265,15 +274,20 @@ def GeneratePacketHandlerCpp(packetList):
     if state == False:
         return False
 
-    targetFilePath = packetHandlerFilePath + "_new"
+    targetFilePath = PacketItemsFilePath.packetHandlerFilePath + "_new"
     with open(targetFilePath, 'w') as file:
         file.write(modifiedCode)
     return True
 
 
 def ProcessPacketGenerate():
-    with open(ymlFilePath, 'r') as file:
+    MakePacketItemsOnce.MakePacketItemsOnce()
+    
+    with open(PacketItemsFilePath.ymlFilePath, 'r') as file:
         ymlData = yaml.load(file, Loader=yaml.SafeLoader)
+        if ymlData['Packet'] == None:
+            print("ymlData is empty")
+            exit()
         
     if IsValidPacketTypeInYaml(ymlData['Packet']) == False:
         print("Code genearate failed")
@@ -301,14 +315,6 @@ def ProcessPacketGenerate():
         exit()
         
     ReplacePacketFiled()
-
-
-# Write file path here
-packetTypeFilePath = 'ContentsServer/PacketIdType.h'
-protocolHeaderPath = 'ContentsServer/Protocol.h'
-protocolCppFileCppPath = 'ContentsServer/Protocol.cpp'
-packetHandlerFilePath = 'ContentsServer/PacketHandler.cpp'
-ymlFilePath = 'PacketDefine.yml'
 
 ProcessPacketGenerate()
 print("Code generated successfully")
