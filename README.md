@@ -40,3 +40,18 @@
     * 위에서 얻은 정보로 클라이언트가 패킷을 송신하면, 서버에서는 예약된 세션키를 비교하고 RUDPSession을 해당 클라이언트에게 귀속 시킵니다.
 
 ---
+
+3. Tools
+   1. PacketGenerator
+      * PacketGenerate.bat 파일을 실행하면 PacketDefine.yml 파일을 참조하여 아래 파일들을 생성합니다.
+        * PacketHandler.cpp
+        * PacketHandler.h
+        * Protocol.cpp
+        * Protocol.h
+        * PacketIdType.h
+      * 각 파일 생성 경로를 Tool/PacketGenerator/PacketItemsFilePath.py에 정의하면 해당 경로에 생성됩니다.
+      * PacketDefine.yml 파일의 내용이 비어있을 경우, 파일의 삭제 및 생성을 시도하지 않습니다.
+      * 해당하는 파일이 없을 경우 새로 생성합니다.
+        * 단, PacketHandler.cpp의 HandlePacket(RUDPSession& session, Packet& packet) 함수들은 제거되지 않으며, 해당 함수는 사용자가 직접 지워야 합니다(유저가 작성한 코드이므로, 삭제 책임도 유저가 가지도록 함).
+
+---
