@@ -16,6 +16,9 @@
     <Filter Include="소스 파일\Protocol">
       <UniqueIdentifier>{3aa6ef32-3d90-4050-b921-7e79ca11471c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\EssentialHandler">
+      <UniqueIdentifier>{c27d3a0f-2592-41c9-9b03-0fe851a9d72e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -27,6 +30,9 @@
     <ClCompile Include="Protocol.cpp">
       <Filter>소스 파일\Protocol</Filter>
     </ClCompile>
+    <ClCompile Include="RegisterEssentialHandler.cpp">
+      <Filter>소스 파일\EssentialHandler</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketHandler.h">
@@ -37,6 +43,9 @@
     </ClInclude>
     <ClInclude Include="PacketIdType.h">
       <Filter>소스 파일\Protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="RegisterEssentialHandler.h">
+      <Filter>소스 파일\EssentialHandler</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
