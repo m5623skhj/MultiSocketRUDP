@@ -68,7 +68,7 @@ public:
 	inline bool SendPacket(IPacket& packet);
 
 private:
-	void OnConnected(SessionIdType sessionId);
+	void OnConnected(SessionIdType inSessionId);
 	void OnDisconnected();
 	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence);
 

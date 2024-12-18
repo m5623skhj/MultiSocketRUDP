@@ -3,6 +3,9 @@
 #include "NetServerSerializeBuffer.h"
 #include "PacketManager.h"
 #include "MultiSocketRUDPCore.h"
+#include "PacketHandlerUtil.h"
+
+using namespace PacketHandlerUtil;
 
 RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore)
 	: sock(inSock)
@@ -94,9 +97,9 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	return SendPacket(*buffer, packetSequence);
 }
 
-void RUDPSession::OnConnected(SessionIdType sessionId)
+void RUDPSession::OnConnected(SessionIdType inSessionId)
 {
-
+	sessionId = inSessionId;
 }
 
 void RUDPSession::OnDisconnected()
