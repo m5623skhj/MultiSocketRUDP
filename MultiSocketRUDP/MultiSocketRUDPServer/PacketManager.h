@@ -35,19 +35,19 @@ private:
 public:
 	static PacketManager& GetInst();
 	[[nodiscard]]
-	inline std::shared_ptr<IPacket> MakePacket(PacketId packetId);
+	static std::shared_ptr<IPacket> MakePacket(PacketId packetId);
 	[[nodiscard]]
-	inline PacketHandler GetPacketHandler(PacketId packetId);
+	static PacketHandler GetPacketHandler(PacketId packetId);
 	[[nodiscard]]
-	inline bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
-	void Init();
+	static bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
+	static void Init();
 
 public:
 	using PacketFactoryFunction = std::function<std::shared_ptr<IPacket>()>;
 	using PacketToBufferFunction = std::function<void (NetBuffer&, std::any&)>;
 
 	template <typename PacketType>
-	void RegisterPacket()
+	static void RegisterPacket()
 	{
 		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacket() : PacketType must inherit from IPacket");
 
@@ -61,7 +61,7 @@ public:
 	}
 
 	template <typename PacketType>
-	void RegisterPacketHandler(PacketHandler& handler)
+	static void RegisterPacketHandler(PacketHandler& handler)
 	{
 		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
 
@@ -70,7 +70,7 @@ public:
 	}
 
 	template <typename PacketType>
-	void RegisterBufferToPacketType()
+	static void RegisterBufferToPacketType()
 	{
 		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
 
@@ -85,7 +85,7 @@ public:
 	}
 
 private:
-	std::unordered_map<PacketId, PacketFactoryFunction> packetFactoryFunctionMap;
-	std::unordered_map<PacketId, PacketToBufferFunction> packetToBufferFunctionMap;
-	std::unordered_map<PacketId, PacketHandler> packetHandlerMap;
+	inline static std::unordered_map<PacketId, PacketFactoryFunction> packetFactoryFunctionMap = {};
+	inline static std::unordered_map<PacketId, PacketToBufferFunction> packetToBufferFunctionMap = {};
+	inline static std::unordered_map<PacketId, PacketHandler> packetHandlerMap = {};
 };

@@ -22,7 +22,7 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
-    <ClCompile Include="PacketHandlerUtil.cpp" />
+    <ClCompile Include="EssentialHandler.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
@@ -30,6 +30,7 @@
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CoreType.h" />
+    <ClInclude Include="EssentialHandler.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />

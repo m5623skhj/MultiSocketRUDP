@@ -45,7 +45,7 @@
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\PacketManager</Filter>
     </ClCompile>
-    <ClCompile Include="PacketHandlerUtil.cpp">
+    <ClCompile Include="EssentialHandler.cpp">
       <Filter>소스 파일\PacketManager</Filter>
     </ClCompile>
   </ItemGroup>
@@ -66,6 +66,9 @@
       <Filter>소스 파일\PacketManager</Filter>
     </ClInclude>
     <ClInclude Include="PacketHandlerUtil.h">
+      <Filter>소스 파일\PacketManager</Filter>
+    </ClInclude>
+    <ClInclude Include="EssentialHandler.h">
       <Filter>소스 파일\PacketManager</Filter>
     </ClInclude>
   </ItemGroup>

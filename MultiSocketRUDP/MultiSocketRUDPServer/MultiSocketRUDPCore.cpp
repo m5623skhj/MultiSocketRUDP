@@ -1,7 +1,7 @@
 #include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 #include "BuildConfig.h"
-#include "PacketHandlerUtil.h"
+#include "EssentialHandler.h"
 
 void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
 {
@@ -16,10 +16,10 @@ MultiSocketRUDPCore::MultiSocketRUDPCore()
 
 bool MultiSocketRUDPCore::StartServer(const std::wstring& optionFilePath, const std::wstring& sessionBrokerOptionFilePath)
 {
-	if (PacketHandlerUtil::EssentialHandler::GetInst().IsRegisteredAllEssentialHandler())
+	if (EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
 	{
 		std::cout << "Required handler not registered" << std::endl;
-		PacketHandlerUtil::EssentialHandler::GetInst().PrintUnregisteredEssentialHandler();
+		EssentialHandlerManager::GetInst().PrintUnregisteredEssentialHandler();
 		return false;
 	}
 

@@ -1,11 +1,8 @@
 #include "PreCompile.h"
 #include "RUDPSession.h"
 #include "NetServerSerializeBuffer.h"
-#include "PacketManager.h"
 #include "MultiSocketRUDPCore.h"
-#include "PacketHandlerUtil.h"
-
-using namespace PacketHandlerUtil;
+#include "EssentialHandler.h"
 
 RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore)
 	: sock(inSock)
@@ -100,11 +97,12 @@ bool RUDPSession::SendPacket(IPacket& packet)
 void RUDPSession::OnConnected(SessionIdType inSessionId)
 {
 	sessionId = inSessionId;
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::ConnectHandlerType);
 }
 
 void RUDPSession::OnDisconnected()
 {
-
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::DisconnectHandlerType);
 }
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence)
@@ -151,14 +149,14 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 		return;
 	}
 
-	OnConnected(sessionId);
 	isConnected = true;
+	OnConnected(sessionId);
 }
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
-	isConnected = false;
 	OnDisconnected();
+	isConnected = false;
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
@@ -271,6 +269,11 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	}
 
 	core.EraseSendPacketInfo(sendedPacketInfo, threadId);
+}
+
+SessionIdType RUDPSession::GetSessionId()
+{
+	return sessionId;
 }
 
 sockaddr_in RUDPSession::GetSocketAddress()
