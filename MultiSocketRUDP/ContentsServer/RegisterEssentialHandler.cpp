@@ -4,22 +4,22 @@
 
 namespace EssentialHandler
 {
-	bool HandleConnect(RUDPSession& session)
+	bool HandleOnConnected(RUDPSession& session)
 	{
 		return true;
 	}
 
-	bool HandleDisconnect(RUDPSession& session)
+	bool HandleOnDisconnected(RUDPSession& session)
 	{
 		return true;
 	}
 
 	void RegisterAllEssentialHandler()
 	{
-		RUDPCoreEssentialFunction connectHandler{ HandleConnect };
-		RUDPCoreEssentialFunction disconnectHandler{ HandleDisconnect };
+		RUDPCoreEssentialFunction onConnectedHandler{ HandleOnConnected };
+		RUDPCoreEssentialFunction onDisconnectedHandler{ HandleOnDisconnected };
 
-		EssentialHandlerManager::GetInst().RegisterConnectHandler(connectHandler);
-		EssentialHandlerManager::GetInst().RegisterDisconnectHandler(disconnectHandler);
+		EssentialHandlerManager::GetInst().RegisterOnConnectedHandler(onConnectedHandler);
+		EssentialHandlerManager::GetInst().RegisterOnDisconnectedHandler(onDisconnectedHandler);
 	}
 }

@@ -11,8 +11,8 @@ class EssentialHandlerManager
 public:
 	enum EssentialHandlerType
 	{
-		ConnectHandlerType,
-		DisconnectHandlerType,
+		OnConnectedHandlerType,
+		OnDisconnectedHandlerType,
 	};
 
 private:
@@ -46,14 +46,14 @@ private:
 	}
 
 public:
-	static void RegisterConnectHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
+	static void RegisterOnConnectedHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
 	{
-		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::ConnectHandlerType);
+		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::OnConnectedHandlerType);
 	}
 
-	static void RegisterDisconnectHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
+	static void RegisterOnDisconnectedHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
 	{
-		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::DisconnectHandlerType);
+		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::OnDisconnectedHandlerType);
 	}
 
 private:
@@ -70,14 +70,14 @@ private:
 		bool isRegistered{ false };
 	};
 
-	struct ConnectHandlerRegisterChecker : EssentialHandlerRegisterChecker
+	struct OnConnectedHandlerRegisterChecker : EssentialHandlerRegisterChecker
 	{
-		std::string GetHandlerType() override { return "connect handler"; }
+		std::string GetHandlerType() override { return "OnConnected handler"; }
 	};
 
-	struct DisconnectHandlerRegisterChecker : EssentialHandlerRegisterChecker
+	struct OnDisconnectedHandlerRegisterChecker : EssentialHandlerRegisterChecker
 	{
-		std::string GetHandlerType() override { return "disconnect handler"; }
+		std::string GetHandlerType() override { return "OnDisconnected handler"; }
 	};
 
 private:

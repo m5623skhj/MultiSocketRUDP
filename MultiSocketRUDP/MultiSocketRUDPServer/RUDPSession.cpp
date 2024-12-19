@@ -97,12 +97,12 @@ bool RUDPSession::SendPacket(IPacket& packet)
 void RUDPSession::OnConnected(SessionIdType inSessionId)
 {
 	sessionId = inSessionId;
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::ConnectHandlerType);
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::OnConnectedHandlerType);
 }
 
 void RUDPSession::OnDisconnected()
 {
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::DisconnectHandlerType);
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::OnDisconnectedHandlerType);
 }
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence)
