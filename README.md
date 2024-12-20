@@ -39,6 +39,15 @@
   * 유저가 접속하면, 세션 브로커는 연결할 세션 정보와 세션 키를 발급하고 연결을 종료시킵니다.
     * 위에서 얻은 정보로 클라이언트가 패킷을 송신하면, 서버에서는 예약된 세션키를 비교하고 RUDPSession을 해당 클라이언트에게 귀속 시킵니다.
 
+* EssentialHandlerManager
+  * 필수적인 핸들러들을 등록 및 검사하는 싱글턴 객체입니다.
+  * 필수 핸들러들 중 등록되지 않은 핸들러가 존재한다면, 서버를 띄우는 것이 실패하게 됩니다.
+    * 시그니쳐는 RUDPCoreEssentialFunction = std::function<bool(RUDPSession&)>이며, 해당 형태의 핸들러만 등록됩니다.
+	* 핸들러는 Register~(RUDPCoreEssentialFunction&)로 등록합니다.
+	* 현재 필수 등록 핸들러 목록
+	  * ConnectHandler
+	  * DisconnectHandler
+
 ---
 
 3. Tools
