@@ -74,13 +74,13 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
-	if (not isConnected)
+	bool connectState{ true };
+	if (not isConnected.compare_exchange_strong(connectState, false))
 	{
 		return;
 	}
 
 	OnDisconnected();
-	isConnected = false;
 
 	core.DisconnectSession(sessionId);
 }
