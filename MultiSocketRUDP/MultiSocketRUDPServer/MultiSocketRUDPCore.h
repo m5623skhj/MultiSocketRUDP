@@ -101,7 +101,6 @@ private:
 private:
 	std::shared_ptr<RUDPSession> AcquireSession();
 	std::shared_ptr<RUDPSession> GetUsingSession(SessionIdType sessionId);
-	void ReleaseSession(std::shared_ptr<RUDPSession> session);
 
 private:
 	// This container's size must not be increased any further

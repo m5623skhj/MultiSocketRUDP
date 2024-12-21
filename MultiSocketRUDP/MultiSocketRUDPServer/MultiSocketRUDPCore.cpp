@@ -331,21 +331,6 @@ std::shared_ptr<RUDPSession> MultiSocketRUDPCore::GetUsingSession(SessionIdType 
 	return sessionArray[sessionId];
 }
 
-void MultiSocketRUDPCore::ReleaseSession(std::shared_ptr<RUDPSession> session)
-{
-	if (session == nullptr)
-	{
-		std::cout << "ReleaseSession() : session is nullptr" << std::endl;
-		return;
-	}
-	
-	{
-		std::scoped_lock lock(unusedSessionIdListLock);
-		unusedSessionIdList.emplace_back(session->sessionId);
-	}
-	session->isUsingSession = false;
-}
-
 void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 {
 	RIORESULT rioResults[maxRIOResult];
@@ -602,7 +587,6 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 		}
 
 		session->Disconnect(recvPacket);
-		ReleaseSession(session);
 		return false;
 	}
 	break;
@@ -615,7 +599,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 
 		if (session->OnRecvPacket(recvPacket) == false)
 		{
-			// disconnect?
+			session->Disconnect();
 		}
 		break;
 	}

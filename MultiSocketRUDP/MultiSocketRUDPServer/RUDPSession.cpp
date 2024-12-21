@@ -74,6 +74,9 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
+	OnDisconnected();
+	isConnected = false;
+
 	core.DisconnectSession(sessionId);
 }
 
@@ -155,8 +158,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
-	OnDisconnected();
-	isConnected = false;
+	Disconnect();
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
