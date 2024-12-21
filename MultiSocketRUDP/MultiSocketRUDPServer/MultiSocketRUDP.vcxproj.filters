@@ -25,6 +25,9 @@
     <Filter Include="소스 파일\PacketManager">
       <UniqueIdentifier>{314e01ef-91d4-4000-b448-c39baca6d21f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Handler">
+      <UniqueIdentifier>{44d20824-0ad8-47ca-8061-a7f77d167649}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
@@ -46,7 +49,7 @@
       <Filter>소스 파일\PacketManager</Filter>
     </ClCompile>
     <ClCompile Include="EssentialHandler.cpp">
-      <Filter>소스 파일\PacketManager</Filter>
+      <Filter>소스 파일\Handler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -65,11 +68,11 @@
     <ClInclude Include="PacketManager.h">
       <Filter>소스 파일\PacketManager</Filter>
     </ClInclude>
-    <ClInclude Include="PacketHandlerUtil.h">
-      <Filter>소스 파일\PacketManager</Filter>
-    </ClInclude>
     <ClInclude Include="EssentialHandler.h">
-      <Filter>소스 파일\PacketManager</Filter>
+      <Filter>소스 파일\Handler</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketHandlerUtil.h">
+      <Filter>소스 파일\Handler</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
