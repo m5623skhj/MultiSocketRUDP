@@ -363,7 +363,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
-		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMillisecond);
+		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
 #endif
 	}
 
@@ -435,18 +435,18 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 			SendPacket(sendedPacketInfo);
 		}
 
-		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMillisecond);
+		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
 
-void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMillisecond)
+void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs)
 {
 	tickSet.nowTick = GetTickCount64();
 	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
 
-	if (deltaTick < intervalMillisecond && deltaTick > 0)
+	if (deltaTick < intervalMs && deltaTick > 0)
 	{
-		Sleep(intervalMillisecond - static_cast<DWORD>(deltaTick));
+		Sleep(intervalMs - static_cast<DWORD>(deltaTick));
 	}
 
 	tickSet.beforeTick = tickSet.nowTick;
@@ -747,7 +747,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			break;
 		}
 
-		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMillisecond;
+		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
 		{
 			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
 			auto itor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);

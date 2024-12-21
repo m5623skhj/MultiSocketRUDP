@@ -158,7 +158,7 @@ private:
 	void RunWorkerThread(ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(ThreadIdType threadId);
 	void RunRetransmissionThread(ThreadIdType threadId);
-	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMillisecond);
+	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
 	unsigned char numOfWorkerThread{};
