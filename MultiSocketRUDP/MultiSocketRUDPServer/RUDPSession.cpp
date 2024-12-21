@@ -74,6 +74,11 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
+	if (not isConnected)
+	{
+		return;
+	}
+
 	OnDisconnected();
 	isConnected = false;
 
