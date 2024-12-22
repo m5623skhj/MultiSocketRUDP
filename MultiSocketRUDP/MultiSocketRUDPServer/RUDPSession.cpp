@@ -95,7 +95,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	PACKET_TYPE packetType = PACKET_TYPE::SendType;
-	unsigned long long packetSequence = ++lastSendPacketSequence;
+	PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
