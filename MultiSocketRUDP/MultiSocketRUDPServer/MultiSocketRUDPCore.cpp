@@ -533,94 +533,38 @@ bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUD
 
 void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
 {
-	IOContext* context = nullptr;
-	if (ioCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
+	while (ioCompletedContexts[threadId].GetRestSize() > 0)
 	{
-		return;
+		IOContext* context = nullptr;
+		if (ioCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
+		{
+			continue;
+		}
+
+		NetBuffer* buffer = nullptr;
+		do
+		{
+			if (context->session->recvBuffer.recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
+			{
+				break;
+			}
+
+			if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
+			{
+				break;
+			}
+
+			sockaddr_in clientAddr;
+			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(context->clientAddrBuffer));
+			ProcessByPacketType(context->session, clientAddr, *buffer);
+		} while (false);
+
+		if (buffer != nullptr)
+		{
+			NetBuffer::Free(buffer);
+		}
+		contextPool.Free(context);
 	}
-
-	NetBuffer* buffer = nullptr;
-	do
-	{
-		if (context->session->recvBuffer.recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
-		{
-			contextPool.Free(context);
-			return;
-		}
-
-		if (not buffer->Decode())
-		{
-			break;
-		}
-		else if (buffer->GetUseSize() != GetPayloadLength(*buffer))
-		{
-			break;
-		}
-
-		sockaddr_in clientAddr;
-		std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(context->clientAddrBuffer));
-		ProcessByPacketType(context->session, clientAddr, *buffer);
-	} while (false);
-
-	NetBuffer::Free(buffer);
-	contextPool.Free(context);
-}
-
-bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
-{
-	PACKET_TYPE packetType;
-	recvPacket >> packetType;
-
-	switch (packetType)
-	{
-	case PACKET_TYPE::ConnectType:
-	{
-		session->TryConnect(recvPacket);
-		break;
-	}
-	break;
-	case PACKET_TYPE::DisconnectType:
-	{
-		if (not session->CheckMyClient(clientAddr))
-		{
-			break;
-		}
-
-		session->Disconnect(recvPacket);
-		return false;
-	}
-	break;
-	case PACKET_TYPE::SendType:
-	{
-		if (not session->CheckMyClient(clientAddr))
-		{
-			break;
-		}
-
-		if (session->OnRecvPacket(recvPacket) == false)
-		{
-			session->Disconnect();
-		}
-		break;
-	}
-	break;
-	case PACKET_TYPE::SendReplyType:
-	{
-		if (not session->CheckMyClient(clientAddr))
-		{
-			break;
-		}
-
-		session->OnSendReply(recvPacket);
-		break;
-	}
-	break;
-	default:
-		// TODO : Write log
-		break;
-	}
-
-	return true;
 }
 
 bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)

@@ -51,6 +51,9 @@
     <ClCompile Include="EssentialHandler.cpp">
       <Filter>소스 파일\Handler</Filter>
     </ClCompile>
+    <ClCompile Include="ProcessByPacketType.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">

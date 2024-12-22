@@ -142,11 +142,6 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 void RUDPSession::TryConnect(NetBuffer& recvPacket)
 {
-	if (isConnected)
-	{
-		return;
-	}
-
 	PacketSequence packetSequence;
 	SessionIdType inputSessionId;
 	std::string inputSessionKey;
@@ -157,7 +152,12 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 		return;
 	}
 
-	isConnected = true;
+	bool connectState{ false };
+	if (not isConnected.compare_exchange_strong(connectState, true))
+	{
+		return;
+	}
+
 	OnConnected(sessionId);
 }
 

@@ -24,6 +24,7 @@
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="EssentialHandler.cpp" />
     <ClCompile Include="PacketManager.cpp" />
+    <ClCompile Include="ProcessByPacketType.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
   </ItemGroup>
