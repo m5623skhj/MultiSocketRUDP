@@ -4,10 +4,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.6.33815.320
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentsServer", "ContentsServer\ContentsServer.vcxproj", "{A3E55530-D4C9-40EF-8D91-C1CFA7384F2F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{16F99C50-D24A-47B7-9402-2278BC3F0B0B} = {16F99C50-D24A-47B7-9402-2278BC3F0B0B}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDPClient", "MultiSocketRUDPClient\MultiSocketRUDPClient.vcxproj", "{F3949482-754B-4097-AE29-AA14E700FEC3}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentsClient", "ContentsClient\ContentsClient.vcxproj", "{53B3C18C-880D-47D7-BB35-92FC9B3D4583}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F3949482-754B-4097-AE29-AA14E700FEC3} = {F3949482-754B-4097-AE29-AA14E700FEC3}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiSocketRUDPServer", "MultiSocketRUDPServer\MultiSocketRUDP.vcxproj", "{16F99C50-D24A-47B7-9402-2278BC3F0B0B}"
 EndProject
