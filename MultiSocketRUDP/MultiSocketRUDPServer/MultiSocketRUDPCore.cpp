@@ -14,16 +14,20 @@ MultiSocketRUDPCore::MultiSocketRUDPCore()
 {
 }
 
-bool MultiSocketRUDPCore::StartServer(const std::wstring& optionFilePath, const std::wstring& sessionBrokerOptionFilePath)
+bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath)
 {
+	if (not ReadOptionFile(coreOptionFilePath, sessionBrokerOptionFilePath))
+	{
+		std::cout << "Option file read failed" << std::endl;
+		return false;
+	}
+
 	if (EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
 	{
 		std::cout << "Required handler not registered" << std::endl;
 		EssentialHandlerManager::GetInst().PrintUnregisteredEssentialHandler();
 		return false;
 	}
-
-	// Parsing items from option file path
 
 	if (not InitNetwork())
 	{
@@ -245,7 +249,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 		return false;
 	}
 #else
-	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, ip); });
+	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, coreServerIp); });
 #endif
 
 	return true;

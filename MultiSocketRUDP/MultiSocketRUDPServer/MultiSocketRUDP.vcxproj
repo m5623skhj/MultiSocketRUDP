@@ -21,10 +21,13 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="EssentialHandler.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="ProcessByPacketType.cpp" />
+    <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
   </ItemGroup>

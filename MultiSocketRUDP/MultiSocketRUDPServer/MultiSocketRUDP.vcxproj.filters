@@ -54,6 +54,15 @@
     <ClCompile Include="ProcessByPacketType.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPCoreReadOptionFile.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">

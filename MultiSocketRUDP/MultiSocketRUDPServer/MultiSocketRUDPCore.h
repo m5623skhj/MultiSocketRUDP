@@ -62,7 +62,7 @@ public:
 
 public:
 	[[nodiscard]]
-	bool StartServer(const std::wstring& optionFilePath, const std::wstring& sessionBrokerOptionFilePath);
+	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
 	void StopServer();
 
 	[[nodiscard]]
@@ -74,6 +74,8 @@ public:
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 
 private:
+	[[nodiscard]]
+	bool ReadOptionFile(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
 	[[nodiscard]]
 	bool InitNetwork();
 	[[nodiscard]]
@@ -96,7 +98,7 @@ private:
 	unsigned short numOfSockets{};
 	PortType portStartNumber{};
 	PortType sessionBrokerPort{};
-	std::string ip{};
+	std::string coreServerIp{};
 
 private:
 	std::shared_ptr<RUDPSession> AcquireSession();
