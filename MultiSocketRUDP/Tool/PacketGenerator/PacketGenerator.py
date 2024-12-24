@@ -44,7 +44,20 @@ def ReplaceFile(originFile, newFile):
             print(f"Error during file replacement: {e}")
     else:
         print(f"New file does not exist: {newFile}")
-
+        
+        
+def CopyServerGeneratedFileToClientPath():
+    CopyServerFileToClientFile(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.clientPacketTypeFilePath)
+    CopyServerFileToClientFile(PacketItemsFilePath.protocolCppFileCppPath, PacketItemsFilePath.clientProtocolCppFilePath)
+    CopyServerFileToClientFile(PacketItemsFilePath.protocolHeaderPath, PacketItemsFilePath.clientProtocolHeaderFilePath)
+    print("Copy server geneareted file to client path completed")
+            
+            
+def CopyServerFileToClientFile(serverFilePath, clientFilePath):
+    with open(serverFilePath, 'r') as readFile:
+        with open(clientFilePath, 'w') as writeFile:
+            writeFile.write(readFile.read())
+            
 
 def DuplicateCheckAndAdd(packetDuplicateCheckerContainer, checkTarget):
     if checkTarget in packetDuplicateCheckerContainer:
@@ -315,6 +328,7 @@ def ProcessPacketGenerate():
         exit()
         
     ReplacePacketFiled()
+    CopyServerGeneratedFileToClientPath()
 
 ProcessPacketGenerate()
 print("Code generated successfully")
