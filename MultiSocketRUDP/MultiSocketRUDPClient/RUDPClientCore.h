@@ -8,6 +8,8 @@
 #include <array>
 #include "Queue.h"
 
+#pragma comment(lib, "ws2_32.lib")
+
 class RUDPClientCore
 {
 private:

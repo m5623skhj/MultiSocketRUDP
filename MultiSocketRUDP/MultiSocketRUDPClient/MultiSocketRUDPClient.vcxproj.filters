@@ -19,9 +19,6 @@
     <Filter Include="소스 파일\lib">
       <UniqueIdentifier>{fb2376d3-f29d-4e31-838e-a7aa470ecdc3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\main">
-      <UniqueIdentifier>{941b7d41-61a3-40b4-ac19-531f4661545b}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RUDPClientCore.cpp">
