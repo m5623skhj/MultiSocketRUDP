@@ -1,5 +1,4 @@
 #include "PreCompile.h"
-#include <iostream>
 #include "PacketHandler.h"
 #include "RegisterEssentialHandler.h"
 #include "MultiSocketRUDPCore.h"
