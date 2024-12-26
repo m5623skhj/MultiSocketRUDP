@@ -16,6 +16,9 @@
     <Filter Include="소스 파일\Protocol">
       <UniqueIdentifier>{6e02fa28-4373-40f9-9067-4a4453c75412}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\TestClient">
+      <UniqueIdentifier>{a71fd836-09fd-4081-8894-0d39ee2267fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -24,6 +27,9 @@
     <ClCompile Include="Protocol.cpp">
       <Filter>소스 파일\Protocol</Filter>
     </ClCompile>
+    <ClCompile Include="TestClient.cpp">
+      <Filter>소스 파일\TestClient</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketIdType.h">
@@ -31,6 +37,9 @@
     </ClInclude>
     <ClInclude Include="Protocol.h">
       <Filter>소스 파일\Protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="TestClient.h">
+      <Filter>소스 파일\TestClient</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,13 +1,13 @@
 #include "PreCompile.h"
-#include "RUDPClientCore.h"
+#include "TestClient.h"
 
 int main()
 {
-	if (not RUDPClientCore::GetInst().Start(L"OptionFile/CoreOption.txt"))
+	if (not TestClient::GetInst().Start(L"OptionFile/CoreOption.txt"))
 	{
-		std::cout << "Core start failed" << std::endl;
 		return 0;
 	}
+	std::cout << "Exit : ESC" << std::endl;
 
 	while (true)
 	{
@@ -15,11 +15,10 @@ int main()
 
 		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
 		{
-			RUDPClientCore::GetInst().Stop();
+			TestClient::GetInst().Stop();
 			break;
 		}
 	}
-	std::cout << "Server stop" << std::endl;
 
 	return 0;
 }

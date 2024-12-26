@@ -19,6 +19,9 @@
     <Filter Include="소스 파일\EssentialHandler">
       <UniqueIdentifier>{c27d3a0f-2592-41c9-9b03-0fe851a9d72e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\TestServer">
+      <UniqueIdentifier>{1f6ac488-2a1b-4beb-bd23-8e6eb9279ce2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -33,6 +36,9 @@
     <ClCompile Include="RegisterEssentialHandler.cpp">
       <Filter>소스 파일\EssentialHandler</Filter>
     </ClCompile>
+    <ClCompile Include="TestServer.cpp">
+      <Filter>소스 파일\TestServer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketHandler.h">
@@ -46,6 +52,9 @@
     </ClInclude>
     <ClInclude Include="RegisterEssentialHandler.h">
       <Filter>소스 파일\EssentialHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="TestServer.h">
+      <Filter>소스 파일\TestServer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

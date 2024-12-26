@@ -2,18 +2,19 @@
 #include "PacketHandler.h"
 #include "RegisterEssentialHandler.h"
 #include "MultiSocketRUDPCore.h"
+#include "TestServer.h"
 
 int main()
 {
 	ContentsPacketHandler::Init();
 	EssentialHandler::RegisterAllEssentialHandler();
 
-	MultiSocketRUDPCore serverCore;
-	if (not serverCore.StartServer(L"OptionFile/CoreOption.txt", L"OptionFile/SessionBrokerOption.txt"))
+	if (not TestServer::GetInst().Start(L"OptionFile/CoreOption.txt", L"OptionFile/SessionBrokerOption.txt"))
 	{
 		std::cout << "StartServer() failed" << std::endl;
 		return 0;
 	}
+	std::cout << "Exit : ESC" << std::endl;
 
 	while (true)
 	{
@@ -21,11 +22,11 @@ int main()
 		
 		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
 		{
-			serverCore.StopServer();
+			TestServer::GetInst().Stop();
 			break;
 		}
 	}
-	std::cout << "Server stop" << std::endl;
+	std::cout << "Server stopped" << std::endl;
 
 	return 0;
 }
