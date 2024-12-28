@@ -62,5 +62,7 @@
       * PacketDefine.yml 파일의 내용이 비어있을 경우, 파일의 삭제 및 생성을 시도하지 않습니다.
       * 해당하는 파일이 없을 경우 새로 생성합니다.
         * 단, PacketHandler.cpp의 HandlePacket(RUDPSession& session, Packet& packet) 함수들은 제거되지 않으며, 해당 함수는 사용자가 직접 지워야 합니다(유저가 작성한 코드이므로, 삭제 책임도 유저가 가지도록 함).
+   2. RunDebug
+      * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다. 
 
 ---
