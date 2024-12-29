@@ -92,12 +92,6 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
-		if (not SetSessionId(session))
-		{
-			std::cout << "Session already has session id" << std::endl;
-			continue;
-		}
-
 		SetSessionKey(session);
 		SetSessionInfoToBuffer(session, rudpSessionIP, sendBuffer);
 
@@ -114,17 +108,6 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 
 	closesocket(listenSocket);
 	std::cout << "Session broker thread stopped" << std::endl;
-}
-
-bool MultiSocketRUDPCore::SetSessionId(OUT std::shared_ptr<RUDPSession> session)
-{
-	if (session->sessionId != invalidSessionId)
-	{
-		return false;
-	}
-
-	session->sessionId = ++sessionIdGenerator;
-	return true;
 }
 
 void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session)

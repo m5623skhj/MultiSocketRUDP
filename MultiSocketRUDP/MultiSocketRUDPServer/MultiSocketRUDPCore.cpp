@@ -22,7 +22,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		return false;
 	}
 
-	if (EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
+	if (not EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
 	{
 		std::cout << "Required handler not registered" << std::endl;
 		EssentialHandlerManager::GetInst().PrintUnregisteredEssentialHandler();
@@ -64,6 +64,7 @@ void MultiSocketRUDPCore::StopServer()
 	sessionBrokerThread.join();
 #endif
 	CloseAllSessions();
+	delete[] rioCQList;
 
 	isServerStopped = true;
 	std::cout << "Server stop" << std::endl;
@@ -159,6 +160,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		}
 
 		sessionArray.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
+		sessionArray[socketNumber]->sessionId = socketNumber;
 	}
 
 	return true;
@@ -181,6 +183,10 @@ bool MultiSocketRUDPCore::InitRIO()
 	if (rioCQList == nullptr)
 	{
 		return false;
+	}
+	for (int rioCQIndex = 0; rioCQIndex < numOfWorkerThread; ++rioCQIndex)
+	{
+		rioCQList[rioCQIndex] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * maxSendBufferSize, nullptr);
 	}
 
 	for (auto& session : sessionArray)
@@ -257,7 +263,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 
 std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socketNumber)
 {
-	SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)
 	{
 		std::cout << "Socket create failed " << WSAGetLastError() << std::endl;
@@ -338,7 +344,6 @@ std::shared_ptr<RUDPSession> MultiSocketRUDPCore::GetUsingSession(SessionIdType 
 void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 {
 	RIORESULT rioResults[maxRIOResult];
-	rioCQList[threadId] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * maxSendBufferSize, nullptr);
 	ULONG numOfResults = 0;
 
 	TickSet tickSet;

@@ -48,7 +48,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, 32, 1, 32, 1, rioRecvCQ, rioSendCQ, &sessionId);
 	if (rioRQ == RIO_INVALID_RQ)
 	{
-		std::cout << "RIORegisterBuffer failed" << std::endl;
+		std::cout << "RIORegisterBuffer failed with error code " << WSAGetLastError() << std::endl;
 		return false;
 	}
 
