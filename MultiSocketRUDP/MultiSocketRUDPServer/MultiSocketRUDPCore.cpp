@@ -437,7 +437,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 
 			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				DisconnectSession(sendedPacketInfo->owner->sessionId);
+				sendedPacketInfo->owner->Disconnect();
 				continue;
 			}
 
