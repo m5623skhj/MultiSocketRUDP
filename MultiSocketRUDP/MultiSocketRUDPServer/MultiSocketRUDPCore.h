@@ -70,6 +70,7 @@ public:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
+	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 
