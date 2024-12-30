@@ -131,7 +131,7 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, T
 		}
 
 		{
-			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
+			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
 			sendedPacketInfoList[threadId].erase(eraseTarget->listItor);
 		}
 	} while (false);
@@ -225,6 +225,8 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		return false;
 	}
 
+	sendedPacketInfoList.reserve(numOfWorkerThread);
+	sendedPacketInfoListLock.reserve(numOfWorkerThread);
 	ioWorkerThreads.reserve(numOfWorkerThread);
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
 	retransmissionThread.reserve(numOfWorkerThread);
@@ -236,6 +238,8 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
+		sendedPacketInfoList.emplace_back();
+		sendedPacketInfoListLock.push_back(std::make_unique<std::mutex>());
 
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
@@ -417,7 +421,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 	tickSet.beforeTick = tickSet.nowTick;
 
 	auto& thisThreadSendedPacketInfoList = sendedPacketInfoList[threadId];
-	auto& thisThreadSendedPacketInfoListLock = sendedPacketInfoListLock[threadId];
+	auto& thisThreadSendedPacketInfoListLock = *sendedPacketInfoListLock[threadId];
 
 	std::list<SendPacketInfo*> copyList;
 
@@ -702,7 +706,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
 		{
-			std::scoped_lock lock(sendedPacketInfoListLock[threadId]);
+			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
 			auto itor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
 			sendPacketInfo->listItor = itor;
 		}

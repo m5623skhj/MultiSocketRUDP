@@ -113,7 +113,7 @@ private:
 
 private:
 	std::vector<std::list<SendPacketInfo*>> sendedPacketInfoList;
-	std::vector<std::mutex> sendedPacketInfoListLock;
+	std::vector<std::unique_ptr<std::mutex>> sendedPacketInfoListLock;
 
 #pragma region thread
 #if USE_IOCP_SESSION_BROKER
