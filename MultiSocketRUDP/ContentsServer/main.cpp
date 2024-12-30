@@ -9,7 +9,7 @@ int main()
 	ContentsPacketHandler::Init();
 	EssentialHandler::RegisterAllEssentialHandler();
 
-	if (not TestServer::GetInst().Start(L"OptionFile/CoreOption.txt", L"OptionFile/SessionBrokerOption.txt"))
+	if (not TestServer::GetInst().Start(L"ServerOptionFile/CoreOption.txt", L"ServerOptionFile/SessionBrokerOption.txt"))
 	{
 		std::cout << "StartServer() failed" << std::endl;
 		return 0;

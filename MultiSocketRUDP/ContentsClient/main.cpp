@@ -3,7 +3,7 @@
 
 int main()
 {
-	if (not TestClient::GetInst().Start(L"OptionFile/CoreOption.txt"))
+	if (not TestClient::GetInst().Start(L"ClientOptionFile/CoreOption.txt"))
 	{
 		return 0;
 	}
