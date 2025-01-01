@@ -22,6 +22,9 @@
     <Filter Include="소스 파일\TestServer">
       <UniqueIdentifier>{1f6ac488-2a1b-4beb-bd23-8e6eb9279ce2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\PC">
+      <UniqueIdentifier>{685caa2a-05df-4474-ace4-66d72f798148}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -39,6 +42,12 @@
     <ClCompile Include="TestServer.cpp">
       <Filter>소스 파일\TestServer</Filter>
     </ClCompile>
+    <ClCompile Include="PC.cpp">
+      <Filter>소스 파일\PC</Filter>
+    </ClCompile>
+    <ClCompile Include="PCManager.cpp">
+      <Filter>소스 파일\PC</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketHandler.h">
@@ -55,6 +64,12 @@
     </ClInclude>
     <ClInclude Include="TestServer.h">
       <Filter>소스 파일\TestServer</Filter>
+    </ClInclude>
+    <ClInclude Include="PC.h">
+      <Filter>소스 파일\PC</Filter>
+    </ClInclude>
+    <ClInclude Include="PCManager.h">
+      <Filter>소스 파일\PC</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
