@@ -2,6 +2,7 @@
 #include "CoreType.h"
 
 class RUDPSession;
+class IPacket;
 
 class PC
 {
@@ -12,6 +13,7 @@ public:
 
 public:
 	SessionIdType GetSessionId();
+	void SendPacket(IPacket& packet);
 
 private:
 	RUDPSession& session;

@@ -65,7 +65,7 @@ public:
 
 public:
 	void Disconnect();
-	inline bool SendPacket(IPacket& packet);
+	bool SendPacket(IPacket& packet);
 
 private:
 	void OnConnected(SessionIdType inSessionId);
