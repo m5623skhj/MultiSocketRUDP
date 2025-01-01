@@ -14,9 +14,15 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
+	bool HandlePacket(RUDPSession& session, TestPacketReq& packet)
+	{
+		return true;
+	}
+
 	void Init()
 	{
 		PacketHandlerUtil::RegisterPacket<Ping>(HandlePacket);
 		PacketHandlerUtil::RegisterPacket<TestStringPacket>(HandlePacket);
+		PacketHandlerUtil::RegisterPacket<TestPacketReq>(HandlePacket);
 	}
 }

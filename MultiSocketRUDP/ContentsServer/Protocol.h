@@ -90,6 +90,36 @@ public:
 	std::string testString;
 };
 
+class TestPacketReq : public IPacket
+{
+public:
+	TestPacketReq() = default;
+	virtual ~TestPacketReq() override = default;
+
+public:
+	virtual PacketId GetPacketId() const override;
+	virtual void BufferToPacket(NetBuffer& buffer) override;
+	virtual void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	int order;
+};
+
+class TestPacketRes : public IPacket
+{
+public:
+	TestPacketRes() = default;
+	virtual ~TestPacketRes() override = default;
+
+public:
+	virtual PacketId GetPacketId() const override;
+	virtual void BufferToPacket(NetBuffer& buffer) override;
+	virtual void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	int order;
+};
+
 #pragma pack(pop)
 
 ////////////////////////////////////////////////////////////////////////////////////

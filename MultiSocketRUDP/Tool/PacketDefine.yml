@@ -8,3 +8,13 @@ Packet:
     Items:
       - Type: std::string
         Name: testString
+  - Type: RequestPacket
+    PacketName: TestPacketReq
+    Items:
+      - Type: int
+        Name: order
+  - Type: ReplyPacket
+    PacketName: TestPacketRes
+    Items:
+      - Type: int
+        Name: order

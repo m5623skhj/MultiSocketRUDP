@@ -6,4 +6,6 @@ enum class PACKET_ID : unsigned int
 	, Ping
 	, Pong
 	, TestStringPacket
+	, TestPacketReq
+	, TestPacketRes
 };

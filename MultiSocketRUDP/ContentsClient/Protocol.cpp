@@ -22,4 +22,28 @@ void TestStringPacket::PacketToBuffer(NetBuffer& buffer)
 {
 	SetParametersToBuffer(buffer, testString);
 }
+PacketId TestPacketReq::GetPacketId() const
+{
+	return static_cast<PacketId>(PACKET_ID::TestPacketReq);
+}
+void TestPacketReq::BufferToPacket(NetBuffer& buffer)
+{
+	SetBufferToParameters(buffer, order);
+}
+void TestPacketReq::PacketToBuffer(NetBuffer& buffer)
+{
+	SetParametersToBuffer(buffer, order);
+}
+PacketId TestPacketRes::GetPacketId() const
+{
+	return static_cast<PacketId>(PACKET_ID::TestPacketRes);
+}
+void TestPacketRes::BufferToPacket(NetBuffer& buffer)
+{
+	SetBufferToParameters(buffer, order);
+}
+void TestPacketRes::PacketToBuffer(NetBuffer& buffer)
+{
+	SetParametersToBuffer(buffer, order);
+}
 #pragma endregion packet function
