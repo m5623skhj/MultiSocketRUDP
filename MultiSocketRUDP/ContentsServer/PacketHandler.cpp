@@ -1,6 +1,9 @@
 #include "PreCompile.h"
 #include "PacketHandler.h"
 #include "../MultiSocketRUDPServer/PacketHandlerUtil.h"
+#include "PCManager.h"
+#include "RUDPSession.h"
+#include "PC.h"
 
 namespace ContentsPacketHandler
 {

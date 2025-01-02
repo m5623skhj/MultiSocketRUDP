@@ -1,17 +1,20 @@
 #include "PreCompile.h"
 #include "EssentialHandler.h"
 #include "RegisterEssentialHandler.h"
+#include "PCManager.h"
+#include "RUDPSession.h"
+#include "PC.h"
 
 namespace EssentialHandler
 {
 	bool HandleOnConnected(RUDPSession& session)
 	{
-		return true;
+		return PCManager::GetInst().InsertPC(std::make_shared<PC>(session));
 	}
 
 	bool HandleOnDisconnected(RUDPSession& session)
 	{
-		return true;
+		return PCManager::GetInst().DeletePC(session.GetSessionId());
 	}
 
 	void RegisterAllEssentialHandler()
