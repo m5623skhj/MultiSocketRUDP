@@ -1,5 +1,6 @@
 #pragma once
 #include <thread>
+#include "NetServerSerializeBuffer.h"
 
 class TestClient
 {
@@ -18,6 +19,7 @@ public:
 
 private:
 	void RunTestThread();
+	bool ProcessPacketHandle(NetBuffer& buffer);
 
 private:
 	std::thread testThread;

@@ -34,7 +34,20 @@ void TestClient::RunTestThread()
 {
 	while (RUDPClientCore::GetInst().IsStopped())
 	{
+		auto remainPacketSize = RUDPClientCore::GetInst().GetRemainPacketSize();
+		while (remainPacketSize > 0)
+		{
+			auto buffer = RUDPClientCore::GetInst().GetReceivedPacket();
+			if (buffer == nullptr)
+			{
+				continue;
+			}
 
+			if (not ProcessPacketHandle(*buffer))
+			{
+				// logging
+			}
+		}
 	}
 
 	std::cout << "Test thread stopped" << std::endl;

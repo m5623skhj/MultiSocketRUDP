@@ -136,6 +136,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="TestClient.cpp" />
+    <ClCompile Include="TestPacketHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketIdType.h" />

@@ -30,6 +30,9 @@
     <ClCompile Include="TestClient.cpp">
       <Filter>소스 파일\TestClient</Filter>
     </ClCompile>
+    <ClCompile Include="TestPacketHandler.cpp">
+      <Filter>소스 파일\TestClient</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketIdType.h">
