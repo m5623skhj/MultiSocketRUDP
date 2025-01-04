@@ -32,9 +32,11 @@ void TestClient::Stop()
 
 void TestClient::RunTestThread()
 {
+	const unsigned int maxProcessPacketInOneTick = 100;
+
 	while (RUDPClientCore::GetInst().IsStopped())
 	{
-		auto remainPacketSize = RUDPClientCore::GetInst().GetRemainPacketSize();
+		auto remainPacketSize = min(RUDPClientCore::GetInst().GetRemainPacketSize(), maxProcessPacketInOneTick);
 		while (remainPacketSize > 0)
 		{
 			auto buffer = RUDPClientCore::GetInst().GetReceivedPacket();
