@@ -118,6 +118,7 @@ private:
 	void RunRecvThread();
 	void RunSendThread();
 
+	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void DoSend();
 
 private:
@@ -140,7 +141,10 @@ private:
 			return lfh.packetSequence > rfh.packetSequence;
 		}
 	};
-	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
+	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHoldingQueue;
+	std::mutex recvPacketHoldingQueueLock;
+
+	PacketSequence recvPacketSequence{};
 #pragma endregion RUDP
 
 public:
@@ -152,7 +156,6 @@ private:
 	void EncodePacket(OUT NetBuffer& packet);
 
 private:
-	CListBaseQueue<NetBuffer*> recvBufferQueue;
 	CListBaseQueue<NetBuffer*> sendBufferQueue;
 	std::mutex sendBufferQueueLock;
 };

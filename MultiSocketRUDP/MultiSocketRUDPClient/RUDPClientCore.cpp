@@ -102,7 +102,8 @@ void RUDPClientCore::RunRecvThread()
 
 		// Check is valid packet
 
-		recvBufferQueue.Enqueue(buffer);
+		//recvBufferQueue.Enqueue(buffer);
+		ProcessRecvPacket(*buffer);
 	}
 }
 
@@ -135,6 +136,29 @@ void RUDPClientCore::RunSendThread()
 	}
 }
 
+void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
+{
+	PACKET_TYPE packetType;
+	PacketSequence packetSequence;
+	receivedBuffer >> packetType >> packetSequence;
+
+	switch (packetType)
+	{
+	case PACKET_TYPE::SendType:
+	{
+		NetBuffer::AddRefCount(&receivedBuffer);
+
+		std::scoped_lock lock(recvPacketHoldingQueueLock);
+		recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
+	}
+		break;
+	case PACKET_TYPE::SendReplyType:
+		break;
+	default:std::cout << "Invalid packet type " << static_cast<unsigned char>(packetType) << std::endl;
+		break;
+	}
+}
+
 void RUDPClientCore::DoSend()
 {
 	while (sendBufferQueue.GetRestSize() > 0)
@@ -157,15 +181,21 @@ void RUDPClientCore::DoSend()
 
 unsigned int RUDPClientCore::GetRemainPacketSize()
 {
-	return recvBufferQueue.GetRestSize();
+	std::scoped_lock lock(recvPacketHoldingQueueLock);
+	return static_cast<unsigned int>(recvPacketHoldingQueue.size());
 }
 
 NetBuffer* RUDPClientCore::GetReceivedPacket()
 {
-	NetBuffer* buffer = nullptr;
-	recvBufferQueue.Dequeue(&buffer);
+	std::scoped_lock lock(recvPacketHoldingQueueLock);
+	auto holdingPacketInfo = recvPacketHoldingQueue.top();
 
-	return buffer;
+	if (holdingPacketInfo.packetSequence != recvPacketSequence)
+	{
+		return nullptr;
+	}
+
+	return holdingPacketInfo.buffer;
 }
 
 void RUDPClientCore::SendPacket(OUT NetBuffer& packet)
