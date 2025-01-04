@@ -48,6 +48,14 @@
 	  * ConnectHandler
 	  * DisconnectHandler
 
+* 패킷 구성
+  * 위에서 부터 아래로 순차적으로 패킷 배열에 해당 내용이 들어가 있습니다.
+    * Packet header 5byte
+    * Packet type 1byte
+    * Packet sequence 8byte
+    * Packet id 4byte
+    * body nbyte
+
 ---
 
 3. Tools
