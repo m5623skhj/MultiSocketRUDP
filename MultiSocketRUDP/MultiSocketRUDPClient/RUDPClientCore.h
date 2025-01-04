@@ -7,8 +7,42 @@
 #include <mutex>
 #include <array>
 #include "Queue.h"
+#include <queue>
 
 #pragma comment(lib, "ws2_32.lib")
+
+struct SendPacketInfo
+{
+	NetBuffer* buffer{};
+	RUDPSession* owner{};
+	PacketRetransmissionCount retransmissionCount{};
+	PacketSequence sendPacektSequence{};
+	unsigned long long sendTimeStamp{};
+	std::list<SendPacketInfo*>::iterator listItor;
+
+	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
+	{
+		owner = inOwner;
+		buffer = inBuffer;
+		sendPacektSequence = inSendPacketSequence;
+		NetBuffer::AddRefCount(inBuffer);
+	}
+
+	[[nodiscard]]
+	NetBuffer* GetBuffer() { return buffer; }
+};
+
+struct RecvPacketInfo
+{
+	explicit RecvPacketInfo(NetBuffer* inBuffer, PacketSequence inPacketSequence)
+		: buffer(inBuffer)
+		, packetSequence(inPacketSequence)
+	{
+	}
+
+	NetBuffer* buffer{};
+	PacketSequence packetSequence{};
+};
 
 class RUDPClientCore
 {
@@ -94,6 +128,19 @@ private:
 	std::thread sendThread{};
 	std::array<HANDLE, 2> sendEventHandles{};
 
+private:
+	std::atomic<PacketSequence> lastSendPacketSequence{};
+	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+
+	std::atomic<PacketSequence> lastReceivedPacketSequence{};
+	struct RecvPacketInfoPriority
+	{
+		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh)
+		{
+			return lfh.packetSequence > rfh.packetSequence;
+		}
+	};
+	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
 #pragma endregion RUDP
 
 public:
