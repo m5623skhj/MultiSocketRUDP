@@ -49,6 +49,8 @@ void TestClient::RunTestThread()
 			{
 				// logging
 			}
+
+			NetBuffer::Free(buffer);
 		}
 	}
 
