@@ -63,7 +63,7 @@ bool RUDPClientCore::ConnectToServer()
 	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
 	
 	connectPacket << packetType << sessionId << sessionKey;
-	SendPacket(connectPacket);
+	SendPacket(connectPacket, ++lastSendPacketSequence);
 
 	return true;
 }
@@ -80,9 +80,14 @@ void RUDPClientCore::RunThreads()
 void RUDPClientCore::RunRecvThread()
 {
 	int senderLength = sizeof(serverAddr);
+	NetBuffer* buffer = nullptr;
 	while (true)
 	{
-		NetBuffer* buffer = NetBuffer::Alloc();
+		if (buffer != nullptr)
+		{
+			NetBuffer::Free(buffer);
+		}
+		buffer = NetBuffer::Alloc();
 
 		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&serverAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
@@ -91,16 +96,21 @@ void RUDPClientCore::RunRecvThread()
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
 				std::cout << "Recv thread stopped" << std::endl;
-				break;
+				continue;
 			}
 			else
 			{
 				std::cout << "recvfrom() error with " << error << std::endl;
-				break;
+				continue;
 			}
 		}
 
-		// Process packet header 
+		if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
+		{
+			continue;
+		}
+
+		NetBuffer::AddRefCount(buffer);
 		ProcessRecvPacket(*buffer);
 	}
 }
@@ -196,14 +206,60 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	return holdingPacketInfo.buffer;
 }
 
-void RUDPClientCore::SendPacket(OUT NetBuffer& packet)
+void RUDPClientCore::SendPacket(OUT IPacket& packet)
 {
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		std::cout << "Buffer is nullptr in RUDPSession::SendPacket()" << std::endl;
+		return;
+	}
+
+	PACKET_TYPE packetType = PACKET_TYPE::SendType;
+	PacketSequence packetSequence = ++lastSendPacketSequence;
+	*buffer << packetType << packetSequence << packet.GetPacketId();
+	packet.PacketToBuffer(*buffer);
+
+	return SendPacket(*buffer, packetSequence);
+}
+
+void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence)
+{
+	auto sendPacketInfo = sendPacketInfoPool->Alloc();
+	if (sendPacketInfo == nullptr)
+	{
+		std::cout << "SendPacketInfo is nullptr in RUDPSession::SendPacket()" << std::endl;
+		NetBuffer::Free(&buffer);
+		return;
+	}
+
+	sendPacketInfo->Initialize(&buffer, inSendPacketSequence);
+	{
+		std::unique_lock lock(sendPacketInfoMapLock);
+		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
+	}
+
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
-		sendBufferQueue.Enqueue(&packet);
+		sendBufferQueue.Enqueue(&buffer);
 	}
 
 	SetEvent(sendEventHandles[0]);
+}
+
+WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer)
+{
+	BYTE code;
+	WORD payloadLength;
+	buffer >> code >> payloadLength;
+
+	if (code != NetBuffer::m_byHeaderCode)
+	{
+		std::cout << "code : " << code << std::endl;
+		return 0;
+	}
+
+	return payloadLength;
 }
 
 void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)

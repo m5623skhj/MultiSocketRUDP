@@ -8,21 +8,20 @@
 #include <array>
 #include "Queue.h"
 #include <queue>
+#include "../MultiSocketRUDPServer/PacketManager.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
 struct SendPacketInfo
 {
 	NetBuffer* buffer{};
-	RUDPSession* owner{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
 	unsigned long long sendTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
+	void Initialize(NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
-		owner = inOwner;
 		buffer = inBuffer;
 		sendPacektSequence = inSendPacketSequence;
 		NetBuffer::AddRefCount(inBuffer);
@@ -132,6 +131,7 @@ private:
 private:
 	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+	std::mutex sendPacketInfoMapLock;
 
 	std::atomic<PacketSequence> lastReceivedPacketSequence{};
 	struct RecvPacketInfoPriority
@@ -150,12 +150,16 @@ private:
 public:
 	unsigned int GetRemainPacketSize();
 	NetBuffer* GetReceivedPacket();
-	void SendPacket(OUT NetBuffer& packet);
+	void SendPacket(OUT IPacket& packet);
 
 private:
+	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
+	WORD GetPayloadLength(OUT NetBuffer& buffer);
 	void EncodePacket(OUT NetBuffer& packet);
 
 private:
 	CListBaseQueue<NetBuffer*> sendBufferQueue;
 	std::mutex sendBufferQueueLock;
 };
+
+static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);
