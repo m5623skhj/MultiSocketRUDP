@@ -100,9 +100,7 @@ void RUDPClientCore::RunRecvThread()
 			}
 		}
 
-		// Check is valid packet
-
-		//recvBufferQueue.Enqueue(buffer);
+		// Process packet header 
 		ProcessRecvPacket(*buffer);
 	}
 }
