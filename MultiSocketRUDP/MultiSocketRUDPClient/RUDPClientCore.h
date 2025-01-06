@@ -118,6 +118,7 @@ private:
 	void RunSendThread();
 
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
+	void OnSendReply(NetBuffer& recvPacket);
 	void DoSend();
 
 private:

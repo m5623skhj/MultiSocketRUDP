@@ -160,9 +160,33 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 		break;
 	case PACKET_TYPE::SendReplyType:
+		OnSendReply(receivedBuffer);
 		break;
 	default:std::cout << "Invalid packet type " << static_cast<unsigned char>(packetType) << std::endl;
 		break;
+	}
+}
+
+void RUDPClientCore::OnSendReply(NetBuffer& recvPacket)
+{
+	PacketSequence packetSequence;
+	recvPacket >> packetSequence;
+
+	if (lastSendPacketSequence < packetSequence)
+	{
+		return;
+	}
+
+	SendPacketInfo* sendedPacketInfo = nullptr;
+	{
+		std::scoped_lock lock(sendPacketInfoMapLock);
+		auto itor = sendPacketInfoMap.find(packetSequence);
+		if (itor != sendPacketInfoMap.end())
+		{
+			sendedPacketInfo = itor->second;
+		}
+
+		sendPacketInfoMap.erase(packetSequence);
 	}
 }
 
