@@ -160,9 +160,14 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 		break;
 	case PACKET_TYPE::SendReplyType:
+	{
 		OnSendReply(receivedBuffer);
+	}
 		break;
-	default:std::cout << "Invalid packet type " << static_cast<unsigned char>(packetType) << std::endl;
+	default:
+	{
+		std::cout << "Invalid packet type " << static_cast<unsigned char>(packetType) << std::endl;
+	}
 		break;
 	}
 }
