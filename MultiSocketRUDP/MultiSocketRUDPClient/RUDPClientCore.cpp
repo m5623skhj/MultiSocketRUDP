@@ -110,7 +110,6 @@ void RUDPClientCore::RunRecvThread()
 			continue;
 		}
 
-		NetBuffer::AddRefCount(buffer);
 		ProcessRecvPacket(*buffer);
 	}
 }
@@ -203,6 +202,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 		return nullptr;
 	}
 
+	recvPacketHoldingQueue.pop();
 	return holdingPacketInfo.buffer;
 }
 
