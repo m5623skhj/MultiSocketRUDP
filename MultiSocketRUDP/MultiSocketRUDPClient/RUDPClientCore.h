@@ -122,6 +122,7 @@ private:
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket);
 	void DoSend();
+	void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
 	SOCKET rudpSocket{};

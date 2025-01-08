@@ -155,11 +155,32 @@ void RUDPClientCore::RunRetransmissionThread()
 	tickSet.nowTick = GetTickCount64();
 	tickSet.beforeTick = tickSet.nowTick;
 
-	std::list<SendPacketInfo*> copyList;
+	std::list<std::pair<PacketSequence, SendPacketInfo*>> copyList;
 
 	while (threadStopFlag == true)
 	{
+		{
+			std::scoped_lock lock(sendPacketInfoMapLock);
+			copyList.assign(sendPacketInfoMap.begin(), sendPacketInfoMap.end());
+		}
 
+		for (auto& sendedPacketInfo : copyList)
+		{
+			if (sendedPacketInfo.second->sendTimeStamp < tickSet.nowTick)
+			{
+				continue;
+			}
+
+			if (++sendedPacketInfo.second->retransmissionCount >= maxPacketRetransmissionCount)
+			{
+				// Do what? Maybe it was disconnected..
+				continue;
+			}
+
+			SendPacket(*sendedPacketInfo.second->GetBuffer(), sendedPacketInfo.second->sendPacektSequence);
+		}
+
+		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
 
@@ -233,6 +254,19 @@ void RUDPClientCore::DoSend()
 			continue;
 		}
 	}
+}
+
+void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs)
+{
+	tickSet.nowTick = GetTickCount64();
+	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
+
+	if (deltaTick < intervalMs && deltaTick > 0)
+	{
+		Sleep(intervalMs - static_cast<DWORD>(deltaTick));
+	}
+
+	tickSet.beforeTick = tickSet.nowTick;
 }
 
 unsigned int RUDPClientCore::GetRemainPacketSize()
