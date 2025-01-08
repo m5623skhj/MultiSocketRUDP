@@ -13,12 +13,6 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-struct TickSet
-{
-	UINT64 nowTick = 0;
-	UINT64 beforeTick = 0;
-};
-
 struct IOContext : RIO_BUF
 {
 	IOContext() = default;

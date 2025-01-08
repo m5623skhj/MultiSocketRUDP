@@ -33,6 +33,11 @@ void RUDPClientCore::Stop()
 	closesocket(rudpSocket);
 
 	SetEvent(sendEventHandles[1]);
+	threadStopFlag = true;
+
+	retransmissionThread.join();
+	sendThread.join();
+	recvThread.join();
 
 	isStopped = true;
 }
@@ -75,13 +80,14 @@ void RUDPClientCore::RunThreads()
 
 	recvThread = std::thread([this]() { this->RunRecvThread(); });
 	sendThread = std::thread([this]() { this->RunSendThread(); });
+	retransmissionThread = std::thread([this]() { this->RunRetransmissionThread(); });
 }
 
 void RUDPClientCore::RunRecvThread()
 {
 	int senderLength = sizeof(serverAddr);
 	NetBuffer* buffer = nullptr;
-	while (true)
+	while (threadStopFlag == true)
 	{
 		if (buffer != nullptr)
 		{
@@ -140,6 +146,20 @@ void RUDPClientCore::RunSendThread()
 		}
 		break;
 		}
+	}
+}
+
+void RUDPClientCore::RunRetransmissionThread()
+{
+	TickSet tickSet;
+	tickSet.nowTick = GetTickCount64();
+	tickSet.beforeTick = tickSet.nowTick;
+
+	std::list<SendPacketInfo*> copyList;
+
+	while (threadStopFlag == true)
+	{
+
 	}
 }
 

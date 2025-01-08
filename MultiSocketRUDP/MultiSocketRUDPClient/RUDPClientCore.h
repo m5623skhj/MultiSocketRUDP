@@ -66,6 +66,7 @@ private:
 
 private:
 	bool isStopped{};
+	bool threadStopFlag{};
 	bool isConnected{};
 
 #pragma region SessionBroker
@@ -116,6 +117,7 @@ private:
 	void RunThreads();
 	void RunRecvThread();
 	void RunSendThread();
+	void RunRetransmissionThread();
 
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket);
@@ -127,6 +129,7 @@ private:
 
 	std::thread recvThread{};
 	std::thread sendThread{};
+	std::thread retransmissionThread{};
 	std::array<HANDLE, 2> sendEventHandles{};
 
 private:

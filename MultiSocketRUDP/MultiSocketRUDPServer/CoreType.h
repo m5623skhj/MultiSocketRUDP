@@ -41,3 +41,9 @@ enum class PACKET_TYPE : unsigned char
 	, SendType
 	, SendReplyType
 };
+
+struct TickSet
+{
+	UINT64 nowTick = 0;
+	UINT64 beforeTick = 0;
+};
