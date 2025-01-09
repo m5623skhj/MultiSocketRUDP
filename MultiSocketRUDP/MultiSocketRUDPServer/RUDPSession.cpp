@@ -80,6 +80,13 @@ void RUDPSession::Disconnect()
 		return;
 	}
 
+	{
+		std::unique_lock lock(sendPacketInfoMapLock);
+		for (const auto& item : sendPacketInfoMap)
+		{
+			core.EraseSendPacketInfo(item.second, threadId);
+		}
+	}
 	OnDisconnected();
 
 	core.DisconnectSession(sessionId);
