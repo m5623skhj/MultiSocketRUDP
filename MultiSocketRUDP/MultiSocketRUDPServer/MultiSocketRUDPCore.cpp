@@ -66,6 +66,17 @@ void MultiSocketRUDPCore::StopServer()
 	CloseAllSessions();
 	delete[] rioCQList;
 
+	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
+	{
+		SetEvent(recvLogicThreadEventHandles[i]);
+		ioWorkerThreads[i].join();
+		recvLogicWorkerThreads[i].join();
+		retransmissionThreads[i].join();
+	}
+
+	SetEvent(timeoutEventHandle);
+	timeoutThread.join();
+
 	isServerStopped = true;
 	std::cout << "Server stop" << std::endl;
 }
@@ -229,12 +240,14 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	sendedPacketInfoListLock.reserve(numOfWorkerThread);
 	ioWorkerThreads.reserve(numOfWorkerThread);
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
-	retransmissionThread.reserve(numOfWorkerThread);
+	retransmissionThreads.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
+	timeoutEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
+	timeoutThread = std::thread([this]() { RunTimeoutThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
@@ -243,7 +256,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
-		retransmissionThread.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
+		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	return true;
@@ -441,7 +454,8 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 
 			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				sendedPacketInfo->owner->Disconnect();
+				std::scoped_lock lock(timeoutSessionList);
+				timeoutSessionList.push_back(sendedPacketInfo->owner);
 				continue;
 			}
 
@@ -449,6 +463,38 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+	}
+}
+
+void MultiSocketRUDPCore::RunTimeoutThread()
+{
+	while (not threadStopFlag)
+	{
+		const auto waitResult = WaitForSingleObject(timeoutEventHandle, INFINITE);
+		switch (waitResult)
+		{
+		case WAIT_OBJECT_0:
+		{
+			std::scoped_lock lock(timeoutSessionList);
+			for (auto& timeoutSession : timeoutSessionList)
+			{
+				if (timeoutSession == nullptr)
+				{
+					continue;
+				}
+
+				timeoutSession->Disconnect();
+			}
+			timeoutSessionList.clear();
+		}
+			break;
+		default:
+		{
+			std::cout << "Invalid timeout thread wait result. Error is " << WSAGetLastError() << std::endl;
+			g_Dump.Crash();
+		}
+			break;
+		}
 	}
 }
 
