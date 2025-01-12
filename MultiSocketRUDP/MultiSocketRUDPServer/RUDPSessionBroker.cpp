@@ -118,9 +118,9 @@ void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 
 		auto now = std::chrono::system_clock::now();
 		auto duration = now.time_since_epoch();
-		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+		auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
-		std::seed_seq seed { static_cast<unsigned int>(millis & 0xFFFFFFFF), static_cast<unsigned int>((millis >> 32) & 0xFFFFFFFF) };
+		std::seed_seq seed { static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
 		std::mt19937 gen(seed);
 		std::uniform_int_distribution<int> dist(0, 255);
 
