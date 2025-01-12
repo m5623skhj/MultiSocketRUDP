@@ -438,6 +438,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 	auto& thisThreadSendedPacketInfoListLock = *sendedPacketInfoListLock[threadId];
 
 	std::list<SendPacketInfo*> copyList;
+	unsigned short numOfTimeoutSession{};
 
 	while (not threadStopFlag)
 	{
@@ -457,10 +458,17 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 			{
 				std::scoped_lock lock(timeoutSessionListLock);
 				timeoutSessionList.push_back(sendedPacketInfo->owner);
+				++numOfTimeoutSession;
 				continue;
 			}
 
 			SendPacket(sendedPacketInfo);
+		}
+
+		if (numOfTimeoutSession > 0)
+		{
+			SetEvent(timeoutEventHandle);
+			numOfTimeoutSession = {};
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
