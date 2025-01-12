@@ -92,8 +92,8 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
-		SetSessionKey(session);
-		SetSessionInfoToBuffer(session, rudpSessionIP, sendBuffer);
+		SetSessionKey(*session);
+		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
 
 		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetUseSize() + df_HEADER_SIZE, 0);
 		if (result == SOCKET_ERROR)
@@ -110,7 +110,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 	std::cout << "Session broker thread stopped" << std::endl;
 }
 
-void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session)
+void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 {
 	auto MakeSessionKey = []() -> std::string
 	{
@@ -137,14 +137,14 @@ void MultiSocketRUDPCore::SetSessionKey(OUT std::shared_ptr<RUDPSession> session
 
 		return ss.str();
 	};
-	session->sessionKey = MakeSessionKey();
+	session.sessionKey = MakeSessionKey();
 }
 
-void MultiSocketRUDPCore::SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
+void MultiSocketRUDPCore::SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
 {
-	PortType targetPort = session->serverPort;
-	SessionIdType sessionId = session->sessionId;
-	std::string sessionKey = session->sessionKey;
+	PortType targetPort = session.serverPort;
+	SessionIdType sessionId = session.sessionId;
+	std::string sessionKey = session.sessionKey;
 
 	//Send rudp session infomation packet to client
 	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;

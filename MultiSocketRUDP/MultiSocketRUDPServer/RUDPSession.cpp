@@ -13,7 +13,7 @@ RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCo
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
-std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore)
+RUDPSession* RUDPSession::Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore)
 {
 	struct RUDPSessionCreator : public RUDPSession
 	{
@@ -23,7 +23,7 @@ std::shared_ptr<RUDPSession> RUDPSession::Create(SOCKET inSock, PortType inPort,
 		}
 	};
 
-	return std::make_shared<RUDPSessionCreator>(inSock, inPort, inCore);
+	return new RUDPSessionCreator(inSock, inPort, inCore);
 }
 
 bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ)

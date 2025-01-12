@@ -22,7 +22,7 @@ struct IOContext : RIO_BUF
 
 	SessionIdType ownerSessionId = invalidSessionId;
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
-	std::shared_ptr<RUDPSession> session = nullptr;
+	RUDPSession* session = nullptr;
 	RIO_BUFFERID clientAddrBufferId{ RIO_INVALID_BUFFERID };
 	char clientAddrBuffer[sizeof(sockaddr_in)];
 };
@@ -96,12 +96,12 @@ private:
 	std::string coreServerIp{};
 
 private:
-	std::shared_ptr<RUDPSession> AcquireSession();
-	std::shared_ptr<RUDPSession> GetUsingSession(SessionIdType sessionId);
+	RUDPSession* AcquireSession();
+	RUDPSession* GetUsingSession(SessionIdType sessionId);
 
 private:
 	// This container's size must not be increased any further
-	std::vector<std::shared_ptr<RUDPSession>> sessionArray;
+	std::vector<RUDPSession*> sessionArray;
 	std::list<SessionIdType> unusedSessionIdList;
 	std::recursive_mutex unusedSessionIdListLock;
 
@@ -142,8 +142,8 @@ private:
 #else
 private:
 	void RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP);
-	void SetSessionKey(OUT std::shared_ptr<RUDPSession> session);
-	void SetSessionInfoToBuffer(std::shared_ptr<RUDPSession> session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
+	void SetSessionKey(OUT RUDPSession& session);
+	void SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 
 private:
 	std::thread sessionBrokerThread{};
@@ -182,11 +182,11 @@ private:
 	IOContext* GetIOCompletedContext(RIORESULT& rioResult);
 	bool IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
 	bool RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
-	bool SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId);
+	bool SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
-	bool ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
-	bool DoRecv(std::shared_ptr<RUDPSession> session);
+	bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
+	bool DoRecv(RUDPSession& session);
 	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
 

@@ -1,7 +1,7 @@
 #include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 
-bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
+bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
 {
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
@@ -10,43 +10,43 @@ bool MultiSocketRUDPCore::ProcessByPacketType(std::shared_ptr<RUDPSession> sessi
 	{
 	case PACKET_TYPE::ConnectType:
 	{
-		session->TryConnect(recvPacket);
+		session.TryConnect(recvPacket);
 		break;
 	}
 	break;
 	case PACKET_TYPE::DisconnectType:
 	{
-		if (not session->CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr))
 		{
 			break;
 		}
 
-		session->Disconnect(recvPacket);
+		session.Disconnect(recvPacket);
 		return false;
 	}
 	break;
 	case PACKET_TYPE::SendType:
 	{
-		if (not session->CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr))
 		{
 			break;
 		}
 
-		if (session->OnRecvPacket(recvPacket) == false)
+		if (session.OnRecvPacket(recvPacket) == false)
 		{
-			session->Disconnect();
+			session.Disconnect();
 		}
 		break;
 	}
 	break;
 	case PACKET_TYPE::SendReplyType:
 	{
-		if (not session->CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr))
 		{
 			break;
 		}
 
-		session->OnSendReply(recvPacket);
+		session.OnSendReply(recvPacket);
 		break;
 	}
 	break;

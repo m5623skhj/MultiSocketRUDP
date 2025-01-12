@@ -315,6 +315,7 @@ void MultiSocketRUDPCore::CloseAllSessions()
 		for (auto& session : sessionArray)
 		{
 			closesocket(session->sock);
+			delete session;
 		}
 
 		// need wait?
@@ -322,9 +323,9 @@ void MultiSocketRUDPCore::CloseAllSessions()
 	}
 }
 
-std::shared_ptr<RUDPSession> MultiSocketRUDPCore::AcquireSession()
+RUDPSession* MultiSocketRUDPCore::AcquireSession()
 {
-	std::shared_ptr<RUDPSession> session = nullptr;
+	RUDPSession* session = nullptr;
 	SessionIdType sessionId{};
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
@@ -348,7 +349,7 @@ std::shared_ptr<RUDPSession> MultiSocketRUDPCore::AcquireSession()
 	return session;
 }
 
-std::shared_ptr<RUDPSession> MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId)
+RUDPSession* MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId)
 {
 	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->isUsingSession)
 	{
@@ -454,7 +455,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
 
 			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				std::scoped_lock lock(timeoutSessionList);
+				std::scoped_lock lock(timeoutSessionListLock);
 				timeoutSessionList.push_back(sendedPacketInfo->owner);
 				continue;
 			}
@@ -475,7 +476,7 @@ void MultiSocketRUDPCore::RunTimeoutThread()
 		{
 		case WAIT_OBJECT_0:
 		{
-			std::scoped_lock lock(timeoutSessionList);
+			std::scoped_lock lock(timeoutSessionListLock);
 			for (auto& timeoutSession : timeoutSessionList)
 			{
 				if (timeoutSession == nullptr)
@@ -555,7 +556,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transf
 	break;
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		return SendIOCompleted(transferred, contextResult->session, threadId);
+		return SendIOCompleted(transferred, *contextResult->session, threadId);
 	}
 	break;
 	default:
@@ -581,13 +582,13 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG tr
 	ioCompletedContexts[threadId].Enqueue(contextResult);
 	SetEvent(recvLogicThreadEventHandles[threadId]);
 
-	return DoRecv(contextResult->session);
+	return DoRecv(*contextResult->session);
 }
 
-bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, std::shared_ptr<RUDPSession> session, BYTE threadId)
+bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
 {
-	InterlockedExchange((UINT*)&session->sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
-	return DoSend(*session, threadId);
+	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	return DoSend(session, threadId);
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
@@ -615,7 +616,7 @@ void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
 
 			sockaddr_in clientAddr;
 			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(context->clientAddrBuffer));
-			ProcessByPacketType(context->session, clientAddr, *buffer);
+			ProcessByPacketType(*context->session, clientAddr, *buffer);
 		} while (false);
 
 		if (buffer != nullptr)
@@ -626,11 +627,11 @@ void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
 	}
 }
 
-bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
+bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 {
 	auto context = contextPool.Alloc();
-	context->InitContext(session->sessionId, RIO_OPERATION_TYPE::OP_RECV);
-	context->BufferId = session->recvBuffer.recvBufferId;
+	context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_RECV);
+	context->BufferId = session.recvBuffer.recvBufferId;
 	context->Length = recvBufferSize;
 	context->Offset = 0;
 
@@ -646,7 +647,7 @@ bool MultiSocketRUDPCore::DoRecv(std::shared_ptr<RUDPSession> session)
 	clientAddrBuffer.Length = sizeof(sockaddr_in);
 	clientAddrBuffer.Offset = 0;
 
-	if (rioFunctionTable.RIOReceiveEx(session->rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
+	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
 	{
 		std::cout << "RIOReceiveEx() failed with " << WSAGetLastError() << std::endl;
 		return false;

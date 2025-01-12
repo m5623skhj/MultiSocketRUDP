@@ -56,7 +56,7 @@ private:
 	RUDPSession() = delete;
 	explicit RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore);
 
-	static std::shared_ptr<RUDPSession> Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore);
+	static RUDPSession* Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore);
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
 	void InitializeSession();
 
