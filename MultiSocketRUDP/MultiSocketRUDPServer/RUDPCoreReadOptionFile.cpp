@@ -20,6 +20,22 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
+	if (g_Paser.GetValue_Short(buffer, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", (short*)&maxPacketRetransmissionCount) == false)
+	{
+		return false;
+	}
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"WORKER_THREAD_ONE_FRAME_MS", (int*)&workerThreadOneFrameMs) == false)
+	{
+		return false;
+	}
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_MS", (int*)&retransmissionMs) == false)
+	{
+		return false;
+	}
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_THREAD_SLEEP_MS", (int*)&retransmissionThreadSleepMs) == false)
+	{
+		return false;
+	}
 
 	// buffer
 	if (g_Paser.GetValue_Byte(buffer, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode) == false)

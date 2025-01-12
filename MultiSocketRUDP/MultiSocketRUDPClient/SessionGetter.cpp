@@ -42,7 +42,7 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 #else
 bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
-	if (not ReadOptionFile(optionFilePath))
+	if (not ReadSessionGetterOptionFile(optionFilePath))
 	{
 		std::cout << "RunGetSessionFromServer::ReadOptionFile() failed" << std::endl;
 		return false;
@@ -59,7 +59,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 	return true;
 }
 
-bool RUDPClientCore::ReadOptionFile(const std::wstring& optionFilePath)
+bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFilePath)
 {
 	_wsetlocale(LC_ALL, L"Korean");
 

@@ -7,7 +7,7 @@ RUDPClientCore& RUDPClientCore::GetInst()
 	return instance;
 }
 
-bool RUDPClientCore::Start(const std::wstring& optionFilePath)
+bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)
 {
 #if USE_IOCP_SESSION_BROKER
 	if (not sessionGetter.Start(optionFilePath))
@@ -15,13 +15,16 @@ bool RUDPClientCore::Start(const std::wstring& optionFilePath)
 		return false;
 	}
 #else
-	if (not RunGetSessionFromServer(optionFilePath))
+	if (not RunGetSessionFromServer(sessionGetterOptionFilePath))
 	{
 		return false;
 	}
 #endif
 
-	ConnectToServer();
+	if (not ConnectToServer(clientCoreOptionFile))
+	{
+		return false;
+	}
 	RunThreads();
 
 	return true;
@@ -52,8 +55,14 @@ bool RUDPClientCore::IsConnected()
 	return isConnected;
 }
 
-bool RUDPClientCore::ConnectToServer()
+bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 {
+	if (not ReadClientCoreOptionFile(optionFilePath))
+	{
+		std::cout << "RUDPClientCore::ReadClientCoreOptionFile() failed" << std::endl;
+		return false;
+	}
+
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(port);
 	InetPtonA(AF_INET, serverIp.c_str(), &serverAddr.sin_addr);
@@ -354,4 +363,33 @@ void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
 		packet.m_iRead = 0;
 		packet.Encode();
 	}
+}
+
+bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath)
+{
+	_wsetlocale(LC_ALL, L"Korean");
+
+	CParser parser;
+	WCHAR cBuffer[BUFFER_MAX];
+
+	FILE* fp;
+	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
+
+	int iJumpBOM = ftell(fp);
+	fseek(fp, 0, SEEK_END);
+	int iFileSize = ftell(fp);
+	fseek(fp, iJumpBOM, SEEK_SET);
+	int FileSize = (int)fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp);
+	int iAmend = iFileSize - FileSize;
+	fclose(fp);
+
+	cBuffer[iFileSize - iAmend] = '\0';
+	WCHAR* pBuff = cBuffer;
+
+	if (!parser.GetValue_Short(pBuff, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", (short*)&maxPacketRetransmissionCount))
+		return false;
+	if (!parser.GetValue_Int(pBuff, L"CORE", L"RETRANSMISSION_MS", (int*)&retransmissionThreadSleepMs))
+		return false;
+
+	return true;
 }

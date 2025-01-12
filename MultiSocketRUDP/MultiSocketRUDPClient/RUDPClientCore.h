@@ -55,14 +55,14 @@ public:
 	static RUDPClientCore& GetInst();
 
 public:
-	bool Start(const std::wstring& optionFilePath);
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	void Stop();
 
 	bool IsStopped();
 	bool IsConnected();
 
 private:
-	bool ConnectToServer();
+	bool ConnectToServer(const std::wstring& optionFilePath);
 
 private:
 	bool isStopped{};
@@ -91,7 +91,7 @@ private:
 #else
 private:
 	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
-	bool ReadOptionFile(const std::wstring& optionFilePath);
+	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);
 	bool GetSessionFromServer();
 
 private:
@@ -161,10 +161,15 @@ private:
 	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
 	WORD GetPayloadLength(OUT NetBuffer& buffer);
 	void EncodePacket(OUT NetBuffer& packet);
+	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);
 
 private:
 	CListBaseQueue<NetBuffer*> sendBufferQueue;
 	std::mutex sendBufferQueueLock;
+
+private:
+	PacketRetransmissionCount maxPacketRetransmissionCount{};
+	unsigned int retransmissionThreadSleepMs{};
 };
 
 static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);

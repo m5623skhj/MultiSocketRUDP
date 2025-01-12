@@ -14,7 +14,7 @@ public:
 	static TestClient& GetInst();
 
 public:
-	bool Start(const std::wstring& optionFilePath);
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile);
 	void Stop();
 
 private:

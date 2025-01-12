@@ -159,6 +159,10 @@ private:
 private:
 	unsigned char numOfWorkerThread{};
 	HANDLE logicThreadEventStopHandle{};
+	PacketRetransmissionCount maxPacketRetransmissionCount{};
+	unsigned int workerThreadOneFrameMs{};
+	unsigned int retransmissionMs{};
+	unsigned int retransmissionThreadSleepMs{};
 
 	// threads
 	std::vector<std::thread> ioWorkerThreads;

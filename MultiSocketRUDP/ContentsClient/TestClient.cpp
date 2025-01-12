@@ -8,9 +8,9 @@ TestClient& TestClient::GetInst()
 	return instance;
 }
 
-bool TestClient::Start(const std::wstring& optionFilePath)
+bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile)
 {
-	if (not RUDPClientCore::GetInst().Start(optionFilePath))
+	if (not RUDPClientCore::GetInst().Start(clientCoreOptionFile, sessionGetterOptionFile))
 	{
 		std::cout << "Core start failed" << std::endl;
 		return false;
