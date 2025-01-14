@@ -3,6 +3,8 @@
 #include "NetServerSerializeBuffer.h"
 #include "MultiSocketRUDPCore.h"
 #include "EssentialHandler.h"
+#include "LogExtension.h"
+#include "Logger.h"
 
 RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore)
 	: sock(inSock)
@@ -34,21 +36,27 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	recvBuffer.recvBufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, dfDEFAULTSIZE);
 	if (recvBuffer.recvBufferId == RIO_INVALID_BUFFERID)
 	{
-		std::cout << "Recv RIORegisterBuffer failed" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "Recv RIORegisterBuffer failed";
+		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
 	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
-		std::cout << "Send RIORegisterBuffer failed" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "Send RIORegisterBuffer failed";
+		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
 	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, 32, 1, 32, 1, rioRecvCQ, rioSendCQ, &sessionId);
 	if (rioRQ == RIO_INVALID_RQ)
 	{
-		std::cout << "RIORegisterBuffer failed with error code " << WSAGetLastError() << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "RIORegisterBuffer failed with error code " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
@@ -97,7 +105,9 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
-		std::cout << "Buffer is nullptr in RUDPSession::SendPacket()" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "Buffer is nullptr in RUDPSession::SendPacket()";
+		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
@@ -125,7 +135,9 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		std::cout << "SendPacketInfo is nullptr in RUDPSession::SendPacket()" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "SendPacketInfo is nullptr in RUDPSession::SendPacket()";
+		Logger::GetInstance().WriteLog(log);
 		NetBuffer::Free(&buffer);
 		return false;
 	}

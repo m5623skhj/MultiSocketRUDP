@@ -1,6 +1,8 @@
 #include "PreCompile.h"
 #include "EssentialHandler.h"
 #include "RUDPSession.h"
+#include "LogExtension.h"
+#include "Logger.h"
 
 EssentialHandlerManager::EssentialHandlerManager()
 {
@@ -36,7 +38,9 @@ void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 			continue;
 		}
 
-		std::cout << checker.second.first->GetHandlerType() << " is unregistered" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = checker.second.first->GetHandlerType() + " is unregistered";
+		Logger::GetInstance().WriteLog(log);
 	}
 }
 

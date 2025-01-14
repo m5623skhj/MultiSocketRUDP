@@ -5,13 +5,18 @@
 #include <iomanip>
 #include <array>
 #include "MultiSocketRUDPCore.h"
+#include "LogExtension.h"
+#include "Logger.h"
+
 
 #if USE_IOCP_SESSION_BROKER
 bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
 {
 	if (not CNetServer::Start(sessionBrokerOptionFilePath.c_str()))
 	{
-		std::cout << "RUDPSessionBroker Start failed" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "RUDPSessionBroker Start failed";
+		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
@@ -51,7 +56,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (listenSocket == INVALID_SOCKET)
 	{
-		std::cout << "RunSessionBrokerThread listen socket is invalid with error " << WSAGetLastError() << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "RunSessionBrokerThread listen socket is invalid with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
 		return;
 	}
 
@@ -63,7 +70,10 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 
 	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
-		std::cerr << "RunSessionBrokerThread bind failed with error " << WSAGetLastError() << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "RunSessionBrokerThread bind failed with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+
 		closesocket(listenSocket);
 		return;
 	}
@@ -75,20 +85,26 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
-			std::cout << "RunSessionBrokerThread accept falid with error " << WSAGetLastError() << std::endl;
+			auto log = std::make_shared<ServerLog>();
+			log->logString = "RunSessionBrokerThread accept falid with error " + WSAGetLastError();
+			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
 
 		auto session = AcquireSession();
 		if (session == nullptr)
 		{
-			std::cout << "Server is full of users" << std::endl;
+			auto log = std::make_shared<ServerLog>();
+			log->logString = "Server is full of users";
+			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
 		
 		if (session->isConnected)
 		{
-			std::cout << "This session already connected" << std::endl;
+			auto log = std::make_shared<ServerLog>();
+			log->logString = "This session already connected";
+			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
 
@@ -98,7 +114,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetUseSize() + df_HEADER_SIZE, 0);
 		if (result == SOCKET_ERROR)
 		{
-			std::cout << "RunSessionBrokerThread send failed with error " << WSAGetLastError() << std::endl;
+			auto log = std::make_shared<ServerLog>();
+			log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
+			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
 
@@ -107,7 +125,9 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 	}
 
 	closesocket(listenSocket);
-	std::cout << "Session broker thread stopped" << std::endl;
+	auto log = std::make_shared<ServerLog>();
+	log->logString = "Session broker thread stopped";
+	Logger::GetInstance().WriteLog(log);
 }
 
 void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
