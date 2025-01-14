@@ -2,6 +2,8 @@
 #include "MultiSocketRUDPCore.h"
 #include "BuildConfig.h"
 #include "EssentialHandler.h"
+#include "LogExtension.h"
+#include "Logger.h"
 
 void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
 {
@@ -14,11 +16,16 @@ MultiSocketRUDPCore::MultiSocketRUDPCore()
 {
 }
 
-bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath)
+bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, bool printLogToConsole)
 {
+	Logger::GetInstance().RunLoggerThread(printLogToConsole);
+
 	if (not ReadOptionFile(coreOptionFilePath, sessionBrokerOptionFilePath))
 	{
-		std::cout << "Option file read failed" << std::endl;
+		auto log = std::make_shared<ServerLog>();
+		log->logString = "Option file read failed";
+		Logger::GetInstance().WriteLog(log);
+
 		return false;
 	}
 
@@ -76,6 +83,8 @@ void MultiSocketRUDPCore::StopServer()
 
 	SetEvent(timeoutEventHandle);
 	timeoutThread.join();
+
+	Logger::GetInstance().StopLoggerThread();
 
 	isServerStopped = true;
 	std::cout << "Server stop" << std::endl;

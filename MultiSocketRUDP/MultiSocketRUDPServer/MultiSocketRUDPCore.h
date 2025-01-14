@@ -56,7 +56,7 @@ public:
 
 public:
 	[[nodiscard]]
-	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
+	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, bool printLogToConsole = false);
 	void StopServer();
 
 	[[nodiscard]]

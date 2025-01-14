@@ -28,6 +28,9 @@
     <Filter Include="소스 파일\Handler">
       <UniqueIdentifier>{44d20824-0ad8-47ca-8061-a7f77d167649}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Log">
+      <UniqueIdentifier>{026f6f28-f811-456a-9506-993b77c3fe91}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
@@ -85,6 +88,9 @@
     </ClInclude>
     <ClInclude Include="PacketHandlerUtil.h">
       <Filter>소스 파일\Handler</Filter>
+    </ClInclude>
+    <ClInclude Include="LogExtension.h">
+      <Filter>소스 파일\Log</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
