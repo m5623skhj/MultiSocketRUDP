@@ -46,8 +46,6 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 #else
 bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, bool printLogToConsole)
 {
-	Logger::GetInstance().RunLoggerThread(printLogToConsole);
-
 	if (not ReadSessionGetterOptionFile(optionFilePath))
 	{
 		auto log = std::make_shared<ClientLog>();

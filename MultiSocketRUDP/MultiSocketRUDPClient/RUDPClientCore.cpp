@@ -11,6 +11,8 @@ RUDPClientCore& RUDPClientCore::GetInst()
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)
 {
+	Logger::GetInstance().RunLoggerThread(printLogToConsole);
+
 #if USE_IOCP_SESSION_BROKER
 	if (not sessionGetter.Start(optionFilePath))
 	{
