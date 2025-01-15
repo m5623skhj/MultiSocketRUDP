@@ -55,7 +55,7 @@ public:
 	static RUDPClientCore& GetInst();
 
 public:
-	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
 	void Stop();
 
 	bool IsStopped();
@@ -90,7 +90,7 @@ private:
 	SessionGetter sessionGetter;
 #else
 private:
-	bool RunGetSessionFromServer(const std::wstring& optionFilePath, bool printLogToConsole);
+	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
 	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);
 	bool GetSessionFromServer();
 

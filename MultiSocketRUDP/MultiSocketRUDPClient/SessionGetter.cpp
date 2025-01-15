@@ -44,7 +44,7 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 }
 
 #else
-bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, bool printLogToConsole)
+bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
 	if (not ReadSessionGetterOptionFile(optionFilePath))
 	{

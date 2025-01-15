@@ -9,7 +9,7 @@ RUDPClientCore& RUDPClientCore::GetInst()
 	return instance;
 }
 
-bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)
+bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole)
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
@@ -19,7 +19,7 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 		return false;
 	}
 #else
-	if (not RunGetSessionFromServer(sessionGetterOptionFilePath, false))
+	if (not RunGetSessionFromServer(sessionGetterOptionFilePath))
 	{
 		return false;
 	}
