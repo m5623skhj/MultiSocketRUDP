@@ -90,7 +90,7 @@ private:
 	SessionGetter sessionGetter;
 #else
 private:
-	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
+	bool RunGetSessionFromServer(const std::wstring& optionFilePath, bool printLogToConsole);
 	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);
 	bool GetSessionFromServer();
 
