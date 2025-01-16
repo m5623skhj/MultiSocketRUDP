@@ -198,7 +198,11 @@ void RUDPClientCore::RunRetransmissionThread()
 
 			if (++sendedPacketInfo.second->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				// Do what? Maybe it was disconnected..
+				auto log = std::make_shared<ClientLog>();
+				log->logString = "The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates";
+				Logger::GetInstance().WriteLog(log);
+
+				// Call Stop() is impossible by self thread join()
 				continue;
 			}
 

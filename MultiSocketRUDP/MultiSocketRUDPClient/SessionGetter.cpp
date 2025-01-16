@@ -62,7 +62,6 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 		WSACleanup();
 		return false;
 	}
-	WSACleanup();
 
 	return true;
 }
