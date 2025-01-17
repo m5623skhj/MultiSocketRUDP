@@ -63,7 +63,7 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 {
 	if (not ReadClientCoreOptionFile(optionFilePath))
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "RUDPClientCore::ReadClientCoreOptionFile() failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -75,7 +75,7 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 
 	if (bind(rudpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "bind() failed with error " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -118,14 +118,14 @@ void RUDPClientCore::RunRecvThread()
 			const int error = WSAGetLastError();
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
-				auto log = std::make_shared<ClientLog>();
+				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "Recv thread stopped";
 				Logger::GetInstance().WriteLog(log);
 				continue;
 			}
 			else
 			{
-				auto log = std::make_shared<ClientLog>();
+				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "recvfrom() error with " + error;
 				Logger::GetInstance().WriteLog(log);
 				continue;
@@ -156,7 +156,7 @@ void RUDPClientCore::RunSendThread()
 		case WAIT_OBJECT_0 + 1:
 		{
 			DoSend();
-			auto log = std::make_shared<ClientLog>();
+			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Send thread stopped";
 			Logger::GetInstance().WriteLog(log);
 			break;
@@ -164,7 +164,7 @@ void RUDPClientCore::RunSendThread()
 		break;
 		default:
 		{
-			auto log = std::make_shared<ClientLog>();
+			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Invalid send thread wait result. Error is " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
 			g_Dump.Crash();
@@ -198,7 +198,7 @@ void RUDPClientCore::RunRetransmissionThread()
 
 			if (++sendedPacketInfo.second->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				auto log = std::make_shared<ClientLog>();
+				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates";
 				Logger::GetInstance().WriteLog(log);
 
@@ -236,7 +236,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 		break;
 	default:
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "Invalid packet type " + static_cast<unsigned char>(packetType);
 		Logger::GetInstance().WriteLog(log);
 	}
@@ -274,7 +274,7 @@ void RUDPClientCore::DoSend()
 		NetBuffer* packet = nullptr;
 		if (not sendBufferQueue.Dequeue(&packet))
 		{
-			auto log = std::make_shared<ClientLog>();
+			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "sendBufferQueue.Dequeue() failed";
 			Logger::GetInstance().WriteLog(log);
 			continue;
@@ -283,7 +283,7 @@ void RUDPClientCore::DoSend()
 		EncodePacket(*packet);
 		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			auto log = std::make_shared<ClientLog>();
+			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "sendto() failed with error code " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
 			continue;
@@ -329,7 +329,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "Buffer is nullptr in RUDPSession::SendPacket()";
 		Logger::GetInstance().WriteLog(log);
 		return;
@@ -348,7 +348,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SendPacketInfo is nullptr in RUDPSession::SendPacket()";
 		Logger::GetInstance().WriteLog(log);
 		NetBuffer::Free(&buffer);
@@ -377,7 +377,7 @@ WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer)
 
 	if (code != NetBuffer::m_byHeaderCode)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "code : " + code;
 		Logger::GetInstance().WriteLog(log);
 		return 0;

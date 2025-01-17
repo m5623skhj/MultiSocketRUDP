@@ -38,7 +38,7 @@ void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 			continue;
 		}
 
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = checker.second.first->GetHandlerType() + " is unregistered";
 		Logger::GetInstance().WriteLog(log);
 	}

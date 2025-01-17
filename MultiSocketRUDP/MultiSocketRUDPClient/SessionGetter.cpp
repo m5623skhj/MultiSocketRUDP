@@ -8,7 +8,7 @@ bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
 {
 	if (CNetClient::Start(optionFilePath.c_str()) == false)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SessionGetter::Start failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -48,7 +48,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
 	if (not ReadSessionGetterOptionFile(optionFilePath))
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "RunGetSessionFromServer::ReadOptionFile() failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -56,7 +56,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 
 	if (not GetSessionFromServer())
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "RunGetSessionFromServer::GetSessionFromServer() failed";
 		Logger::GetInstance().WriteLog(log);
 		WSACleanup();
@@ -108,7 +108,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "WSAStartup failed GetSessionFromServer() with error code " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -117,7 +117,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "Socket creation failed in GetSessionFromServer() with error code " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -130,7 +130,7 @@ bool RUDPClientCore::GetSessionFromServer()
 
 	if (connect(sessionBrokerSocket, (struct sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "Connection failed in GetSessionFromServer() with error code " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sessionBrokerSocket);
@@ -152,7 +152,7 @@ bool RUDPClientCore::GetSessionFromServer()
 			}
 			else
 			{
-				auto log = std::make_shared<ClientLog>();
+				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "recv() failed in GetSessionFromServer() with error code " + error;
 				Logger::GetInstance().WriteLog(log);
 				closesocket(sessionBrokerSocket);
@@ -163,7 +163,7 @@ bool RUDPClientCore::GetSessionFromServer()
 		totalReceivedBytes += bytesReceived;
 		if (totalReceivedBytes > sessionInfoSize)
 		{
-			auto log = std::make_shared<ClientLog>();
+			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Received byte is invalid. Total received size " + totalReceivedBytes;
 			Logger::GetInstance().WriteLog(log);
 			closesocket(sessionBrokerSocket);
@@ -190,7 +190,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
 	if (not receivedBuffer.Decode())
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SetTargetSessionInfo()";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -198,7 +198,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 
 	if (receivedBuffer.GetUseSize() != sessionInfoSize)
 	{
-		auto log = std::make_shared<ClientLog>();
+		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SetTargetSessionInfo() : Invalid session info size. receivedBuffer size is " + receivedBuffer.GetUseSize();
 		Logger::GetInstance().WriteLog(log);
 		return false;

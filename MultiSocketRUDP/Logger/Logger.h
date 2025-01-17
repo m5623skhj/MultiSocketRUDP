@@ -23,6 +23,13 @@ public:
 	void Worker();
 	void StopLoggerThread();
 
+	template<typename LogType>
+	requires std::is_base_of_v<LogBase, LogType>
+	static std::shared_ptr<LogType> MakeLogObject()
+	{
+		return std::make_shared<LogType>();
+	}
+
 private:
 	void WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue);
 

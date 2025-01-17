@@ -36,7 +36,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	recvBuffer.recvBufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, dfDEFAULTSIZE);
 	if (recvBuffer.recvBufferId == RIO_INVALID_BUFFERID)
 	{
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Recv RIORegisterBuffer failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -45,7 +45,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Send RIORegisterBuffer failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -54,7 +54,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, 32, 1, 32, 1, rioRecvCQ, rioSendCQ, &sessionId);
 	if (rioRQ == RIO_INVALID_RQ)
 	{
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RIORegisterBuffer failed with error code " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -105,7 +105,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Buffer is nullptr in RUDPSession::SendPacket()";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -135,7 +135,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		auto log = std::make_shared<ServerLog>();
+		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "SendPacketInfo is nullptr in RUDPSession::SendPacket()";
 		Logger::GetInstance().WriteLog(log);
 		NetBuffer::Free(&buffer);
