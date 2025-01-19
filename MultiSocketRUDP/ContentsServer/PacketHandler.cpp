@@ -17,6 +17,9 @@ namespace ContentsPacketHandler
 	bool HandlePacket(RUDPSession& session, Ping& packet)
 	{
 		auto pc = GET_PC(pc, session);
+		
+		Pong pong;
+		pc->SendPacket(pong);
 
 		return true;
 	}
@@ -31,6 +34,10 @@ namespace ContentsPacketHandler
 	bool HandlePacket(RUDPSession& session, TestPacketReq& packet)
 	{
 		auto pc = GET_PC(pc, session);
+
+		TestPacketRes res;
+		res.order = packet.order;
+		pc->SendPacket(res);
 
 		return true;
 	}

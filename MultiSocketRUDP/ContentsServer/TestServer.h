@@ -17,9 +17,5 @@ public:
 	void Stop();
 
 private:
-	void RunTestThread();
-
-private:
-	std::thread testThread;
 	MultiSocketRUDPCore serverCore;
 };

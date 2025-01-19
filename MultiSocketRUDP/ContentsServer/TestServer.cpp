@@ -25,8 +25,3 @@ void TestServer::Stop()
 
 	std::cout << "Server stopped" << std::endl;
 }
-
-void TestServer::RunTestThread()
-{
-
-}
