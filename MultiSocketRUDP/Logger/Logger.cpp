@@ -108,6 +108,7 @@ void Logger::WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQu
 	{
 		WriteLogToFile(copyLogWaitingQueue.front());
 		copyLogWaitingQueue.pop();
+		--logSize;
 	}
 }
 
