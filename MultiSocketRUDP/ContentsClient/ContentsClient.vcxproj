@@ -106,7 +106,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\User\Desktop\Common;C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPClient;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\User\Desktop\Common;C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPClient;C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;C:\Users\User\Desktop\Common\json-develop\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>

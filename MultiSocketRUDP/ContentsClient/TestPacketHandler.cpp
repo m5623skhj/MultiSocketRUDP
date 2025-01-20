@@ -39,11 +39,8 @@ namespace
 	}
 }
 
-bool TestClient::ProcessPacketHandle(NetBuffer& buffer)
+bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 {
-	PACKET_ID packetId;
-	buffer >> packetId;
-
 	switch (packetId)
 	{
 	case PACKET_ID::Pong:

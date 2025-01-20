@@ -1,6 +1,8 @@
 #include "PreCompile.h"
 #include "TestClient.h"
 #include "RUDPClientCore.h"
+#include "Logger.h"
+#include "LogExtention.h"
 
 TestClient& TestClient::GetInst()
 {
@@ -45,9 +47,14 @@ void TestClient::RunTestThread()
 				continue;
 			}
 
-			if (not ProcessPacketHandle(*buffer))
+			PACKET_ID packetId;
+			*buffer >> packetId;
+			if (not ProcessPacketHandle(*buffer, packetId))
 			{
-				// logging
+				auto log = Logger::MakeLogObject<ClientLog>();
+				log->logString = "ProcessPacketHandle failed by invalid packet id ";
+				log->logString += static_cast<unsigned int>(packetId);
+				Logger::GetInstance().WriteLog(log);
 			}
 
 			NetBuffer::Free(buffer);

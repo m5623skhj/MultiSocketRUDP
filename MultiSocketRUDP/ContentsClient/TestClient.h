@@ -1,6 +1,7 @@
 #pragma once
 #include <thread>
 #include "NetServerSerializeBuffer.h"
+#include "PacketIdType.h"
 
 class TestClient
 {
@@ -19,7 +20,7 @@ public:
 
 private:
 	void RunTestThread();
-	bool ProcessPacketHandle(NetBuffer& buffer);
+	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
 
 private:
 	std::thread testThread;
