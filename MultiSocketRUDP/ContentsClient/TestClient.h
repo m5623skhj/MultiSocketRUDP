@@ -23,4 +23,7 @@ private:
 
 private:
 	std::thread testThread;
+
+private:
+	std::string echoString;
 };

@@ -10,17 +10,29 @@ PacketId Pong::GetPacketId() const
 {
 	return static_cast<PacketId>(PACKET_ID::Pong);
 }
-PacketId TestStringPacket::GetPacketId() const
+PacketId TestStringPacketReq::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::TestStringPacket);
+	return static_cast<PacketId>(PACKET_ID::TestStringPacketReq);
 }
-void TestStringPacket::BufferToPacket(NetBuffer& buffer)
+void TestStringPacketReq::BufferToPacket(NetBuffer& buffer)
 {
 	SetBufferToParameters(buffer, testString);
 }
-void TestStringPacket::PacketToBuffer(NetBuffer& buffer)
+void TestStringPacketReq::PacketToBuffer(NetBuffer& buffer)
 {
 	SetParametersToBuffer(buffer, testString);
+}
+PacketId TestStringPacketRes::GetPacketId() const
+{
+	return static_cast<PacketId>(PACKET_ID::TestStringPacketRes);
+}
+void TestStringPacketRes::BufferToPacket(NetBuffer& buffer)
+{
+	SetBufferToParameters(buffer, echoString);
+}
+void TestStringPacketRes::PacketToBuffer(NetBuffer& buffer)
+{
+	SetParametersToBuffer(buffer, echoString);
 }
 PacketId TestPacketReq::GetPacketId() const
 {

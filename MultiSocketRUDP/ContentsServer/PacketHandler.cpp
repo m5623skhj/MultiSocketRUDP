@@ -24,13 +24,6 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
-	bool HandlePacket(RUDPSession& session, TestStringPacket& packet)
-	{
-		auto pc = GET_PC(pc, session);
-
-		return true;
-	}
-
 	bool HandlePacket(RUDPSession& session, TestPacketReq& packet)
 	{
 		auto pc = GET_PC(pc, session);
@@ -42,10 +35,21 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
+	bool HandlePacket(RUDPSession& session, TestStringPacketReq& packet)
+	{
+		auto pc = GET_PC(pc, session);
+
+		TestStringPacketRes res;
+		res.echoString = packet.testString;
+		pc->SendPacket(res);
+
+		return true;
+	}
+
 	void Init()
 	{
 		PacketHandlerUtil::RegisterPacket<Ping>(HandlePacket);
-		PacketHandlerUtil::RegisterPacket<TestStringPacket>(HandlePacket);
+		PacketHandlerUtil::RegisterPacket<TestStringPacketReq>(HandlePacket);
 		PacketHandlerUtil::RegisterPacket<TestPacketReq>(HandlePacket);
 	}
 }

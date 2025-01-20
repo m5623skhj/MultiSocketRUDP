@@ -75,11 +75,11 @@ public:
 	virtual PacketId GetPacketId() const override;
 };
 
-class TestStringPacket : public IPacket
+class TestStringPacketReq : public IPacket
 {
 public:
-	TestStringPacket() = default;
-	virtual ~TestStringPacket() override = default;
+	TestStringPacketReq() = default;
+	virtual ~TestStringPacketReq() override = default;
 
 public:
 	virtual PacketId GetPacketId() const override;
@@ -88,6 +88,21 @@ public:
 
 public:
 	std::string testString;
+};
+
+class TestStringPacketRes : public IPacket
+{
+public:
+	TestStringPacketRes() = default;
+	virtual ~TestStringPacketRes() override = default;
+
+public:
+	virtual PacketId GetPacketId() const override;
+	virtual void BufferToPacket(NetBuffer& buffer) override;
+	virtual void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	std::string echoString;
 };
 
 class TestPacketReq : public IPacket
