@@ -128,7 +128,24 @@ bool RUDPClientCore::GetSessionFromServer()
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
 	InetPton(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr);
 
-	if (connect(sessionBrokerSocket, (struct sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
+	bool isConnected{};
+	for (int i = 0; i < 5; ++i)
+	{
+		if (connect(sessionBrokerSocket, (struct sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
+		{
+			Sleep(1000);
+			{
+				continue;
+			}
+		}
+		else
+		{
+			isConnected = true;
+			break;
+		}
+	}
+
+	if (not isConnected)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "Connection failed in GetSessionFromServer() with error code " + WSAGetLastError();
