@@ -232,6 +232,7 @@ bool MultiSocketRUDPCore::InitRIO()
 		{
 			return false;
 		}
+		unusedSessionIdList.emplace_back(session->sessionId);
 	}
 
 	return true;

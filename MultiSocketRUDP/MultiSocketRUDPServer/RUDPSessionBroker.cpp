@@ -97,6 +97,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "Server is full of users";
 			Logger::GetInstance().WriteLog(log);
+			closesocket(clientSocket);
 			continue;
 		}
 		
@@ -105,6 +106,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "This session already connected";
 			Logger::GetInstance().WriteLog(log);
+			closesocket(clientSocket);
 			continue;
 		}
 
@@ -117,6 +119,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
+			closesocket(clientSocket);
 			continue;
 		}
 
