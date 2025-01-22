@@ -1,5 +1,6 @@
 #include "PreCompile.h"
 #include "TestServer.h"
+#include "Logger.h"
 
 TestServer& TestServer::GetInst()
 {
@@ -12,6 +13,7 @@ bool TestServer::Start(const std::wstring& coreOptionFilePath, const std::wstrin
 	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath))
 	{
 		std::cout << "StartServer() failed" << std::endl;
+		Logger::GetInstance().StopLoggerThread();
 		return 0;
 	}
 

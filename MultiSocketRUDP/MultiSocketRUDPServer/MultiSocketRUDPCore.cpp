@@ -25,7 +25,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Option file read failed";
 		Logger::GetInstance().WriteLog(log);
-
 		return false;
 	}
 
