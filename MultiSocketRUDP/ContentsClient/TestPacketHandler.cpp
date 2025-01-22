@@ -45,14 +45,10 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 	{
 	case PACKET_ID::Pong:
 	{
-		Ping ping;
-		RUDPClientCore::GetInst().SendPacket(ping);
 	}
 	break;
 	case PACKET_ID::TestPacketRes:
 	{
-		static int order = 0;
-
 		int recvOrder;
 		buffer >> recvOrder;
 
@@ -60,10 +56,6 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 		{
 			g_Dump.Crash();
 		}
-
-		TestPacketReq req;
-		req.order = ++order;
-		RUDPClientCore::GetInst().SendPacket(req);
 	}
 	break;
 	case PACKET_ID::TestStringPacketRes:
@@ -75,15 +67,44 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 		{
 			g_Dump.Crash();
 		}
-
-		echoString = MakeRandomString();
-		TestStringPacketReq req;
-		req.testString = echoString;
-		RUDPClientCore::GetInst().SendPacket(req);
 	}
 	default:
 		return false;
 	}
 
 	return true;
+}
+
+void TestClient::SendAnyPacket()
+{
+	constexpr int pickablePacketSize = 3;
+	int pickedItem = rand() % pickablePacketSize;
+
+	switch (pickedItem)
+	{
+	case 0:
+	{
+		Ping ping;
+		RUDPClientCore::GetInst().SendPacket(ping);
+	}
+	break;
+	case 1:
+	{
+		TestPacketReq req;
+		req.order = ++order;
+		RUDPClientCore::GetInst().SendPacket(req);
+	}
+	break;
+	case 2:
+	{
+		echoString = MakeRandomString();
+		TestStringPacketReq req;
+		req.testString = echoString;
+		RUDPClientCore::GetInst().SendPacket(req);
+	}
+	break;
+	default:
+		break;
+	}
+
 }

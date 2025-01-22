@@ -21,10 +21,12 @@ public:
 private:
 	void RunTestThread();
 	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
+	void SendAnyPacket();
 
 private:
 	std::thread testThread;
 
 private:
-	std::string echoString;
+	int order{};
+	std::string echoString{};
 };

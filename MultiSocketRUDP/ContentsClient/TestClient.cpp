@@ -3,6 +3,7 @@
 #include "RUDPClientCore.h"
 #include "Logger.h"
 #include "LogExtention.h"
+#include "Protocol.h"
 
 TestClient& TestClient::GetInst()
 {
@@ -35,6 +36,15 @@ void TestClient::Stop()
 void TestClient::RunTestThread()
 {
 	const unsigned int maxProcessPacketInOneTick = 100;
+
+	while (not RUDPClientCore::GetInst().IsConnected())
+	{
+		Sleep(1000);
+	}
+	{
+		Ping ping;
+		RUDPClientCore::GetInst().SendPacket(ping);
+	}
 
 	while (RUDPClientCore::GetInst().IsStopped())
 	{
