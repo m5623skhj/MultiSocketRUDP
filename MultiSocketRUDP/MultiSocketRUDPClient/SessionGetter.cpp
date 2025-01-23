@@ -155,7 +155,11 @@ bool RUDPClientCore::GetSessionFromServer()
 	}
 
 	auto& recvBuffer = *NetBuffer::Alloc();
+	recvBuffer.m_iRead = 0;
 	int totalReceivedBytes = 0;
+	BYTE code{};
+	WORD payloadLength{};
+
 	while (true)
 	{
 		int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), recvBufferSize + df_HEADER_SIZE, 0);
@@ -178,29 +182,25 @@ bool RUDPClientCore::GetSessionFromServer()
 		}
 
 		totalReceivedBytes += bytesReceived;
-		if (totalReceivedBytes > sessionInfoSize)
+		recvBuffer.MoveWritePos(bytesReceived - df_HEADER_SIZE);
+		if (totalReceivedBytes >= df_HEADER_SIZE && payloadLength == 0)
 		{
-			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = "Received byte is invalid. Total received size " + totalReceivedBytes;
-			Logger::GetInstance().WriteLog(log);
-			closesocket(sessionBrokerSocket);
-			return false;
+			recvBuffer >> code >> payloadLength;
 		}
-		else if (totalReceivedBytes == sessionInfoSize)
+		else if (totalReceivedBytes < df_HEADER_SIZE)
+		{
+			continue;
+		}
+		
+		if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
 		{
 			break;
 		}
 	}
 	closesocket(sessionBrokerSocket);
 
-	if (SetTargetSessionInfo(recvBuffer))
-	{
-		NetBuffer::Free(&recvBuffer);
-		return false;
-	}
-
 	NetBuffer::Free(&recvBuffer);
-	return true;
+	return SetTargetSessionInfo(recvBuffer);
 }
 
 bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
@@ -209,14 +209,6 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SetTargetSessionInfo()";
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
-
-	if (receivedBuffer.GetUseSize() != sessionInfoSize)
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "SetTargetSessionInfo() : Invalid session info size. receivedBuffer size is " + receivedBuffer.GetUseSize();
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}

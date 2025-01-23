@@ -113,7 +113,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 		SetSessionKey(*session);
 		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
 
-		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetUseSize() + df_HEADER_SIZE, 0);
+		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
 		if (result == SOCKET_ERROR)
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
