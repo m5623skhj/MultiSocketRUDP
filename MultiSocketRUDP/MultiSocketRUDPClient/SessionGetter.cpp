@@ -46,14 +46,6 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 #else
 bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
-	if (not ReadSessionGetterOptionFile(optionFilePath))
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "RunGetSessionFromServer::ReadOptionFile() failed";
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
-
 	if (not GetSessionFromServer())
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
@@ -86,19 +78,15 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 
 	cBuffer[iFileSize - iAmend] = '\0';
 	WCHAR* pBuff = cBuffer;
-	BYTE headerCode, xOrCode;
 
 	if (!parser.GetValue_String(pBuff, L"SESSION_BROKER", L"IP", sessionBrokerIP))
 		return false;
 	if (!parser.GetValue_Short(pBuff, L"SESSION_BROKER", L"PORT", (short*)&sessionBrokerPort))
 		return false;
-	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_CODE", &headerCode))
+	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode))
 		return false;
-	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_KEY", &xOrCode))
+	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_KEY", &NetBuffer::m_byXORCode))
 		return false;
-
-	CNetServerSerializationBuf::m_byHeaderCode = headerCode;
-	CNetServerSerializationBuf::m_byXORCode = xOrCode;
 
 	return true;
 }
@@ -187,20 +175,22 @@ bool RUDPClientCore::GetSessionFromServer()
 		{
 			recvBuffer >> code >> payloadLength;
 		}
-		else if (totalReceivedBytes < df_HEADER_SIZE)
+
+		if (totalReceivedBytes < df_HEADER_SIZE)
 		{
 			continue;
 		}
-		
-		if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
+		else if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
 		{
 			break;
 		}
 	}
 	closesocket(sessionBrokerSocket);
 
+	bool retval = SetTargetSessionInfo(recvBuffer);
 	NetBuffer::Free(&recvBuffer);
-	return SetTargetSessionInfo(recvBuffer);
+
+	return retval;
 }
 
 bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)

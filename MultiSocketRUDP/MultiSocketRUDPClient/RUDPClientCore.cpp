@@ -13,6 +13,11 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
+	if (not ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath))
+	{
+		return false;
+	}
+
 #if USE_IOCP_SESSION_BROKER
 	if (not sessionGetter.Start(optionFilePath))
 	{
@@ -61,13 +66,6 @@ bool RUDPClientCore::IsConnected()
 
 bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 {
-	if (not ReadClientCoreOptionFile(optionFilePath))
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "RUDPClientCore::ReadClientCoreOptionFile() failed";
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
 
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(port);
@@ -395,6 +393,27 @@ void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
 		packet.m_iRead = 0;
 		packet.Encode();
 	}
+}
+
+bool RUDPClientCore::ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)
+{
+	if (not ReadClientCoreOptionFile(clientCoreOptionFile))
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "RUDPClientCore::ReadClientCoreOptionFile() failed";
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
+	if (not ReadSessionGetterOptionFile(sessionGetterOptionFilePath))
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "RunGetSessionFromServer::ReadOptionFile() failed";
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
+	return true;
 }
 
 bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath)

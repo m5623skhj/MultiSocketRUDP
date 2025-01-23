@@ -168,11 +168,11 @@ private:
 	std::vector<std::thread> ioWorkerThreads;
 	std::vector<std::thread> recvLogicWorkerThreads;
 	std::vector<std::thread> retransmissionThreads;
-	std::thread timeoutThread;
+	std::thread timeoutThread{};
 
 	// event handles
 	std::vector<HANDLE> recvLogicThreadEventHandles;
-	HANDLE timeoutEventHandle;
+	HANDLE timeoutEventHandle{};
 
 	// objects
 	std::vector<CListBaseQueue<IOContext*>> ioCompletedContexts;
