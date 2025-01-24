@@ -1,12 +1,15 @@
 #include "PreCompile.h"
 #include "Logger.h"
 #include <syncstream>
+#include <filesystem>
 
 #define LOG_HANDLE  WAIT_OBJECT_0
 #define STOP_HANDLE WAIT_OBJECT_0 + 1
 
 Logger::Logger()
 {
+	CreateFolderIfNotExists(logFolder);
+
 	for (int i = 0; i < 2; ++i)
 	{
 		loggerEventHandles[i] = NULL;
@@ -26,7 +29,8 @@ Logger::Logger()
 	char buffer[80];
 	std::strftime(buffer, sizeof(buffer), "%Y-%m-%d_%H", &utcTime);
 
-	std::string fileName = std::string("log_") + buffer + ".txt"; // 파일 이름 생성
+	std::string fileName = logFolder;
+	fileName += std::string("/log_") + buffer + ".txt";
 
 	logFileStream.open(fileName, std::ios::app);
 	if (!logFileStream.is_open())
@@ -99,6 +103,18 @@ void Logger::StopLoggerThread()
 	SetEvent(loggerEventHandles[1]);
 
 	loggerThread.join();
+}
+
+void Logger::CreateFolderIfNotExists(const std::string& folderPath)
+{
+	if (not std::filesystem::exists(folderPath))
+	{
+		if (not std::filesystem::create_directory(folderPath))
+		{
+			std::cout << "Folder create failed with error code " << GetLastError() << std::endl;
+			g_Dump.Crash();
+		}
+	}
 }
 
 void Logger::WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue)

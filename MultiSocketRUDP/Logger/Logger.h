@@ -31,6 +31,7 @@ public:
 	}
 
 private:
+	void CreateFolderIfNotExists(const std::string& folderPath);
 	void WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue);
 
 private:
@@ -55,6 +56,7 @@ private:
 #pragma endregion LogWaitingQueue
 
 	bool printToConsole{};
+	std::string logFolder = "Log Folder";
 };
 
 namespace LogHelper
