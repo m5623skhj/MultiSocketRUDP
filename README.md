@@ -2,6 +2,8 @@
 
 1. 개요
 2. 구성
+2.1	서버
+2.2 클라이언트
 3. Tools
 
 ---
@@ -17,6 +19,10 @@
 ---
 
 2. 구성
+
+---
+
+2.1 서버
 
 * MultiSocketRUDPCore
   * UDP와 RIO를 사용하는 서버의 본체입니다.
@@ -57,6 +63,12 @@
     * Packet sequence 8byte
     * Packet id 4byte
     * body nbyte
+
+---
+
+2.2 클라이언트
+
+
 
 ---
 
