@@ -57,14 +57,6 @@
 	  * ConnectHandler
 	  * DisconnectHandler
 
-* 패킷 구성
-  * 위에서 부터 아래로 순차적으로 패킷 배열에 해당 내용이 들어가 있습니다.
-    * Packet header 5byte
-    * Packet type 1byte
-    * Packet sequence 8byte
-    * Packet id 4byte
-    * body nbyte
-
 ---
 
 2.2 클라이언트
@@ -82,6 +74,14 @@
 		* 기본적으로 지정된 폴더에 로그 파일을 생성하며, 유저의 지정에 따라 콘솔에도 로그를 출력합니다.
 		* 샘플로 들어 있는 서버나 클라이언트에 있는 LogExtension.h 파일을 참고하여 LogBase 클래스를 상속 받고 로그 클래스를 작성해주시면 됩니다.
 			* 로그는 json 형식으로 출력됩니다.
+
+* 패킷 구성
+  * 위에서 부터 아래로 순차적으로 패킷 배열에 해당 내용이 들어가 있습니다.
+    * Packet header 5byte
+    * Packet type 1byte
+    * Packet sequence 8byte
+    * Packet id 4byte
+    * body nbyte
 
 ---
 
