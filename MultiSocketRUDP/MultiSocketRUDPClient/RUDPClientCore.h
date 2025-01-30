@@ -69,8 +69,8 @@ private:
 	bool threadStopFlag{};
 	bool isConnected{};
 
-#pragma region SessionBroker
-#if USE_IOCP_SESSION_BROKER
+#pragma region SessionGetter
+#if USE_IOCP_SESSION_GETTER
 private:
 	class SessionGetter : public CNetClient
 	{
@@ -109,7 +109,7 @@ private:
 	SessionIdType sessionId{};
 	std::string sessionKey{};
 
-#pragma endregion SessionBroker
+#pragma endregion SessionGetter
 
 #pragma region RUDP
 private:
