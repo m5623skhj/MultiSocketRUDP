@@ -18,7 +18,7 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 		return false;
 	}
 
-#if USE_IOCP_SESSION_BROKER
+#if USE_IOCP_SESSION_GETTER
 	if (not sessionGetter.Start(optionFilePath))
 	{
 		return false;
