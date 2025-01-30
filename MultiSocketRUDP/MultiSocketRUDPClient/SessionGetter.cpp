@@ -3,7 +3,7 @@
 #include "Logger.h"
 #include "LogExtention.h"
 
-#if USE_IOCP_SESSION_BROKER
+#if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
 {
 	if (CNetClient::Start(optionFilePath.c_str()) == false)
@@ -73,7 +73,7 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	int iFileSize = ftell(fp);
 	fseek(fp, iJumpBOM, SEEK_SET);
 	int FileSize = (int)fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp);
-	int iAmend = iFileSize - FileSize; // °³Çà ¹®ÀÚ¿Í ÆÄÀÏ »çÀÌÁî¿¡ ´ëÇÑ º¸Á¤°ª
+	int iAmend = iFileSize - FileSize; // ê°œí–‰ ë¬¸ìì™€ íŒŒì¼ ì‚¬ì´ì¦ˆì— ëŒ€í•œ ë³´ì •ê°’
 	fclose(fp);
 
 	cBuffer[iFileSize - iAmend] = '\0';
