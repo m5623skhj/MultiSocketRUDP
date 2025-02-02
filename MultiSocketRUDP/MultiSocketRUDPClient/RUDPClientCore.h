@@ -1,7 +1,7 @@
 #pragma once
 #include "NetServerSerializeBuffer.h"
 #include "NetClient.h"
-#include "../MultiSocketRUDPServer/BuildConfig.h"
+#include "BuildConfig.h"
 #include "../MultiSocketRUDPServer/CoreType.h"
 #include <thread>
 #include <mutex>

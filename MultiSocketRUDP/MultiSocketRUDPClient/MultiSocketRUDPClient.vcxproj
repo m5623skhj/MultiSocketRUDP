@@ -145,6 +145,7 @@
     <ClCompile Include="SessionGetter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="LogExtention.h" />
     <ClInclude Include="RUDPClientCore.h" />
   </ItemGroup>

@@ -22,6 +22,9 @@
     <Filter Include="소스 파일\Log">
       <UniqueIdentifier>{52e411ac-c75a-46de-940b-050f4d76f256}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\MultiSocketClientCore\CoreType">
+      <UniqueIdentifier>{3a2f56bd-436c-4f2f-b70a-d14ad7460e90}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RUDPClientCore.cpp">
@@ -58,6 +61,9 @@
     </ClInclude>
     <ClInclude Include="LogExtention.h">
       <Filter>소스 파일\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildConfig.h">
+      <Filter>소스 파일\MultiSocketClientCore\CoreType</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
