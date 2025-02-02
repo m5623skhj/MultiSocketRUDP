@@ -64,6 +64,7 @@ public:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
+	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
@@ -191,7 +192,6 @@ private:
 	void OnRecvPacket(BYTE threadId);
 	bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	bool DoRecv(RUDPSession& session);
-	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
 
 private:

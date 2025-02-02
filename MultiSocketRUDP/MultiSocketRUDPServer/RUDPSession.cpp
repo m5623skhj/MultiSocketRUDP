@@ -178,6 +178,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 	}
 
 	OnConnected(sessionId);
+	SendReplyToClient(packetSequence);
 }
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
@@ -187,20 +188,20 @@ void RUDPSession::Disconnect(NetBuffer& recvPacket)
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
-	PacketSequence packetSequece;
-	recvPacket >> packetSequece;
+	PacketSequence packetSequence;
+	recvPacket >> packetSequence;
 
-	if (lastReceivedPacketSequence != packetSequece)
+	if (lastReceivedPacketSequence != packetSequence)
 	{
 		std::scoped_lock lock(recvPacketHolderQueueLock);
 
 		NetBuffer::AddRefCount(&recvPacket);
-		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequece });
+		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequence });
 
 		return false;
 	}
 	
-	if (ProcessPacket(recvPacket) == false)
+	if (ProcessPacket(recvPacket, packetSequence) == false)
 	{
 		return false;
 	}
@@ -210,7 +211,7 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 
 bool RUDPSession::ProcessHoldingPacket()
 {
-	PacketSequence packetSequece;
+	PacketSequence packetSequence;
 	size_t queueRestSize = 0;
 
 	{
@@ -229,12 +230,12 @@ bool RUDPSession::ProcessHoldingPacket()
 				break;
 			}
 
-			packetSequece = recvPacketHolderTop.packetSequence;
+			packetSequence = recvPacketHolderTop.packetSequence;
 			storedBuffer = recvPacketHolderTop.buffer;
 			recvPacketHolderQueue.pop();
 		}
 
-		if (ProcessPacket(*storedBuffer) == false)
+		if (ProcessPacket(*storedBuffer, packetSequence) == false)
 		{
 			return false;
 		}
@@ -244,7 +245,7 @@ bool RUDPSession::ProcessHoldingPacket()
 	return true;
 }
 
-bool RUDPSession::ProcessPacket(NetBuffer& recvPacket)
+bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
 	++lastReceivedPacketSequence;
 	
@@ -269,7 +270,30 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket)
 		return false;
 	}
 
-	return packetHandler(*this, (IPacket&)realPacket);
+	bool packetHandleResult = packetHandler(*this, (IPacket&)realPacket);
+	if (packetHandleResult == true)
+	{
+		SendReplyToClient(recvPacketSequence);
+	}
+
+	return packetHandleResult;
+}
+
+void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
+{
+	NetBuffer& buffer = *NetBuffer::Alloc();
+
+	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
+	buffer << packetType << recvPacketSequence;
+
+	if (not core.DoSend(*this, threadId))
+	{
+		NetBuffer::Free(&buffer);
+
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "SendReplyToClient failed";
+		Logger::GetInstance().WriteLog(log);
+	}
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)

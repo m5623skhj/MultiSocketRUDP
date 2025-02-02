@@ -76,8 +76,9 @@ private:
 	void TryConnect(NetBuffer& recvPacket);
 	void Disconnect(NetBuffer& recvPacket);
 	bool OnRecvPacket(NetBuffer& recvPacket);
-	bool ProcessPacket(NetBuffer& recvPacket);
+	bool ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence);
 	bool ProcessHoldingPacket();
+	void SendReplyToClient(const PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
 
 private:
