@@ -120,6 +120,7 @@ private:
 
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket);
+	void SendReplyToServer(const PacketSequence recvPacketSequence);
 	void DoSend();
 	void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 

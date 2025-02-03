@@ -225,6 +225,8 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 		std::scoped_lock lock(recvPacketHoldingQueueLock);
 		recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
+
+		SendReplyToServer(packetSequence);
 	}
 		break;
 	case PACKET_TYPE::SendReplyType:
@@ -262,6 +264,21 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket)
 		}
 
 		sendPacketInfoMap.erase(packetSequence);
+	}
+}
+
+void RUDPClientCore::SendReplyToServer(const PacketSequence recvPacketSequence)
+{
+	auto& buffer = *NetBuffer::Alloc();
+
+	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
+	buffer << packetType << recvPacketSequence;
+
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		sendBufferQueue.Enqueue(&buffer);
+
+		SetEvent(sendEventHandles[0]);
 	}
 }
 
