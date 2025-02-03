@@ -328,15 +328,26 @@ unsigned int RUDPClientCore::GetRemainPacketSize()
 NetBuffer* RUDPClientCore::GetReceivedPacket()
 {
 	std::scoped_lock lock(recvPacketHoldingQueueLock);
-	auto holdingPacketInfo = recvPacketHoldingQueue.top();
-
-	if (holdingPacketInfo.packetSequence != recvPacketSequence)
+	while (not recvPacketHoldingQueue.empty())
 	{
-		return nullptr;
+		auto holdingPacketInfo = recvPacketHoldingQueue.top();
+
+		if (holdingPacketInfo.packetSequence < recvPacketSequence)
+		{
+			recvPacketHoldingQueue.pop();
+			continue;
+		}
+		else if (holdingPacketInfo.packetSequence != recvPacketSequence)
+		{
+			return nullptr;
+		}
+
+		++recvPacketSequence;
+		recvPacketHoldingQueue.pop();
+		return holdingPacketInfo.buffer;
 	}
 
-	recvPacketHoldingQueue.pop();
-	return holdingPacketInfo.buffer;
+	return nullptr;
 }
 
 void RUDPClientCore::SendPacket(OUT IPacket& packet)
