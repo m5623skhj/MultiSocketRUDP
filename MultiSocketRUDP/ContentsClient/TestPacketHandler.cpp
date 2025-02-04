@@ -72,6 +72,8 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 		return false;
 	}
 
+	SendAnyPacket();
+
 	return true;
 }
 
@@ -106,5 +108,12 @@ void TestClient::SendAnyPacket()
 	default:
 		break;
 	}
+}
 
+void TestClient::SendAnyPacket(const unsigned int sendCount)
+{
+	for (unsigned int i = 0; i < sendCount; ++i)
+	{
+		SendAnyPacket();
+	}
 }

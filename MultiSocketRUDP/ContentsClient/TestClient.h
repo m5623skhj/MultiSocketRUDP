@@ -17,11 +17,14 @@ public:
 public:
 	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile);
 	void Stop();
+	bool IsConnected() const;
 
 private:
+	bool WaitingConnectToServer(const unsigned int maximumConnectWaitingCount);
 	void RunTestThread();
 	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
 	void SendAnyPacket();
+	void SendAnyPacket(const unsigned int sendCount);
 
 private:
 	std::thread testThread;

@@ -13,7 +13,7 @@ int main()
 	{
 		Sleep(1000);
 
-		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000 || not TestClient::GetInst().IsConnected())
 		{
 			TestClient::GetInst().Stop();
 			break;
