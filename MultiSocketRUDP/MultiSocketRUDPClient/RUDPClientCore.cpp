@@ -114,6 +114,8 @@ void RUDPClientCore::RunRecvThread()
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
+			NetBuffer::Free(buffer);
+			
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
 				auto log = Logger::MakeLogObject<ClientLog>();
@@ -200,8 +202,8 @@ void RUDPClientCore::RunRetransmissionThread()
 				log->logString = "The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates";
 				Logger::GetInstance().WriteLog(log);
 
-				// Call Stop() is impossible by self thread join()
-				continue;
+				isConnected = false;
+				break;
 			}
 
 			SendPacket(*sendedPacketInfo.second->GetBuffer(), sendedPacketInfo.second->sendPacektSequence);
@@ -252,6 +254,11 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket)
 	if (lastSendPacketSequence < packetSequence)
 	{
 		return;
+	}
+
+	if (packetSequence == 0)
+	{
+		isConnected = true;
 	}
 
 	SendPacketInfo* sendedPacketInfo = nullptr;
