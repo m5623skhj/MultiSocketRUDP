@@ -106,14 +106,14 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\User\Desktop\Common;C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPClient;C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;C:\Users\User\Desktop\Common\json-develop\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPClient;C:\Users\KimHyeongJin\Desktop\Common\json-develop\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>MultiSocketRUDPClient.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\User\source\repos\MultiSocketRUDP\MultiSocketRUDP\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
