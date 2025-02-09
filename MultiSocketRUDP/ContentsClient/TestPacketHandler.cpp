@@ -2,6 +2,8 @@
 #include "TestClient.h"
 #include "Protocol.h"
 #include "RUDPClientCore.h"
+#include "Logger.h"
+#include "LogExtention.h"
 #include <random>
 
 namespace
@@ -68,8 +70,15 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
 			g_Dump.Crash();
 		}
 	}
+	break;
 	default:
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "Invalid packet id " + static_cast<unsigned int>(packetId);
+		Logger::GetInstance().WriteLog(log);
+
 		return false;
+	}
 	}
 
 	SendAnyPacket();
@@ -106,7 +115,9 @@ void TestClient::SendAnyPacket()
 	}
 	break;
 	default:
-		break;
+	{
+	}
+	break;
 	}
 }
 
