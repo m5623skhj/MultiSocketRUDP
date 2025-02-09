@@ -703,7 +703,7 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 	clientAddrBuffer.Length = sizeof(sockaddr_in);
 	clientAddrBuffer.Offset = 0;
 
-	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
+	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RIOReceiveEx() failed with " + WSAGetLastError();
@@ -755,7 +755,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, ThreadIdType threadId
 		clientAddrBuffer.Length = sizeof(sockaddr_in);
 		clientAddrBuffer.Offset = 0;
 
-		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, nullptr) == false)
+		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "RIOSendEx() failed with " + WSAGetLastError();

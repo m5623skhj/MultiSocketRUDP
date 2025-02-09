@@ -16,6 +16,9 @@ public:
 	bool Start(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
 	void Stop();
 
+public:
+	bool IsServerStopped();
+
 private:
 	MultiSocketRUDPCore serverCore;
 };

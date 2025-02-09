@@ -27,3 +27,8 @@ void TestServer::Stop()
 
 	std::cout << "Server stopped" << std::endl;
 }
+
+bool TestServer::IsServerStopped()
+{
+	return serverCore.IsServerStopped();
+}

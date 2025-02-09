@@ -26,6 +26,11 @@ int main()
 			break;
 		}
 	}
+
+	while (not TestServer::GetInst().IsServerStopped())
+	{
+		Sleep(1000);
+	}
 	std::cout << "Server stopped" << std::endl;
 
 	return 0;
