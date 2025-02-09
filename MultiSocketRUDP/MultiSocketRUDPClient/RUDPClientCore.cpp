@@ -108,28 +108,30 @@ void RUDPClientCore::RunRecvThread()
 		{
 			NetBuffer::Free(buffer);
 		}
+		
 		buffer = NetBuffer::Alloc();
+		if (buffer == nullptr)
+		{
+			g_Dump.Crash();
+		}
 
 		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&serverAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
-			NetBuffer::Free(buffer);
 			
+			auto log = Logger::MakeLogObject<ClientLog>();
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
-				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "Recv thread stopped";
-				Logger::GetInstance().WriteLog(log);
-				continue;
 			}
 			else
 			{
-				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "recvfrom() error with " + error;
-				Logger::GetInstance().WriteLog(log);
-				continue;
 			}
+
+			Logger::GetInstance().WriteLog(log);
+			continue;
 		}
 
 		if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
