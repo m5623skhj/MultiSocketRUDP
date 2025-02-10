@@ -77,7 +77,10 @@ void RUDPSession::InitializeSession()
 
 RUDPSession::~RUDPSession()
 {
-	closesocket(sock);
+	if (sock != INVALID_SOCKET)
+	{
+		closesocket(sock);
+	}
 }
 
 void RUDPSession::Disconnect()
