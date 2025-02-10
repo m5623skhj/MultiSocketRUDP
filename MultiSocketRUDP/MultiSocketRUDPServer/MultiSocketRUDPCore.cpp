@@ -99,9 +99,14 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().WriteLog(log);
 }
 
-bool MultiSocketRUDPCore::IsServerStopped()
+bool MultiSocketRUDPCore::IsServerStopped() const
 {
 	return isServerStopped;
+}
+
+unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
+{
+	return connectedUserCount;
 }
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
@@ -140,6 +145,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 		std::scoped_lock lock(unusedSessionIdListLock);
 		unusedSessionIdList.emplace_back(disconnectTargetSessionId);
 	}
+	--connectedUserCount;
 	sessionArray[disconnectTargetSessionId]->isUsingSession = false;
 
 	auto log = Logger::MakeLogObject<ServerLog>();
@@ -356,6 +362,7 @@ void MultiSocketRUDPCore::CloseAllSessions()
 
 		// need wait?
 		sessionArray.clear();
+		connectedUserCount = 0;
 	}
 }
 
@@ -385,7 +392,7 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 	return session;
 }
 
-RUDPSession* MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId)
+RUDPSession* MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId) const
 {
 	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->isUsingSession)
 	{
@@ -830,7 +837,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 	return totalSendSize;
 }
 
-WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer)
+WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer) const
 {
 	BYTE code;
 	WORD payloadLength;

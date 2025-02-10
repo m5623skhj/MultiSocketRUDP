@@ -60,7 +60,9 @@ public:
 	void StopServer();
 
 	[[nodiscard]]
-	bool IsServerStopped();
+	bool IsServerStopped() const;
+	[[nodiscard]]
+	unsigned short GetConnectedUserCount() const;
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
@@ -98,13 +100,14 @@ private:
 
 private:
 	RUDPSession* AcquireSession();
-	RUDPSession* GetUsingSession(SessionIdType sessionId);
+	RUDPSession* GetUsingSession(SessionIdType sessionId) const;
 
 private:
 	// This container's size must not be increased any further
 	std::vector<RUDPSession*> sessionArray;
 	std::list<SessionIdType> unusedSessionIdList;
 	std::recursive_mutex unusedSessionIdListLock;
+	std::atomic_uint16_t connectedUserCount{};
 
 private:
 	std::vector<std::list<SendPacketInfo*>> sendedPacketInfoList;
@@ -204,7 +207,7 @@ private:
 
 private:
 	void EncodePacket(OUT NetBuffer& packet);
-	WORD GetPayloadLength(OUT NetBuffer& buffer);
+	WORD GetPayloadLength(OUT NetBuffer& buffer) const;
 };
 
 static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);

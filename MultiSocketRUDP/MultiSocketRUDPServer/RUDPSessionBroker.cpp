@@ -123,6 +123,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::strin
 			continue;
 		}
 
+		++connectedUserCount;
 		closesocket(clientSocket);
 		sendBuffer.Init();
 	}
