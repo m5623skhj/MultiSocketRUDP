@@ -49,7 +49,7 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 
 }
 #else
-void MultiSocketRUDPCore::RunSessionBrokerThread(PortType listenPort, std::string rudpSessionIP)
+void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP)
 {
 	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
 

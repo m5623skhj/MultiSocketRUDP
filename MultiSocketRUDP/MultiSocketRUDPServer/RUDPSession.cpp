@@ -324,12 +324,12 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	core.EraseSendPacketInfo(sendedPacketInfo, threadId);
 }
 
-SessionIdType RUDPSession::GetSessionId()
+SessionIdType RUDPSession::GetSessionId() const
 {
 	return sessionId;
 }
 
-sockaddr_in RUDPSession::GetSocketAddress()
+sockaddr_in RUDPSession::GetSocketAddress() const
 {
 	return clientAddr;
 }

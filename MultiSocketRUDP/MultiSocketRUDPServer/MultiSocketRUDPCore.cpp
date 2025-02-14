@@ -154,7 +154,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 	Logger::GetInstance().WriteLog(log);
 }
 
-void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId)
+void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
 	if (eraseTarget == nullptr)
 	{
@@ -244,7 +244,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	return true;
 }
 
-RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, unsigned int targetBuffersize)
+RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize)
 {
 	if (targetBuffer == nullptr)
 	{
@@ -316,7 +316,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 	return true;
 }
 
-std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(unsigned short socketNumber)
+std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short socketNumber)
 {
 	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)
@@ -392,7 +392,7 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 	return session;
 }
 
-RUDPSession* MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId) const
+RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId) const
 {
 	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->isUsingSession)
 	{
@@ -402,7 +402,7 @@ RUDPSession* MultiSocketRUDPCore::GetUsingSession(SessionIdType sessionId) const
 	return sessionArray[sessionId];
 }
 
-void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
+void MultiSocketRUDPCore::RunWorkerThread(const ThreadIdType threadId)
 {
 	RIORESULT rioResults[maxRIOResult];
 	ULONG numOfResults = 0;
@@ -442,7 +442,7 @@ void MultiSocketRUDPCore::RunWorkerThread(ThreadIdType threadId)
 	Logger::GetInstance().WriteLog(log);
 }
 
-void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
+void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 {
 	HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
 	while (not threadStopFlag)
@@ -477,7 +477,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::RunRetransmissionThread(ThreadIdType threadId)
+void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
@@ -558,7 +558,7 @@ void MultiSocketRUDPCore::RunTimeoutThread()
 	}
 }
 
-void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs)
+void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
 	tickSet.nowTick = GetTickCount64();
 	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
@@ -595,7 +595,7 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 	return context;
 }
 
-bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId)
+bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId)
 {
 	if (contextResult == nullptr)
 	{
@@ -631,7 +631,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, ULONG transf
 	return false;
 }
 
-bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId)
+bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId)
 {
 	auto buffer = NetBuffer::Alloc();
 	if (memcpy_s(buffer->m_pSerializeBuffer, recvBufferSize, contextResult->session->recvBuffer.buffer, transferred) != 0)
@@ -646,13 +646,13 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, ULONG tr
 	return DoRecv(*contextResult->session);
 }
 
-bool MultiSocketRUDPCore::SendIOCompleted(ULONG transferred, RUDPSession& session, BYTE threadId)
+bool MultiSocketRUDPCore::SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId)
 {
 	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 	return DoSend(session, threadId);
 }
 
-void MultiSocketRUDPCore::OnRecvPacket(BYTE threadId)
+void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 {
 	while (ioCompletedContexts[threadId].GetRestSize() > 0)
 	{
@@ -721,7 +721,7 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 	return true;
 }
 
-bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, ThreadIdType threadId)
+bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType threadId)
 {
 	while (1)
 	{
@@ -776,7 +776,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, ThreadIdType threadId
 	return true;
 }
 
-int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId)
+int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
 {
 	int totalSendSize = 0;
 	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();

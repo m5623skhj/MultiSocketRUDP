@@ -33,7 +33,7 @@ struct SendPacketInfo
 
 struct RecvPacketInfo
 {
-	explicit RecvPacketInfo(NetBuffer* inBuffer, PacketSequence inPacketSequence)
+	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence)
 		: buffer(inBuffer)
 		, packetSequence(inPacketSequence)
 	{
@@ -55,7 +55,7 @@ public:
 	static RUDPClientCore& GetInst();
 
 public:
-	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole);
 	void Stop();
 
 	bool IsStopped();
@@ -122,7 +122,7 @@ private:
 	void OnSendReply(NetBuffer& recvPacket);
 	void SendReplyToServer(const PacketSequence recvPacketSequence);
 	void DoSend();
-	void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
+	void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
 	SOCKET rudpSocket{};

@@ -19,7 +19,7 @@ public:
 
 #pragma region Thread
 public:
-	void RunLoggerThread(bool isAlsoPrintToConsole);
+	void RunLoggerThread(const bool isAlsoPrintToConsole);
 	void Worker();
 	void StopLoggerThread();
 

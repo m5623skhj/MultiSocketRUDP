@@ -51,7 +51,7 @@ Logger& Logger::GetInstance()
 	return inst;
 }
 
-void Logger::RunLoggerThread(bool isAlsoPrintToConsole)
+void Logger::RunLoggerThread(const bool isAlsoPrintToConsole)
 {
 	printToConsole = isAlsoPrintToConsole;
 

@@ -85,8 +85,8 @@ private:
 	bool CheckMyClient(const sockaddr_in& targetClientAddr);
 
 public:
-	SessionIdType GetSessionId();
-	sockaddr_in GetSocketAddress();
+	SessionIdType GetSessionId() const;
+	sockaddr_in GetSocketAddress() const;
 
 private:
 	std::atomic_bool isConnected{};

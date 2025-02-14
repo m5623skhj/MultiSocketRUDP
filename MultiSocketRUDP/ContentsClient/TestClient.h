@@ -22,7 +22,7 @@ public:
 private:
 	bool WaitingConnectToServer(const unsigned int maximumConnectWaitingCount);
 	void RunTestThread();
-	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
+	bool ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId);
 	void SendAnyPacket();
 	void SendAnyPacket(const unsigned int sendCount);
 

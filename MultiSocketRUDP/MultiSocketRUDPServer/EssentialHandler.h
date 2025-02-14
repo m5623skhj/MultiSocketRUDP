@@ -23,10 +23,10 @@ public:
 
 	static bool IsRegisteredAllEssentialHandler();
 	static void PrintUnregisteredEssentialHandler();
-	static bool CallRegisteredHandler(RUDPSession& session, EssentialHandlerType handlerType);
+	static bool CallRegisteredHandler(RUDPSession& session, const EssentialHandlerType handlerType);
 
 private:
-	static void RegisterEssentialHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction, EssentialHandlerType targetType)
+	static void RegisterEssentialHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction, const EssentialHandlerType targetType)
 	{
 		auto itor = essentialHandler.find(targetType);
 		if (itor == essentialHandler.end())

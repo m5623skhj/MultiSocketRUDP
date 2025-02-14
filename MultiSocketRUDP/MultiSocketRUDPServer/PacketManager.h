@@ -18,8 +18,8 @@ public:
 	virtual PacketId GetPacketId() const = 0;
 
 public:
-	virtual void BufferToPacket([[maybe_unused]] NetBuffer& buffer) { buffer; }
-	virtual void PacketToBuffer([[maybe_unused]] NetBuffer& buffer) { buffer; }
+	virtual void BufferToPacket([[maybe_unused]] NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
+	virtual void PacketToBuffer([[maybe_unused]] NetBuffer& buffer) { UNREFERENCED_PARAMETER(buffer); }
 };
 using PacketHandler = std::function<bool(RUDPSession&, IPacket&)>;
 
@@ -35,11 +35,11 @@ private:
 public:
 	static PacketManager& GetInst();
 	[[nodiscard]]
-	static std::shared_ptr<IPacket> MakePacket(PacketId packetId);
+	static std::shared_ptr<IPacket> MakePacket(const PacketId packetId);
 	[[nodiscard]]
-	static PacketHandler GetPacketHandler(PacketId packetId);
+	static PacketHandler GetPacketHandler(const PacketId packetId);
 	[[nodiscard]]
-	static bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
+	static bool BufferToPacket(const PacketId packetId, NetBuffer& buffer, std::any& packet);
 	static void Init();
 
 public:

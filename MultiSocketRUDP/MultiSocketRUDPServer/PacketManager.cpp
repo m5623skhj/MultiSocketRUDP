@@ -12,7 +12,7 @@ void PacketManager::Init()
 {
 }
 
-std::shared_ptr<IPacket> PacketManager::MakePacket(PacketId packetId)
+std::shared_ptr<IPacket> PacketManager::MakePacket(const PacketId packetId)
 {
 	auto iter = packetFactoryFunctionMap.find(packetId);
 	if (iter == packetFactoryFunctionMap.end())
@@ -24,7 +24,7 @@ std::shared_ptr<IPacket> PacketManager::MakePacket(PacketId packetId)
 	return factoryFunc();
 }
 
-PacketHandler PacketManager::GetPacketHandler(PacketId packetId)
+PacketHandler PacketManager::GetPacketHandler(const PacketId packetId)
 {
 	auto iter = packetHandlerMap.find(packetId);
 	if (iter == packetHandlerMap.end())
@@ -35,7 +35,7 @@ PacketHandler PacketManager::GetPacketHandler(PacketId packetId)
 	return iter->second;
 }
 
-bool PacketManager::BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet)
+bool PacketManager::BufferToPacket(const PacketId packetId, NetBuffer& buffer, std::any& packet)
 {
 	auto iter = packetToBufferFunctionMap.find(packetId);
 	if (iter == packetToBufferFunctionMap.end())

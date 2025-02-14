@@ -315,7 +315,7 @@ void RUDPClientCore::DoSend()
 	}
 }
 
-void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs)
+void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
 	tickSet.nowTick = GetTickCount64();
 	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;

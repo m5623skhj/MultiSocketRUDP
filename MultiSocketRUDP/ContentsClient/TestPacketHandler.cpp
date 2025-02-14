@@ -41,7 +41,7 @@ namespace
 	}
 }
 
-bool TestClient::ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId)
+bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId)
 {
 	switch (packetId)
 	{
