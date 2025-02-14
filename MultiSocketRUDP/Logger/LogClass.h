@@ -30,7 +30,7 @@ private:
 	void SetLogTime();
 
 public:
-	void SetLastErrorCode(DWORD inLastErrorCode)
+	void SetLastErrorCode(const DWORD inLastErrorCode)
 	{
 		lastErrorCode = inLastErrorCode;
 	}
