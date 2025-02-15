@@ -1,6 +1,5 @@
 #pragma once
 #include "LogClass.h"
-#include <string>
 
 #pragma comment(lib, "Logger.lib")
 
@@ -14,3 +13,11 @@ public:
 public:
 	std::string logString;
 };
+
+#ifdef NDEBUG
+#define LOG_DEBUG(x) ((void)0)
+#else
+#define LOG_DEBUG(LOG_STRING) auto log = Logger::MakeLogObject<ClientLog>(); \
+			log->logString = LOG_STRING; \
+			Logger::GetInstance().WriteLog(log);
+#endif
