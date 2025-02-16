@@ -14,6 +14,14 @@
 
 이 경우 Send를 할 때, 하나의 소켓만 사용하게 되어 스레드를 효율적으로 사용하지 못하게 되고, 때문에 현재와 같이 클라이언트와 소켓이 1:1 대응이 되도록 수정하였습니다.
 
+아래는 약식으로 그린 Connect, Recv, Send의 흐름도 입니다.
+
+![RUDP-페이지-3 drawio](https://github.com/user-attachments/assets/d7fefb55-c949-4fdd-9ba0-04cae1749b9b)
+
+![RUDP-페이지-1 drawio](https://github.com/user-attachments/assets/8b7e2985-e021-4383-b9ec-8fe81e9061b5)
+
+![RUDP-페이지-2 drawio](https://github.com/user-attachments/assets/913fd4c0-0655-4f3e-b290-2bb2662490c3)
+
 ---
 
 2. 구성
