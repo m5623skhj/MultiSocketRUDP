@@ -78,10 +78,12 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		return;
 	}
 
+	char connectFailCode = 0;
 	auto& sendBuffer = *NetBuffer::Alloc();
 	listen(listenSocket, SOMAXCONN);
 	while (not threadStopFlag)
 	{
+		connectFailCode = 0;
 		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -91,27 +93,32 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			continue;
 		}
 
-		auto session = AcquireSession();
-		if (session == nullptr)
+		do
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Server is full of users";
-			Logger::GetInstance().WriteLog(log);
-			closesocket(clientSocket);
-			continue;
-		}
-		
-		if (session->isConnected)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "This session already connected";
-			Logger::GetInstance().WriteLog(log);
-			closesocket(clientSocket);
-			continue;
-		}
+			auto session = AcquireSession();
+			if (session == nullptr)
+			{
+				auto log = Logger::MakeLogObject<ServerLog>();
+				log->logString = "Server is full of users";
+				Logger::GetInstance().WriteLog(log);
+				connectFailCode = 1;
+				sendBuffer << connectFailCode;
+				break;
+			}
 
-		SetSessionKey(*session);
-		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
+			if (session->isConnected)
+			{
+				auto log = Logger::MakeLogObject<ServerLog>();
+				log->logString = "This session already connected";
+				Logger::GetInstance().WriteLog(log);
+				connectFailCode = 2;
+				sendBuffer << connectFailCode;
+				break;
+			}
+
+			SetSessionKey(*session);
+			SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
+		} while (false);
 
 		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
 		if (result == SOCKET_ERROR)
@@ -119,16 +126,19 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
-			closesocket(clientSocket);
-			continue;
 		}
 
-		++connectedUserCount;
+		if (connectFailCode == 0)
+		{
+			++connectedUserCount;
+		}
 		closesocket(clientSocket);
 		sendBuffer.Init();
 	}
 
 	closesocket(listenSocket);
+	NetBuffer::Free(&sendBuffer);
+
 	auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
 	Logger::GetInstance().WriteLog(log);
