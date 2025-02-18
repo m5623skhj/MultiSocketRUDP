@@ -78,12 +78,12 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		return;
 	}
 
-	char connectFailCode = 0;
+	char connectResultCode = 0;
 	auto& sendBuffer = *NetBuffer::Alloc();
 	listen(listenSocket, SOMAXCONN);
 	while (not threadStopFlag)
 	{
-		connectFailCode = 0;
+		connectResultCode = 0;
 		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -101,8 +101,8 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 				auto log = Logger::MakeLogObject<ServerLog>();
 				log->logString = "Server is full of users";
 				Logger::GetInstance().WriteLog(log);
-				connectFailCode = 1;
-				sendBuffer << connectFailCode;
+				connectResultCode = 1;
+				sendBuffer << connectResultCode;
 				break;
 			}
 
@@ -111,15 +111,18 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 				auto log = Logger::MakeLogObject<ServerLog>();
 				log->logString = "This session already connected";
 				Logger::GetInstance().WriteLog(log);
-				connectFailCode = 2;
-				sendBuffer << connectFailCode;
+				connectResultCode = 2;
+				sendBuffer << connectResultCode;
 				break;
 			}
 
+			sendBuffer << connectResultCode;
 			SetSessionKey(*session);
 			SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
+			++connectedUserCount;
 		} while (false);
 
+		EncodePacket(sendBuffer);
 		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
 		if (result == SOCKET_ERROR)
 		{
@@ -128,10 +131,6 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			Logger::GetInstance().WriteLog(log);
 		}
 
-		if (connectFailCode == 0)
-		{
-			++connectedUserCount;
-		}
 		closesocket(clientSocket);
 		sendBuffer.Init();
 	}
@@ -182,7 +181,6 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(RUDPSession& session, const std
 
 	//Send rudp session infomation packet to client
 	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
-	EncodePacket(buffer);
 }
 
 #endif
