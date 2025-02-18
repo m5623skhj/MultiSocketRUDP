@@ -111,6 +111,20 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
+	if (not TryConnectToSessionBroker())
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "Connection failed in GetSessionFromServer() with error code " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+		closesocket(sessionBrokerSocket);
+		return false;
+	}
+
+	return TrySetTargetSessionInfo();
+}
+
+bool RUDPClientCore::TryConnectToSessionBroker()
+{
 	sockaddr_in sessionGetterAddr;
 	sessionGetterAddr.sin_family = AF_INET;
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
@@ -133,15 +147,11 @@ bool RUDPClientCore::GetSessionFromServer()
 		}
 	}
 
-	if (not isConnected)
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Connection failed in GetSessionFromServer() with error code " + WSAGetLastError();
-		Logger::GetInstance().WriteLog(log);
-		closesocket(sessionBrokerSocket);
-		return false;
-	}
+	return isConnected;
+}
 
+bool RUDPClientCore::TrySetTargetSessionInfo()
+{
 	auto& recvBuffer = *NetBuffer::Alloc();
 	recvBuffer.m_iRead = 0;
 	int totalReceivedBytes = 0;
@@ -198,7 +208,17 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	if (not receivedBuffer.Decode())
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "SetTargetSessionInfo()";
+		log->logString = "SetTargetSessionInfo() failed with Decode()";
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
+	char connectResultCode;
+	receivedBuffer >> connectResultCode;
+	if (connectResultCode != 0)
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "SetTargetSessionInfo() failed with connectResultCode " + connectResultCode;
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}

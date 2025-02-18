@@ -92,6 +92,8 @@ private:
 private:
 	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
 	bool GetSessionFromServer();
+	bool TryConnectToSessionBroker();
+	bool TrySetTargetSessionInfo();
 
 private:
 	WCHAR sessionBrokerIP[16]{};
