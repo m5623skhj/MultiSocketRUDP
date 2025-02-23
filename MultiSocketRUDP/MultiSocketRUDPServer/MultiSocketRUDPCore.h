@@ -82,13 +82,13 @@ private:
 	[[nodiscard]]
 	bool InitRIO();
 	[[nodiscard]]
-	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize);
+	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const;
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
 	bool RunSessionBroker();
 	[[nodiscard]]
-	std::optional<SOCKET> CreateRUDPSocket(const unsigned short socketNumber);
+	std::optional<SOCKET> CreateRUDPSocket(const unsigned short socketNumber) const;
 
 private:
 	void CloseAllSessions();

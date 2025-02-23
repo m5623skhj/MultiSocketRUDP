@@ -17,7 +17,7 @@ public:
 	void Stop();
 
 public:
-	bool IsServerStopped();
+	bool IsServerStopped() const;
 
 private:
 	MultiSocketRUDPCore serverCore;

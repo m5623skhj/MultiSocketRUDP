@@ -253,7 +253,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	return true;
 }
 
-RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize)
+RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const
 {
 	if (targetBuffer == nullptr)
 	{
@@ -325,7 +325,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 	return true;
 }
 
-std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short socketNumber)
+std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short socketNumber) const
 {
 	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)

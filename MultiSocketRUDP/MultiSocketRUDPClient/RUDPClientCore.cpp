@@ -55,12 +55,12 @@ void RUDPClientCore::Stop()
 	isStopped = true;
 }
 
-bool RUDPClientCore::IsStopped()
+bool RUDPClientCore::IsStopped() const
 {
 	return isStopped;
 }
 
-bool RUDPClientCore::IsConnected()
+bool RUDPClientCore::IsConnected() const
 {
 	return isConnected;
 }
@@ -414,7 +414,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	SetEvent(sendEventHandles[0]);
 }
 
-WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer)
+WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer) const
 {
 	BYTE code;
 	WORD payloadLength;
