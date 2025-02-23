@@ -64,6 +64,9 @@ public:
 	[[nodiscard]]
 	unsigned short GetConnectedUserCount() const;
 
+private:
+	void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
+
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	bool DoSend(OUT RUDPSession& session, const ThreadIdType threadId);
