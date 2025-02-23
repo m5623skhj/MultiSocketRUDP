@@ -62,6 +62,9 @@ public:
 	bool IsConnected();
 
 private:
+	void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
+
+private:
 	bool ConnectToServer(const std::wstring& optionFilePath);
 
 private:

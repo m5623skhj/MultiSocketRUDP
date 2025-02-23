@@ -47,9 +47,10 @@ void RUDPClientCore::Stop()
 	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
 
-	retransmissionThread.join();
-	sendThread.join();
-	recvThread.join();
+	const std::thread::id nowThreadId = std::this_thread::get_id();
+	StopThread(retransmissionThread, nowThreadId);
+	StopThread(sendThread, nowThreadId);
+	StopThread(recvThread, nowThreadId);
 
 	isStopped = true;
 }
@@ -62,6 +63,14 @@ bool RUDPClientCore::IsStopped()
 bool RUDPClientCore::IsConnected()
 {
 	return isConnected;
+}
+
+void RUDPClientCore::StopThread(std::thread& stopTarget, const std::thread::id& threadId)
+{
+	if (stopTarget.joinable() && threadId != stopTarget.get_id())
+	{
+		stopTarget.join();
+	}
 }
 
 bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
@@ -205,6 +214,7 @@ void RUDPClientCore::RunRetransmissionThread()
 				Logger::GetInstance().WriteLog(log);
 
 				isConnected = false;
+				Stop();
 				break;
 			}
 
