@@ -8,7 +8,7 @@
 
 1. 개요
 
-기존 RUDP 프로젝트[https://github.com/m5623skhj/RUDPServer]에서 부족한 점을 보완하기 위해 생성한 프로젝트 입니다.
+[기존 RUDP 프로젝트](https://github.com/m5623skhj/RUDPServer)에서 부족한 점을 보완하기 위해 생성한 프로젝트 입니다.
 
 기존 RUDP에서는 하나의 소켓이 여러 클라이언트에 대한 수신을, SendWorkerThread가 소유한 소켓에 대해서 클라이언트에 대한 송신을 담당하였는데,
 
