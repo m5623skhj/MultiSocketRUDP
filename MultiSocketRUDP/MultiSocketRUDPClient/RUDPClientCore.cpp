@@ -75,7 +75,6 @@ void RUDPClientCore::StopThread(std::thread& stopTarget, const std::thread::id& 
 
 bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 {
-
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(port);
 	InetPtonA(AF_INET, serverIp.c_str(), &serverAddr.sin_addr);
