@@ -186,6 +186,12 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 	sendPacketInfoPool->Free(eraseTarget);
 }
 
+void MultiSocketRUDPCore::PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId)
+{
+	std::scoped_lock lock(timeoutSessionIdListLock);
+	timeoutSessionIdList.emplace_back(disconnectTargetSessionId);
+}
+
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;
@@ -479,7 +485,6 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "Invalid logic thread wait result. Error is " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
-			g_Dump.Crash();
 		}
 		break;
 		}
@@ -514,8 +519,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 
 			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				std::scoped_lock lock(timeoutSessionListLock);
-				timeoutSessionList.push_back(sendedPacketInfo->owner);
+				PushToDisconnectTargetSession(sendedPacketInfo->owner->GetSessionId());
 				++numOfTimeoutSession;
 				continue;
 			}
@@ -542,17 +546,15 @@ void MultiSocketRUDPCore::RunTimeoutThread()
 		{
 		case WAIT_OBJECT_0:
 		{
-			std::scoped_lock lock(timeoutSessionListLock);
-			for (auto& timeoutSession : timeoutSessionList)
+			std::scoped_lock lock(timeoutSessionIdListLock);
+			for (auto& timeoutSessionId : timeoutSessionIdList)
 			{
-				if (timeoutSession == nullptr)
+				if (auto timeoutSession = GetUsingSession(timeoutSessionId))
 				{
-					continue;
+					timeoutSession->Disconnect();
 				}
-
-				timeoutSession->Disconnect();
 			}
-			timeoutSessionList.clear();
+			timeoutSessionIdList.clear();
 		}
 			break;
 		default:
@@ -560,7 +562,6 @@ void MultiSocketRUDPCore::RunTimeoutThread()
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "Invalid timeout thread wait result. Error is " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
-			g_Dump.Crash();
 		}
 			break;
 		}
@@ -632,7 +633,6 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Invalid rio operation type. Type is " + static_cast<unsigned char>(contextResult->ioType);
 		Logger::GetInstance().WriteLog(log);
-		g_Dump.Crash();
 	}
 	break;
 	}
@@ -686,7 +686,11 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 
 			sockaddr_in clientAddr;
 			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(context->clientAddrBuffer));
-			ProcessByPacketType(*context->session, clientAddr, *buffer);
+			if (not ProcessByPacketType(*context->session, clientAddr, *buffer))
+			{
+				NetBuffer::Free(buffer);
+				return;
+			}
 		} while (false);
 
 		if (buffer != nullptr)
@@ -750,36 +754,58 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType th
 			break;
 		}
 
-		int contextCount = 1;
-		IOContext* context = contextPool.Alloc();
-		context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_SEND);
-		context->BufferId = session.sendBuffer.sendBufferId;
-		context->Offset = 0;
-		context->Length = MakeSendStream(session, context, threadId);
-
-		if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
-			(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
+		IOContext* sendContext = MakeSendContext(session, threadId);
+		if (sendContext == nullptr)
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "DoSend() : clientAddrBufferId is RIO_INVALID_BUFFERID";
-			Logger::GetInstance().WriteLog(log);
 			return false;
 		}
 
-		RIO_BUF clientAddrBuffer;
-		clientAddrBuffer.BufferId = context->clientAddrBufferId;
-		clientAddrBuffer.Length = sizeof(sockaddr_in);
-		clientAddrBuffer.Offset = 0;
+		return TryRIOSend(session, sendContext);
+	}
 
-		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "RIOSendEx() failed with " + WSAGetLastError();
-			Logger::GetInstance().WriteLog(log);
-			return false;
-		}
+	return true;
+}
 
-		break;
+IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const ThreadIdType threadId)
+{
+	IOContext* context = contextPool.Alloc();
+	context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_SEND);
+	context->BufferId = session.sendBuffer.sendBufferId;
+	context->Offset = 0;
+	context->Length = MakeSendStream(session, context, threadId);
+	if (context->Length == 0)
+	{
+		contextPool.Free(context);
+		return nullptr;
+	}
+
+	if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
+		(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "MakeSendContext() : clientAddrBufferId is RIO_INVALID_BUFFERID";
+		Logger::GetInstance().WriteLog(log);
+		contextPool.Free(context);
+		return nullptr;
+	}
+
+	return context;
+}
+
+bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* context)
+{
+	RIO_BUF clientAddrBuffer;
+	clientAddrBuffer.BufferId = context->clientAddrBufferId;
+	clientAddrBuffer.Length = sizeof(sockaddr_in);
+	clientAddrBuffer.Offset = 0;
+
+	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RIOSendEx() failed with " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+		contextPool.Free(context);
+		return false;
 	}
 
 	return true;
@@ -799,7 +825,8 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
 			Logger::GetInstance().WriteLog(log);
-			// call g_Dump.Crash() ?
+			PushToDisconnectTargetSession(session.GetSessionId());
+			SetEvent(timeoutEventHandle);
 			return 0;
 		}
 
@@ -822,7 +849,6 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
 			Logger::GetInstance().WriteLog(log);
-			// call g_Dump.Crash() ?
 			return 0;
 		}
 

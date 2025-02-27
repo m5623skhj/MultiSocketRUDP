@@ -69,10 +69,16 @@ private:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
+	[[nodiscard]]
 	bool DoSend(OUT RUDPSession& session, const ThreadIdType threadId);
+	[[nodiscard]]
+	IOContext* MakeSendContext(OUT RUDPSession& session, const ThreadIdType threadId);
+	[[nodiscard]]
+	bool TryRIOSend(OUT RUDPSession& session, IOContext* context);
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId);
+	void PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId);
 
 private:
 	[[nodiscard]]
@@ -102,7 +108,9 @@ private:
 	std::string coreServerIp{};
 
 private:
+	[[nodiscard]]
 	RUDPSession* AcquireSession();
+	[[nodiscard]]
 	RUDPSession* GetUsingSession(const SessionIdType sessionId) const;
 
 private:
@@ -165,7 +173,6 @@ private:
 
 private:
 	unsigned char numOfWorkerThread{};
-	HANDLE logicThreadEventStopHandle{};
 	PacketRetransmissionCount maxPacketRetransmissionCount{};
 	unsigned int workerThreadOneFrameMs{};
 	unsigned int retransmissionMs{};
@@ -178,26 +185,34 @@ private:
 	std::thread timeoutThread{};
 
 	// event handles
+	HANDLE logicThreadEventStopHandle{};
 	std::vector<HANDLE> recvLogicThreadEventHandles;
 	HANDLE timeoutEventHandle{};
 
 	// objects
 	std::vector<CListBaseQueue<IOContext*>> ioCompletedContexts;
-	std::list<RUDPSession*> timeoutSessionList;
-	std::mutex timeoutSessionListLock;
+	std::list<SessionIdType> timeoutSessionIdList;
+	std::mutex timeoutSessionIdListLock;
 
 #pragma endregion thread
 
 #pragma region RIO
 private:
+	[[nodiscard]]
 	IOContext* GetIOCompletedContext(RIORESULT& rioResult);
+	[[nodiscard]]
 	bool IOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
+	[[nodiscard]]
 	bool RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
+	[[nodiscard]]
 	bool SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId);
 
 	void OnRecvPacket(const BYTE threadId);
+	[[nodiscard]]
 	bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
+	[[nodiscard]]
 	bool DoRecv(RUDPSession& session);
+	[[nodiscard]]
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
 
 private:
@@ -210,6 +225,7 @@ private:
 
 private:
 	void EncodePacket(OUT NetBuffer& packet);
+	[[nodiscard]]
 	WORD GetPayloadLength(OUT NetBuffer& buffer) const;
 };
 
