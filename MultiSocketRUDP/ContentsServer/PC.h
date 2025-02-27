@@ -15,6 +15,8 @@ public:
 	SessionIdType GetSessionId();
 	void SendPacket(IPacket& packet);
 
+	bool IsConnected() const;
+
 private:
 	RUDPSession& session;
 };

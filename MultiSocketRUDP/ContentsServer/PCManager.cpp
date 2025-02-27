@@ -18,8 +18,20 @@ std::shared_ptr<PC> PCManager::FindPC(SessionIdType sessionId)
 		return nullptr;
 	}
 
+	if (itor->second == nullptr)
+	{
+		pcMap.erase(itor);
+		return nullptr;
+	}
+
+	if (not itor->second->IsConnected())
+	{
+		return nullptr;
+	}
+
 	return itor->second;
 }
+
 bool PCManager::InsertPC(std::shared_ptr<PC> session)
 {
 	std::unique_lock lock(pcMapLock);

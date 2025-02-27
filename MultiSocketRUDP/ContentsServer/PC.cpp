@@ -13,6 +13,11 @@ SessionIdType PC::GetSessionId()
 	return session.GetSessionId();
 }
 
+bool PC::IsConnected() const
+{
+	return session.IsConnected();
+}
+
 void PC::SendPacket(IPacket& packet)
 {
 	session.SendPacket(packet);
