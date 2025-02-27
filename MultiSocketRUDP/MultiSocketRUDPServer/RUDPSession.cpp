@@ -105,6 +105,11 @@ void RUDPSession::Disconnect()
 
 bool RUDPSession::SendPacket(IPacket& packet)
 {
+	if (not isConnected)
+	{
+		return false;
+	}
+
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -332,6 +337,11 @@ SessionIdType RUDPSession::GetSessionId() const
 sockaddr_in RUDPSession::GetSocketAddress() const
 {
 	return clientAddr;
+}
+
+bool RUDPSession::IsConnected() const
+{
+	return isConnected;
 }
 
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)

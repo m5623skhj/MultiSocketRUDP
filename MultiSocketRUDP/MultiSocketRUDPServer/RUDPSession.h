@@ -56,7 +56,9 @@ private:
 	RUDPSession() = delete;
 	explicit RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore);
 
+	[[nodiscard]]
 	static RUDPSession* Create(SOCKET inSock, PortType inPort, MultiSocketRUDPCore& inCore);
+	[[nodiscard]]
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
 	void InitializeSession();
 
@@ -70,13 +72,18 @@ public:
 private:
 	void OnConnected(SessionIdType inSessionId);
 	void OnDisconnected();
+	[[nodiscard]]
 	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence);
 
 private:
 	void TryConnect(NetBuffer& recvPacket);
+	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
+	[[nodiscard]]
 	bool OnRecvPacket(NetBuffer& recvPacket);
+	[[nodiscard]]
 	bool ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence);
+	[[nodiscard]]
 	bool ProcessHoldingPacket();
 	void SendReplyToClient(const PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
@@ -85,8 +92,12 @@ private:
 	bool CheckMyClient(const sockaddr_in& targetClientAddr);
 
 public:
+	[[nodiscard]]
 	SessionIdType GetSessionId() const;
+	[[nodiscard]]
 	sockaddr_in GetSocketAddress() const;
+	[[nodiscard]]
+	bool IsConnected() const;
 
 private:
 	std::atomic_bool isConnected{};
