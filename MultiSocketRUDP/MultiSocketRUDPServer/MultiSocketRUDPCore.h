@@ -168,7 +168,7 @@ private:
 	void RunWorkerThread(const ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
 	void RunRetransmissionThread(const ThreadIdType threadId);
-	void RunTimeoutThread();
+	void RunSessionReleaseThread();
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
@@ -182,17 +182,17 @@ private:
 	std::vector<std::thread> ioWorkerThreads;
 	std::vector<std::thread> recvLogicWorkerThreads;
 	std::vector<std::thread> retransmissionThreads;
-	std::thread timeoutThread{};
+	std::thread sessionReleaseThread{};
 
 	// event handles
 	HANDLE logicThreadEventStopHandle{};
 	std::vector<HANDLE> recvLogicThreadEventHandles;
-	HANDLE timeoutEventHandle{};
+	HANDLE sessionReleaseEventHandle{};
 
 	// objects
 	std::vector<CListBaseQueue<IOContext*>> ioCompletedContexts;
-	std::list<SessionIdType> timeoutSessionIdList;
-	std::mutex timeoutSessionIdListLock;
+	std::list<SessionIdType> releaseSessionIdList;
+	std::mutex releaseSessionIdListLock;
 
 #pragma endregion thread
 

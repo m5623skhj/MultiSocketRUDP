@@ -89,8 +89,8 @@ void MultiSocketRUDPCore::StopServer()
 		StopThread(retransmissionThreads[i], nowThreadId);
 	}
 
-	SetEvent(timeoutEventHandle);
-	StopThread(timeoutThread, nowThreadId);
+	SetEvent(sessionReleaseEventHandle);
+	StopThread(sessionReleaseThread, nowThreadId);
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -188,8 +188,8 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId)
 {
-	std::scoped_lock lock(timeoutSessionIdListLock);
-	timeoutSessionIdList.emplace_back(disconnectTargetSessionId);
+	std::scoped_lock lock(releaseSessionIdListLock);
+	releaseSessionIdList.emplace_back(disconnectTargetSessionId);
 }
 
 bool MultiSocketRUDPCore::InitNetwork()
@@ -294,11 +294,11 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	retransmissionThreads.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
-	timeoutEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
+	sessionReleaseEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
-	timeoutThread = std::thread([this]() { RunTimeoutThread(); });
+	sessionReleaseThread = std::thread([this]() { RunSessionReleaseThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
@@ -529,7 +529,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 
 		if (numOfTimeoutSession > 0)
 		{
-			SetEvent(timeoutEventHandle);
+			SetEvent(sessionReleaseEventHandle);
 			numOfTimeoutSession = {};
 		}
 
@@ -537,30 +537,30 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::RunTimeoutThread()
+void MultiSocketRUDPCore::RunSessionReleaseThread()
 {
 	while (not threadStopFlag)
 	{
-		const auto waitResult = WaitForSingleObject(timeoutEventHandle, INFINITE);
+		const auto waitResult = WaitForSingleObject(sessionReleaseEventHandle, INFINITE);
 		switch (waitResult)
 		{
 		case WAIT_OBJECT_0:
 		{
-			std::scoped_lock lock(timeoutSessionIdListLock);
-			for (auto& timeoutSessionId : timeoutSessionIdList)
+			std::scoped_lock lock(releaseSessionIdListLock);
+			for (auto& releaseSessionId : releaseSessionIdList)
 			{
-				if (auto timeoutSession = GetUsingSession(timeoutSessionId))
+				if (auto releaseSession = GetUsingSession(releaseSessionId))
 				{
-					timeoutSession->Disconnect();
+					releaseSession->Disconnect();
 				}
 			}
-			timeoutSessionIdList.clear();
+			releaseSessionIdList.clear();
 		}
 			break;
 		default:
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Invalid timeout thread wait result. Error is " + WSAGetLastError();
+			log->logString = "Invalid release thread wait result. Error is " + WSAGetLastError();
 			Logger::GetInstance().WriteLog(log);
 		}
 			break;
@@ -826,7 +826,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
 			Logger::GetInstance().WriteLog(log);
 			PushToDisconnectTargetSession(session.GetSessionId());
-			SetEvent(timeoutEventHandle);
+			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
 
