@@ -18,7 +18,7 @@ struct IOContext : RIO_BUF
 	IOContext() = default;
 	~IOContext() = default;
 
-	void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
+	inline void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
 
 	SessionIdType ownerSessionId = invalidSessionId;
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
@@ -36,7 +36,7 @@ struct SendPacketInfo
 	unsigned long long sendTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
+	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
 		owner = inOwner;
 		buffer = inBuffer;
@@ -45,7 +45,7 @@ struct SendPacketInfo
 	}
 
 	[[nodiscard]]
-	NetBuffer* GetBuffer() { return buffer; }
+	inline NetBuffer* GetBuffer() { return buffer; }
 };
 
 class MultiSocketRUDPCore
@@ -60,12 +60,12 @@ public:
 	void StopServer();
 
 	[[nodiscard]]
-	bool IsServerStopped() const;
+	inline bool IsServerStopped() const { return isServerStopped; }
 	[[nodiscard]]
-	unsigned short GetConnectedUserCount() const;
+	inline unsigned short GetConnectedUserCount() const { return connectedUserCount; }
 
 private:
-	void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
+	inline void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
@@ -78,7 +78,7 @@ public:
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId);
-	void PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId);
+	inline void PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId);
 
 private:
 	[[nodiscard]]
@@ -111,7 +111,7 @@ private:
 	[[nodiscard]]
 	RUDPSession* AcquireSession();
 	[[nodiscard]]
-	RUDPSession* GetUsingSession(const SessionIdType sessionId) const;
+	inline RUDPSession* GetUsingSession(const SessionIdType sessionId) const;
 
 private:
 	// This container's size must not be increased any further
@@ -205,7 +205,7 @@ private:
 	[[nodiscard]]
 	bool RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
 	[[nodiscard]]
-	bool SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId);
+	inline bool SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId);
 
 	void OnRecvPacket(const BYTE threadId);
 	[[nodiscard]]
@@ -226,7 +226,7 @@ private:
 private:
 	void EncodePacket(OUT NetBuffer& packet);
 	[[nodiscard]]
-	WORD GetPayloadLength(OUT NetBuffer& buffer) const;
+	inline WORD GetPayloadLength(OUT NetBuffer& buffer) const;
 };
 
 static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);

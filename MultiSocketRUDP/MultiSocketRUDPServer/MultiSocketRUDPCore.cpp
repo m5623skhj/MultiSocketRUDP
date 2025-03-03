@@ -100,16 +100,6 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().WriteLog(log);
 }
 
-bool MultiSocketRUDPCore::IsServerStopped() const
-{
-	return isServerStopped;
-}
-
-unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
-{
-	return connectedUserCount;
-}
-
 void MultiSocketRUDPCore::StopThread(std::thread& stopTarget, const std::thread::id& threadId)
 {
 	if (stopTarget.joinable() && threadId != stopTarget.get_id())

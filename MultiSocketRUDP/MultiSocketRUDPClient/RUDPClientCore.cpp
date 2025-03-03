@@ -55,16 +55,6 @@ void RUDPClientCore::Stop()
 	isStopped = true;
 }
 
-bool RUDPClientCore::IsStopped() const
-{
-	return isStopped;
-}
-
-bool RUDPClientCore::IsConnected() const
-{
-	return isConnected;
-}
-
 void RUDPClientCore::StopThread(std::thread& stopTarget, const std::thread::id& threadId)
 {
 	if (stopTarget.joinable() && threadId != stopTarget.get_id())

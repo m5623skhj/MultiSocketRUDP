@@ -58,8 +58,8 @@ public:
 	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole);
 	void Stop();
 
-	bool IsStopped() const;
-	bool IsConnected() const;
+	inline bool IsStopped() const { return isStopped; }
+	inline bool IsConnected() const { return isConnected; }
 
 private:
 	void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
@@ -164,8 +164,8 @@ public:
 
 private:
 	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
-	WORD GetPayloadLength(OUT NetBuffer& buffer) const;
-	void EncodePacket(OUT NetBuffer& packet);
+	inline WORD GetPayloadLength(OUT NetBuffer& buffer) const;
+	inline void EncodePacket(OUT NetBuffer& packet);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);
 	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);
