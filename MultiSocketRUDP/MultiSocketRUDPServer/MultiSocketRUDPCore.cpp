@@ -214,7 +214,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 			return false;
 		}
 
-		sessionArray.emplace_back(RUDPSession::Create(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
+		sessionArray.emplace_back(new RUDPSession(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
 		sessionArray[socketNumber]->sessionId = socketNumber;
 	}
 
