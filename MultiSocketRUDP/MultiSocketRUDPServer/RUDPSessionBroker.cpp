@@ -52,38 +52,16 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP)
 {
 	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
-
-	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listenSocket == INVALID_SOCKET)
+	sockaddr_in clientAddr;
+	if (not OpenSessionBrokerSocket(listenPort, listenSocket))
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread listen socket is invalid with error " + WSAGetLastError();
-		Logger::GetInstance().WriteLog(log);
 		return;
 	}
 
-	sockaddr_in serverAddr, clientAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-	serverAddr.sin_port = htons(listenPort);
-	int sockAddrSize = static_cast<int>(sizeof(clientAddr));
-
-	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
-	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread bind failed with error " + WSAGetLastError();
-		Logger::GetInstance().WriteLog(log);
-
-		closesocket(listenSocket);
-		return;
-	}
-
-	char connectResultCode = 0;
+	int sockAddrSize = static_cast<int>(sizeof(clientAddr)); 
 	auto& sendBuffer = *NetBuffer::Alloc();
-	listen(listenSocket, SOMAXCONN);
 	while (not threadStopFlag)
 	{
-		connectResultCode = 0;
 		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -93,46 +71,8 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			continue;
 		}
 
-		do
-		{
-			auto session = AcquireSession();
-			if (session == nullptr)
-			{
-				auto log = Logger::MakeLogObject<ServerLog>();
-				log->logString = "Server is full of users";
-				Logger::GetInstance().WriteLog(log);
-				connectResultCode = 1;
-				sendBuffer << connectResultCode;
-				break;
-			}
-
-			if (session->isConnected)
-			{
-				auto log = Logger::MakeLogObject<ServerLog>();
-				log->logString = "This session already connected";
-				Logger::GetInstance().WriteLog(log);
-				connectResultCode = 2;
-				sendBuffer << connectResultCode;
-				break;
-			}
-
-			sendBuffer << connectResultCode;
-			SetSessionKey(*session);
-			SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
-			++connectedUserCount;
-		} while (false);
-
-		EncodePacket(sendBuffer);
-		int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
-		if (result == SOCKET_ERROR)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
-			Logger::GetInstance().WriteLog(log);
-		}
-
-		closesocket(clientSocket);
-		sendBuffer.Init();
+		ReserveSession(sendBuffer, rudpSessionIP);
+		SendSessionInfoToClient(clientSocket, sendBuffer);
 	}
 
 	closesocket(listenSocket);
@@ -141,6 +81,46 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
 	Logger::GetInstance().WriteLog(log);
+}
+
+bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT SOCKET& listenSocket)
+{
+	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (listenSocket == INVALID_SOCKET)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RunSessionBrokerThread listen socket is invalid with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+
+		return false;
+	}
+
+	sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
+	serverAddr.sin_port = htons(listenPort);
+
+	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RunSessionBrokerThread bind failed with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+
+		closesocket(listenSocket);
+		return false;
+	}
+
+	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RunSessionBrokerThread listen failed with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+
+		closesocket(listenSocket);
+		return false;
+	}
+
+	return true;
 }
 
 void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
@@ -181,6 +161,59 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(RUDPSession& session, const std
 
 	//Send rudp session infomation packet to client
 	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
+}
+
+void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
+{
+	char connectResultCode = 0;
+	auto session = AcquireSession();
+	do
+	{
+		if (session == nullptr)
+		{
+			auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = "Server is full of users";
+			Logger::GetInstance().WriteLog(log);
+			connectResultCode = 1;
+			sendBuffer << connectResultCode;
+
+			break;
+		}
+
+		if (session->isConnected)
+		{
+			auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = "This session already connected";
+			Logger::GetInstance().WriteLog(log);
+			connectResultCode = 2;
+			sendBuffer << connectResultCode;
+
+			break;
+		}
+	} while (false);
+	
+	sendBuffer << connectResultCode;
+	if (connectResultCode == 0)
+	{
+		SetSessionKey(*session);
+		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
+		++connectedUserCount;
+	}
+}
+
+void MultiSocketRUDPCore::SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
+{
+	EncodePacket(sendBuffer);
+	int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
+	if (result == SOCKET_ERROR)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+	}
+
+	closesocket(clientSocket);
+	sendBuffer.Init();
 }
 
 #endif

@@ -157,8 +157,12 @@ private:
 #else
 private:
 	void RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP);
+	[[nodiscard]]
+	bool OpenSessionBrokerSocket(const PortType listenPort, OUT SOCKET& listenSocket);
 	void SetSessionKey(OUT RUDPSession& session);
 	void SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
+	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
+	void SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
 	std::thread sessionBrokerThread{};
