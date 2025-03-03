@@ -231,7 +231,7 @@ bool MultiSocketRUDPCore::InitRIO()
 		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER";
+		log->logString = "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with " + WSAGetLastError();
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
