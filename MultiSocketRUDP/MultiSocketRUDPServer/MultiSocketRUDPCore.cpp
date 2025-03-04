@@ -143,9 +143,9 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
 		unusedSessionIdList.emplace_back(disconnectTargetSessionId);
+		sessionArray[disconnectTargetSessionId]->isUsingSession = false;
 	}
 	--connectedUserCount;
-	sessionArray[disconnectTargetSessionId]->isUsingSession = false;
 
 	auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session id " + disconnectTargetSessionId;
@@ -385,14 +385,15 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 
 		sessionId = unusedSessionIdList.front();
 		unusedSessionIdList.pop_front();
-	}
 
-	session = sessionArray[sessionId];
-	if (session->isUsingSession == true)
-	{
-		return nullptr;
+		session = sessionArray[sessionId];
+		if (session->isUsingSession == true)
+		{
+			unusedSessionIdList.push_back(sessionId);
+			return nullptr;
+		}
+		session->isUsingSession = true;
 	}
-	session->isUsingSession = true;
 
 	return session;
 }
