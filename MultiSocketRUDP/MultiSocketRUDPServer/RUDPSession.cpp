@@ -57,6 +57,11 @@ void RUDPSession::InitializeSession()
 	clientAddr = {};
 	ioCancle = {};
 	lastSendPacketSequence = {};
+
+	if (sendBuffer.reservedSendPacketInfo != nullptr)
+	{
+		sendPacketInfoPool->Free(sendBuffer.reservedSendPacketInfo);
+	}
 }
 
 RUDPSession::~RUDPSession()
