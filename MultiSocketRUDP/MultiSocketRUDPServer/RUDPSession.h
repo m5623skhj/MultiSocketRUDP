@@ -40,7 +40,6 @@ struct RecvBuffer
 
 struct SendBuffer
 {
-	WORD bufferCount = 0;
 	CLockFreeQueue<SendPacketInfo*> sendPacketInfoQueue;
 	SendPacketInfo* reservedSendPacketInfo;
 	char rioSendBuffer[maxSendBufferSize];

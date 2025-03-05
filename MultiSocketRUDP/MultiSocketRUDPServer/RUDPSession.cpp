@@ -63,6 +63,16 @@ void RUDPSession::InitializeSession()
 		sendPacketInfoPool->Free(sendBuffer.reservedSendPacketInfo);
 		sendBuffer.reservedSendPacketInfo = {};
 	}
+
+	int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.GetRestSize();
+	SendPacketInfo* eraseTarget = nullptr;
+	for (int i = 0; i < sendPacketInfoQueueSize; ++i)
+	{
+		if (sendBuffer.sendPacketInfoQueue.Dequeue(&eraseTarget))
+		{
+			sendPacketInfoPool->Free(eraseTarget);
+		}
+	}
 }
 
 RUDPSession::~RUDPSession()
