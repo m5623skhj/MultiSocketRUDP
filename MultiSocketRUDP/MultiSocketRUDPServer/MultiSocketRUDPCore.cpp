@@ -541,6 +541,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 				if (auto releaseSession = GetUsingSession(releaseSessionId))
 				{
 					releaseSession->Disconnect();
+					releaseSession->InitializeSession();
 				}
 			}
 			releaseSessionIdList.clear();
@@ -838,6 +839,8 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
 			Logger::GetInstance().WriteLog(log);
+			PushToDisconnectTargetSession(session.GetSessionId());
+			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
 

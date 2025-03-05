@@ -53,13 +53,10 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 void RUDPSession::InitializeSession()
 {
 	sessionId = invalidSessionId;
-	isConnected = {};
 	sessionKey = {};
 	clientAddr = {};
-	isUsingSession = {};
 	ioCancle = {};
 	lastSendPacketSequence = {};
-	sendPacketInfoMap.clear();
 }
 
 RUDPSession::~RUDPSession()
