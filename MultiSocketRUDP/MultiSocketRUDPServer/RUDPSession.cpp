@@ -61,6 +61,7 @@ void RUDPSession::InitializeSession()
 	if (sendBuffer.reservedSendPacketInfo != nullptr)
 	{
 		sendPacketInfoPool->Free(sendBuffer.reservedSendPacketInfo);
+		sendBuffer.reservedSendPacketInfo = {};
 	}
 }
 
