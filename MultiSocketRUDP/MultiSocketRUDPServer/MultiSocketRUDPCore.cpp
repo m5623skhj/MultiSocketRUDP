@@ -124,9 +124,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 
 	if (not DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
-		NetBuffer::Free(buffer);
 		sendPacketInfoPool->Free(sendPacketInfo);
-		
 		return false;
 	}
 
@@ -616,7 +614,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	break;
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		return SendIOCompleted(transferred, *contextResult->session, threadId);
+		return SendIOCompleted(*contextResult->session, threadId);
 	}
 	break;
 	default:
@@ -646,7 +644,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 	return DoRecv(*contextResult->session);
 }
 
-bool MultiSocketRUDPCore::SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId)
+bool MultiSocketRUDPCore::SendIOCompleted(RUDPSession& session, const BYTE threadId)
 {
 	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
 	return DoSend(session, threadId);

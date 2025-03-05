@@ -36,6 +36,16 @@ struct SendPacketInfo
 	unsigned long long sendTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
+	~SendPacketInfo()
+	{
+		NetBuffer::Free(buffer);
+		owner = {};
+		retransmissionCount = {};
+		sendPacektSequence = {};
+		sendTimeStamp = {};
+		listItor = {};
+	}
+
 	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
 		owner = inOwner;
@@ -209,7 +219,7 @@ private:
 	[[nodiscard]]
 	bool RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
 	[[nodiscard]]
-	inline bool SendIOCompleted(const ULONG transferred, RUDPSession& session, const BYTE threadId);
+	inline bool SendIOCompleted(RUDPSession& session, const BYTE threadId);
 
 	void OnRecvPacket(const BYTE threadId);
 	[[nodiscard]]
@@ -233,4 +243,4 @@ private:
 	inline WORD GetPayloadLength(OUT NetBuffer& buffer) const;
 };
 
-static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);
+static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);
