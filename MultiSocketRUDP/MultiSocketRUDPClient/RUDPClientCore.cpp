@@ -69,6 +69,14 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 	serverAddr.sin_port = htons(port);
 	InetPtonA(AF_INET, serverIp.c_str(), &serverAddr.sin_addr);
 
+	if (rudpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); rudpSocket == INVALID_SOCKET)
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "socket() failed with error " + WSAGetLastError();
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
 	if (bind(rudpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
