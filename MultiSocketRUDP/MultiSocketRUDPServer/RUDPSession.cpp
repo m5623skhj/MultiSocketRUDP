@@ -24,7 +24,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	if (recvBuffer.recvBufferId == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Recv RIORegisterBuffer failed with " + WSAGetLastError();
+		log->logString = std::format("Recv RIORegisterBuffer failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -33,7 +33,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Send RIORegisterBuffer failed with " + WSAGetLastError();
+		log->logString = std::format("Send RIORegisterBuffer failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -42,7 +42,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	if (rioRQ == RIO_INVALID_RQ)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RIOCreateRQ failed with " + WSAGetLastError();
+		log->logString = std::format("RIOCreateRQ failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}

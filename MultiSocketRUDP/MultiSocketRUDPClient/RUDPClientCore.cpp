@@ -72,7 +72,7 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 	if (rudpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); rudpSocket == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "socket() failed with error " + WSAGetLastError();
+		log->logString = std::format("socket() failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -80,7 +80,7 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 	if (bind(rudpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "bind() failed with error " + WSAGetLastError();
+		log->logString = std::format("bind() failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -133,7 +133,7 @@ void RUDPClientCore::RunRecvThread()
 			}
 			else
 			{
-				log->logString = "recvfrom() error with " + error;
+				log->logString = std::format("recvfrom() error with {}", error);
 			}
 
 			Logger::GetInstance().WriteLog(log);
@@ -173,7 +173,7 @@ void RUDPClientCore::RunSendThread()
 		default:
 		{
 			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = "Invalid send thread wait result. Error is " + WSAGetLastError();
+			log->logString = std::format("Invalid send thread wait result. Error is {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 			g_Dump.Crash();
 		}
@@ -248,7 +248,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	default:
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Invalid packet type " + static_cast<unsigned char>(packetType);
+		log->logString = std::format("Invalid packet type {}", static_cast<unsigned char>(packetType));
 		Logger::GetInstance().WriteLog(log);
 	}
 		break;
@@ -315,7 +315,7 @@ void RUDPClientCore::DoSend()
 		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 		{
 			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = "sendto() failed with error code " + WSAGetLastError();
+			log->logString = std::format("sendto() failed with error code {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
@@ -420,7 +420,7 @@ WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer) const
 	if (code != NetBuffer::m_byHeaderCode)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "code : " + code;
+		log->logString = std::format("code : {}", code);
 		Logger::GetInstance().WriteLog(log);
 		return 0;
 	}

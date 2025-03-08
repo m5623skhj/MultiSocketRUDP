@@ -66,7 +66,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		if (clientSocket == INVALID_SOCKET)
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "RunSessionBrokerThread accept falid with error " + WSAGetLastError();
+			log->logString = std::format("RunSessionBrokerThread accept falid with error {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
@@ -89,7 +89,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT
 	if (listenSocket == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread listen socket is invalid with error " + WSAGetLastError();
+		log->logString = std::format("RunSessionBrokerThread listen socket is invalid with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
 		return false;
@@ -103,7 +103,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT
 	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread bind failed with error " + WSAGetLastError();
+		log->logString = std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
 		closesocket(listenSocket);
@@ -113,7 +113,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT
 	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread listen failed with error " + WSAGetLastError();
+		log->logString = std::format("RunSessionBrokerThread listen failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
 		closesocket(listenSocket);
@@ -208,7 +208,7 @@ void MultiSocketRUDPCore::SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT 
 	if (result == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBrokerThread send failed with error " + WSAGetLastError();
+		log->logString = std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 	}
 

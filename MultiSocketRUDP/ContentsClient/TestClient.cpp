@@ -89,8 +89,7 @@ void TestClient::RunTestThread()
 			if (not ProcessPacketHandle(*buffer, packetId))
 			{
 				auto log = Logger::MakeLogObject<ClientLog>();
-				log->logString = "ProcessPacketHandle failed by invalid packet id ";
-				log->logString += static_cast<unsigned int>(packetId);
+				log->logString = std::format("ProcessPacketHandle failed by invalid packet id {}", log->logString += static_cast<unsigned int>(packetId));
 				Logger::GetInstance().WriteLog(log);
 			}
 

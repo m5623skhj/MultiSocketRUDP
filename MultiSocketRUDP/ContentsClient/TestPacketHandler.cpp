@@ -74,7 +74,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 	default:
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Invalid packet id " + static_cast<unsigned int>(packetId);
+		log->logString = std::format("Invalid packet id {}", static_cast<unsigned int>(packetId));
 		Logger::GetInstance().WriteLog(log);
 
 		return false;

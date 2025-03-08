@@ -97,7 +97,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "WSAStartup failed GetSessionFromServer() with error code " + WSAGetLastError();
+		log->logString = std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -106,7 +106,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Socket creation failed in GetSessionFromServer() with error code " + WSAGetLastError();
+		log->logString = std::format("Socket creation failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -114,7 +114,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	if (not TryConnectToSessionBroker())
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Connection failed in GetSessionFromServer() with error code " + WSAGetLastError();
+		log->logString = std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sessionBrokerSocket);
 		return false;
@@ -172,7 +172,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 			else
 			{
 				auto log = Logger::MakeLogObject<ClientLog>();
-				log->logString = "recv() failed in GetSessionFromServer() with error code " + error;
+				log->logString = std::format("recv() failed in GetSessionFromServer() with error code {}", error);
 				Logger::GetInstance().WriteLog(log);
 				closesocket(sessionBrokerSocket);
 				return false;
@@ -218,7 +218,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	if (connectResultCode != 0)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "SetTargetSessionInfo() failed with connectResultCode " + connectResultCode;
+		log->logString = std::format("SetTargetSessionInfo() failed with connectResultCode {}", connectResultCode);
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}

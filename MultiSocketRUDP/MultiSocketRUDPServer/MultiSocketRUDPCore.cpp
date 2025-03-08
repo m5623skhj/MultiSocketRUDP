@@ -146,8 +146,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 	--connectedUserCount;
 
 	auto log = Logger::MakeLogObject<ServerLog>();
-	log->logString = "Session id " + disconnectTargetSessionId;
-	log->logString += " is disconnected";
+	log->logString = std::format("Session id {} is disconnected", disconnectTargetSessionId);
 	Logger::GetInstance().WriteLog(log);
 }
 
@@ -187,7 +186,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 	if (result != 0)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "WSAStartup failed " + result;
+		log->logString = std::format("WSAStartup failed {}", result);
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -219,7 +218,7 @@ bool MultiSocketRUDPCore::InitRIO()
 		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with " + WSAGetLastError();
+		log->logString = std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -258,7 +257,7 @@ RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const un
 	if (clientAddrBufferId == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Send RIORegisterBuffer failed with error code " + WSAGetLastError();
+		log->logString = std::format("Send RIORegisterBuffer failed with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 	}
 
@@ -325,7 +324,7 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short
 	if (sock == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Socket create failed " + WSAGetLastError();
+		log->logString = std::format("Socket create failed {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return std::nullopt;
 	}
@@ -340,7 +339,7 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short
 	if (bind(sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Bind failed " + WSAGetLastError();
+		log->logString = std::format("Bind failed {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sock);
 		return std::nullopt;
@@ -464,7 +463,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 			Sleep(logicThreadStopSleepTime);
 			OnRecvPacket(threadId);
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Logic thread stop. ThreadId is " + threadId;
+			log->logString = std::format("Logic thread stop. ThreadId is {}", threadId);
 			Logger::GetInstance().WriteLog(log);
 			break;
 		}
@@ -472,7 +471,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 		default:
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Invalid logic thread wait result. Error is " + WSAGetLastError();
+			log->logString = std::format("Invalid logic thread wait result. Error is {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 		}
 		break;
@@ -550,7 +549,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 		default:
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Invalid release thread wait result. Error is " + WSAGetLastError();
+			log->logString = std::format("Invalid release thread wait result. Error is {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 		}
 			break;
@@ -621,7 +620,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	default:
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "Invalid rio operation type. Type is " + static_cast<unsigned char>(contextResult->ioType);
+		log->logString = std::format("Invalid rio operation type. Type is {}", static_cast<unsigned char>(contextResult->ioType));
 		Logger::GetInstance().WriteLog(log);
 	}
 	break;
@@ -716,7 +715,7 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RIOReceiveEx() failed with " + WSAGetLastError();
+		log->logString = std::format("RIOReceiveEx() failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
@@ -792,7 +791,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &clientAddrBuffer, nullptr, nullptr, 0, context) == false)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RIOSendEx() failed with " + WSAGetLastError();
+		log->logString = std::format("RIOSendEx() failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		contextPool.Free(context);
 		return false;
@@ -813,7 +812,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 		if (useSize < maxSendBufferSize)
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
+			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
 			Logger::GetInstance().WriteLog(log);
 			PushToDisconnectTargetSession(session.GetSessionId());
 			SetEvent(sessionReleaseEventHandle);
@@ -837,7 +836,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 		if (useSize < maxSendBufferSize)
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "MakeSendStream() : useSize over with " + maxSendBufferSize;
+			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
 			Logger::GetInstance().WriteLog(log);
 			PushToDisconnectTargetSession(session.GetSessionId());
 			SetEvent(sessionReleaseEventHandle);
@@ -873,7 +872,7 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer) const
 	if (code != NetBuffer::m_byHeaderCode)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "code : " + code;
+		log->logString = std::format("code : {}", code);
 		Logger::GetInstance().WriteLog(log);
 		return 0;
 	}
