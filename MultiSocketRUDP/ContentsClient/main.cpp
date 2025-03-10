@@ -5,6 +5,7 @@ int main()
 {
 	if (not TestClient::GetInst().Start(L"ClientOptionFile/CoreOption.txt", L"ClientOptionFile/SessionGetterOption.txt"))
 	{
+		TestClient::GetInst().Stop();
 		return 0;
 	}
 	std::cout << "Exit : ESC" << std::endl;
