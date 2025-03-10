@@ -10,7 +10,7 @@ TestServer& TestServer::GetInst()
 
 bool TestServer::Start(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath)
 {
-	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath))
+	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath, true))
 	{
 		std::cout << "StartServer() failed" << std::endl;
 		Logger::GetInstance().StopLoggerThread();

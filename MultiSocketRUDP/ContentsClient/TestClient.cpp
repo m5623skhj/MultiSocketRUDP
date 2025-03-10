@@ -13,7 +13,7 @@ TestClient& TestClient::GetInst()
 
 bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile)
 {
-	if (not RUDPClientCore::GetInst().Start(clientCoreOptionFile, sessionGetterOptionFile, false))
+	if (not RUDPClientCore::GetInst().Start(clientCoreOptionFile, sessionGetterOptionFile, true))
 	{
 		std::cout << "Core start failed" << std::endl;
 		return false;
