@@ -88,6 +88,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 
 void TestClient::SendAnyPacket()
 {
+	static unsigned long long packetSendCount = 0;
 	constexpr int pickablePacketSize = 3;
 	int pickedItem = rand() % pickablePacketSize;
 
@@ -116,9 +117,13 @@ void TestClient::SendAnyPacket()
 	break;
 	default:
 	{
+		std::cout << "Invalid pickedItem" << std::endl;
+		return;
 	}
-	break;
 	}
+
+	++packetSendCount;
+	std::cout << "Packet recv count " << packetSendCount << std::endl;
 }
 
 void TestClient::SendAnyPacket(const unsigned int sendCount)

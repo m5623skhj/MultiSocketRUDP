@@ -25,7 +25,7 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 	constexpr unsigned int maximumConnectWaitingCount = 20;
 	if (not WaitingConnectToServer(maximumConnectWaitingCount))
 	{
-		std::cout << "It was waiting " << maximumConnectWaitingCount << "seconds. bust connect to server failed" << std::endl;
+		std::cout << "It was waiting " << maximumConnectWaitingCount << "seconds. But connect to server failed" << std::endl;
 		return false;
 	}
 
