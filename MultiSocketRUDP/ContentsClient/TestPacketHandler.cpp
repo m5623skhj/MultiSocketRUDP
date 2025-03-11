@@ -123,7 +123,7 @@ void TestClient::SendAnyPacket()
 	}
 
 	++packetSendCount;
-	std::cout << "Packet recv count " << packetSendCount << std::endl;
+	std::cout << "Packet send count " << packetSendCount << std::endl;
 }
 
 void TestClient::SendAnyPacket(const unsigned int sendCount)

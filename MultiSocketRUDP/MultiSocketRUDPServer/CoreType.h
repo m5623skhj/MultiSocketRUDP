@@ -12,11 +12,16 @@ const PacketSequence loginPacketSequence = 0;
 
 using PacketRetransmissionCount = unsigned short;
 
-constexpr unsigned short maxRIOResult = 256;
+constexpr unsigned short maxRIOResult = 1024;
 constexpr unsigned int maxSendBufferSize = 32768;
 constexpr int recvBufferSize = 16384;
 constexpr unsigned char sessionKeySize = 16;
 constexpr unsigned int logicThreadStopSleepTime = 10000;
+
+#pragma region RIO
+constexpr ULONG maxOutStandingReceive = 1000;
+constexpr ULONG maxOutStandingSend = 100;
+#pragma endregion RIO
 
 #define OUT
 
