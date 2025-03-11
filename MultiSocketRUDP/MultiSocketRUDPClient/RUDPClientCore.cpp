@@ -30,11 +30,12 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 	}
 #endif
 
-	if (not ConnectToServer(clientCoreOptionFile))
+	if (not CreateRUDPSocket())
 	{
 		return false;
 	}
 	RunThreads();
+	SendConnectPacket();
 
 	return true;
 }
@@ -51,6 +52,7 @@ void RUDPClientCore::Stop()
 	StopThread(retransmissionThread, nowThreadId);
 	StopThread(sendThread, nowThreadId);
 	StopThread(recvThread, nowThreadId);
+	Logger::GetInstance().StopLoggerThread();
 
 	isStopped = true;
 }
@@ -63,7 +65,7 @@ void RUDPClientCore::StopThread(std::thread& stopTarget, const std::thread::id& 
 	}
 }
 
-bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
+bool RUDPClientCore::CreateRUDPSocket()
 {
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(port);
@@ -77,21 +79,16 @@ bool RUDPClientCore::ConnectToServer(const std::wstring& optionFilePath)
 		return false;
 	}
 
-	if (bind(rudpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("bind() failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
+	return true;
+}
 
+void RUDPClientCore::SendConnectPacket()
+{
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
 	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
 	
 	connectPacket << packetType << sessionId << sessionKey;
 	SendPacket(connectPacket, ++lastSendPacketSequence);
-
-	return true;
 }
 
 void RUDPClientCore::RunThreads()
@@ -106,9 +103,10 @@ void RUDPClientCore::RunThreads()
 
 void RUDPClientCore::RunRecvThread()
 {
-	int senderLength = sizeof(serverAddr);
 	NetBuffer* buffer = nullptr;
-	while (threadStopFlag == true)
+	sockaddr_in senderAddr;
+	int senderLength = sizeof(sockaddr_in);
+	while (not threadStopFlag)
 	{
 		if (buffer != nullptr)
 		{
@@ -121,7 +119,7 @@ void RUDPClientCore::RunRecvThread()
 			g_Dump.Crash();
 		}
 
-		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&serverAddr, &senderLength);
+		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
@@ -167,7 +165,7 @@ void RUDPClientCore::RunSendThread()
 			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Send thread stopped";
 			Logger::GetInstance().WriteLog(log);
-			break;
+			return;
 		}
 		break;
 		default:
@@ -190,7 +188,7 @@ void RUDPClientCore::RunRetransmissionThread()
 
 	std::list<std::pair<PacketSequence, SendPacketInfo*>> copyList;
 
-	while (threadStopFlag == true)
+	while (not threadStopFlag)
 	{
 		{
 			std::scoped_lock lock(sendPacketInfoMapLock);
@@ -312,7 +310,7 @@ void RUDPClientCore::DoSend()
 		}
 
 		EncodePacket(*packet);
-		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 		{
 			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = std::format("sendto() failed with error code {}", WSAGetLastError());

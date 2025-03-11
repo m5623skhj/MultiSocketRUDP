@@ -268,14 +268,6 @@ RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const un
 
 bool MultiSocketRUDPCore::RunAllThreads()
 {
-	if (not RunSessionBroker())
-	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RunSessionBroker() failed";
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
-
 	sendedPacketInfoList.reserve(numOfWorkerThread);
 	sendedPacketInfoListLock.reserve(numOfWorkerThread);
 	ioWorkerThreads.reserve(numOfWorkerThread);
@@ -297,6 +289,15 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
+	}
+
+	Sleep(1000);
+	if (not RunSessionBroker())
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "RunSessionBroker() failed";
+		Logger::GetInstance().WriteLog(log);
+		return false;
 	}
 
 	return true;
@@ -712,7 +713,6 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 			return false;
 		}
 	}
-
 	context->clientAddrRIOBuffer.BufferId = context->clientAddrBufferId;
 	context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
 	context->clientAddrRIOBuffer.Offset = 0;
@@ -728,12 +728,11 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 			return false;
 		}
 	}
-
 	context->localAddrRIOBuffer.BufferId = context->localAddrBufferId;
 	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
 	context->localAddrRIOBuffer.Offset = 0;
 
-	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, (PRIO_BUF)context, 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, (PRIO_BUF)context) == false)
+	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, context) == false)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOReceiveEx() failed with {}", WSAGetLastError());
