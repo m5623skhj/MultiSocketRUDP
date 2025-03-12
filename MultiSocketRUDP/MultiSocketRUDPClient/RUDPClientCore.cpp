@@ -117,7 +117,7 @@ void RUDPClientCore::RunRecvThread()
 {
 	NetBuffer* buffer{};
 	sockaddr_in senderAddr{};
-	int senderLength{};
+	int senderLength{sizeof(senderAddr)};
 	while (not threadStopFlag)
 	{
 		if (buffer != nullptr)
@@ -131,7 +131,6 @@ void RUDPClientCore::RunRecvThread()
 			g_Dump.Crash();
 		}
 
-		senderLength = sizeof(senderAddr);
 		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
@@ -424,19 +423,9 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer) const
 {
-	BYTE code;
-	WORD payloadLength;
-	buffer >> code >> payloadLength;
+	static constexpr int payloadLengthPosition = 1;
 
-	if (code != NetBuffer::m_byHeaderCode)
-	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("code : {}", code);
-		Logger::GetInstance().WriteLog(log);
-		return 0;
-	}
-
-	return payloadLength;
+	return *((WORD*)(&buffer.m_pSerializeBuffer[payloadLengthPosition]));
 }
 
 void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
