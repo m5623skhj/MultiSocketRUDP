@@ -27,8 +27,8 @@ struct IOContext : RIO_BUF
 	RIO_BUFFERID clientAddrBufferId{ RIO_INVALID_BUFFERID };
 	RIO_BUF localAddrRIOBuffer{};
 	RIO_BUFFERID localAddrBufferId{ RIO_INVALID_BUFFERID };
-	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
-	char localAddrBuffer[sizeof(SOCKADDR_INET)];
+	char clientAddrBuffer[sizeof(sockaddr_in)];
+	char localAddrBuffer[sizeof(sockaddr_in)];
 };
 
 struct SendPacketInfo

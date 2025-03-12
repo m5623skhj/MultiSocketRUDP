@@ -282,6 +282,8 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	sessionReleaseThread = std::thread([this]() { RunSessionReleaseThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
+		ioCompletedContexts.emplace_back();
+
 		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
 		sendedPacketInfoList.emplace_back();
 		sendedPacketInfoListLock.push_back(std::make_unique<std::mutex>());
@@ -639,6 +641,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 	{
 		return false;
 	}
+	buffer->m_iWrite = static_cast<WORD>(transferred);
 
 	contextResult->session->recvBuffer.recvBufferList.Enqueue(buffer);
 	ioCompletedContexts[threadId].Enqueue(contextResult);
@@ -885,19 +888,9 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer) const
 {
-	BYTE code;
-	WORD payloadLength;
-	buffer >> code >> payloadLength;
+	static constexpr int payloadLengthPosition = 1;
 
-	if (code != NetBuffer::m_byHeaderCode)
-	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("code : {}", code);
-		Logger::GetInstance().WriteLog(log);
-		return 0;
-	}
-
-	return payloadLength;
+	return *((WORD*)(&buffer.m_pSerializeBuffer[payloadLengthPosition]));
 }
 
 void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet)
