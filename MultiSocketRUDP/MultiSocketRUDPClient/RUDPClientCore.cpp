@@ -35,6 +35,8 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 		return false;
 	}
 	RunThreads();
+	Sleep(1000);
+
 	SendConnectPacket();
 
 	return true;
@@ -79,15 +81,25 @@ bool RUDPClientCore::CreateRUDPSocket()
 		return false;
 	}
 
+	if (bind(rudpSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
+	{
+		auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = std::format("bind() failed with error {}", WSAGetLastError());
+		Logger::GetInstance().WriteLog(log);
+		closesocket(rudpSocket);
+		return false;
+	}
+
 	return true;
 }
 
 void RUDPClientCore::SendConnectPacket()
 {
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
+	PacketSequence packetSequence = 0;
 	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
 	
-	connectPacket << packetType << sessionId << sessionKey;
+	connectPacket << packetType << packetSequence << sessionId << sessionKey;
 	SendPacket(connectPacket, ++lastSendPacketSequence);
 }
 
@@ -103,9 +115,9 @@ void RUDPClientCore::RunThreads()
 
 void RUDPClientCore::RunRecvThread()
 {
-	NetBuffer* buffer = nullptr;
-	sockaddr_in senderAddr;
-	int senderLength = sizeof(sockaddr_in);
+	NetBuffer* buffer{};
+	sockaddr_in senderAddr{};
+	int senderLength{};
 	while (not threadStopFlag)
 	{
 		if (buffer != nullptr)
@@ -119,6 +131,7 @@ void RUDPClientCore::RunRecvThread()
 			g_Dump.Crash();
 		}
 
+		senderLength = sizeof(senderAddr);
 		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
