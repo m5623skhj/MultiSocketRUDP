@@ -73,7 +73,7 @@ private:
 	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence);
 
 private:
-	void TryConnect(NetBuffer& recvPacket);
+	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
 	[[nodiscard]]

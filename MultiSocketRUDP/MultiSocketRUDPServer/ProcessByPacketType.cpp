@@ -10,7 +10,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	{
 	case PACKET_TYPE::ConnectType:
 	{
-		session.TryConnect(recvPacket);
+		session.TryConnect(recvPacket, clientAddr);
 		break;
 	}
 	break;

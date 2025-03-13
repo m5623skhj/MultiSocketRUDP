@@ -167,7 +167,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	return true;
 }
 
-void RUDPSession::TryConnect(NetBuffer& recvPacket)
+void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
 {
 	PacketSequence packetSequence;
 	SessionIdType inputSessionId;
@@ -184,6 +184,8 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket)
 	{
 		return;
 	}
+	clientAddr = inClientAddr;
+	++lastReceivedPacketSequence;
 
 	OnConnected(sessionId);
 	SendReplyToClient(packetSequence);

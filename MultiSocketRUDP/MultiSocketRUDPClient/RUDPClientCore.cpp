@@ -81,7 +81,12 @@ bool RUDPClientCore::CreateRUDPSocket()
 		return false;
 	}
 
-	if (bind(rudpSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
+	sockaddr_in recvAddr;
+	recvAddr.sin_family = AF_INET;
+	recvAddr.sin_addr.s_addr = INADDR_ANY;
+	recvAddr.sin_port = 0;
+
+	if (bind(rudpSocket, reinterpret_cast<sockaddr*>(&recvAddr), sizeof(recvAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("bind() failed with error {}", WSAGetLastError());
@@ -100,7 +105,7 @@ void RUDPClientCore::SendConnectPacket()
 	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
 	
 	connectPacket << packetType << packetSequence << sessionId << sessionKey;
-	SendPacket(connectPacket, ++lastSendPacketSequence);
+	SendPacket(connectPacket, packetSequence);
 }
 
 void RUDPClientCore::RunThreads()
