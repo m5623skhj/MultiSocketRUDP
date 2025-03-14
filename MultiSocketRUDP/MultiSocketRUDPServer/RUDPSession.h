@@ -12,6 +12,7 @@ class MultiSocketRUDPCore;
 class IPacket;
 
 struct SendPacketInfo;
+struct IOContext;
 
 struct RecvPacketInfo
 {
@@ -33,8 +34,8 @@ enum class IO_MODE : LONG
 
 struct RecvBuffer
 {
+	IOContext* recvContext{};
 	char buffer[recvBufferSize];
-	RIO_BUFFERID recvBufferId{};
 	CListBaseQueue<NetBuffer*> recvBufferList;
 };
 

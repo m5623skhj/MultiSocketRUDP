@@ -24,9 +24,7 @@ struct IOContext : RIO_BUF
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 	RUDPSession* session = nullptr;
 	RIO_BUF clientAddrRIOBuffer{};
-	RIO_BUFFERID clientAddrBufferId{ RIO_INVALID_BUFFERID };
 	RIO_BUF localAddrRIOBuffer{};
-	RIO_BUFFERID localAddrBufferId{ RIO_INVALID_BUFFERID };
 	char clientAddrBuffer[sizeof(sockaddr_in)];
 	char localAddrBuffer[sizeof(sockaddr_in)];
 };
@@ -101,6 +99,8 @@ private:
 	bool InitNetwork();
 	[[nodiscard]]
 	bool InitRIO();
+	[[nodiscard]]
+	bool InitSessionRecvBuffer(RUDPSession* session);
 	[[nodiscard]]
 	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const;
 	[[nodiscard]]

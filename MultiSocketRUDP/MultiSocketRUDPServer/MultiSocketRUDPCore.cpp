@@ -236,13 +236,54 @@ bool MultiSocketRUDPCore::InitRIO()
 	for (auto& session : sessionArray)
 	{
 		session->threadId = session->sessionId % numOfWorkerThread;
-		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadId], rioCQList[session->threadId]) ||
-			not DoRecv(*session))
+		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadId], rioCQList[session->threadId]))
+		{
+			return false;
+		}
+
+		if (not InitSessionRecvBuffer(session))
+		{
+			return false;
+		}
+
+		if (not DoRecv(*session))
 		{
 			return false;
 		}
 
 		unusedSessionIdList.emplace_back(session->sessionId);
+	}
+
+	return true;
+}
+
+bool MultiSocketRUDPCore::InitSessionRecvBuffer(RUDPSession* session)
+{
+	session->recvBuffer.recvContext = new IOContext();
+	if (session->recvBuffer.recvContext == nullptr)
+	{
+		return false;
+	}
+
+	auto& context = session->recvBuffer.recvContext;
+	context->InitContext(session->sessionId, RIO_OPERATION_TYPE::OP_RECV);
+	context->Length = recvBufferSize;
+	context->Offset = 0;
+	context->session = session;
+
+	context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
+	context->clientAddrRIOBuffer.Offset = 0;
+
+	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
+	context->localAddrRIOBuffer.Offset = 0;
+
+	context->BufferId = RegisterRIOBuffer(session->recvBuffer.buffer, recvBufferSize);
+	context->clientAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
+	context->localAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
+
+	if (context->BufferId == RIO_INVALID_BUFFERID || context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID || context->localAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
+	{
+		return false;
 	}
 
 	return true;
@@ -255,15 +296,15 @@ RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const un
 		return RIO_INVALID_BUFFERID;
 	}
 
-	RIO_BUFFERID clientAddrBufferId = rioFunctionTable.RIORegisterBuffer(targetBuffer, targetBuffersize);
-	if (clientAddrBufferId == RIO_INVALID_BUFFERID)
+	RIO_BUFFERID bufferId = rioFunctionTable.RIORegisterBuffer(targetBuffer, targetBuffersize);
+	if (bufferId == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("Send RIORegisterBuffer failed with error code {}", WSAGetLastError());
+		log->logString = std::format("RIORegisterBuffer failed with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 	}
 
-	return clientAddrBufferId;
+	return bufferId;
 }
 
 bool MultiSocketRUDPCore::RunAllThreads()
@@ -692,48 +733,19 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		{
 			NetBuffer::Free(buffer);
 		}
-		contextPool.Free(context);
 	}
 }
 
 bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 {
-	auto context = contextPool.Alloc();
-	context->InitContext(session.sessionId, RIO_OPERATION_TYPE::OP_RECV);
-	context->BufferId = session.recvBuffer.recvBufferId;
-	context->Length = recvBufferSize;
-	context->Offset = 0;
-	context->session = &session;
-
-	if (context->clientAddrBufferId == RIO_INVALID_BUFFERID)
+	auto context = session.recvBuffer.recvContext;
+	if (context == nullptr)
 	{
-		if (context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
-			context->clientAddrBufferId == RIO_INVALID_BUFFERID)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "DoRecv() : clientAddrBufferId is RIO_INVALID_BUFFERID";
-			Logger::GetInstance().WriteLog(log);
-			return false;
-		}
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "DoRecv() : context is nullptr";
+		Logger::GetInstance().WriteLog(log);
+		return false;
 	}
-	context->clientAddrRIOBuffer.BufferId = context->clientAddrBufferId;
-	context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
-	context->clientAddrRIOBuffer.Offset = 0;
-
-	if (context->localAddrBufferId == RIO_INVALID_BUFFERID)
-	{
-		if (context->localAddrBufferId = RegisterRIOBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
-			context->localAddrBufferId == RIO_INVALID_BUFFERID)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "DoRecv() : localAddrBufferId is RIO_INVALID_BUFFERID";
-			Logger::GetInstance().WriteLog(log);
-			return false;
-		}
-	}
-	context->localAddrRIOBuffer.BufferId = context->localAddrBufferId;
-	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
-	context->localAddrRIOBuffer.Offset = 0;
 
 	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, context) == false)
 	{
@@ -791,8 +803,8 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 		return nullptr;
 	}
 
-	if (context->clientAddrBufferId == RIO_INVALID_BUFFERID &&
-		(context->clientAddrBufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
+	if (context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID &&
+		(context->clientAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(sockaddr_in))) == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "MakeSendContext() : clientAddrBufferId is RIO_INVALID_BUFFERID";
@@ -807,7 +819,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* context)
 {
 	RIO_BUF clientAddrBuffer;
-	clientAddrBuffer.BufferId = context->clientAddrBufferId;
+	clientAddrBuffer.BufferId = context->clientAddrRIOBuffer.BufferId;
 	clientAddrBuffer.Length = sizeof(sockaddr_in);
 	clientAddrBuffer.Offset = 0;
 

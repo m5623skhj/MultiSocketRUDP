@@ -20,15 +20,6 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	u_long nonBlocking = 1;
 	ioctlsocket(sock, FIONBIO, &nonBlocking);
 
-	recvBuffer.recvBufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, sizeof(recvBuffer.buffer));
-	if (recvBuffer.recvBufferId == RIO_INVALID_BUFFERID)
-	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("Recv RIORegisterBuffer failed with {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
-
 	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
