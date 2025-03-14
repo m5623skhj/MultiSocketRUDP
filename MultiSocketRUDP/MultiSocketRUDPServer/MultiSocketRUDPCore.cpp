@@ -259,7 +259,7 @@ bool MultiSocketRUDPCore::InitRIO()
 
 bool MultiSocketRUDPCore::InitSessionRecvBuffer(RUDPSession* session)
 {
-	session->recvBuffer.recvContext = new IOContext();
+	session->recvBuffer.recvContext = std::make_shared<IOContext>();
 	if (session->recvBuffer.recvContext == nullptr)
 	{
 		return false;
@@ -747,7 +747,7 @@ bool MultiSocketRUDPCore::DoRecv(RUDPSession& session)
 		return false;
 	}
 
-	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context, 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, context) == false)
+	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, context.get()) == false)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOReceiveEx() failed with {}", WSAGetLastError());

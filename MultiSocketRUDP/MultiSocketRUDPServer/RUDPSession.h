@@ -34,7 +34,7 @@ enum class IO_MODE : LONG
 
 struct RecvBuffer
 {
-	IOContext* recvContext{};
+	std::shared_ptr<IOContext> recvContext{};
 	char buffer[recvBufferSize];
 	CListBaseQueue<NetBuffer*> recvBufferList;
 };
