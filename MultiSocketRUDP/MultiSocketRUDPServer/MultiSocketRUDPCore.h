@@ -23,8 +23,8 @@ struct IOContext : RIO_BUF
 	SessionIdType ownerSessionId = invalidSessionId;
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 	RUDPSession* session = nullptr;
-	RIO_BUF clientAddrRIOBuffer{};
-	RIO_BUF localAddrRIOBuffer{};
+	RIO_BUF clientAddrRIOBuffer{ RIO_INVALID_BUFFERID };
+	RIO_BUF localAddrRIOBuffer{ RIO_INVALID_BUFFERID };
 	char clientAddrBuffer[sizeof(sockaddr_in)];
 	char localAddrBuffer[sizeof(sockaddr_in)];
 };
