@@ -25,8 +25,8 @@ struct IOContext : RIO_BUF
 	RUDPSession* session = nullptr;
 	RIO_BUF clientAddrRIOBuffer{ RIO_INVALID_BUFFERID };
 	RIO_BUF localAddrRIOBuffer{ RIO_INVALID_BUFFERID };
-	char clientAddrBuffer[sizeof(sockaddr_in)];
-	char localAddrBuffer[sizeof(sockaddr_in)];
+	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
+	char localAddrBuffer[sizeof(SOCKADDR_INET)];
 };
 
 struct SendPacketInfo
