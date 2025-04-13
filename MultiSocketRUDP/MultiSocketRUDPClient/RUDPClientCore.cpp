@@ -128,6 +128,7 @@ void RUDPClientCore::RunRecvThread()
 	while (not threadStopFlag)
 	{
 		buffer->Init();
+		buffer->m_iWrite = 0;
 		
 		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), recvBufferSize, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
@@ -147,14 +148,9 @@ void RUDPClientCore::RunRecvThread()
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
+		buffer->MoveWritePos(bytesReceived);
+		buffer->m_iRead = 0;
 		OnRecvStream(*buffer, bytesReceived);
-
-		if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
-		{
-			continue;
-		}
-
-		ProcessRecvPacket(*buffer);
 	}
 
 	NetBuffer::Free(buffer);
@@ -233,9 +229,42 @@ void RUDPClientCore::RunRetransmissionThread()
 	}
 }
 
-void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, const int recvSize)
+void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 {
+	NetBuffer* packetBuffer = nullptr;
 
+	while (recvSize > df_HEADER_SIZE)
+	{
+		if (packetBuffer != nullptr)
+		{
+			NetBuffer::Free(packetBuffer);
+			packetBuffer = nullptr;
+		}
+
+		NetBuffer* packetBuffer = NetBuffer::Alloc();
+		recvBuffer.ReadBuffer(packetBuffer->GetBufferPtr(), df_HEADER_SIZE);
+		packetBuffer->m_iRead = 0;
+
+		WORD payloadLength = GetPayloadLength(*packetBuffer);
+		if (payloadLength <= 0 || payloadLength > dfDEFAULTSIZE || payloadLength > recvSize)
+		{
+			NetBuffer::Free(packetBuffer);
+			break;
+		}
+		int packetSize = (payloadLength + df_HEADER_SIZE);
+		recvSize -= packetSize;
+		
+		recvBuffer.ReadBuffer(packetBuffer->GetWriteBufferPtr(), payloadLength);
+		packetBuffer->m_iWrite = packetSize;
+		if (not packetBuffer->Decode())
+		{
+			NetBuffer::Free(packetBuffer);
+			break;
+		}
+
+		ProcessRecvPacket(*packetBuffer);
+		NetBuffer::Free(packetBuffer);
+	}
 }
 
 void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
@@ -431,7 +460,7 @@ WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer) const
 {
 	static constexpr int payloadLengthPosition = 1;
 
-	return *((WORD*)(&buffer.m_pSerializeBuffer[payloadLengthPosition]));
+	return *((WORD*)(&buffer.m_pSerializeBuffer[buffer.m_iRead + payloadLengthPosition]));
 }
 
 void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
