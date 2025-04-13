@@ -166,10 +166,7 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 
 		{
 			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
-			if (eraseTarget->listItor != sendedPacketInfoList[threadId].end())
-			{
-				sendedPacketInfoList[threadId].erase(eraseTarget->listItor);
-			}
+			sendedPacketInfoList[threadId].erase(eraseTarget->listItor);
 		}
 	} while (false);
 
@@ -818,10 +815,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 		}
 	}
 
-	SOCKADDR_INET sockaddrInet;
-	memset(&sockaddrInet, 0, sizeof(sockaddrInet));
-	sockaddrInet.Ipv4 = session.clientAddr;
-	if (memcpy_s(context->clientAddrBuffer, sizeof(context->clientAddrBuffer), &sockaddrInet, sizeof(SOCKADDR_INET)) != NOERROR)
+	if (memcpy_s(context->clientAddrBuffer, sizeof(context->clientAddrBuffer), &session.clientSockaddrInet, sizeof(SOCKADDR_INET)) != NOERROR)
 	{
 		return nullptr;
 	}

@@ -95,6 +95,8 @@ public:
 	[[nodiscard]]
 	sockaddr_in GetSocketAddress() const;
 	[[nodiscard]]
+	SOCKADDR_INET GetSocketAddressInet() const;
+	[[nodiscard]]
 	bool IsConnected() const;
 
 private:
@@ -107,6 +109,7 @@ private:
 	// insert the client information into clientAddr below
 	std::string sessionKey{};
 	sockaddr_in clientAddr{};
+	SOCKADDR_INET clientSockaddrInet{};
 	PortType serverPort{ invalidPortNumber };
 	SOCKET sock{};
 	bool isUsingSession{};
