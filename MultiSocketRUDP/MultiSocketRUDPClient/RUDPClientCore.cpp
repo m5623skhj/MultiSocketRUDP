@@ -120,23 +120,16 @@ void RUDPClientCore::RunThreads()
 
 void RUDPClientCore::RunRecvThread()
 {
-	NetBuffer* buffer{};
+	NetBuffer* buffer = NetBuffer::Alloc();
+	buffer->Resize(recvBufferSize);
 	sockaddr_in senderAddr{};
 	int senderLength{sizeof(senderAddr)};
+
 	while (not threadStopFlag)
 	{
-		if (buffer != nullptr)
-		{
-			NetBuffer::Free(buffer);
-		}
+		buffer->Init();
 		
-		buffer = NetBuffer::Alloc();
-		if (buffer == nullptr)
-		{
-			g_Dump.Crash();
-		}
-
-		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), dfDEFAULTSIZE, 0, (sockaddr*)&senderAddr, &senderLength);
+		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), recvBufferSize, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
@@ -154,6 +147,7 @@ void RUDPClientCore::RunRecvThread()
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
+		OnRecvStream(*buffer, bytesReceived);
 
 		if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
 		{
@@ -162,6 +156,8 @@ void RUDPClientCore::RunRecvThread()
 
 		ProcessRecvPacket(*buffer);
 	}
+
+	NetBuffer::Free(buffer);
 }
 
 void RUDPClientCore::RunSendThread()
@@ -235,6 +231,11 @@ void RUDPClientCore::RunRetransmissionThread()
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
+}
+
+void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, const int recvSize)
+{
+
 }
 
 void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)

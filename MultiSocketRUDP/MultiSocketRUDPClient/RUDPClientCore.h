@@ -124,6 +124,7 @@ private:
 	void RunSendThread();
 	void RunRetransmissionThread();
 
+	void OnRecvStream(NetBuffer& recvBuffer, const int recvSize);
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket);
 	void SendReplyToServer(const PacketSequence recvPacketSequence);
