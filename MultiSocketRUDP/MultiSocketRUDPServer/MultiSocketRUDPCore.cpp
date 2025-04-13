@@ -894,8 +894,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
 		{
 			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
-			auto itor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
-			sendPacketInfo->listItor = itor;
+			sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
 		}
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
