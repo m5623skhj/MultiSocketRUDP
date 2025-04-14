@@ -36,6 +36,7 @@ struct SendPacketInfo
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
 	unsigned long long sendTimeStamp{};
+	bool isErasedPacketInfo{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
 	~SendPacketInfo()
@@ -46,6 +47,7 @@ struct SendPacketInfo
 		sendPacektSequence = {};
 		sendTimeStamp = {};
 		listItor = {};
+		isErasedPacketInfo = {};
 	}
 
 	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
@@ -90,7 +92,7 @@ public:
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId);
-	inline void PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId);
+	inline void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
 	[[nodiscard]]

@@ -167,16 +167,18 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 		{
 			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
 			sendedPacketInfoList[threadId].erase(eraseTarget->listItor);
+			eraseTarget->isErasedPacketInfo = true;
 		}
 	} while (false);
 
 	sendPacketInfoPool->Free(eraseTarget);
 }
 
-void MultiSocketRUDPCore::PushToDisconnectTargetSession(SessionIdType disconnectTargetSessionId)
+void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 {
 	std::scoped_lock lock(releaseSessionIdListLock);
-	releaseSessionIdList.emplace_back(disconnectTargetSessionId);
+	session.nowInReleaseThread = true;
+	releaseSessionIdList.emplace_back(session.GetSessionId());
 }
 
 bool MultiSocketRUDPCore::InitNetwork()
@@ -546,14 +548,14 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 		
 		for (auto& sendedPacketInfo : copyList)
 		{
-			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick)
+			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick || sendedPacketInfo->owner->nowInReleaseThread)
 			{
 				continue;
 			}
 
 			if (++sendedPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				PushToDisconnectTargetSession(sendedPacketInfo->owner->GetSessionId());
+				PushToDisconnectTargetSession(*sendedPacketInfo->owner);
 				++numOfTimeoutSession;
 				continue;
 			}
@@ -585,6 +587,11 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 			{
 				if (auto releaseSession = GetUsingSession(releaseSessionId))
 				{
+					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING)
+					{
+						continue;
+					}
+
 					releaseSession->Disconnect();
 					releaseSession->InitializeSession();
 				}
@@ -627,12 +634,18 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 	context->session = GetUsingSession(context->ownerSessionId);
 	if (context->session == nullptr)
 	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("Session is nullptr in GetIOCompletedContext() with session id {}, error {}", context->ownerSessionId, rioResult.Status);
+		Logger::GetInstance().WriteLog(log);
 		contextPool.Free(context);
 		return nullptr;
 	}
 
 	if (rioResult.BytesTransferred == 0 || context->session->ioCancle == true)
 	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("RIO operation failed with session id {}, error {}", context->ownerSessionId, rioResult.Status);
+		Logger::GetInstance().WriteLog(log);
 		contextPool.Free(context);
 		return nullptr;
 	}
@@ -855,7 +868,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
 			Logger::GetInstance().WriteLog(log);
-			PushToDisconnectTargetSession(session.GetSessionId());
+			PushToDisconnectTargetSession(session);
 			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
@@ -879,7 +892,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
 			Logger::GetInstance().WriteLog(log);
-			PushToDisconnectTargetSession(session.GetSessionId());
+			PushToDisconnectTargetSession(session);
 			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
@@ -894,6 +907,15 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
 		{
 			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
+			if (sendPacketInfo->isErasedPacketInfo == true)
+			{
+				continue;
+			}
+
+			if (sendPacketInfo->retransmissionCount > 0)
+			{
+				sendedPacketInfoList[threadId].erase(sendPacketInfo->listItor);
+			}
 			sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
 		}
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize

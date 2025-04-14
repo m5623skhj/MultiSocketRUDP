@@ -49,6 +49,7 @@ void RUDPSession::InitializeSession()
 	clientSockaddrInet = {};
 	ioCancle = {};
 	lastSendPacketSequence = {};
+	nowInReleaseThread = {};
 
 	if (sendBuffer.reservedSendPacketInfo != nullptr)
 	{
@@ -354,4 +355,9 @@ bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)
 	}
 
 	return true;
+}
+
+bool RUDPSession::IsReleasing() const
+{
+	return nowInReleaseThread;
 }

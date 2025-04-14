@@ -88,6 +88,7 @@ private:
 
 private:
 	bool CheckMyClient(const sockaddr_in& targetClientAddr);
+	bool IsReleasing() const;
 
 public:
 	[[nodiscard]]
@@ -112,6 +113,7 @@ private:
 	SOCKADDR_INET clientSockaddrInet{};
 	PortType serverPort{ invalidPortNumber };
 	SOCKET sock{};
+	bool nowInReleaseThread{};
 	bool isUsingSession{};
 	bool ioCancle{};
 	ThreadIdType threadId{};

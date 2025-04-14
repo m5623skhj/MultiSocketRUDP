@@ -16,7 +16,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	break;
 	case PACKET_TYPE::DisconnectType:
 	{
-		if (not session.CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr) || session.IsReleasing())
 		{
 			break;
 		}
@@ -27,7 +27,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	break;
 	case PACKET_TYPE::SendType:
 	{
-		if (not session.CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr) || session.IsReleasing())
 		{
 			break;
 		}
@@ -42,7 +42,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	break;
 	case PACKET_TYPE::SendReplyType:
 	{
-		if (not session.CheckMyClient(clientAddr))
+		if (not session.CheckMyClient(clientAddr) || session.IsReleasing())
 		{
 			break;
 		}
