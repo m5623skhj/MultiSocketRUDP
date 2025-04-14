@@ -278,25 +278,26 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	case PACKET_TYPE::SendType:
 	{
 		NetBuffer::AddRefCount(&receivedBuffer);
-
-		std::scoped_lock lock(recvPacketHoldingQueueLock);
-		recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
+		{
+			std::scoped_lock lock(recvPacketHoldingQueueLock);
+			recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
+		}
 
 		SendReplyToServer(packetSequence);
-	}
 		break;
+	}
 	case PACKET_TYPE::SendReplyType:
 	{
 		OnSendReply(receivedBuffer);
-	}
 		break;
+	}
 	default:
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("Invalid packet type {}", static_cast<unsigned char>(packetType));
 		Logger::GetInstance().WriteLog(log);
-	}
 		break;
+	}
 	}
 }
 

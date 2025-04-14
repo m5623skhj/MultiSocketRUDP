@@ -65,9 +65,15 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 		std::string recvString;
 		buffer >> recvString;
 
-		if (recvString != echoString)
 		{
-			g_Dump.Crash();
+			std::scoped_lock lock(echoStringListLock);
+			const auto& echoString = echoStringList.front();
+			if (recvString != echoString)
+			{
+				g_Dump.Crash();
+			}
+
+			echoStringList.pop_front();
 		}
 	}
 	break;
@@ -109,9 +115,13 @@ void TestClient::SendAnyPacket()
 	break;
 	case 2:
 	{
-		echoString = MakeRandomString();
+		auto echoString = MakeRandomString();
 		TestStringPacketReq req;
 		req.testString = echoString;
+		{
+			std::scoped_lock lock(echoStringListLock);
+			echoStringList.emplace_back(echoString);
+		}
 		RUDPClientCore::GetInst().SendPacket(req);
 	}
 	break;

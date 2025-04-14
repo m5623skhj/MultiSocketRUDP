@@ -2,6 +2,7 @@
 #include <thread>
 #include "NetServerSerializeBuffer.h"
 #include "PacketIdType.h"
+#include <mutex>
 
 class TestClient
 {
@@ -31,5 +32,6 @@ private:
 
 private:
 	int order{};
-	std::string echoString{};
+	std::list<std::string> echoStringList{};
+	std::mutex echoStringListLock;
 };

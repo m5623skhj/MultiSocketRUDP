@@ -156,7 +156,7 @@ private:
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHoldingQueue;
 	std::mutex recvPacketHoldingQueueLock;
 
-	PacketSequence recvPacketSequence{};
+	PacketSequence recvPacketSequence{ 1 };
 #pragma endregion RUDP
 
 public:
