@@ -203,7 +203,7 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 		NetBuffer::AddRefCount(&recvPacket);
 		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequence });
 
-		return false;
+		return true;
 	}
 	
 	if (ProcessPacket(recvPacket, packetSequence) == false)
