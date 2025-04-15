@@ -16,7 +16,7 @@ namespace PacketHandlerUtil
 	}
 
 	template <typename PacketType>
-	PacketHandler WappingHandler(bool (*targetFunction)(RUDPSession&, PacketType&))
+	PacketHandler MappingHandler(bool (*targetFunction)(RUDPSession&, PacketType&))
 	{
 		return [targetFunction](RUDPSession& session, IPacket& inPacket) -> bool
 		{
@@ -28,7 +28,7 @@ namespace PacketHandlerUtil
 	template <typename PacketType>
 	void RegisterPacket(bool (*targetFunction)(RUDPSession&, PacketType&))
 	{
-		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::WappingHandler(targetFunction));
+		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::MappingHandler(targetFunction));
 		REGISTER_PACKET(PacketType, handler);
 	}
 }

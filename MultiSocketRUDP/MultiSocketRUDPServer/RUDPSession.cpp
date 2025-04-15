@@ -275,7 +275,7 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 		return false;
 	}
 
-	bool packetHandleResult = packetHandler(*this, (IPacket&)realPacket);
+	bool packetHandleResult = packetHandler(*this, *packet);
 	if (packetHandleResult == true)
 	{
 		SendReplyToClient(recvPacketSequence);
@@ -291,14 +291,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
 	buffer << packetType << recvPacketSequence;
 
-	if (not core.DoSend(*this, threadId))
-	{
-		NetBuffer::Free(&buffer);
-
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "SendReplyToClient failed";
-		Logger::GetInstance().WriteLog(log);
-	}
+	std::ignore = SendPacket(buffer, recvPacketSequence);
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)

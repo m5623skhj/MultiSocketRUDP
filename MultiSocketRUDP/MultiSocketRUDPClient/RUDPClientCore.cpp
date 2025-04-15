@@ -288,7 +288,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 	case PACKET_TYPE::SendReplyType:
 	{
-		OnSendReply(receivedBuffer);
+		OnSendReply(receivedBuffer, packetSequence);
 		break;
 	}
 	default:
@@ -301,11 +301,8 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 }
 
-void RUDPClientCore::OnSendReply(NetBuffer& recvPacket)
+void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence packetSequence)
 {
-	PacketSequence packetSequence;
-	recvPacket >> packetSequence;
-
 	if (lastSendPacketSequence < packetSequence)
 	{
 		return;

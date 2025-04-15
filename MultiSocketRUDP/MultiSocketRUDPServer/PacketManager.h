@@ -76,8 +76,8 @@ public:
 
 		auto packetToBufferFunction = [](NetBuffer& buffer, std::any& packet)
 		{
-			auto realPacket = static_cast<PacketType*>(std::any_cast<IPacket*>(packet));
-			realPacket->BufferToPacket(buffer);
+			auto& realPacket = *static_cast<PacketType*>(std::any_cast<IPacket*>(packet));
+			realPacket.BufferToPacket(buffer);
 		};
 
 		PacketType packetType;
