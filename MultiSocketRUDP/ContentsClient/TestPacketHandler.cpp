@@ -43,6 +43,11 @@ namespace
 
 bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId)
 {
+	if (IsConnected() == false)
+	{
+		g_Dump.Crash();
+	}
+
 	switch (packetId)
 	{
 	case PACKET_ID::Pong:
