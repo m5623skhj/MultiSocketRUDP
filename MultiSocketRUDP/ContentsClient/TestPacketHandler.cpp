@@ -59,9 +59,15 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 		int recvOrder;
 		buffer >> recvOrder;
 
-		if (order != recvOrder)
 		{
-			g_Dump.Crash();
+			std::scoped_lock lock(orderListLock);
+			int frontOrder = orderList.front();
+			if (frontOrder != recvOrder)
+			{
+				g_Dump.Crash();
+			}
+
+			orderList.pop_front();
 		}
 	}
 	break;
@@ -114,7 +120,12 @@ void TestClient::SendAnyPacket()
 	case 1:
 	{
 		TestPacketReq req;
+		
 		req.order = ++order;
+		{
+			std::scoped_lock lock(orderListLock);
+			orderList.emplace_back(req.order);
+		}
 		RUDPClientCore::GetInst().SendPacket(req);
 	}
 	break;

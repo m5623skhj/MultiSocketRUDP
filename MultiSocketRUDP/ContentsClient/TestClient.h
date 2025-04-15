@@ -31,7 +31,9 @@ private:
 	std::thread testThread;
 
 private:
-	int order{};
+	std::atomic_int order{ 0 };
+	std::list<int> orderList{};
+	std::mutex orderListLock;
 	std::list<std::string> echoStringList{};
 	std::mutex echoStringListLock;
 };
