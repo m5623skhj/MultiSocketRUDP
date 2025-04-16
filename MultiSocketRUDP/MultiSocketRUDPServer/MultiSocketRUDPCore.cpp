@@ -891,7 +891,6 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 		session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
 		if (packetSequenceSet.contains(sendPacketInfo->sendPacektSequence) == true)
 		{
-			sendPacketInfoPool->Free(sendPacketInfo);
 			continue;
 		}
 
