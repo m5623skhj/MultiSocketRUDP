@@ -4,6 +4,7 @@
 #include "EssentialHandler.h"
 #include "LogExtension.h"
 #include "Logger.h"
+#include <unordered_set>
 
 void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
 {
@@ -856,6 +857,8 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 
 int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
 {
+	std::unordered_set<PacketSequence> packetSequenceSet;
+
 	int totalSendSize = 0;
 	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
 	char* bufferPositionPointer = session.sendBuffer.rioSendBuffer;
@@ -875,6 +878,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 		memcpy_s(bufferPositionPointer, maxSendBufferSize
 			, session.sendBuffer.reservedSendPacketInfo->buffer->GetBufferPtr(), useSize);
+		packetSequenceSet.insert(session.sendBuffer.reservedSendPacketInfo->sendPacektSequence);
 
 		totalSendSize += useSize;
 		bufferPositionPointer += totalSendSize;
@@ -885,6 +889,11 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 	for (int i = 0; i < bufferCount; ++i)
 	{
 		session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
+		if (packetSequenceSet.contains(sendPacketInfo->sendPacektSequence) == true)
+		{
+			sendPacketInfoPool->Free(sendPacketInfo);
+			continue;
+		}
 
 		int useSize = sendPacketInfo->buffer->GetAllUseSize();
 		if (useSize > maxSendBufferSize)
@@ -918,6 +927,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			}
 			sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
 		}
+		packetSequenceSet.insert(sendPacketInfo->sendPacektSequence);
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	}
