@@ -227,6 +227,10 @@ void RUDPClientCore::RunRetransmissionThread()
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
+
+	auto log = Logger::MakeLogObject<ClientLog>();
+	log->logString = "Retransmission thread stopped";
+	Logger::GetInstance().WriteLog(log);
 }
 
 void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
