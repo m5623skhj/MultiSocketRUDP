@@ -549,7 +549,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 		
 		for (auto& sendedPacketInfo : copyList)
 		{
-			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick || sendedPacketInfo->owner->nowInReleaseThread)
+			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick || sendedPacketInfo->owner->nowInReleaseThread || sendedPacketInfo->isErasedPacketInfo)
 			{
 				continue;
 			}
