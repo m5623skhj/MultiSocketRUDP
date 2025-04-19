@@ -600,14 +600,14 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 			}
 			releaseSessionIdList.clear();
 		}
-			break;
+		break;
 		default:
 		{
 			auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format("Invalid release thread wait result. Error is {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 		}
-			break;
+		break;
 		}
 	}
 }
