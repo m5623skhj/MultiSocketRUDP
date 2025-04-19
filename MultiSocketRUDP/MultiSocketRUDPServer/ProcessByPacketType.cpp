@@ -6,6 +6,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
 
+	session.nowInProcessingRecvPacket = true;
 	switch (packetType)
 	{
 	case PACKET_TYPE::ConnectType:
@@ -22,6 +23,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		}
 
 		session.Disconnect(recvPacket);
+		session.nowInProcessingRecvPacket = false;
 		return false;
 	}
 	break;
@@ -35,6 +37,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		if (session.OnRecvPacket(recvPacket) == false)
 		{
 			session.Disconnect();
+			session.nowInProcessingRecvPacket = false;
 			return false;
 		}
 		break;
@@ -55,6 +58,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		// TODO : Write log
 		break;
 	}
+	session.nowInProcessingRecvPacket = false;
 
 	return true;
 }

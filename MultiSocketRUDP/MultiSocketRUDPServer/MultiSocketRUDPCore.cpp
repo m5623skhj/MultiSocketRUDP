@@ -588,7 +588,8 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 			{
 				if (auto releaseSession = GetUsingSession(releaseSessionId))
 				{
-					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING)
+					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING ||
+						releaseSession->nowInProcessingRecvPacket)
 					{
 						continue;
 					}

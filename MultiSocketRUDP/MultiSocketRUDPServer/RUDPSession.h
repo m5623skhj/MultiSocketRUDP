@@ -114,6 +114,7 @@ private:
 	PortType serverPort{ invalidPortNumber };
 	SOCKET sock{};
 	bool nowInReleaseThread{};
+	bool nowInProcessingRecvPacket{};
 	bool isUsingSession{};
 	bool ioCancle{};
 	ThreadIdType threadId{};
