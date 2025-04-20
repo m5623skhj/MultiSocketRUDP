@@ -37,6 +37,7 @@ struct SendPacketInfo
 	PacketSequence sendPacektSequence{};
 	unsigned long long sendTimeStamp{};
 	bool isErasedPacketInfo{};
+	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
 	~SendPacketInfo()
@@ -48,13 +49,15 @@ struct SendPacketInfo
 		sendTimeStamp = {};
 		listItor = {};
 		isErasedPacketInfo = {};
+		isReplyType = {};
 	}
 
-	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
+	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
 	{
 		owner = inOwner;
 		buffer = inBuffer;
 		sendPacektSequence = inSendPacketSequence;
+		isReplyType = inIsReplyType;
 		NetBuffer::AddRefCount(inBuffer);
 	}
 

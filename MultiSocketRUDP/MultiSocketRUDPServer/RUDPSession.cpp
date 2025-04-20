@@ -117,7 +117,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence);
+	return SendPacket(*buffer, packetSequence, true);
 }
 
 void RUDPSession::OnConnected(SessionIdType inSessionId)
@@ -131,7 +131,7 @@ void RUDPSession::OnDisconnected()
 	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::OnDisconnectedHandlerType);
 }
 
-bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence)
+bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType)
 {
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
@@ -143,7 +143,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		return false;
 	}
 
-	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence);
+	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
@@ -291,7 +291,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
 	buffer << packetType << recvPacketSequence;
 
-	std::ignore = SendPacket(buffer, recvPacketSequence);
+	std::ignore = SendPacket(buffer, recvPacketSequence, false);
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)

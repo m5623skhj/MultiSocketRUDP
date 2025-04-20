@@ -3,6 +3,7 @@
 #include "NetServerSerializeBuffer.h"
 #include "PacketIdType.h"
 #include <mutex>
+#include <set>
 
 class TestClient
 {
@@ -34,6 +35,6 @@ private:
 	std::atomic_int order{ 0 };
 	std::list<int> orderList{};
 	std::mutex orderListLock;
-	std::list<std::string> echoStringList{};
-	std::mutex echoStringListLock;
+	std::multiset<std::string> echoStringSet{};
+	std::mutex echoStringSetLock;
 };

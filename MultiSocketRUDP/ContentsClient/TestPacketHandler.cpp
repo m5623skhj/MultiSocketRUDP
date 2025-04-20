@@ -45,7 +45,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 {
 	if (IsConnected() == false)
 	{
-		g_Dump.Crash();
+		return false;
 	}
 
 	switch (packetId)
@@ -77,14 +77,13 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 		buffer >> recvString;
 
 		{
-			std::scoped_lock lock(echoStringListLock);
-			const auto& echoString = echoStringList.front();
-			if (recvString != echoString)
+			std::scoped_lock lock(echoStringSetLock);
+			if (not echoStringSet.contains(recvString))
 			{
 				g_Dump.Crash();
 			}
 
-			echoStringList.pop_front();
+			echoStringSet.erase(recvString);
 		}
 	}
 	break;
@@ -135,8 +134,8 @@ void TestClient::SendAnyPacket()
 		TestStringPacketReq req;
 		req.testString = echoString;
 		{
-			std::scoped_lock lock(echoStringListLock);
-			echoStringList.emplace_back(echoString);
+			std::scoped_lock lock(echoStringSetLock);
+			echoStringSet.emplace(echoString);
 		}
 		RUDPClientCore::GetInst().SendPacket(req);
 	}

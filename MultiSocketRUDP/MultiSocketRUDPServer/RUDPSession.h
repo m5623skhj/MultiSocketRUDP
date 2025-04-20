@@ -71,7 +71,7 @@ private:
 	void OnConnected(SessionIdType inSessionId);
 	void OnDisconnected();
 	[[nodiscard]]
-	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence);
+	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType);
 
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
