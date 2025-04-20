@@ -317,15 +317,8 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		isConnected = true;
 	}
 
-	SendPacketInfo* sendedPacketInfo = nullptr;
 	{
 		std::scoped_lock lock(sendPacketInfoMapLock);
-		auto itor = sendPacketInfoMap.find(packetSequence);
-		if (itor != sendPacketInfoMap.end())
-		{
-			sendedPacketInfo = itor->second;
-		}
-
 		sendPacketInfoMap.erase(packetSequence);
 	}
 }
@@ -445,6 +438,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	}
 
 	sendPacketInfo->Initialize(&buffer, inSendPacketSequence);
+	sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });

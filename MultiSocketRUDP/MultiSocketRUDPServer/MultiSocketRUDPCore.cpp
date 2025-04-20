@@ -4,7 +4,7 @@
 #include "EssentialHandler.h"
 #include "LogExtension.h"
 #include "Logger.h"
-#include <unordered_set>
+#include <set>
 
 void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
 {
@@ -636,20 +636,38 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 	context->session = GetUsingSession(context->ownerSessionId);
 	if (context->session == nullptr)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("Session is nullptr in GetIOCompletedContext() with session id {}, error {}", context->ownerSessionId, rioResult.Status);
-		Logger::GetInstance().WriteLog(log);
-		contextPool.Free(context);
-		return nullptr;
+		// In recv case not freed
+		// Because it is not a buffer allocated from the memory pool
+		if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+		{
+			return nullptr;
+		}
+		else
+		{
+			auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = std::format("Session is nullptr in GetIOCompletedContext() with session id {}, error {}", context->ownerSessionId, rioResult.Status);
+			Logger::GetInstance().WriteLog(log);
+			contextPool.Free(context);
+			return nullptr;
+		}
 	}
 
 	if (rioResult.BytesTransferred == 0 || context->session->ioCancle == true)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("RIO operation failed with session id {}, error {}", context->ownerSessionId, rioResult.Status);
-		Logger::GetInstance().WriteLog(log);
-		contextPool.Free(context);
-		return nullptr;
+		// In recv case not freed
+		// Because it is not a buffer allocated from the memory pool
+		if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+		{
+			return nullptr;
+		}
+		else
+		{
+			auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = std::format("RIO operation failed with session id {}, error {}", context->ownerSessionId, rioResult.Status);
+			Logger::GetInstance().WriteLog(log);
+			contextPool.Free(context);
+			return nullptr;
+		}
 	}
 
 	return context;
@@ -858,7 +876,27 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 
 int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
 {
-	std::unordered_set<PacketSequence> packetSequenceSet;
+	struct SetKey
+	{
+		SetKey(const bool inIsReplyType, const PacketSequence inPacketSequence)
+			: isReplyType(inIsReplyType), packetSequence(inPacketSequence)
+		{
+		}
+
+		bool operator<(const SetKey& other) const
+		{
+			if (isReplyType != other.isReplyType)
+			{
+				return isReplyType < other.isReplyType;
+			}
+
+			return packetSequence < other.packetSequence;
+		}
+
+		bool isReplyType{};
+		PacketSequence packetSequence{};
+	};
+	std::set<SetKey> packetSequenceSet;
 
 	int totalSendSize = 0;
 	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
@@ -879,7 +917,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 		memcpy_s(bufferPositionPointer, maxSendBufferSize
 			, session.sendBuffer.reservedSendPacketInfo->buffer->GetBufferPtr(), useSize);
-		packetSequenceSet.insert(session.sendBuffer.reservedSendPacketInfo->sendPacektSequence);
+		packetSequenceSet.insert(SetKey{ session.sendBuffer.reservedSendPacketInfo->isReplyType, session.sendBuffer.reservedSendPacketInfo->sendPacektSequence });
 
 		totalSendSize += useSize;
 		bufferPositionPointer += totalSendSize;
@@ -890,7 +928,8 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 	for (int i = 0; i < bufferCount; ++i)
 	{
 		session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
-		if (packetSequenceSet.contains(sendPacketInfo->sendPacektSequence) == true)
+		SetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacektSequence };
+		if (packetSequenceSet.contains(key) == true)
 		{
 			continue;
 		}
@@ -927,7 +966,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 			}
 			sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
 		}
-		packetSequenceSet.insert(sendPacketInfo->sendPacektSequence);
+		packetSequenceSet.insert(key);
 		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
 			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	}
