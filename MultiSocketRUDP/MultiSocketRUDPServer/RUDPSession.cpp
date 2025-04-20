@@ -117,7 +117,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence, true);
+	return SendPacket(*buffer, packetSequence, false);
 }
 
 void RUDPSession::OnConnected(SessionIdType inSessionId)
@@ -291,7 +291,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
 	buffer << packetType << recvPacketSequence;
 
-	std::ignore = SendPacket(buffer, recvPacketSequence, false);
+	std::ignore = SendPacket(buffer, recvPacketSequence, true);
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)
