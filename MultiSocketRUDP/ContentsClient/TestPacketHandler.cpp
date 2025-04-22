@@ -105,7 +105,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 void TestClient::SendAnyPacket()
 {
 	static unsigned long long packetSendCount = 0;
-	constexpr int pickablePacketSize = 3;
+	constexpr int pickablePacketSize = 1;
 	int pickedItem = rand() % pickablePacketSize;
 
 	switch (pickedItem)
