@@ -10,8 +10,18 @@
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
+#include <set>
 
 #pragma comment(lib, "ws2_32.lib")
+
+enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
+{
+	SUCCESS = 0,
+	OCCURED_ERROR = -1,
+	IS_ERASED_PACKET = -2,
+	STREAM_IS_FULL = -3,
+	IS_SENDED = -4,
+};
 
 struct IOContext : RIO_BUF
 {
@@ -64,6 +74,30 @@ struct SendPacketInfo
 	[[nodiscard]]
 	inline NetBuffer* GetBuffer() { return buffer; }
 };
+
+namespace MultiSocketRUDP
+{
+	struct PacketSequenceSetKey
+	{
+		PacketSequenceSetKey(const bool inIsReplyType, const PacketSequence inPacketSequence)
+			: isReplyType(inIsReplyType), packetSequence(inPacketSequence)
+		{
+		}
+
+		bool operator<(const PacketSequenceSetKey& other) const
+		{
+			if (isReplyType != other.isReplyType)
+			{
+				return isReplyType < other.isReplyType;
+			}
+
+			return packetSequence < other.packetSequence;
+		}
+
+		bool isReplyType{};
+		PacketSequence packetSequence{};
+	};
+}
 
 class MultiSocketRUDPCore
 {
@@ -237,6 +271,13 @@ private:
 	bool DoRecv(RUDPSession& session);
 	[[nodiscard]]
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
+	[[nodiscard]]
+    [[nodiscard]]  
+	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId);
+	[[nodiscard]]
+	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId);
+	[[nodiscard]]
+	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, const ThreadIdType threadId);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};

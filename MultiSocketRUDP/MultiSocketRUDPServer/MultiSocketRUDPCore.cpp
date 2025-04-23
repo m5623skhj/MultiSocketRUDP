@@ -4,7 +4,6 @@
 #include "EssentialHandler.h"
 #include "LogExtension.h"
 #include "Logger.h"
-#include <set>
 
 void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
 {
@@ -876,27 +875,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 
 int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
 {
-	struct SetKey
-	{
-		SetKey(const bool inIsReplyType, const PacketSequence inPacketSequence)
-			: isReplyType(inIsReplyType), packetSequence(inPacketSequence)
-		{
-		}
-
-		bool operator<(const SetKey& other) const
-		{
-			if (isReplyType != other.isReplyType)
-			{
-				return isReplyType < other.isReplyType;
-			}
-
-			return packetSequence < other.packetSequence;
-		}
-
-		bool isReplyType{};
-		PacketSequence packetSequence{};
-	};
-	std::set<SetKey> packetSequenceSet;
+	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
 
 	int totalSendSize = 0;
 	int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
@@ -904,74 +883,125 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 
 	if (session.sendBuffer.reservedSendPacketInfo != nullptr)
 	{
-		int useSize = session.sendBuffer.reservedSendPacketInfo->buffer->GetAllUseSize();
-		if (useSize < maxSendBufferSize)
+		if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
-			Logger::GetInstance().WriteLog(log);
-			PushToDisconnectTargetSession(session);
-			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
-
-		memcpy_s(bufferPositionPointer, maxSendBufferSize
-			, session.sendBuffer.reservedSendPacketInfo->buffer->GetBufferPtr(), useSize);
-		packetSequenceSet.insert(SetKey{ session.sendBuffer.reservedSendPacketInfo->isReplyType, session.sendBuffer.reservedSendPacketInfo->sendPacektSequence });
-
-		totalSendSize += useSize;
-		bufferPositionPointer += totalSendSize;
-		session.sendBuffer.reservedSendPacketInfo = nullptr;
 	}
 
-	SendPacketInfo* sendPacketInfo;
 	for (int i = 0; i < bufferCount; ++i)
 	{
-		session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
-		SetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacektSequence };
-		if (packetSequenceSet.contains(key) == true)
+		const auto returnValue = StoredSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId);
+		switch (returnValue)
 		{
-			continue;
-		}
-
-		int useSize = sendPacketInfo->buffer->GetAllUseSize();
-		if (useSize > maxSendBufferSize)
+		case SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR:
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
-			Logger::GetInstance().WriteLog(log);
-			PushToDisconnectTargetSession(session);
-			SetEvent(sessionReleaseEventHandle);
 			return 0;
 		}
-
-		totalSendSize += useSize;
-		if (totalSendSize >= maxSendBufferSize)
+		case SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL:
 		{
-			session.sendBuffer.reservedSendPacketInfo = sendPacketInfo;
+			return totalSendSize;
+		}
+		default:
 			break;
 		}
-
-		sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
-		{
-			std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
-			if (sendPacketInfo->isErasedPacketInfo == true)
-			{
-				continue;
-			}
-
-			if (sendPacketInfo->retransmissionCount > 0)
-			{
-				sendedPacketInfoList[threadId].erase(sendPacketInfo->listItor);
-			}
-			sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
-		}
-		packetSequenceSet.insert(key);
-		memcpy_s(&session.sendBuffer.rioSendBuffer[totalSendSize - useSize], maxSendBufferSize - totalSendSize - useSize
-			, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	}
 
 	return totalSendSize;
+}
+
+SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId)
+{
+	SendPacketInfo* sendPacketInfo = session.sendBuffer.reservedSendPacketInfo;
+	int useSize = sendPacketInfo->buffer->GetAllUseSize();
+	if (useSize < maxSendBufferSize)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
+		Logger::GetInstance().WriteLog(log);
+		PushToDisconnectTargetSession(session);
+		SetEvent(sessionReleaseEventHandle);
+
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
+	}
+
+	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
+	{
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
+	}
+
+	char* bufferPositionPointer = session.sendBuffer.rioSendBuffer;
+	memcpy_s(bufferPositionPointer, maxSendBufferSize, sendPacketInfo->buffer->GetBufferPtr(), useSize);
+	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacektSequence });
+
+	totalSendSize += useSize;
+	bufferPositionPointer += useSize;
+	sendPacketInfo = nullptr;
+
+	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
+}
+
+SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId)
+{
+	SendPacketInfo* sendPacketInfo;
+
+	session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
+	MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacektSequence };
+	if (packetSequenceSet.contains(key) == true)
+	{
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENDED;
+	}
+
+	int useSize = sendPacketInfo->buffer->GetAllUseSize();
+	if (useSize > maxSendBufferSize)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("MakeSendStream() : useSize over with {}", maxSendBufferSize);
+		Logger::GetInstance().WriteLog(log);
+		PushToDisconnectTargetSession(session);
+		SetEvent(sessionReleaseEventHandle);
+
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
+	}
+
+	int beforeSendSize = totalSendSize;
+	totalSendSize += useSize;
+	if (totalSendSize >= maxSendBufferSize)
+	{
+		session.sendBuffer.reservedSendPacketInfo = sendPacketInfo;
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL;
+	}
+
+	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
+	{
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
+	}
+
+	packetSequenceSet.insert(key);
+	memcpy_s(&session.sendBuffer.rioSendBuffer[beforeSendSize], maxSendBufferSize - beforeSendSize, sendPacketInfo->buffer->GetBufferPtr(), useSize);
+
+	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
+}
+
+bool MultiSocketRUDPCore::RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, const ThreadIdType threadId)
+{
+	sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
+	{
+		std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
+		if (sendPacketInfo->isErasedPacketInfo == true)
+		{
+			sendPacketInfo = nullptr;
+			return false;
+		}
+
+		if (sendPacketInfo->retransmissionCount > 0)
+		{
+			sendedPacketInfoList[threadId].erase(sendPacketInfo->listItor);
+		}
+		sendPacketInfo->listItor = sendedPacketInfoList[threadId].emplace(sendedPacketInfoList[threadId].end(), sendPacketInfo);
+	}
+
+	return true;
 }
 
 WORD MultiSocketRUDPCore::GetPayloadLength(OUT NetBuffer& buffer) const
