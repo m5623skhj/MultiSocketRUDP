@@ -936,6 +936,10 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 
 	totalSendSize += useSize;
 	bufferPositionPointer += useSize;
+	if (sendPacketInfo->isReplyType == true)
+	{
+		sendPacketInfoPool->Free(session.sendBuffer.reservedSendPacketInfo);
+	}
 	sendPacketInfo = nullptr;
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
@@ -979,12 +983,21 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 
 	packetSequenceSet.insert(key);
 	memcpy_s(&session.sendBuffer.rioSendBuffer[beforeSendSize], maxSendBufferSize - beforeSendSize, sendPacketInfo->buffer->GetBufferPtr(), useSize);
+	if (sendPacketInfo->isReplyType == true)
+	{
+		sendPacketInfoPool->Free(sendPacketInfo);
+	}
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
 
 bool MultiSocketRUDPCore::RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, const ThreadIdType threadId)
 {
+	if (sendPacketInfo->isReplyType == true)
+	{
+		return true;
+	}
+
 	sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
 	{
 		std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
