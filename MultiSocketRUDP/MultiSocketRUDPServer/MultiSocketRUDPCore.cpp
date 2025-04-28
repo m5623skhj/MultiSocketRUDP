@@ -316,6 +316,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	ioWorkerThreads.reserve(numOfWorkerThread);
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
 	retransmissionThreads.reserve(numOfWorkerThread);
+	heartbeatThreads.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
 	sessionReleaseEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -334,6 +335,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
+		heartbeatThreads.emplace_back([this, id]() { this->RunHeartbeatThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	Sleep(1000);
@@ -608,6 +610,19 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 		}
 		break;
 		}
+	}
+}
+
+void MultiSocketRUDPCore::RunHeartbeatThread(const ThreadIdType threadId)
+{
+	TickSet tickSet;
+	tickSet.nowTick = GetTickCount64();
+	tickSet.beforeTick = tickSet.nowTick;
+
+	while (not threadStopFlag)
+	{
+
+		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
 

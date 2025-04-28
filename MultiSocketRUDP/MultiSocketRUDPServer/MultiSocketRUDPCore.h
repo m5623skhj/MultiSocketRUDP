@@ -226,6 +226,7 @@ private:
 	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
 	void RunRetransmissionThread(const ThreadIdType threadId);
 	void RunSessionReleaseThread();
+	void RunHeartbeatThread(const ThreadIdType threadId);
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
@@ -234,11 +235,13 @@ private:
 	unsigned int workerThreadOneFrameMs{};
 	unsigned int retransmissionMs{};
 	unsigned int retransmissionThreadSleepMs{};
+	unsigned int heartbeatThreadSleepMs{};
 
 	// threads
 	std::vector<std::thread> ioWorkerThreads;
 	std::vector<std::thread> recvLogicWorkerThreads;
 	std::vector<std::thread> retransmissionThreads;
+	std::vector<std::thread> heartbeatThreads;
 	std::thread sessionReleaseThread{};
 
 	// event handles
@@ -271,7 +274,6 @@ private:
 	bool DoRecv(RUDPSession& session);
 	[[nodiscard]]
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
-	[[nodiscard]]
     [[nodiscard]]  
 	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId);
 	[[nodiscard]]
