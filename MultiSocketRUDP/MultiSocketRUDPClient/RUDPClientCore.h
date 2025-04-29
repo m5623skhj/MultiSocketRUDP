@@ -127,7 +127,7 @@ private:
 	void OnRecvStream(NetBuffer& recvBuffer, int recvSize);
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket, const PacketSequence packetSequence);
-	void SendReplyToServer(const PacketSequence recvPacketSequence);
+	void SendReplyToServer(const PacketSequence recvPacketSequence, const PACKET_TYPE packetType = PACKET_TYPE::SendReplyType);
 	void DoSend();
 	void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 

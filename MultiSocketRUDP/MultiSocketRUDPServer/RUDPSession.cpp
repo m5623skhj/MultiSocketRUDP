@@ -160,6 +160,17 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	return true;
 }
 
+void RUDPSession::SendHeartbeatPacket()
+{
+	NetBuffer& buffer = *NetBuffer::Alloc();
+
+	PACKET_TYPE packetType = PACKET_TYPE::HeartbeatType;
+	PacketSequence packetSequence = ++lastSendPacketSequence;
+	buffer << packetType << packetSequence;
+
+	std::ignore = SendPacket(buffer, packetSequence, false);
+}
+
 void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
 {
 	PacketSequence packetSequence;

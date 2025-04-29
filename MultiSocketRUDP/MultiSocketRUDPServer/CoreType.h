@@ -40,6 +40,8 @@ enum class PACKET_TYPE : unsigned char
 	, DisconnectType
 	, SendType
 	, SendReplyType
+	, HeartbeatType
+	, HeartbeatReplyType
 };
 
 struct TickSet

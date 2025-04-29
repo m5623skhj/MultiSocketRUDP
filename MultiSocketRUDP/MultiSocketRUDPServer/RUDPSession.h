@@ -73,6 +73,8 @@ private:
 	[[nodiscard]]
 	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType);
 
+	void SendHeartbeatPacket();
+
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
 	// Call this function when the client sends a disconnect packet

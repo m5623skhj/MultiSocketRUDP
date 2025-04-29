@@ -226,7 +226,7 @@ private:
 	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
 	void RunRetransmissionThread(const ThreadIdType threadId);
 	void RunSessionReleaseThread();
-	void RunHeartbeatThread(const ThreadIdType threadId);
+	void RunHeartbeatThread();
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
@@ -241,7 +241,7 @@ private:
 	std::vector<std::thread> ioWorkerThreads;
 	std::vector<std::thread> recvLogicWorkerThreads;
 	std::vector<std::thread> retransmissionThreads;
-	std::vector<std::thread> heartbeatThreads;
+	std::thread heartbeatThread;
 	std::thread sessionReleaseThread{};
 
 	// event handles

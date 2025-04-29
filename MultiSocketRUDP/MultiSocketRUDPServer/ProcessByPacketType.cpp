@@ -44,6 +44,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	}
 	break;
 	case PACKET_TYPE::SendReplyType:
+	case PACKET_TYPE::HeartbeatReplyType:
 	{
 		if (not session.CheckMyClient(clientAddr) || session.IsReleasing())
 		{

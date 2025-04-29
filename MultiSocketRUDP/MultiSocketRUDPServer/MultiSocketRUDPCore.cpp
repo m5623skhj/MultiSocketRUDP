@@ -316,7 +316,6 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	ioWorkerThreads.reserve(numOfWorkerThread);
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
 	retransmissionThreads.reserve(numOfWorkerThread);
-	heartbeatThreads.reserve(numOfWorkerThread);
 
 	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
 	sessionReleaseEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -324,6 +323,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
 	sessionReleaseThread = std::thread([this]() { RunSessionReleaseThread(); });
+	heartbeatThread = std::thread([this]() { RunHeartbeatThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		ioCompletedContexts.emplace_back();
@@ -335,7 +335,6 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
-		heartbeatThreads.emplace_back([this, id]() { this->RunHeartbeatThread(static_cast<ThreadIdType>(id)); });
 	}
 
 	Sleep(1000);
@@ -613,7 +612,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 	}
 }
 
-void MultiSocketRUDPCore::RunHeartbeatThread(const ThreadIdType threadId)
+void MultiSocketRUDPCore::RunHeartbeatThread()
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
@@ -621,6 +620,15 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const ThreadIdType threadId)
 
 	while (not threadStopFlag)
 	{
+		for (const auto& session : sessionArray)
+		{
+			if (session->isUsingSession == false || session->isConnected == false)
+			{
+				continue;
+			}
+
+			session->SendHeartbeatPacket();
+		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}

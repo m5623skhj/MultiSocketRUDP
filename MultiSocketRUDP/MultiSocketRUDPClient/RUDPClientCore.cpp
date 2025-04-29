@@ -295,6 +295,11 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 		OnSendReply(receivedBuffer, packetSequence);
 		break;
 	}
+	case PACKET_TYPE::HeartbeatType:
+	{
+		SendReplyToServer(packetSequence, PACKET_TYPE::HeartbeatReplyType);
+		break;
+	}
 	default:
 	{
 		auto log = Logger::MakeLogObject<ClientLog>();
@@ -323,11 +328,10 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	}
 }
 
-void RUDPClientCore::SendReplyToServer(const PacketSequence recvPacketSequence)
+void RUDPClientCore::SendReplyToServer(const PacketSequence recvPacketSequence, const PACKET_TYPE packetType)
 {
 	auto& buffer = *NetBuffer::Alloc();
 
-	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
 	buffer << packetType << recvPacketSequence;
 
 	{
