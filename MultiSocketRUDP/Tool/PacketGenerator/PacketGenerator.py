@@ -2,6 +2,7 @@ import yaml
 import os
 import shutil
 import re
+import filecmp
 
 import PacketItemsFilePath
 import MakePacketItemsOnce
@@ -36,6 +37,10 @@ def ReplaceFile(originFile, newFile):
     if os.path.exists(newFile):
         try:
             if os.path.exists(originFile):
+                if filecmp.cmp(originFile, newFile, shallow=False):
+                    os.remove(newFile)
+                    return
+                
                 os.remove(originFile)
             
             shutil.move(newFile, originFile)
@@ -54,9 +59,10 @@ def CopyServerGeneratedFileToClientPath():
             
             
 def CopyServerFileToClientFile(serverFilePath, clientFilePath):
-    with open(serverFilePath, 'r') as readFile:
-        with open(clientFilePath, 'w') as writeFile:
-            writeFile.write(readFile.read())
+    if os.path.exists(clientFilePath) and filecmp.cmp(serverFilePath, clientFilePath, shallow=False):
+        return
+
+    shutil.copy2(serverFilePath, clientFilePath)
             
 
 def DuplicateCheckAndAdd(packetDuplicateCheckerContainer, checkTarget):
