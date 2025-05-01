@@ -193,7 +193,6 @@ void RUDPClientCore::RunRetransmissionThread()
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
-	tickSet.beforeTick = tickSet.nowTick;
 
 	std::list<std::pair<PacketSequence, SendPacketInfo*>> copyList;
 
@@ -206,7 +205,7 @@ void RUDPClientCore::RunRetransmissionThread()
 
 		for (auto& sendedPacketInfo : copyList)
 		{
-			if (sendedPacketInfo.second->sendTimeStamp < tickSet.nowTick)
+			if (sendedPacketInfo.second->retransmissionTimeStamp < tickSet.nowTick)
 			{
 				continue;
 			}
@@ -368,15 +367,15 @@ void RUDPClientCore::DoSend()
 
 void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
-	tickSet.nowTick = GetTickCount64();
-	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
+	UINT64 now = GetTickCount64();
+	UINT64 delta = now - tickSet.nowTick;
 
-	if (deltaTick < intervalMs && deltaTick > 0)
+	if (delta < intervalMs)
 	{
-		Sleep(intervalMs - static_cast<DWORD>(deltaTick));
+		Sleep(static_cast<DWORD>(intervalMs - delta));
 	}
 
-	tickSet.beforeTick = tickSet.nowTick;
+	tickSet.nowTick = GetTickCount64();
 }
 
 unsigned int RUDPClientCore::GetRemainPacketSize()
@@ -442,7 +441,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	}
 
 	sendPacketInfo->Initialize(&buffer, inSendPacketSequence);
-	sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
+	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });

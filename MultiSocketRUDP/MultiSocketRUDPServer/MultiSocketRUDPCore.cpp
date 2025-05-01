@@ -461,7 +461,6 @@ void MultiSocketRUDPCore::RunWorkerThread(const ThreadIdType threadId)
 
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
-	tickSet.beforeTick = tickSet.nowTick;
 
 	while (not threadStopFlag)
 	{
@@ -532,7 +531,6 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
-	tickSet.beforeTick = tickSet.nowTick;
 
 	auto& thisThreadSendedPacketInfoList = sendedPacketInfoList[threadId];
 	auto& thisThreadSendedPacketInfoListLock = *sendedPacketInfoListLock[threadId];
@@ -549,7 +547,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 		
 		for (auto& sendedPacketInfo : copyList)
 		{
-			if (sendedPacketInfo->sendTimeStamp < tickSet.nowTick || sendedPacketInfo->owner->nowInReleaseThread || sendedPacketInfo->isErasedPacketInfo)
+			if (sendedPacketInfo->retransmissionTimeStamp > tickSet.nowTick || sendedPacketInfo->owner->nowInReleaseThread || sendedPacketInfo->isErasedPacketInfo)
 			{
 				continue;
 			}
@@ -616,7 +614,6 @@ void MultiSocketRUDPCore::RunHeartbeatThread()
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
-	tickSet.beforeTick = tickSet.nowTick;
 
 	while (not threadStopFlag)
 	{
@@ -636,15 +633,15 @@ void MultiSocketRUDPCore::RunHeartbeatThread()
 
 void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
-	tickSet.nowTick = GetTickCount64();
-	UINT64 deltaTick = tickSet.nowTick - tickSet.beforeTick;
+	UINT64 now = GetTickCount64();
+	UINT64 delta = now - tickSet.nowTick;
 
-	if (deltaTick < intervalMs && deltaTick > 0)
+	if (delta < intervalMs)
 	{
-		Sleep(intervalMs - static_cast<DWORD>(deltaTick));
+		Sleep(static_cast<DWORD>(intervalMs - delta));
 	}
 
-	tickSet.beforeTick = tickSet.nowTick;
+	tickSet.nowTick = GetTickCount64();
 }
 
 IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
@@ -1021,7 +1018,7 @@ bool MultiSocketRUDPCore::RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo
 		return true;
 	}
 
-	sendPacketInfo->sendTimeStamp = GetTickCount64() + retransmissionMs;
+	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
 	{
 		std::scoped_lock lock(*sendedPacketInfoListLock[threadId]);
 		if (sendPacketInfo->isErasedPacketInfo == true)

@@ -45,7 +45,7 @@ struct SendPacketInfo
 	RUDPSession* owner{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
-	unsigned long long sendTimeStamp{};
+	unsigned long long retransmissionTimeStamp{};
 	bool isErasedPacketInfo{};
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
@@ -56,7 +56,7 @@ struct SendPacketInfo
 		owner = {};
 		retransmissionCount = {};
 		sendPacektSequence = {};
-		sendTimeStamp = {};
+		retransmissionTimeStamp = {};
 		listItor = {};
 		isErasedPacketInfo = {};
 		isReplyType = {};

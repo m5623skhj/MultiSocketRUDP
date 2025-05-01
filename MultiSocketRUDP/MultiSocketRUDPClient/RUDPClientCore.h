@@ -17,7 +17,7 @@ struct SendPacketInfo
 	NetBuffer* buffer{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacektSequence{};
-	unsigned long long sendTimeStamp{};
+	unsigned long long retransmissionTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
 	void Initialize(NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
