@@ -630,7 +630,7 @@ void MultiSocketRUDPCore::RunHeartbeatThread()
 			session->SendHeartbeatPacket();
 		}
 
-		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+		SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
 	}
 }
 
