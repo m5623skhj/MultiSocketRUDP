@@ -195,7 +195,6 @@ void RUDPClientCore::RunRetransmissionThread()
 	tickSet.nowTick = GetTickCount64();
 
 	std::list<std::pair<PacketSequence, SendPacketInfo*>> copyList;
-
 	while (not threadStopFlag)
 	{
 		{
@@ -205,7 +204,7 @@ void RUDPClientCore::RunRetransmissionThread()
 
 		for (auto& sendedPacketInfo : copyList)
 		{
-			if (sendedPacketInfo.second->retransmissionTimeStamp < tickSet.nowTick)
+			if (sendedPacketInfo.second->retransmissionTimeStamp > tickSet.nowTick)
 			{
 				continue;
 			}
