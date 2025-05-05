@@ -263,7 +263,7 @@ bool RUDPSession::ProcessHoldingPacket()
 	return true;
 }
 
-bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, bool needReplyToClient)
+bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient)
 {
 	++lastReceivedPacketSequence;
 	
