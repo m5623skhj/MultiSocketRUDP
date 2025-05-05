@@ -214,6 +214,8 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 		NetBuffer::AddRefCount(&recvPacket);
 		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequence });
 
+		SendReplyToClient(packetSequence);
+
 		return true;
 	}
 	
@@ -251,7 +253,7 @@ bool RUDPSession::ProcessHoldingPacket()
 			recvPacketHolderQueue.pop();
 		}
 
-		if (ProcessPacket(*storedBuffer, packetSequence) == false)
+		if (ProcessPacket(*storedBuffer, packetSequence, false) == false)
 		{
 			return false;
 		}
@@ -261,7 +263,7 @@ bool RUDPSession::ProcessHoldingPacket()
 	return true;
 }
 
-bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
+bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, bool needReplyToClient)
 {
 	++lastReceivedPacketSequence;
 	
@@ -287,7 +289,7 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 	}
 
 	bool packetHandleResult = packetHandler(*this, *packet);
-	if (packetHandleResult == true)
+	if (packetHandleResult == true && needReplyToClient == true)
 	{
 		SendReplyToClient(recvPacketSequence);
 	}

@@ -82,7 +82,7 @@ private:
 	[[nodiscard]]
 	bool OnRecvPacket(NetBuffer& recvPacket);
 	[[nodiscard]]
-	bool ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence);
+	bool ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, bool needReplyToClient = true);
 	[[nodiscard]]
 	bool ProcessHoldingPacket();
 	void SendReplyToClient(const PacketSequence recvPacketSequence);
