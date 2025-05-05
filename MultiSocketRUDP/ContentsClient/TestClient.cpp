@@ -19,8 +19,6 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 		return false;
 	}
 
-	testThread = std::thread{ &TestClient::RunTestThread, this };
-
 	// Waiting maximumConnectWaitingCount seconds
 	constexpr unsigned int maximumConnectWaitingCount = 20;
 	if (not WaitingConnectToServer(maximumConnectWaitingCount))
@@ -30,6 +28,8 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 	}
 
 	std::cout << "Client is running" << std::endl;
+
+	testThread = std::thread{ &TestClient::RunTestThread, this };
 	return true;
 }
 
