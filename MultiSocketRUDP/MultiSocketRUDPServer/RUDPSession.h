@@ -118,7 +118,6 @@ private:
 	bool nowInReleaseThread{};
 	bool nowInProcessingRecvPacket{};
 	bool isUsingSession{};
-	bool ioCancle{};
 	ThreadIdType threadId{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};

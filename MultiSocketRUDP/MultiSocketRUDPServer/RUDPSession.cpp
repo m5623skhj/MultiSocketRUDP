@@ -47,7 +47,6 @@ void RUDPSession::InitializeSession()
 	sessionKey = {};
 	clientAddr = {};
 	clientSockaddrInet = {};
-	ioCancle = {};
 	lastSendPacketSequence = {};
 	nowInReleaseThread = {};
 

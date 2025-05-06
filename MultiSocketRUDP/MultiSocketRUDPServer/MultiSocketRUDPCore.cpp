@@ -671,7 +671,7 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 		}
 	}
 
-	if (rioResult.BytesTransferred == 0 || context->session->ioCancle == true)
+	if (rioResult.BytesTransferred == 0)
 	{
 		// In recv case not freed
 		// Because it is not a buffer allocated from the memory pool
