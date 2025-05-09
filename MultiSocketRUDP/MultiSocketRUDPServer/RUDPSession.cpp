@@ -90,6 +90,8 @@ void RUDPSession::Disconnect()
 			core.EraseSendPacketInfo(item.second, threadId);
 		}
 	}
+	closesocket(sock);
+	sock = INVALID_SOCKET;
 	OnDisconnected();
 
 	core.DisconnectSession(sessionId);

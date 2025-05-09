@@ -222,7 +222,7 @@ private:
 #endif
 
 private:
-	void RunWorkerThread(const ThreadIdType threadId);
+	void RunIOWorkerThread(const ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
 	void RunRetransmissionThread(const ThreadIdType threadId);
 	void RunSessionReleaseThread();

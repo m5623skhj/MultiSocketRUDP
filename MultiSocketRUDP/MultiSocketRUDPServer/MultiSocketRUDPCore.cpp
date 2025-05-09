@@ -332,7 +332,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		sendedPacketInfoList.emplace_back();
 		sendedPacketInfoListLock.push_back(std::make_unique<std::mutex>());
 
-		ioWorkerThreads.emplace_back([this, id]() { this->RunWorkerThread(static_cast<ThreadIdType>(id)); });
+		ioWorkerThreads.emplace_back([this, id]() { this->RunIOWorkerThread(static_cast<ThreadIdType>(id)); });
 		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
 		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
 	}
@@ -454,7 +454,7 @@ RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId)
 	return sessionArray[sessionId];
 }
 
-void MultiSocketRUDPCore::RunWorkerThread(const ThreadIdType threadId)
+void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 {
 	RIORESULT rioResults[maxRIOResult];
 	ULONG numOfResults = 0;
@@ -652,41 +652,19 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 		return nullptr;
 	}
 
+	if (rioResult.Status != 0)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("RIO operation failed with error code {}", rioResult.Status);
+		Logger::GetInstance().WriteLog(log);
+		contextPool.Free(context);
+		return nullptr;
+	}
+
 	context->session = GetUsingSession(context->ownerSessionId);
 	if (context->session == nullptr)
 	{
-		// In recv case not freed
-		// Because it is not a buffer allocated from the memory pool
-		if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
-		{
-			return nullptr;
-		}
-		else
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("Session is nullptr in GetIOCompletedContext() with session id {}, error {}", context->ownerSessionId, rioResult.Status);
-			Logger::GetInstance().WriteLog(log);
-			contextPool.Free(context);
-			return nullptr;
-		}
-	}
-
-	if (rioResult.BytesTransferred == 0)
-	{
-		// In recv case not freed
-		// Because it is not a buffer allocated from the memory pool
-		if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
-		{
-			return nullptr;
-		}
-		else
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("RIO operation failed with session id {}, error {}", context->ownerSessionId, rioResult.Status);
-			Logger::GetInstance().WriteLog(log);
-			contextPool.Free(context);
-			return nullptr;
-		}
+		return nullptr;
 	}
 
 	return context;
