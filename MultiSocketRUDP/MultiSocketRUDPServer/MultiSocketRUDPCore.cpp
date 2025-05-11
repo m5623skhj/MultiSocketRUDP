@@ -197,14 +197,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 	sessionArray.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
-		auto optSocket = CreateRUDPSocket(socketNumber);
-		if (not optSocket.has_value())
-		{
-			WSACleanup();
-			return false;
-		}
-
-		sessionArray.emplace_back(new RUDPSession(optSocket.value(), static_cast<PortType>(portStartNumber + socketNumber), *this));
+		sessionArray.emplace_back(new RUDPSession(*this));
 		sessionArray[socketNumber]->sessionId = socketNumber;
 	}
 
@@ -216,80 +209,45 @@ bool MultiSocketRUDPCore::InitRIO()
 	GUID guid = WSAID_MULTIPLE_RIO;
 	DWORD bytes = 0;
 
-	// For the purpose of obtaining the function table, any of the created sessions selected
-	if (WSAIoctl((sessionArray[0])->sock, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
-		, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
+	SOCKET tempSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	bool result = true;
+	do
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-		return false;
-	}
-
-	rioCQList = new RIO_CQ[numOfWorkerThread];
-	if (rioCQList == nullptr)
-	{
-		return false;
-	}
-	for (int rioCQIndex = 0; rioCQIndex < numOfWorkerThread; ++rioCQIndex)
-	{
-		rioCQList[rioCQIndex] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * maxSendBufferSize, nullptr);
-	}
-
-	for (auto& session : sessionArray)
-	{
-		session->threadId = session->sessionId % numOfWorkerThread;
-		if (not session->InitializeRIO(rioFunctionTable, rioCQList[session->threadId], rioCQList[session->threadId]))
+		// For the purpose of obtaining the function table, any of the created sessions selected
+		if (WSAIoctl(tempSocket, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
+			, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
 		{
-			return false;
+			auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with {}", WSAGetLastError());
+			Logger::GetInstance().WriteLog(log);
+			result = false;
+			break;
 		}
 
-		if (not InitSessionRecvBuffer(session))
+		rioCQList = new RIO_CQ[numOfWorkerThread];
+		if (rioCQList == nullptr)
 		{
-			return false;
+			result = false;
+			break;
+		}
+		for (int rioCQIndex = 0; rioCQIndex < numOfWorkerThread; ++rioCQIndex)
+		{
+			rioCQList[rioCQIndex] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * maxSendBufferSize, nullptr);
 		}
 
-		if (not DoRecv(*session))
+		for (auto& session : sessionArray)
 		{
-			return false;
+			session->threadId = session->sessionId % numOfWorkerThread;
+			unusedSessionIdList.emplace_back(session->sessionId);
 		}
-
-		unusedSessionIdList.emplace_back(session->sessionId);
-	}
-
-	return true;
-}
-
-bool MultiSocketRUDPCore::InitSessionRecvBuffer(RUDPSession* session)
-{
-	session->recvBuffer.recvContext = std::make_shared<IOContext>();
-	if (session->recvBuffer.recvContext == nullptr)
+	} while (false);
+	
+	if (tempSocket != INVALID_SOCKET && result == false)
 	{
-		return false;
+		closesocket(tempSocket);
 	}
 
-	auto& context = session->recvBuffer.recvContext;
-	context->InitContext(session->sessionId, RIO_OPERATION_TYPE::OP_RECV);
-	context->Length = recvBufferSize;
-	context->Offset = 0;
-	context->session = session;
-
-	context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
-	context->clientAddrRIOBuffer.Offset = 0;
-
-	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
-	context->localAddrRIOBuffer.Offset = 0;
-
-	context->BufferId = RegisterRIOBuffer(session->recvBuffer.buffer, recvBufferSize);
-	context->clientAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
-	context->localAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
-
-	if (context->BufferId == RIO_INVALID_BUFFERID || context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID || context->localAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
-	{
-		return false;
-	}
-
-	return true;
+	return result;
 }
 
 RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const
@@ -368,7 +326,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 	return true;
 }
 
-std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short socketNumber) const
+SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
 {
 	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)
@@ -376,7 +334,7 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("Socket create failed {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
-		return std::nullopt;
+		return INVALID_SOCKET;
 	}
 
 	sockaddr_in serverAddr;
@@ -384,7 +342,7 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short
 
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-	serverAddr.sin_port = htons(portStartNumber + socketNumber);
+	serverAddr.sin_port = 0;
 
 	if (bind(sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
@@ -392,8 +350,11 @@ std::optional<SOCKET> MultiSocketRUDPCore::CreateRUDPSocket(const unsigned short
 		log->logString = std::format("Bind failed {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sock);
-		return std::nullopt;
+		return INVALID_SOCKET;
 	}
+
+	socklen_t len = sizeof(serverAddr);
+	getsockname(sock, (sockaddr*)&serverAddr, &len);
 
 	return sock;
 }
@@ -405,17 +366,19 @@ void MultiSocketRUDPCore::CloseAllSessions()
 		unusedSessionIdList.clear();
 	}
 
+	for (auto& session : sessionArray)
 	{
-		for (auto& session : sessionArray)
+		if (session->sock != INVALID_SOCKET)
 		{
 			closesocket(session->sock);
-			delete session;
+			continue;
 		}
-
-		// need wait?
-		sessionArray.clear();
-		connectedUserCount = 0;
+		delete session;
 	}
+
+	// need wait?
+	sessionArray.clear();
+	connectedUserCount = 0;
 }
 
 RUDPSession* MultiSocketRUDPCore::AcquireSession()

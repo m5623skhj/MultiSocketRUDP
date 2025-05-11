@@ -121,6 +121,8 @@ private:
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	[[nodiscard]]
+	bool DoRecv(RUDPSession& session);
+	[[nodiscard]]
 	bool DoSend(OUT RUDPSession& session, const ThreadIdType threadId);
 	[[nodiscard]]
 	IOContext* MakeSendContext(OUT RUDPSession& session, const ThreadIdType threadId);
@@ -139,15 +141,13 @@ private:
 	[[nodiscard]]
 	bool InitRIO();
 	[[nodiscard]]
-	bool InitSessionRecvBuffer(RUDPSession* session);
-	[[nodiscard]]
 	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const;
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
 	bool RunSessionBroker();
 	[[nodiscard]]
-	std::optional<SOCKET> CreateRUDPSocket(const unsigned short socketNumber) const;
+	SOCKET CreateRUDPSocket() const;
 
 private:
 	void CloseAllSessions();
@@ -156,7 +156,6 @@ private:
 	bool threadStopFlag{};
 	bool isServerStopped{};
 	unsigned short numOfSockets{};
-	PortType portStartNumber{};
 	PortType sessionBrokerPort{};
 	std::string coreServerIp{};
 
@@ -215,6 +214,8 @@ private:
 	void SetSessionKey(OUT RUDPSession& session);
 	void SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
+	[[nodiscard]]
+	char InitReserveSession(RUDPSession& session);
 	void SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
@@ -270,8 +271,6 @@ private:
 	void OnRecvPacket(const BYTE threadId);
 	[[nodiscard]]
 	bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
-	[[nodiscard]]
-	bool DoRecv(RUDPSession& session);
 	[[nodiscard]]
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
     [[nodiscard]]  

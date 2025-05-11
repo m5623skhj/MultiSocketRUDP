@@ -6,9 +6,9 @@
 #include "LogExtension.h"
 #include "Logger.h"
 
-RUDPSession::RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore)
-	: sock(inSock)
-	, serverPort(inServerPort)
+RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
+	: sock(INVALID_SOCKET)
+	, serverPort(invalidPortNumber)
 	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
@@ -20,12 +20,8 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 	u_long nonBlocking = 1;
 	ioctlsocket(sock, FIONBIO, &nonBlocking);
 
-	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
-	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
+	if (not InitRIOSendBuffer(rioFunctionTable) || not InitRIORecvBuffer(rioFunctionTable))
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("Send RIORegisterBuffer failed with {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
 		return false;
 	}
 
@@ -35,6 +31,52 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOCreateRQ failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
+	return true;
+}
+
+bool RUDPSession::InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
+{
+	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
+	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("Send RIORegisterBuffer failed with {}", WSAGetLastError());
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+
+	return true;
+}
+
+bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
+{
+	recvBuffer.recvContext = std::make_shared<IOContext>();
+	if (recvBuffer.recvContext == nullptr)
+	{
+		return false;
+	}
+
+	auto& context = recvBuffer.recvContext;
+	context->InitContext(sessionId, RIO_OPERATION_TYPE::OP_RECV);
+	context->Length = recvBufferSize;
+	context->Offset = 0;
+	context->session = this;
+
+	context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
+	context->clientAddrRIOBuffer.Offset = 0;
+
+	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
+	context->localAddrRIOBuffer.Offset = 0;
+
+	context->BufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, recvBufferSize);
+	context->clientAddrRIOBuffer.BufferId = rioFunctionTable.RIORegisterBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
+	context->localAddrRIOBuffer.BufferId = rioFunctionTable.RIORegisterBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
+
+	if (context->BufferId == RIO_INVALID_BUFFERID || context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID || context->localAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
+	{
 		return false;
 	}
 

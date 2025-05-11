@@ -175,21 +175,11 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 			log->logString = "Server is full of users";
 			Logger::GetInstance().WriteLog(log);
 			connectResultCode = 1;
-			sendBuffer << connectResultCode;
 
 			break;
 		}
 
-		if (session->isConnected)
-		{
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "This session already connected";
-			Logger::GetInstance().WriteLog(log);
-			connectResultCode = 2;
-			sendBuffer << connectResultCode;
-
-			break;
-		}
+		connectResultCode = InitReserveSession(*session);
 	} while (false);
 	
 	sendBuffer << connectResultCode;
@@ -199,6 +189,59 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
 		++connectedUserCount;
 	}
+	else
+	{
+		if (session != nullptr && session->sock != INVALID_SOCKET)
+		{
+			session->Disconnect();
+		}
+	}
+}
+
+char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session)
+{
+	if (session.isConnected)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "This session already connected";
+		Logger::GetInstance().WriteLog(log);
+
+		return 2;
+	}
+
+	if (session.sock = CreateRUDPSocket(); session.sock == INVALID_SOCKET)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("CreateRUDPSocket failed with error {}", WSAGetLastError());
+		Logger::GetInstance().WriteLog(log);
+
+		return 3;
+	}
+	
+	sockaddr_in serverAddr;
+	socklen_t len = sizeof(serverAddr);
+	getsockname(session.sock, (sockaddr*)&serverAddr, &len);
+	session.serverPort = ntohs(serverAddr.sin_port);
+
+	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("InitializeRIO failed with error {}", WSAGetLastError());
+		Logger::GetInstance().WriteLog(log);
+
+		return 4;
+	}
+
+	if (not DoRecv(session))
+	{
+		auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = std::format("DoRecv failed with error {}", WSAGetLastError());
+		Logger::GetInstance().WriteLog(log);
+
+		return 5;
+	}
+
+	return 0;
 }
 
 void MultiSocketRUDPCore::SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer)

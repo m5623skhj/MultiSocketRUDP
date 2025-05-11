@@ -16,10 +16,6 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Short(buffer, L"CORE", L"PORT_START_NUMBER", (short*)&portStartNumber) == false)
-	{
-		return false;
-	}
 	if (g_Paser.GetValue_Short(buffer, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", (short*)&maxPacketRetransmissionCount) == false)
 	{
 		return false;

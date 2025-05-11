@@ -54,10 +54,14 @@ class RUDPSession
 
 private:
 	RUDPSession() = delete;
-	explicit RUDPSession(SOCKET inSock, PortType inServerPort, MultiSocketRUDPCore& inCore);
+	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
 	[[nodiscard]]
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
+	[[nodiscard]]
+	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
+	[[nodiscard]]
+	bool InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	void InitializeSession();
 
 public:
