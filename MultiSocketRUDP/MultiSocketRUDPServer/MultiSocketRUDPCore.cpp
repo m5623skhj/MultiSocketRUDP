@@ -91,6 +91,7 @@ void MultiSocketRUDPCore::StopServer()
 
 	SetEvent(sessionReleaseEventHandle);
 	StopThread(sessionReleaseThread, nowThreadId);
+	StopThread(heartbeatThread, nowThreadId);
 
 	Logger::GetInstance().StopLoggerThread();
 
