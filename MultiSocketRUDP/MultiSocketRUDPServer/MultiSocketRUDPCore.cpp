@@ -76,7 +76,8 @@ void MultiSocketRUDPCore::StopServer()
 #if USE_IOCP_SESSION_BROKER
 	sessionBroker.Stop();
 #else
-	StopThread(sessionBrokerThread, nowThreadId);
+	closesocket(sessionBrokerListenSocket);
+	JoinThread(sessionBrokerThread, nowThreadId);
 #endif
 	CloseAllSessions();
 	delete[] rioCQList;
@@ -84,14 +85,14 @@ void MultiSocketRUDPCore::StopServer()
 	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
 	{
 		SetEvent(recvLogicThreadEventHandles[i]);
-		StopThread(ioWorkerThreads[i], nowThreadId);
-		StopThread(recvLogicWorkerThreads[i], nowThreadId);
-		StopThread(retransmissionThreads[i], nowThreadId);
+		JoinThread(ioWorkerThreads[i], nowThreadId);
+		JoinThread(recvLogicWorkerThreads[i], nowThreadId);
+		JoinThread(retransmissionThreads[i], nowThreadId);
 	}
 
 	SetEvent(sessionReleaseEventHandle);
-	StopThread(sessionReleaseThread, nowThreadId);
-	StopThread(heartbeatThread, nowThreadId);
+	JoinThread(sessionReleaseThread, nowThreadId);
+	JoinThread(heartbeatThread, nowThreadId);
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -101,7 +102,7 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().WriteLog(log);
 }
 
-void MultiSocketRUDPCore::StopThread(std::thread& stopTarget, const std::thread::id& threadId)
+void MultiSocketRUDPCore::JoinThread(std::thread& stopTarget, const std::thread::id& threadId)
 {
 	if (stopTarget.joinable() && threadId != stopTarget.get_id())
 	{

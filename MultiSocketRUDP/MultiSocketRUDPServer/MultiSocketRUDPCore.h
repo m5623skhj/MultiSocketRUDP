@@ -116,7 +116,7 @@ public:
 	inline unsigned short GetConnectedUserCount() const { return connectedUserCount; }
 
 private:
-	inline void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
+	inline void JoinThread(std::thread& stopTarget, const std::thread::id& threadId);
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
@@ -210,7 +210,7 @@ private:
 private:
 	void RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP);
 	[[nodiscard]]
-	bool OpenSessionBrokerSocket(const PortType listenPort, OUT SOCKET& listenSocket);
+	bool OpenSessionBrokerSocket(const PortType listenPort);
 	void SetSessionKey(OUT RUDPSession& session);
 	void SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
@@ -220,6 +220,7 @@ private:
 
 private:
 	std::thread sessionBrokerThread{};
+	SOCKET sessionBrokerListenSocket{ INVALID_SOCKET };
 #endif
 
 private:

@@ -51,9 +51,9 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 #else
 void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP)
 {
-	SOCKET listenSocket, clientSocket = INVALID_SOCKET;
+	SOCKET clientSocket = INVALID_SOCKET;
 	sockaddr_in clientAddr;
-	if (not OpenSessionBrokerSocket(listenPort, listenSocket))
+	if (not OpenSessionBrokerSocket(listenPort))
 	{
 		return;
 	}
@@ -62,11 +62,17 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	auto& sendBuffer = *NetBuffer::Alloc();
 	while (not threadStopFlag)
 	{
-		clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
+		clientSocket = accept(sessionBrokerListenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
+			auto error = WSAGetLastError();
+			if (error == WSAENOTSOCK)
+			{
+				break;
+			}
+
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("RunSessionBrokerThread accept falid with error {}", WSAGetLastError());
+			log->logString = std::format("RunSessionBrokerThread accept falid with error {}", error);
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
@@ -75,7 +81,6 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		SendSessionInfoToClient(clientSocket, sendBuffer);
 	}
 
-	closesocket(listenSocket);
 	NetBuffer::Free(&sendBuffer);
 
 	auto log = Logger::MakeLogObject<ServerLog>();
@@ -83,10 +88,10 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	Logger::GetInstance().WriteLog(log);
 }
 
-bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT SOCKET& listenSocket)
+bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 {
-	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listenSocket == INVALID_SOCKET)
+	sessionBrokerListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sessionBrokerListenSocket == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RunSessionBrokerThread listen socket is invalid with error {}", WSAGetLastError());
@@ -100,23 +105,23 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort, OUT
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 	serverAddr.sin_port = htons(listenPort);
 
-	if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+	if (bind(sessionBrokerListenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
-		closesocket(listenSocket);
+		closesocket(sessionBrokerListenSocket);
 		return false;
 	}
 
-	if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR)
+	if (listen(sessionBrokerListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RunSessionBrokerThread listen failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
-		closesocket(listenSocket);
+		closesocket(sessionBrokerListenSocket);
 		return false;
 	}
 
