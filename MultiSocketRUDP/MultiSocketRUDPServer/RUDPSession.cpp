@@ -187,6 +187,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	}
 
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
+	if (isReplyType == false)
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
@@ -367,6 +368,10 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		if (itor != sendPacketInfoMap.end())
 		{
 			sendedPacketInfo = itor->second;
+		}
+		else
+		{
+			return;
 		}
 
 		sendPacketInfoMap.erase(packetSequence);

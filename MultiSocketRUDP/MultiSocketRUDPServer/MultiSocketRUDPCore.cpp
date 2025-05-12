@@ -154,7 +154,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 
 void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
-	if (eraseTarget == nullptr)
+	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo == true)
 	{
 		return;
 	}
@@ -903,7 +903,8 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 	{
 		sendPacketInfoPool->Free(session.sendBuffer.reservedSendPacketInfo);
 	}
-	sendPacketInfo = nullptr;
+
+	session.sendBuffer.reservedSendPacketInfo = nullptr;
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
