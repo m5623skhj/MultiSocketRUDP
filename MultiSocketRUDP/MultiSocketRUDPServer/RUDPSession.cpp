@@ -210,6 +210,7 @@ void RUDPSession::SendHeartbeatPacket()
 
 	PACKET_TYPE packetType = PACKET_TYPE::HeartbeatType;
 	PacketSequence packetSequence = ++lastSendPacketSequence;
+	std::cout << "HeartbeatPacketSequence : " << packetSequence << std::endl;
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
@@ -250,13 +251,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
-
+	std::cout << "SendType RecvPacketSequence : " << packetSequence << std::endl;
 	if (lastReceivedPacketSequence != packetSequence)
 	{
-		std::scoped_lock lock(recvPacketHolderQueueLock);
-
 		NetBuffer::AddRefCount(&recvPacket);
 		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequence });
+
+		std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << std::endl;
 
 		SendReplyToClient(packetSequence);
 
@@ -276,17 +277,14 @@ bool RUDPSession::ProcessHoldingPacket()
 	PacketSequence packetSequence;
 	size_t queueRestSize = 0;
 
-	{
-		std::scoped_lock lock(recvPacketHolderQueueLock);
-		queueRestSize = recvPacketHolderQueue.size();
-	}
+	queueRestSize = recvPacketHolderQueue.size();
 
 	while (queueRestSize > 0)
 	{
 		NetBuffer* storedBuffer = nullptr;
 		{
-			std::scoped_lock lock(recvPacketHolderQueueLock);
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
+			std::cout << "RecvPacketHolderTopSequence : " << recvPacketHolderTop.packetSequence << std::endl;
 			if (recvPacketHolderTop.packetSequence != lastSendPacketSequence)
 			{
 				break;
@@ -355,6 +353,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
+	std::cout << "SendReplyPacketSequence : " << packetSequence << std::endl;
 
 	if (lastSendPacketSequence < packetSequence)
 	{

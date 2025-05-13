@@ -137,7 +137,6 @@ private:
 		}
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
-	std::recursive_mutex recvPacketHolderQueueLock;
 
 private:
 	RecvBuffer recvBuffer;
