@@ -289,26 +289,26 @@ bool RUDPSession::ProcessHoldingPacket()
 			{
 				break;
 			}
-
+			
 			packetSequence = recvPacketHolderTop.packetSequence;
 			storedBuffer = recvPacketHolderTop.buffer;
 			recvPacketHolderQueue.pop();
 		}
-
+		
 		if (ProcessPacket(*storedBuffer, packetSequence, false) == false)
 		{
 			return false;
 		}
 		--queueRestSize;
 	}
-
+	
 	return true;
 }
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient)
 {
 	++lastReceivedPacketSequence;
-	
+
 	PacketId packetId;
 	recvPacket >> packetId;
 
@@ -377,6 +377,13 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	}
 
 	core.EraseSendPacketInfo(sendedPacketInfo, threadId);
+	nowInProcessingRecvPacket = true;
+	if (not ProcessHoldingPacket())
+	{
+		Disconnect();
+	}
+
+	nowInProcessingRecvPacket = false;
 }
 
 SessionIdType RUDPSession::GetSessionId() const
