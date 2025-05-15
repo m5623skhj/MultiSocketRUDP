@@ -284,7 +284,6 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
 			recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
 		}
-
 		SendReplyToServer(packetSequence);
 		break;
 	}

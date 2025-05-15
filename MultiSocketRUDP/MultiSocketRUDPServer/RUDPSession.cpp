@@ -284,8 +284,7 @@ bool RUDPSession::ProcessHoldingPacket()
 		NetBuffer* storedBuffer = nullptr;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			std::cout << "RecvPacketHolderTopSequence : " << recvPacketHolderTop.packetSequence << std::endl;
-			if (recvPacketHolderTop.packetSequence != lastSendPacketSequence)
+			if (recvPacketHolderTop.packetSequence != lastReceivedPacketSequence)
 			{
 				break;
 			}
