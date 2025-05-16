@@ -389,12 +389,12 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	{
 		auto holdingPacketInfo = recvPacketHoldingQueue.top();
 
-		if (holdingPacketInfo.packetSequence < recvPacketSequence)
+		if (holdingPacketInfo.packetSequence <= recvPacketSequence)
 		{
 			recvPacketHoldingQueue.pop();
 			continue;
 		}
-		else if (holdingPacketInfo.packetSequence != recvPacketSequence)
+		else if (holdingPacketInfo.packetSequence != recvPacketSequence + 1)
 		{
 			return nullptr;
 		}

@@ -284,7 +284,12 @@ bool RUDPSession::ProcessHoldingPacket()
 		NetBuffer* storedBuffer = nullptr;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			if (recvPacketHolderTop.packetSequence != lastReceivedPacketSequence)
+			if (recvPacketHolderTop.packetSequence <= lastReceivedPacketSequence)
+			{
+				recvPacketHolderQueue.pop();
+				continue;
+			}
+			else if (recvPacketHolderTop.packetSequence != lastReceivedPacketSequence + 1)
 			{
 				break;
 			}
@@ -352,7 +357,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
-	std::cout << "SendReplyPacketSequence : " << packetSequence << std::endl;
 
 	if (lastSendPacketSequence < packetSequence)
 	{
