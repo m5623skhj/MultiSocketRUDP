@@ -275,11 +275,8 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 bool RUDPSession::ProcessHoldingPacket()
 {
 	PacketSequence packetSequence;
-	size_t queueRestSize = 0;
 
-	queueRestSize = recvPacketHolderQueue.size();
-
-	while (queueRestSize > 0)
+	while (not recvPacketHolderQueue.empty())
 	{
 		NetBuffer* storedBuffer = nullptr;
 		{
@@ -303,7 +300,6 @@ bool RUDPSession::ProcessHoldingPacket()
 		{
 			return false;
 		}
-		--queueRestSize;
 	}
 	
 	return true;
