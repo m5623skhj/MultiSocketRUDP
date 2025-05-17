@@ -33,14 +33,16 @@ struct SendPacketInfo
 
 struct RecvPacketInfo
 {
-	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence)
+	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence, const PACKET_TYPE inPacketType)
 		: buffer(inBuffer)
 		, packetSequence(inPacketSequence)
+		, packetType(inPacketType)
 	{
 	}
 
 	NetBuffer* buffer{};
 	PacketSequence packetSequence{};
+	PACKET_TYPE packetType{};
 };
 
 class RUDPClientCore

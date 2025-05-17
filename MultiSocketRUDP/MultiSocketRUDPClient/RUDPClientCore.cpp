@@ -278,11 +278,21 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	switch (packetType)
 	{
 	case PACKET_TYPE::SendType:
+	case PACKET_TYPE::HeartbeatType:
 	{
 		NetBuffer::AddRefCount(&receivedBuffer);
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
-			recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence });
+			recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence, packetType });
+		}
+
+		if (packetType == PACKET_TYPE::HeartbeatType)
+		{
+			SendReplyToServer(packetSequence);
+		}
+		else
+		{
+			SendReplyToServer(packetSequence, PACKET_TYPE::HeartbeatReplyType);
 		}
 		SendReplyToServer(packetSequence);
 		break;
@@ -290,11 +300,6 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	case PACKET_TYPE::SendReplyType:
 	{
 		OnSendReply(receivedBuffer, packetSequence);
-		break;
-	}
-	case PACKET_TYPE::HeartbeatType:
-	{
-		SendReplyToServer(packetSequence, PACKET_TYPE::HeartbeatReplyType);
 		break;
 	}
 	default:
@@ -397,6 +402,10 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 		else if (holdingPacketInfo.packetSequence != recvPacketSequence + 1)
 		{
 			return nullptr;
+		}
+		else if (holdingPacketInfo.packetType == PACKET_TYPE::HeartbeatType)
+		{
+			continue;
 		}
 
 		++recvPacketSequence;
