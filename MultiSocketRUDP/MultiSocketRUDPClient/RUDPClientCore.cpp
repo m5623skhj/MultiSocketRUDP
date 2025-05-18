@@ -403,13 +403,14 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 		{
 			return nullptr;
 		}
-		else if (holdingPacketInfo.packetType == PACKET_TYPE::HeartbeatType)
+
+		++recvPacketSequence;
+		recvPacketHoldingQueue.pop();
+		if (holdingPacketInfo.packetType == PACKET_TYPE::HeartbeatType)
 		{
 			continue;
 		}
 
-		++recvPacketSequence;
-		recvPacketHoldingQueue.pop();
 		return holdingPacketInfo.buffer;
 	}
 
