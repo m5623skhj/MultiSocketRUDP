@@ -63,7 +63,7 @@ void Logger::RunLoggerThread(const bool isAlsoPrintToConsole)
 		g_Dump.Crash();
 	}
 
-	loggerThread = std::thread([this]() { this->Worker(); });
+	loggerThread = std::jthread([this]() { this->Worker(); });
 }
 
 void Logger::Worker()
@@ -101,7 +101,6 @@ void Logger::Worker()
 void Logger::StopLoggerThread()
 {
 	SetEvent(loggerEventHandles[1]);
-
 	loggerThread.join();
 }
 

@@ -35,7 +35,7 @@ private:
 	void WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue);
 
 private:
-	std::thread loggerThread;
+	std::jthread loggerThread;
 	// 0. LogHandle
 	// 1. StopHandle
 	HANDLE loggerEventHandles[2];

@@ -51,20 +51,12 @@ void RUDPClientCore::Stop()
 	threadStopFlag = true;
 
 	const std::thread::id nowThreadId = std::this_thread::get_id();
-	StopThread(retransmissionThread, nowThreadId);
-	StopThread(sendThread, nowThreadId);
-	StopThread(recvThread, nowThreadId);
+	retransmissionThread.join();
+	sendThread.join();
+	recvThread.join();
 	Logger::GetInstance().StopLoggerThread();
 
 	isStopped = true;
-}
-
-void RUDPClientCore::StopThread(std::thread& stopTarget, const std::thread::id& threadId)
-{
-	if (stopTarget.joinable() && threadId != stopTarget.get_id())
-	{
-		stopTarget.join();
-	}
 }
 
 bool RUDPClientCore::CreateRUDPSocket()
@@ -113,9 +105,9 @@ void RUDPClientCore::RunThreads()
 	sendEventHandles[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
 	sendEventHandles[1] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-	recvThread = std::thread([this]() { this->RunRecvThread(); });
-	sendThread = std::thread([this]() { this->RunSendThread(); });
-	retransmissionThread = std::thread([this]() { this->RunRetransmissionThread(); });
+	recvThread = std::jthread([this]() { this->RunRecvThread(); });
+	sendThread = std::jthread([this]() { this->RunSendThread(); });
+	retransmissionThread = std::jthread([this]() { this->RunRetransmissionThread(); });
 }
 
 void RUDPClientCore::RunRecvThread()

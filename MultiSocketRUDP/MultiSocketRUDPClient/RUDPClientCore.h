@@ -63,8 +63,6 @@ public:
 	inline bool IsStopped() const { return isStopped; }
 	inline bool IsConnected() const { return isConnected; }
 
-private:
-	void StopThread(std::thread& stopTarget, const std::thread::id& threadId);
 
 private:
 	bool CreateRUDPSocket();
@@ -137,9 +135,9 @@ private:
 	SOCKET rudpSocket{};
 	sockaddr_in serverAddr{};
 
-	std::thread recvThread{};
-	std::thread sendThread{};
-	std::thread retransmissionThread{};
+	std::jthread recvThread{};
+	std::jthread sendThread{};
+	std::jthread retransmissionThread{};
 	std::array<HANDLE, 2> sendEventHandles{};
 
 private:

@@ -77,7 +77,7 @@ void MultiSocketRUDPCore::StopServer()
 	sessionBroker.Stop();
 #else
 	closesocket(sessionBrokerListenSocket);
-	JoinThread(sessionBrokerThread, nowThreadId);
+	sessionBrokerThread.join();
 #endif
 	CloseAllSessions();
 	delete[] rioCQList;
@@ -85,14 +85,14 @@ void MultiSocketRUDPCore::StopServer()
 	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
 	{
 		SetEvent(recvLogicThreadEventHandles[i]);
-		JoinThread(ioWorkerThreads[i], nowThreadId);
-		JoinThread(recvLogicWorkerThreads[i], nowThreadId);
-		JoinThread(retransmissionThreads[i], nowThreadId);
+		ioWorkerThreads[i].join();
+		recvLogicWorkerThreads[i].join();
+		retransmissionThreads[i].join();
 	}
 
 	SetEvent(sessionReleaseEventHandle);
-	JoinThread(sessionReleaseThread, nowThreadId);
-	JoinThread(heartbeatThread, nowThreadId);
+	sessionReleaseThread.join();
+	heartbeatThread.join();
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -100,14 +100,6 @@ void MultiSocketRUDPCore::StopServer()
 	auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Server stop";
 	Logger::GetInstance().WriteLog(log);
-}
-
-void MultiSocketRUDPCore::JoinThread(std::thread& stopTarget, const std::thread::id& threadId)
-{
-	if (stopTarget.joinable() && threadId != stopTarget.get_id())
-	{
-		stopTarget.join();
-	}
 }
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
@@ -282,8 +274,8 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
-	sessionReleaseThread = std::thread([this]() { RunSessionReleaseThread(); });
-	heartbeatThread = std::thread([this]() { RunHeartbeatThread(); });
+	sessionReleaseThread = std::jthread([this]() { RunSessionReleaseThread(); });
+	heartbeatThread = std::jthread([this]() { RunHeartbeatThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		ioCompletedContexts.emplace_back();
@@ -321,7 +313,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 		return false;
 	}
 #else
-	sessionBrokerThread = std::thread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, coreServerIp); });
+	sessionBrokerThread = std::jthread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, coreServerIp); });
 #endif
 
 	return true;

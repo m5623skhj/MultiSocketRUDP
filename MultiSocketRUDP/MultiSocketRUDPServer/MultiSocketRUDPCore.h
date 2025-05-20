@@ -115,9 +115,6 @@ public:
 	[[nodiscard]]
 	inline unsigned short GetConnectedUserCount() const { return connectedUserCount; }
 
-private:
-	inline void JoinThread(std::thread& stopTarget, const std::thread::id& threadId);
-
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	[[nodiscard]]
@@ -219,7 +216,7 @@ private:
 	void SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
-	std::thread sessionBrokerThread{};
+	std::jthread sessionBrokerThread{};
 	SOCKET sessionBrokerListenSocket{ INVALID_SOCKET };
 #endif
 
@@ -240,11 +237,11 @@ private:
 	unsigned int heartbeatThreadSleepMs{};
 
 	// threads
-	std::vector<std::thread> ioWorkerThreads;
-	std::vector<std::thread> recvLogicWorkerThreads;
-	std::vector<std::thread> retransmissionThreads;
-	std::thread heartbeatThread;
-	std::thread sessionReleaseThread{};
+	std::vector<std::jthread> ioWorkerThreads;
+	std::vector<std::jthread> recvLogicWorkerThreads;
+	std::vector<std::jthread> retransmissionThreads;
+	std::jthread heartbeatThread;
+	std::jthread sessionReleaseThread{};
 
 	// event handles
 	HANDLE logicThreadEventStopHandle{};
