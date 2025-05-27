@@ -4,15 +4,15 @@
 #pragma region packet function
 PacketId Ping::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::Ping);
+	return static_cast<PacketId>(PACKET_ID::PING);
 }
 PacketId Pong::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::Pong);
+	return static_cast<PacketId>(PACKET_ID::PONG);
 }
 PacketId TestStringPacketReq::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::TestStringPacketReq);
+	return static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_REQ);
 }
 void TestStringPacketReq::BufferToPacket(NetBuffer& buffer)
 {
@@ -24,7 +24,7 @@ void TestStringPacketReq::PacketToBuffer(NetBuffer& buffer)
 }
 PacketId TestStringPacketRes::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::TestStringPacketRes);
+	return static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_RES);
 }
 void TestStringPacketRes::BufferToPacket(NetBuffer& buffer)
 {
@@ -36,7 +36,7 @@ void TestStringPacketRes::PacketToBuffer(NetBuffer& buffer)
 }
 PacketId TestPacketReq::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::TestPacketReq);
+	return static_cast<PacketId>(PACKET_ID::TEST_PACKET_REQ);
 }
 void TestPacketReq::BufferToPacket(NetBuffer& buffer)
 {
@@ -48,7 +48,7 @@ void TestPacketReq::PacketToBuffer(NetBuffer& buffer)
 }
 PacketId TestPacketRes::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::TestPacketRes);
+	return static_cast<PacketId>(PACKET_ID::TEST_PACKET_RES);
 }
 void TestPacketRes::BufferToPacket(NetBuffer& buffer)
 {

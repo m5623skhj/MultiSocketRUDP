@@ -123,17 +123,17 @@ bool RUDPClientCore::GetSessionFromServer()
 	return TrySetTargetSessionInfo();
 }
 
-bool RUDPClientCore::TryConnectToSessionBroker()
+bool RUDPClientCore::TryConnectToSessionBroker() const
 {
 	sockaddr_in sessionGetterAddr;
 	sessionGetterAddr.sin_family = AF_INET;
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
 	InetPton(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr);
 
-	bool isConnected{};
+	bool connected{ false };
 	for (int i = 0; i < 5; ++i)
 	{
-		if (connect(sessionBrokerSocket, (struct sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
+		if (connect(sessionBrokerSocket, (sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
 		{
 			Sleep(1000);
 			{
@@ -142,12 +142,12 @@ bool RUDPClientCore::TryConnectToSessionBroker()
 		}
 		else
 		{
-			isConnected = true;
+			connected = true;
 			break;
 		}
 	}
 
-	return isConnected;
+	return connected;
 }
 
 bool RUDPClientCore::TrySetTargetSessionInfo()
@@ -160,7 +160,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 	while (true)
 	{
-		int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), recvBufferSize + df_HEADER_SIZE, 0);
+		int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE + df_HEADER_SIZE, 0);
 		if (bytesReceived <= 0)
 		{
 			int error = WSAGetLastError();
@@ -197,7 +197,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 	}
 	closesocket(sessionBrokerSocket);
 
-	bool retval = SetTargetSessionInfo(recvBuffer);
+	const bool retval = SetTargetSessionInfo(recvBuffer);
 	NetBuffer::Free(&recvBuffer);
 
 	return retval;
@@ -207,7 +207,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
 	if (not receivedBuffer.Decode())
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = "SetTargetSessionInfo() failed with Decode()";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -217,7 +217,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("SetTargetSessionInfo() failed with connectResultCode {}", connectResultCode);
 		Logger::GetInstance().WriteLog(log);
 		return false;

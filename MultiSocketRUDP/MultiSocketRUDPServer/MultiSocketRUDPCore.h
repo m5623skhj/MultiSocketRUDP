@@ -5,7 +5,6 @@
 #include <MSWSock.h>
 #include "NetServer.h"
 #include "NetServerSerializeBuffer.h"
-#include <unordered_map>
 #include <shared_mutex>
 #include "RUDPSession.h"
 #include "Queue.h"
@@ -30,7 +29,7 @@ struct IOContext : RIO_BUF
 
 	inline void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
 
-	SessionIdType ownerSessionId = invalidSessionId;
+	SessionIdType ownerSessionId = INVALID_SESSION_ID;
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 	RUDPSession* session = nullptr;
 	RIO_BUF clientAddrRIOBuffer{ RIO_INVALID_BUFFERID };
@@ -44,7 +43,7 @@ struct SendPacketInfo
 	NetBuffer* buffer{};
 	RUDPSession* owner{};
 	PacketRetransmissionCount retransmissionCount{};
-	PacketSequence sendPacektSequence{};
+	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
 	bool isErasedPacketInfo{};
 	bool isReplyType{};
@@ -55,7 +54,7 @@ struct SendPacketInfo
 		NetBuffer::Free(buffer);
 		owner = {};
 		retransmissionCount = {};
-		sendPacektSequence = {};
+		sendPacketSequence = {};
 		retransmissionTimeStamp = {};
 		listItor = {};
 		isErasedPacketInfo = {};
@@ -66,7 +65,7 @@ struct SendPacketInfo
 	{
 		owner = inOwner;
 		buffer = inBuffer;
-		sendPacektSequence = inSendPacketSequence;
+		sendPacketSequence = inSendPacketSequence;
 		isReplyType = inIsReplyType;
 		NetBuffer::AddRefCount(inBuffer);
 	}
@@ -118,7 +117,7 @@ public:
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	[[nodiscard]]
-	bool DoRecv(RUDPSession& session);
+	bool DoRecv(const RUDPSession& session) const;
 	[[nodiscard]]
 	bool DoSend(OUT RUDPSession& session, const ThreadIdType threadId);
 	[[nodiscard]]
@@ -138,7 +137,7 @@ private:
 	[[nodiscard]]
 	bool InitRIO();
 	[[nodiscard]]
-	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBuffersize) const;
+	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBufferSize) const;
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
@@ -170,8 +169,8 @@ private:
 	std::atomic_uint16_t connectedUserCount{};
 
 private:
-	std::vector<std::list<SendPacketInfo*>> sendedPacketInfoList;
-	std::vector<std::unique_ptr<std::mutex>> sendedPacketInfoListLock;
+	std::vector<std::list<SendPacketInfo*>> sendPacketInfoList;
+	std::vector<std::unique_ptr<std::mutex>> sendPacketInfoListLock;
 
 #pragma region thread
 #if USE_IOCP_SESSION_BROKER
@@ -208,12 +207,12 @@ private:
 	void RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP);
 	[[nodiscard]]
 	bool OpenSessionBrokerSocket(const PortType listenPort);
-	void SetSessionKey(OUT RUDPSession& session);
-	void SetSessionInfoToBuffer(RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
+	static void SetSessionKey(OUT RUDPSession& session);
+	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
 	[[nodiscard]]
 	char InitReserveSession(RUDPSession& session);
-	void SendSessionInfoToClient(OUT SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
+	void SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
 	std::jthread sessionBrokerThread{};
@@ -225,8 +224,8 @@ private:
 	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
 	void RunRetransmissionThread(const ThreadIdType threadId);
 	void RunSessionReleaseThread();
-	void RunHeartbeatThread();
-	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
+	void RunHeartbeatThread() const;
+	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
 	unsigned char numOfWorkerThread{};
@@ -268,13 +267,13 @@ private:
 
 	void OnRecvPacket(const BYTE threadId);
 	[[nodiscard]]
-	bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
+	static bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	[[nodiscard]]
 	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
     [[nodiscard]]  
-	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId);
+	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId);
 	[[nodiscard]]
-	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT int& totalSendSize, const ThreadIdType threadId);
+	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId);
 	[[nodiscard]]
 	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, const ThreadIdType threadId);
 
@@ -287,9 +286,9 @@ private:
 #pragma endregion RIO
 
 private:
-	void EncodePacket(OUT NetBuffer& packet);
+	static void EncodePacket(OUT NetBuffer& packet);
 	[[nodiscard]]
-	inline WORD GetPayloadLength(OUT NetBuffer& buffer) const;
+	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
 };
 
-static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);
+static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

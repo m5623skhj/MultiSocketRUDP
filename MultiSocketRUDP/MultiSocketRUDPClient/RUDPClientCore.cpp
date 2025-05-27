@@ -50,7 +50,6 @@ void RUDPClientCore::Stop()
 	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
 
-	const std::thread::id nowThreadId = std::this_thread::get_id();
 	retransmissionThread.join();
 	sendThread.join();
 	recvThread.join();
@@ -93,8 +92,8 @@ bool RUDPClientCore::CreateRUDPSocket()
 void RUDPClientCore::SendConnectPacket()
 {
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
-	PacketSequence packetSequence = 0;
-	PACKET_TYPE packetType = PACKET_TYPE::ConnectType;
+	constexpr PacketSequence packetSequence = 0;
+	auto packetType = PACKET_TYPE::CONNECT_TYPE;
 	
 	connectPacket << packetType << packetSequence << sessionId << sessionKey;
 	SendPacket(connectPacket, packetSequence);
@@ -113,7 +112,7 @@ void RUDPClientCore::RunThreads()
 void RUDPClientCore::RunRecvThread()
 {
 	NetBuffer* buffer = NetBuffer::Alloc();
-	buffer->Resize(recvBufferSize);
+	buffer->Resize(RECV_BUFFER_SIZE);
 	sockaddr_in senderAddr{};
 	int senderLength{sizeof(senderAddr)};
 
@@ -121,8 +120,8 @@ void RUDPClientCore::RunRecvThread()
 	{
 		buffer->Init();
 		buffer->m_iWrite = 0;
-		
-		int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), recvBufferSize, 0, (sockaddr*)&senderAddr, &senderLength);
+
+		const int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), RECV_BUFFER_SIZE, 0, (sockaddr*)&senderAddr, &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
@@ -152,8 +151,7 @@ void RUDPClientCore::RunSendThread()
 {
 	while (true)
 	{
-		const auto waitResult = WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE);
-		switch (waitResult)
+		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
@@ -168,7 +166,6 @@ void RUDPClientCore::RunSendThread()
 			Logger::GetInstance().WriteLog(log);
 			return;
 		}
-		break;
 		default:
 		{
 			auto log = Logger::MakeLogObject<ClientLog>();
@@ -194,14 +191,14 @@ void RUDPClientCore::RunRetransmissionThread()
 			copyList.assign(sendPacketInfoMap.begin(), sendPacketInfoMap.end());
 		}
 
-		for (auto& sendedPacketInfo : copyList)
+		for (const auto& sendPacketInfo : copyList | std::views::values)
 		{
-			if (sendedPacketInfo.second->retransmissionTimeStamp > tickSet.nowTick)
+			if (sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick)
 			{
 				continue;
 			}
 
-			if (++sendedPacketInfo.second->retransmissionCount >= maxPacketRetransmissionCount)
+			if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
 				auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = "The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates";
@@ -212,7 +209,7 @@ void RUDPClientCore::RunRetransmissionThread()
 				break;
 			}
 
-			SendPacket(*sendedPacketInfo.second->GetBuffer(), sendedPacketInfo.second->sendPacektSequence);
+			SendPacket(*sendPacketInfo->GetBuffer(), sendPacketInfo->sendPacketSequence);
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
@@ -235,29 +232,29 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 			packetBuffer = nullptr;
 		}
 
-		NetBuffer* packetBuffer = NetBuffer::Alloc();
-		recvBuffer.ReadBuffer(packetBuffer->GetBufferPtr(), df_HEADER_SIZE);
-		packetBuffer->m_iRead = 0;
+		NetBuffer* recvPacketBuffer = NetBuffer::Alloc();
+		recvBuffer.ReadBuffer(recvPacketBuffer->GetBufferPtr(), df_HEADER_SIZE);
+		recvPacketBuffer->m_iRead = 0;
 
-		WORD payloadLength = GetPayloadLength(*packetBuffer);
+		WORD payloadLength = GetPayloadLength(*recvPacketBuffer);
 		if (payloadLength <= 0 || payloadLength > dfDEFAULTSIZE || payloadLength > recvSize)
 		{
-			NetBuffer::Free(packetBuffer);
+			NetBuffer::Free(recvPacketBuffer);
 			break;
 		}
-		int packetSize = (payloadLength + df_HEADER_SIZE);
+		const int packetSize = (payloadLength + df_HEADER_SIZE);
 		recvSize -= packetSize;
 		
-		recvBuffer.ReadBuffer(packetBuffer->GetWriteBufferPtr(), payloadLength);
-		packetBuffer->m_iWrite = packetSize;
-		if (not packetBuffer->Decode())
+		recvBuffer.ReadBuffer(recvPacketBuffer->GetWriteBufferPtr(), payloadLength);
+		recvPacketBuffer->m_iWrite = static_cast<WORD>(packetSize);
+		if (not recvPacketBuffer->Decode())
 		{
-			NetBuffer::Free(packetBuffer);
+			NetBuffer::Free(recvPacketBuffer);
 			break;
 		}
 
-		ProcessRecvPacket(*packetBuffer);
-		NetBuffer::Free(packetBuffer);
+		ProcessRecvPacket(*recvPacketBuffer);
+		NetBuffer::Free(recvPacketBuffer);
 	}
 }
 
@@ -269,27 +266,27 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 	switch (packetType)
 	{
-	case PACKET_TYPE::SendType:
-	case PACKET_TYPE::HeartbeatType:
+	case PACKET_TYPE::SEND_TYPE:
+	case PACKET_TYPE::HEARTBEAT_TYPE:
 	{
 		NetBuffer::AddRefCount(&receivedBuffer);
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
-			recvPacketHoldingQueue.emplace(RecvPacketInfo{ &receivedBuffer, packetSequence, packetType });
+			recvPacketHoldingQueue.emplace(&receivedBuffer, packetSequence, packetType);
 		}
 
-		if (packetType == PACKET_TYPE::HeartbeatType)
+		if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
 			SendReplyToServer(packetSequence);
 		}
 		else
 		{
-			SendReplyToServer(packetSequence, PACKET_TYPE::HeartbeatReplyType);
+			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
 		}
 		SendReplyToServer(packetSequence);
 		break;
 	}
-	case PACKET_TYPE::SendReplyType:
+	case PACKET_TYPE::SEND_REPLY_TYPE:
 	{
 		OnSendReply(receivedBuffer, packetSequence);
 		break;
@@ -322,11 +319,11 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	}
 }
 
-void RUDPClientCore::SendReplyToServer(const PacketSequence recvPacketSequence, const PACKET_TYPE packetType)
+void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType)
 {
 	auto& buffer = *NetBuffer::Alloc();
 
-	buffer << packetType << recvPacketSequence;
+	buffer << packetType << inRecvPacketSequence;
 
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
@@ -398,7 +395,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 
 		++recvPacketSequence;
 		recvPacketHoldingQueue.pop();
-		if (holdingPacketInfo.packetType == PACKET_TYPE::HeartbeatType)
+		if (holdingPacketInfo.packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
 			continue;
 		}
@@ -420,7 +417,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 		return;
 	}
 
-	PACKET_TYPE packetType = PACKET_TYPE::SendType;
+	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
 	PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
@@ -455,11 +452,11 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	SetEvent(sendEventHandles[0]);
 }
 
-WORD RUDPClientCore::GetPayloadLength(OUT NetBuffer& buffer) const
+WORD RUDPClientCore::GetPayloadLength(OUT const NetBuffer& buffer)
 {
-	static constexpr int payloadLengthPosition = 1;
+	static constexpr int PAYLOAD_LENGTH_POSITION = 1;
 
-	return *((WORD*)(&buffer.m_pSerializeBuffer[buffer.m_iRead + payloadLengthPosition]));
+	return *((WORD*)(&buffer.m_pSerializeBuffer[buffer.m_iRead + PAYLOAD_LENGTH_POSITION]));
 }
 
 void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)

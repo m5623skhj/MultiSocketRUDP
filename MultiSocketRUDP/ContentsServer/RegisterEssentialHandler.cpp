@@ -12,7 +12,7 @@ namespace EssentialHandler
 		return PCManager::GetInst().InsertPC(std::make_shared<PC>(session));
 	}
 
-	bool HandleOnDisconnected(RUDPSession& session)
+	bool HandleOnDisconnected(const RUDPSession& session)
 	{
 		return PCManager::GetInst().DeletePC(session.GetSessionId());
 	}

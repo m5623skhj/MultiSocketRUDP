@@ -7,6 +7,11 @@ import filecmp
 import PacketItemsFilePath
 import MakePacketItemsOnce
 
+def ToEnumName(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+    return s2.upper()
+
 def CopyPacketFiles():
     try:
         shutil.copy(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.packetTypeFilePath + "_new")
@@ -107,7 +112,7 @@ def IsValidPacketTypeInYaml(yamlData):
                 returnValue = False
         
         if packetType != 'RequestPacket' and packetType != 'ReplyPacket':                
-            print("Invalid packet type : PacketName " + packetName + " / Type : " + value['Type'])
+            print("Invalid packet type : PacketName " + packetName + " / Type : " + {packetType})
             returnValue = False
             continue
             
@@ -126,10 +131,10 @@ def IsValidPacketTypeInYaml(yamlData):
 
 def GeneratePacketType(packetList):
     generatedCode = "#pragma once\n\n"
-    generatedCode += "enum class PACKET_ID : unsigned int\n{\n\tInvalidPacketId = 0\n"
+    generatedCode += "enum class PACKET_ID : unsigned int\n{\n\tINVALID_PACKET_ID = 0\n"
     
     for packet in packetList:
-        generatedCode += f"\t, {packet['PacketName']}\n"
+        generatedCode += f"\t, {ToEnumName(packet['PacketName'])}\n"
     
     generatedCode += "};"
     
@@ -248,7 +253,7 @@ def GenerateProtocolCpp(packetList):
         packetName = packet['PacketName']
         candidateCode = f"PacketId {packetName}::GetPacketId() const\n"
         if candidateCode not in modifiedCode:
-            modifiedCode += f"{candidateCode}{{\n\treturn static_cast<PacketId>(PACKET_ID::{packetName});\n}}\n"
+            modifiedCode += f"{candidateCode}{{\n\treturn static_cast<PacketId>(PACKET_ID::{ToEnumName(packetName)});\n}}\n"
             needWrite = True
         
         bufferToPacketCode = f"void {packetName}::BufferToPacket(NetBuffer& buffer)\n"

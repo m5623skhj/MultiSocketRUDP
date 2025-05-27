@@ -61,8 +61,8 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 		return false;
 	}
 
-	int length = static_cast<int>(wcslen(targetIP));
-	int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, targetIP, length, nullptr, 0, nullptr, nullptr);
+	const int length = static_cast<int>(wcslen(targetIP));
+	const int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, targetIP, length, nullptr, 0, nullptr, nullptr);
 	std::string ipString(sizeNeeded, 0);
 	WideCharToMultiByte(CP_UTF8, 0, targetIP, length, &ipString[0], sizeNeeded, nullptr, nullptr);
 	coreServerIp = ipString;

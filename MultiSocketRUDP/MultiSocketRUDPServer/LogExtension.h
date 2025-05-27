@@ -3,7 +3,7 @@
 
 #pragma comment(lib, "Logger.lib")
 
-class ServerLog : public LogBase
+class ServerLog final : public LogBase
 {
 public:
 	OBJECT_TO_JSON_LOG(

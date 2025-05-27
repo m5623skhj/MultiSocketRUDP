@@ -8,7 +8,7 @@
 
 namespace
 {
-	constexpr int maxRandomStringSize = 20;
+	constexpr int MAX_RANDOM_STRING_SIZE = 20;
 
 	std::string gen_random(const int len)
 	{
@@ -21,22 +21,22 @@ namespace
 		std::mt19937 generator(rd());
 		std::uniform_int_distribution<> dist(0, sizeof(alphanum) - 2);
 
-		std::string tmp_s;
-		tmp_s.reserve(len);
+		std::string tmpString;
+		tmpString.reserve(len);
 
 		for (int i = 0; i < len; ++i)
 		{
-			tmp_s += alphanum[dist(generator)];
+			tmpString += alphanum[dist(generator)];
 		}
 
-		return tmp_s;
+		return tmpString;
 	}
 
 	std::string MakeRandomString()
 	{
 		std::random_device rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> distr(10, maxRandomStringSize);
+		std::uniform_int_distribution<> distr(10, MAX_RANDOM_STRING_SIZE);
 		return gen_random(distr(gen));
 	}
 }
@@ -50,19 +50,18 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 
 	switch (packetId)
 	{
-	case PACKET_ID::Pong:
+	case PACKET_ID::PONG:
 	{
 	}
 	break;
-	case PACKET_ID::TestPacketRes:
+	case PACKET_ID::TEST_PACKET_RES:
 	{
 		int recvOrder;
 		buffer >> recvOrder;
 
 		{
 			std::scoped_lock lock(orderListLock);
-			int frontOrder = orderList.front();
-			if (frontOrder != recvOrder)
+			if (const int frontOrder = orderList.front(); frontOrder != recvOrder)
 			{
 				g_Dump.Crash();
 			}
@@ -71,7 +70,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 		}
 	}
 	break;
-	case PACKET_ID::TestStringPacketRes:
+	case PACKET_ID::TEST_STRING_PACKET_RES:
 	{
 		std::string recvString;
 		buffer >> recvString;
@@ -89,7 +88,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 	break;
 	default:
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("Invalid packet id {}", static_cast<unsigned int>(packetId));
 		Logger::GetInstance().WriteLog(log);
 
@@ -105,10 +104,7 @@ bool TestClient::ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId
 void TestClient::SendAnyPacket()
 {
 	static unsigned long long packetSendCount = 0;
-	constexpr int pickablePacketSize = 1;
-	int pickedItem = rand() % pickablePacketSize;
-
-	switch (pickedItem)
+	switch (constexpr int pickAblePacketSize = 1; rand() % pickAblePacketSize)
 	{
 	case 0:
 	{
@@ -142,13 +138,13 @@ void TestClient::SendAnyPacket()
 	break;
 	default:
 	{
-		std::cout << "Invalid pickedItem" << std::endl;
+		std::cout << "Invalid pickedItem" << '\n';
 		return;
 	}
 	}
 
 	++packetSendCount;
-	std::cout << "Packet send count " << packetSendCount << std::endl;
+	std::cout << "Packet send count " << packetSendCount << '\n';
 }
 
 void TestClient::SendAnyPacket(const unsigned int sendCount)

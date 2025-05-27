@@ -19,10 +19,10 @@ public:
 public:
 	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile);
 	void Stop();
-	bool IsConnected() const;
+	static bool IsConnected();
 
 private:
-	bool WaitingConnectToServer(const unsigned int maximumConnectWaitingCount);
+	static bool WaitingConnectToServer(const unsigned int maximumConnectWaitingCount);
 	void RunTestThread();
 	bool ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId);
 	void SendAnyPacket();

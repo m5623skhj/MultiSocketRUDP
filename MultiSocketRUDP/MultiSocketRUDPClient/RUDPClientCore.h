@@ -16,19 +16,19 @@ struct SendPacketInfo
 {
 	NetBuffer* buffer{};
 	PacketRetransmissionCount retransmissionCount{};
-	PacketSequence sendPacektSequence{};
+	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
 
 	void Initialize(NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
 		buffer = inBuffer;
-		sendPacektSequence = inSendPacketSequence;
+		sendPacketSequence = inSendPacketSequence;
 		NetBuffer::AddRefCount(inBuffer);
 	}
 
 	[[nodiscard]]
-	NetBuffer* GetBuffer() { return buffer; }
+	NetBuffer* GetBuffer() const { return buffer; }
 };
 
 struct RecvPacketInfo
@@ -49,12 +49,12 @@ class RUDPClientCore
 {
 private:
 	RUDPClientCore() = default;
-	~RUDPClientCore() = default;
-	RUDPClientCore& operator=(const RUDPClientCore&) = delete;
-	RUDPClientCore(RUDPClientCore&&) = delete;
 
 public:
 	static RUDPClientCore& GetInst();
+	~RUDPClientCore() = default;
+	RUDPClientCore& operator=(const RUDPClientCore&) = delete;
+	RUDPClientCore(RUDPClientCore&&) = delete;
 
 public:
 	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole);
@@ -96,7 +96,7 @@ private:
 private:
 	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
 	bool GetSessionFromServer();
-	bool TryConnectToSessionBroker();
+	bool TryConnectToSessionBroker() const;
 	bool TrySetTargetSessionInfo();
 
 private:
@@ -127,9 +127,9 @@ private:
 	void OnRecvStream(NetBuffer& recvBuffer, int recvSize);
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
 	void OnSendReply(NetBuffer& recvPacket, const PacketSequence packetSequence);
-	void SendReplyToServer(const PacketSequence recvPacketSequence, const PACKET_TYPE packetType = PACKET_TYPE::SendReplyType);
+	void SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
 	void DoSend();
-	void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
+	static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
 
 private:
 	SOCKET rudpSocket{};
@@ -148,7 +148,7 @@ private:
 	std::atomic<PacketSequence> lastReceivedPacketSequence{};
 	struct RecvPacketInfoPriority
 	{
-		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh)
+		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh) const
 		{
 			return lfh.packetSequence > rfh.packetSequence;
 		}
@@ -166,8 +166,8 @@ public:
 
 private:
 	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
-	inline WORD GetPayloadLength(OUT NetBuffer& buffer) const;
-	inline void EncodePacket(OUT NetBuffer& packet);
+	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
+	static inline void EncodePacket(OUT NetBuffer& packet);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);
 	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);
@@ -181,4 +181,4 @@ private:
 	unsigned int retransmissionThreadSleepMs{};
 };
 
-static CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);
+static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);

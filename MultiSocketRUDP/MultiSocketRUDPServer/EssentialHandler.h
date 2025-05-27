@@ -9,10 +9,10 @@ using RUDPCoreEssentialFunction = std::function<bool(RUDPSession&)>;
 class EssentialHandlerManager
 {
 public:
-	enum EssentialHandlerType
+	enum ESSENTIAL_HANDLER_TYPE
 	{
-		OnConnectedHandlerType,
-		OnDisconnectedHandlerType,
+		ON_CONNECTED_HANDLER_TYPE,
+		ON_DISCONNECTED_HANDLER_TYPE,
 	};
 
 private:
@@ -23,21 +23,21 @@ public:
 
 	static bool IsRegisteredAllEssentialHandler();
 	static void PrintUnregisteredEssentialHandler();
-	static bool CallRegisteredHandler(RUDPSession& session, const EssentialHandlerType handlerType);
+	static bool CallRegisteredHandler(RUDPSession& session, const ESSENTIAL_HANDLER_TYPE handlerType);
 
 private:
-	static void RegisterEssentialHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction, const EssentialHandlerType targetType)
+	static void RegisterEssentialHandler(const RUDPCoreEssentialFunction& rudpCoreEssentialFunction, const ESSENTIAL_HANDLER_TYPE targetType)
 	{
 		auto itor = essentialHandler.find(targetType);
 		if (itor == essentialHandler.end())
 		{
-			std::cout << "You need register essential handler checker in constructor" << std::endl;
+			std::cout << "You need register essential handler checker in constructor" << '\n';
 			return;
 		}
 
 		if (itor->second.first->IsRegisteredHandler())
 		{
-			std::cout << "Connect handler already registered" << std::endl;
+			std::cout << "Connect handler already registered" << '\n';
 			return;
 		}
 
@@ -46,14 +46,14 @@ private:
 	}
 
 public:
-	static void RegisterOnConnectedHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
+	static void RegisterOnConnectedHandler(const RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
 	{
-		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::OnConnectedHandlerType);
+		RegisterEssentialHandler(rudpCoreEssentialFunction, ESSENTIAL_HANDLER_TYPE::ON_CONNECTED_HANDLER_TYPE);
 	}
 
-	static void RegisterOnDisconnectedHandler(RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
+	static void RegisterOnDisconnectedHandler(const RUDPCoreEssentialFunction& rudpCoreEssentialFunction)
 	{
-		RegisterEssentialHandler(rudpCoreEssentialFunction, EssentialHandlerType::OnDisconnectedHandlerType);
+		RegisterEssentialHandler(rudpCoreEssentialFunction, ESSENTIAL_HANDLER_TYPE::ON_DISCONNECTED_HANDLER_TYPE);
 	}
 
 private:
@@ -62,24 +62,25 @@ private:
 		friend EssentialHandlerManager;
 
 		EssentialHandlerRegisterChecker() = default;
+		virtual ~EssentialHandlerRegisterChecker() = default;
 
-		const bool IsRegisteredHandler() { return isRegistered; }
+		bool IsRegisteredHandler() const { return isRegistered; }
 		virtual std::string GetHandlerType() = 0;
 
 	private:
 		bool isRegistered{ false };
 	};
 
-	struct OnConnectedHandlerRegisterChecker : EssentialHandlerRegisterChecker
+	struct OnConnectedHandlerRegisterChecker final : EssentialHandlerRegisterChecker
 	{
 		std::string GetHandlerType() override { return "OnConnected handler"; }
 	};
 
-	struct OnDisconnectedHandlerRegisterChecker : EssentialHandlerRegisterChecker
+	struct OnDisconnectedHandlerRegisterChecker final : EssentialHandlerRegisterChecker
 	{
 		std::string GetHandlerType() override { return "OnDisconnected handler"; }
 	};
 
 private:
-	inline static std::unordered_map<EssentialHandlerType, std::pair<std::unique_ptr<EssentialHandlerRegisterChecker>, RUDPCoreEssentialFunction>> essentialHandler = {};
+	inline static std::unordered_map<ESSENTIAL_HANDLER_TYPE, std::pair<std::unique_ptr<EssentialHandlerRegisterChecker>, RUDPCoreEssentialFunction>> essentialHandler = {};
 };

@@ -11,8 +11,8 @@ PCManager& PCManager::GetInst()
 std::shared_ptr<PC> PCManager::FindPC(SessionIdType sessionId)
 {
 	std::shared_lock lock(pcMapLock);
-	
-	auto itor = pcMap.find(sessionId);
+
+	const auto itor = pcMap.find(sessionId);
 	if (itor == pcMap.end())
 	{
 		return nullptr;
@@ -39,11 +39,11 @@ bool PCManager::InsertPC(std::shared_ptr<PC> session)
 	return pcMap.insert({ session->GetSessionId(), session }).second;
 }
 
-bool PCManager::DeletePC(SessionIdType sessionid)
+bool PCManager::DeletePC(const SessionIdType sessionId)
 {
 	std::unique_lock lock(pcMapLock);
 
-	return pcMap.erase(sessionid) == 0;
+	return pcMap.erase(sessionId) == 0;
 }
 
 void PCManager::ClearPCMap()

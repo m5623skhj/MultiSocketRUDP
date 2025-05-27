@@ -12,8 +12,8 @@ public:
 	explicit PC(RUDPSession& inSession);
 
 public:
-	SessionIdType GetSessionId();
-	void SendPacket(IPacket& packet);
+	SessionIdType GetSessionId() const;
+	void SendPacket(IPacket& packet) const;
 
 	bool IsConnected() const;
 

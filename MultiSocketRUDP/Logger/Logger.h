@@ -31,7 +31,7 @@ public:
 	}
 
 private:
-	void CreateFolderIfNotExists(const std::string& folderPath);
+	static void CreateFolderIfNotExists(const std::string& folderPath);
 	void WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue);
 
 private:
@@ -61,8 +61,9 @@ private:
 
 namespace LogHelper
 {
-	template<typename T, typename = std::enable_if_t<std::is_base_of_v<LogBase, T>>>
+	template<typename T>
 	std::shared_ptr<T> MakeLogObject()
+	requires (std::is_base_of_v<LogBase, T>)
 	{
 		return std::make_shared<T>();
 	}

@@ -6,8 +6,8 @@
 
 EssentialHandlerManager::EssentialHandlerManager()
 {
-	essentialHandler.insert({ EssentialHandlerType::OnConnectedHandlerType, std::make_pair(std::make_unique<OnConnectedHandlerRegisterChecker>(), nullptr) });
-	essentialHandler.insert({ EssentialHandlerType::OnDisconnectedHandlerType, std::make_pair(std::make_unique<OnDisconnectedHandlerRegisterChecker>(), nullptr) });
+	essentialHandler.insert({ ESSENTIAL_HANDLER_TYPE::ON_CONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnConnectedHandlerRegisterChecker>(), nullptr) });
+	essentialHandler.insert({ ESSENTIAL_HANDLER_TYPE::ON_DISCONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnDisconnectedHandlerRegisterChecker>(), nullptr) });
 }
 
 EssentialHandlerManager& EssentialHandlerManager::GetInst()
@@ -44,7 +44,7 @@ void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 	}
 }
 
-bool EssentialHandlerManager::CallRegisteredHandler(RUDPSession& session, EssentialHandlerType handlerType)
+bool EssentialHandlerManager::CallRegisteredHandler(RUDPSession& session, ESSENTIAL_HANDLER_TYPE handlerType)
 {
 	return essentialHandler[handlerType].second(session);
 }

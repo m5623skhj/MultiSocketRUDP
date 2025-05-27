@@ -8,14 +8,14 @@
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
-	, serverPort(invalidPortNumber)
+	, serverPort(INVALID_PORT_NUMBER)
 	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
-bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ)
+bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ)
 {
 	u_long nonBlocking = 1;
 	ioctlsocket(sock, FIONBIO, &nonBlocking);
@@ -25,7 +25,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 		return false;
 	}
 
-	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, maxOutStandingReceive, 1, maxOutStandingSend, 1, rioRecvCQ, rioSendCQ, &sessionId);
+	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, MAX_OUT_STANDING_RECEIVE, 1, MAX_OUT_STANDING_SEND, 1, rioRecvCQ, rioSendCQ, &sessionId);
 	if (rioRQ == RIO_INVALID_RQ)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
@@ -39,7 +39,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 bool RUDPSession::InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
 {
-	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, maxSendBufferSize);
+	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, MAX_SEND_BUFFER_SIZE);
 	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
@@ -61,7 +61,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 
 	auto& context = recvBuffer.recvContext;
 	context->InitContext(sessionId, RIO_OPERATION_TYPE::OP_RECV);
-	context->Length = recvBufferSize;
+	context->Length = RECV_BUFFER_SIZE;
 	context->Offset = 0;
 	context->session = this;
 
@@ -71,7 +71,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 	context->localAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
 	context->localAddrRIOBuffer.Offset = 0;
 
-	context->BufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, recvBufferSize);
+	context->BufferId = rioFunctionTable.RIORegisterBuffer(recvBuffer.buffer, RECV_BUFFER_SIZE);
 	context->clientAddrRIOBuffer.BufferId = rioFunctionTable.RIORegisterBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
 	context->localAddrRIOBuffer.BufferId = rioFunctionTable.RIORegisterBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
 
@@ -85,7 +85,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 
 void RUDPSession::InitializeSession()
 {
-	sessionId = invalidSessionId;
+	sessionId = INVALID_SESSION_ID;
 	sessionKey = {};
 	clientAddr = {};
 	clientSockaddrInet = {};
@@ -127,9 +127,9 @@ void RUDPSession::Disconnect()
 
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
-		for (const auto& item : sendPacketInfoMap)
+		for (const auto& item : sendPacketInfoMap | std::views::values)
 		{
-			core.EraseSendPacketInfo(item.second, threadId);
+			core.EraseSendPacketInfo(item, threadId);
 		}
 	}
 	closesocket(sock);
@@ -155,7 +155,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 		return false;
 	}
 
-	PACKET_TYPE packetType = PACKET_TYPE::SendType;
+	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
 	PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
@@ -166,12 +166,12 @@ bool RUDPSession::SendPacket(IPacket& packet)
 void RUDPSession::OnConnected(SessionIdType inSessionId)
 {
 	sessionId = inSessionId;
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::OnConnectedHandlerType);
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::ESSENTIAL_HANDLER_TYPE::ON_CONNECTED_HANDLER_TYPE);
 }
 
 void RUDPSession::OnDisconnected()
 {
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::EssentialHandlerType::OnDisconnectedHandlerType);
+	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::ESSENTIAL_HANDLER_TYPE::ON_DISCONNECTED_HANDLER_TYPE);
 }
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType)
@@ -208,9 +208,9 @@ void RUDPSession::SendHeartbeatPacket()
 {
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
-	PACKET_TYPE packetType = PACKET_TYPE::HeartbeatType;
+	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 	PacketSequence packetSequence = ++lastSendPacketSequence;
-	std::cout << "HeartbeatPacketSequence : " << packetSequence << std::endl;
+	std::cout << "HeartbeatPacketSequence : " << packetSequence << '\n';
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
@@ -223,7 +223,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	std::string inputSessionKey;
 
 	recvPacket >> packetSequence >> inputSessionId >> inputSessionKey;
-	if (packetSequence != loginPacketSequence || sessionId != inputSessionId || sessionKey != inputSessionKey)
+	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != inputSessionId || sessionKey != inputSessionKey)
 	{
 		return;
 	}
@@ -251,13 +251,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
-	std::cout << "SendType RecvPacketSequence : " << packetSequence << std::endl;
+	std::cout << "SendType RecvPacketSequence : " << packetSequence << '\n';
 	if (lastReceivedPacketSequence != packetSequence)
 	{
 		NetBuffer::AddRefCount(&recvPacket);
-		recvPacketHolderQueue.push(RecvPacketInfo{ &recvPacket, packetSequence });
+		recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
 
-		std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << std::endl;
+		std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << '\n';
 
 		SendReplyToClient(packetSequence);
 
@@ -312,25 +312,24 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 	PacketId packetId;
 	recvPacket >> packetId;
 
-	auto packetHandler = PacketManager::GetInst().GetPacketHandler(packetId);
+	const auto packetHandler = PacketManager::GetInst().GetPacketHandler(packetId);
 	if (packetHandler == nullptr)
 	{
 		return false;
 	}
 
-	auto packet = PacketManager::GetInst().MakePacket(packetId);
+	const auto packet = PacketManager::GetInst().MakePacket(packetId);
 	if (packet == nullptr)
 	{
 		return false;
 	}
 
-	std::any realPacket = std::any(packet.get());
-	if (not PacketManager::GetInst().BufferToPacket(packetId, recvPacket, realPacket))
+	if (auto realPacket = std::any(packet.get()); not PacketManager::GetInst().BufferToPacket(packetId, recvPacket, realPacket))
 	{
 		return false;
 	}
 
-	bool packetHandleResult = packetHandler(*this, *packet);
+	const bool packetHandleResult = packetHandler(*this, *packet);
 	if (packetHandleResult == true && needReplyToClient == true)
 	{
 		SendReplyToClient(recvPacketSequence);
@@ -343,7 +342,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 {
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
-	PACKET_TYPE packetType = PACKET_TYPE::SendReplyType;
+	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
 	buffer << packetType << recvPacketSequence;
 
 	std::ignore = SendPacket(buffer, recvPacketSequence, true);
@@ -359,13 +358,12 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		return;
 	}
 
-	SendPacketInfo* sendedPacketInfo = nullptr;
+	SendPacketInfo* sendPacketInfo = nullptr;
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
-		auto itor = sendPacketInfoMap.find(packetSequence);
-		if (itor != sendPacketInfoMap.end())
+		if (const auto itor = sendPacketInfoMap.find(packetSequence); itor != sendPacketInfoMap.end())
 		{
-			sendedPacketInfo = itor->second;
+			sendPacketInfo = itor->second;
 		}
 		else
 		{
@@ -375,7 +373,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		sendPacketInfoMap.erase(packetSequence);
 	}
 
-	core.EraseSendPacketInfo(sendedPacketInfo, threadId);
+	core.EraseSendPacketInfo(sendPacketInfo, threadId);
 	nowInProcessingRecvPacket = true;
 	if (not ProcessHoldingPacket())
 	{
@@ -405,7 +403,7 @@ bool RUDPSession::IsConnected() const
 	return isConnected;
 }
 
-bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr)
+bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 {
 	if (clientAddr.sin_addr.S_un.S_addr != targetClientAddr.sin_addr.S_un.S_addr ||
 		clientAddr.sin_port != targetClientAddr.sin_port)

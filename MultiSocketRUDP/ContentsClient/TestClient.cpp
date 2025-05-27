@@ -15,7 +15,7 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 {
 	if (not RUDPClientCore::GetInst().Start(clientCoreOptionFile, sessionGetterOptionFile, true))
 	{
-		std::cout << "Core start failed" << std::endl;
+		std::cout << "Core start failed" << '\n';
 		return false;
 	}
 
@@ -23,11 +23,11 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 	constexpr unsigned int maximumConnectWaitingCount = 20;
 	if (not WaitingConnectToServer(maximumConnectWaitingCount))
 	{
-		std::cout << "It was waiting " << maximumConnectWaitingCount << "seconds. But connect to server failed" << std::endl;
+		std::cout << "It was waiting " << maximumConnectWaitingCount << "seconds. But connect to server failed" << '\n';
 		return false;
 	}
 
-	std::cout << "Client is running" << std::endl;
+	std::cout << "Client is running" << '\n';
 
 	testThread = std::thread{ &TestClient::RunTestThread, this };
 	return true;
@@ -38,10 +38,10 @@ void TestClient::Stop()
 	RUDPClientCore::GetInst().Stop();
 	testThread.join();
 
-	std::cout << "Client stopped" << std::endl;
+	std::cout << "Client stopped" << '\n';
 }
 
-bool TestClient::IsConnected() const
+bool TestClient::IsConnected()
 {
 	return RUDPClientCore::GetInst().IsConnected();
 }
@@ -56,7 +56,7 @@ bool TestClient::WaitingConnectToServer(const unsigned int maximumConnectWaiting
 
 		if (connectWaitingCount >= maximumConnectWaitingCount)
 		{
-			auto log = Logger::MakeLogObject<ClientLog>();
+			const auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Connect to server failed";
 			Logger::GetInstance().WriteLog(log);
 
@@ -72,9 +72,9 @@ void TestClient::RunTestThread()
 	constexpr int firstSendCount = 5;
 	SendAnyPacket(firstSendCount);
 
-	constexpr unsigned int maxProcessPacketInOneTick = 100;
 	while (not RUDPClientCore::GetInst().IsStopped())
 	{
+		constexpr unsigned int maxProcessPacketInOneTick = 100;
 		int remainPacketSize = static_cast<int>(min(RUDPClientCore::GetInst().GetRemainPacketSize(), maxProcessPacketInOneTick));
 		while (--remainPacketSize >= 0)
 		{
@@ -97,5 +97,5 @@ void TestClient::RunTestThread()
 		}
 	}
 
-	std::cout << "Test thread stopped" << std::endl;
+	std::cout << "Test thread stopped" << '\n';
 }

@@ -14,35 +14,34 @@ void PacketManager::Init()
 
 std::shared_ptr<IPacket> PacketManager::MakePacket(const PacketId packetId)
 {
-	auto iter = packetFactoryFunctionMap.find(packetId);
-	if (iter == packetFactoryFunctionMap.end())
+	const auto itor = packetFactoryFunctionMap.find(packetId);
+	if (itor == packetFactoryFunctionMap.end())
 	{
 		return nullptr;
 	}
 
-	auto factoryFunc = iter->second;
-	return factoryFunc();
+	return itor->second();
 }
 
 PacketHandler PacketManager::GetPacketHandler(const PacketId packetId)
 {
-	auto iter = packetHandlerMap.find(packetId);
-	if (iter == packetHandlerMap.end())
+	const auto itor = packetHandlerMap.find(packetId);
+	if (itor == packetHandlerMap.end())
 	{
 		return nullptr;
 	}
 
-	return iter->second;
+	return itor->second;
 }
 
 bool PacketManager::BufferToPacket(const PacketId packetId, NetBuffer& buffer, std::any& packet)
 {
-	auto iter = packetToBufferFunctionMap.find(packetId);
-	if (iter == packetToBufferFunctionMap.end())
+	const auto itor = packetToBufferFunctionMap.find(packetId);
+	if (itor == packetToBufferFunctionMap.end())
 	{
 		return false;
 	}
 
-	iter->second(buffer, packet);
+	itor->second(buffer, packet);
 	return true;
 }

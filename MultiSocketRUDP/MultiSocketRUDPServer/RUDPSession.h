@@ -35,7 +35,7 @@ enum class IO_MODE : LONG
 struct RecvBuffer
 {
 	std::shared_ptr<IOContext> recvContext{};
-	char buffer[recvBufferSize];
+	char buffer[RECV_BUFFER_SIZE];
 	CListBaseQueue<NetBuffer*> recvBufferList;
 };
 
@@ -43,7 +43,7 @@ struct SendBuffer
 {
 	CLockFreeQueue<SendPacketInfo*> sendPacketInfoQueue;
 	SendPacketInfo* reservedSendPacketInfo;
-	char rioSendBuffer[maxSendBufferSize];
+	char rioSendBuffer[MAX_SEND_BUFFER_SIZE];
 	RIO_BUFFERID sendBufferId;
 	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
 };
@@ -57,7 +57,7 @@ private:
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
 	[[nodiscard]]
-	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, RIO_CQ& rioRecvCQ, RIO_CQ& rioSendCQ);
+	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
 	[[nodiscard]]
 	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	[[nodiscard]]
@@ -93,7 +93,7 @@ private:
 	void OnSendReply(NetBuffer& recvPacket);
 
 private:
-	bool CheckMyClient(const sockaddr_in& targetClientAddr);
+	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
 	bool IsReleasing() const;
 
 public:
@@ -108,7 +108,7 @@ public:
 
 private:
 	std::atomic_bool isConnected{};
-	SessionIdType sessionId = invalidSessionId;
+	SessionIdType sessionId = INVALID_SESSION_ID;
 	// a connectKey seems to be necessary
 	// generate and store a key on the TCP connection side,
 	// then insert the generated key into the packet and send it
@@ -117,7 +117,7 @@ private:
 	std::string sessionKey{};
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockaddrInet{};
-	PortType serverPort{ invalidPortNumber };
+	PortType serverPort{ INVALID_PORT_NUMBER };
 	SOCKET sock{};
 	bool nowInReleaseThread{};
 	bool nowInProcessingRecvPacket{};
@@ -131,7 +131,7 @@ private:
 	std::atomic<PacketSequence> lastReceivedPacketSequence{};
 	struct RecvPacketInfoPriority
 	{
-		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh)
+		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh) const
 		{
 			return lfh.packetSequence > rfh.packetSequence;
 		}

@@ -8,7 +8,7 @@ PC::PC(RUDPSession& inSession)
 {
 }
 
-SessionIdType PC::GetSessionId()
+SessionIdType PC::GetSessionId() const
 {
 	return session.GetSessionId();
 }
@@ -18,7 +18,7 @@ bool PC::IsConnected() const
 	return session.IsConnected();
 }
 
-void PC::SendPacket(IPacket& packet)
+void PC::SendPacket(IPacket& packet) const
 {
 	session.SendPacket(packet);
 }

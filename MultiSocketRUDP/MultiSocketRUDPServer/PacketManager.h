@@ -15,6 +15,7 @@ public:
 	IPacket() = default;
 	virtual ~IPacket() = default;
 
+	[[nodiscard]]
 	virtual PacketId GetPacketId() const = 0;
 
 public:
@@ -49,7 +50,7 @@ public:
 	template <typename PacketType>
 	static void RegisterPacket()
 	{
-		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacket() : PacketType must inherit from IPacket");
+		static_assert(std::is_base_of_v<IPacket, PacketType>, "RegisterPacket() : PacketType must inherit from IPacket");
 
 		PacketFactoryFunction factoryFunc = []()
 		{
@@ -63,7 +64,7 @@ public:
 	template <typename PacketType>
 	static void RegisterPacketHandler(PacketHandler& handler)
 	{
-		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
+		static_assert(std::is_base_of_v<IPacket, PacketType>, "RegisterPacketHandler() : PacketType must inherit from IPacket");
 
 		PacketType packetType;
 		packetHandlerMap[packetType.GetPacketId()] = handler;
@@ -72,7 +73,7 @@ public:
 	template <typename PacketType>
 	static void RegisterBufferToPacketType()
 	{
-		static_assert(std::is_base_of<IPacket, PacketType>::value, "RegisterPacketHandler() : PacketType must inherit from IPacket");
+		static_assert(std::is_base_of_v<IPacket, PacketType>, "RegisterPacketHandler() : PacketType must inherit from IPacket");
 
 		auto packetToBufferFunction = [](NetBuffer& buffer, std::any& packet)
 		{
