@@ -209,7 +209,7 @@ void RUDPSession::SendHeartbeatPacket()
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
-	PacketSequence packetSequence = ++lastSendPacketSequence;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	std::cout << "HeartbeatPacketSequence : " << packetSequence << '\n';
 	buffer << packetType << packetSequence;
 
@@ -228,8 +228,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 		return;
 	}
 
-	bool connectState{ false };
-	if (not isConnected.compare_exchange_strong(connectState, true))
+	if (bool connectState{ false }; not isConnected.compare_exchange_strong(connectState, true))
 	{
 		return;
 	}

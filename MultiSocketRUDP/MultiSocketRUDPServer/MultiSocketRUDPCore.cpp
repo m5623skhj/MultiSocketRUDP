@@ -5,7 +5,7 @@
 #include "LogExtension.h"
 #include "Logger.h"
 
-void IOContext::InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType)
+void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
 	ownerSessionId = inOwnerSessionId;
 	ioType = inIOType;
@@ -22,7 +22,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not ReadOptionFile(coreOptionFilePath, sessionBrokerOptionFilePath))
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Option file read failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -30,7 +30,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "Required handler not registered";
 		Logger::GetInstance().WriteLog(log);
 		EssentialHandlerManager::GetInst().PrintUnregisteredEssentialHandler();
@@ -40,7 +40,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	if (not InitNetwork())
 	{
 		CloseAllSessions();
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitNetwork failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -49,7 +49,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	if (not InitRIO())
 	{
 		CloseAllSessions();
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitRIO failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -59,7 +59,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	{
 		CloseAllSessions();
 		StopServer();
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RunAllThreads() failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -96,16 +96,14 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().StopLoggerThread();
 
 	isServerStopped = true;
-	auto log = Logger::MakeLogObject<ServerLog>();
+	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Server stop";
 	Logger::GetInstance().WriteLog(log);
 }
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 {
-	auto buffer = sendPacketInfo->GetBuffer();
-
-	if (buffer->m_bIsEncoded == false)
+	if (const auto buffer = sendPacketInfo->GetBuffer(); buffer->m_bIsEncoded == false)
 	{
 		buffer->m_iWriteLast = buffer->m_iWrite;
 		buffer->m_iWrite = 0;
@@ -138,7 +136,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 	}
 	--connectedUserCount;
 
-	auto log = Logger::MakeLogObject<ServerLog>();
+	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = std::format("Session id {} is disconnected", disconnectTargetSessionId);
 	Logger::GetInstance().WriteLog(log);
 }
@@ -177,10 +175,9 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;
-	int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (result != 0)
+	if (int result = WSAStartup(MAKEWORD(2, 2), &wsaData); result != 0)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("WSAStartup failed {}", result);
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -201,7 +198,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	GUID guid = WSAID_MULTIPLE_RIO;
 	DWORD bytes = 0;
 
-	SOCKET tempSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	const SOCKET tempSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	bool result = true;
 	do
 	{
@@ -252,7 +249,7 @@ RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const un
 	const RIO_BUFFERID bufferId = rioFunctionTable.RIORegisterBuffer(targetBuffer, targetBufferSize);
 	if (bufferId == RIO_INVALID_BUFFERID)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIORegisterBuffer failed with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 	}
@@ -291,7 +288,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	Sleep(1000);
 	if (not RunSessionBroker())
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RunSessionBroker() failed";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -329,8 +326,7 @@ SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
 		return INVALID_SOCKET;
 	}
 
-	sockaddr_in serverAddr;
-	memset(&serverAddr, 0, sizeof(serverAddr));
+	sockaddr_in serverAddr = {};
 
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
@@ -444,14 +440,14 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 #endif
 	}
 
-	auto log = Logger::MakeLogObject<ServerLog>();
+	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Worker thread stopped";
 	Logger::GetInstance().WriteLog(log);
 }
 
 void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 {
-	HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
+	const HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
 	while (not threadStopFlag)
 	{
 		switch (WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE))
@@ -535,9 +531,9 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 		case WAIT_OBJECT_0:
 		{
 			std::scoped_lock lock(releaseSessionIdListLock);
-			for (auto& releaseSessionId : releaseSessionIdList)
+			for (const auto& releaseSessionId : releaseSessionIdList)
 			{
-				if (auto releaseSession = GetUsingSession(releaseSessionId))
+				if (const auto releaseSession = GetUsingSession(releaseSessionId))
 				{
 					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING ||
 						releaseSession->nowInProcessingRecvPacket)
@@ -607,7 +603,7 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 
 	if (rioResult.Status != 0)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIO operation failed with error code {}", rioResult.Status);
 		Logger::GetInstance().WriteLog(log);
 		contextPool.Free(context);
@@ -646,7 +642,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	}
 	default:
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("Invalid rio operation type. Type is {}", static_cast<unsigned char>(contextResult->ioType));
 		Logger::GetInstance().WriteLog(log);
 	}
@@ -658,7 +654,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 
 bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId)
 {
-	auto buffer = NetBuffer::Alloc();
+	const auto buffer = NetBuffer::Alloc();
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->session->recvBuffer.buffer, transferred) != 0)
 	{
 		return false;
@@ -722,7 +718,7 @@ bool MultiSocketRUDPCore::DoRecv(const RUDPSession& session) const
 	const auto context = session.recvBuffer.recvContext;
 	if (context == nullptr)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "DoRecv() : context is nullptr";
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -788,7 +784,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 	{
 		if (context->clientAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET)); context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
+			const auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "MakeSendContext() : clientAddrBufferId is RIO_INVALID_BUFFERID";
 			Logger::GetInstance().WriteLog(log);
 			contextPool.Free(context);

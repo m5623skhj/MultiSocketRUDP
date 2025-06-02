@@ -19,8 +19,7 @@ Logger::Logger()
 	std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
 	std::tm utcTime;
 
-	auto error = gmtime_s(&utcTime, &currentTime);
-	if (error != 0)
+	if (auto error = gmtime_s(&utcTime, &currentTime); error != 0)
 	{
 		std::cout << "Error in gmtime_s() : " << error << std::endl;
 		g_Dump.Crash();
@@ -72,7 +71,7 @@ void Logger::Worker()
 
 	while (true)
 	{
-		auto result = WaitForMultipleObjects(2, loggerEventHandles, FALSE, INFINITE);
+		const auto result = WaitForMultipleObjects(2, loggerEventHandles, FALSE, INFINITE);
 
 		{
 			std::scoped_lock lock(logQueueLock);
@@ -127,7 +126,7 @@ void Logger::WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQu
 	}
 }
 
-void Logger::WriteLog(std::shared_ptr<LogBase> logObject)
+void Logger::WriteLog(const std::shared_ptr<LogBase>& logObject)
 {
 	logObject->SetLogTime();
 
@@ -137,9 +136,9 @@ void Logger::WriteLog(std::shared_ptr<LogBase> logObject)
 	SetEvent(loggerEventHandles[0]);
 }
 
-void Logger::WriteLogToFile(std::shared_ptr<LogBase> logObject)
+void Logger::WriteLogToFile(const std::shared_ptr<LogBase>& logObject)
 {
-	auto logJson = logObject->ObjectToJsonImpl();
+	const auto logJson = logObject->ObjectToJsonImpl();
 	logFileStream << logJson << '\n';
 
 	if (printToConsole == true)

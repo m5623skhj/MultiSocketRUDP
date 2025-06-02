@@ -14,7 +14,7 @@ bool TestServer::Start(const std::wstring& coreOptionFilePath, const std::wstrin
 	{
 		std::cout << "StartServer() failed" << std::endl;
 		Logger::GetInstance().StopLoggerThread();
-		return 0;
+		return false;
 	}
 
 	std::cout << "Server is running" << std::endl;

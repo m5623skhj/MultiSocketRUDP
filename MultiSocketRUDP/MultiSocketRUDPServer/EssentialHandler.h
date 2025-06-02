@@ -64,6 +64,7 @@ private:
 		EssentialHandlerRegisterChecker() = default;
 		virtual ~EssentialHandlerRegisterChecker() = default;
 
+		[[nodiscard]]
 		bool IsRegisteredHandler() const { return isRegistered; }
 		virtual std::string GetHandlerType() = 0;
 

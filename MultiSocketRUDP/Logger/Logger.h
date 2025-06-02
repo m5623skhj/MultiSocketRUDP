@@ -43,10 +43,10 @@ private:
 
 #pragma region LogWaitingQueue
 public:
-	void WriteLog(std::shared_ptr<LogBase> logObject);
+	void WriteLog(const std::shared_ptr<LogBase>& logObject);
 
 private:
-	void WriteLogToFile(std::shared_ptr<LogBase> logObject);
+	void WriteLogToFile(const std::shared_ptr<LogBase>& logObject);
 
 private:
 	std::mutex logQueueLock;

@@ -93,7 +93,9 @@ private:
 	void OnSendReply(NetBuffer& recvPacket);
 
 private:
+	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
+	[[nodiscard]]
 	bool IsReleasing() const;
 
 public:

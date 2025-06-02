@@ -12,9 +12,11 @@ public:
 	explicit PC(RUDPSession& inSession);
 
 public:
+	[[nodiscard]]
 	SessionIdType GetSessionId() const;
 	void SendPacket(IPacket& packet) const;
 
+	[[nodiscard]]
 	bool IsConnected() const;
 
 private:
