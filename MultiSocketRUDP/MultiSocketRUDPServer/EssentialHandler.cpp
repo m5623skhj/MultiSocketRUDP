@@ -18,33 +18,28 @@ EssentialHandlerManager& EssentialHandlerManager::GetInst()
 
 bool EssentialHandlerManager::IsRegisteredAllEssentialHandler()
 {
-	for (const auto& checker : essentialHandler)
+	return std::ranges::all_of(essentialHandler | std::views::values, [](const auto& checker)
 	{
-		if (not checker.second.first->IsRegisteredHandler())
-		{
-			return false;
-		}
-	}
-
-	return true;
+		return checker.first->IsRegisteredHandler();
+	});
 }
 
 void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 {
-	for (const auto& checker : essentialHandler)
+	for (const auto& checker : essentialHandler | std::views::values)
 	{
-		if (checker.second.first->IsRegisteredHandler())
+		if (checker.first->IsRegisteredHandler())
 		{
 			continue;
 		}
 
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = checker.second.first->GetHandlerType() + " is unregistered";
+		log->logString = checker.first->GetHandlerType() + " is unregistered";
 		Logger::GetInstance().WriteLog(log);
 	}
 }
 
-bool EssentialHandlerManager::CallRegisteredHandler(RUDPSession& session, ESSENTIAL_HANDLER_TYPE handlerType)
+bool EssentialHandlerManager::CallRegisteredHandler(RUDPSession& session, const ESSENTIAL_HANDLER_TYPE handlerType)
 {
 	return essentialHandler[handlerType].second(session);
 }

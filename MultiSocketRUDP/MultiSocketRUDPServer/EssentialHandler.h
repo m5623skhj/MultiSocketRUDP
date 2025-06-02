@@ -28,7 +28,7 @@ public:
 private:
 	static void RegisterEssentialHandler(const RUDPCoreEssentialFunction& rudpCoreEssentialFunction, const ESSENTIAL_HANDLER_TYPE targetType)
 	{
-		auto itor = essentialHandler.find(targetType);
+		const auto itor = essentialHandler.find(targetType);
 		if (itor == essentialHandler.end())
 		{
 			std::cout << "You need register essential handler checker in constructor" << '\n';
