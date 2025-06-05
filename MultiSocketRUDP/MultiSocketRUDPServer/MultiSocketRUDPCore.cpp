@@ -89,6 +89,7 @@ void MultiSocketRUDPCore::StopServer()
 		retransmissionThreads[i].join();
 	}
 
+	SetEvent(logicThreadEventStopHandle);
 	SetEvent(sessionReleaseEventHandle);
 	sessionReleaseThread.join();
 	heartbeatThread.join();
