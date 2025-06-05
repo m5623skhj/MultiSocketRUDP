@@ -48,6 +48,7 @@ struct SendPacketInfo
 	bool isErasedPacketInfo{};
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
+	UINT64 time = 0;
 
 	~SendPacketInfo()
 	{

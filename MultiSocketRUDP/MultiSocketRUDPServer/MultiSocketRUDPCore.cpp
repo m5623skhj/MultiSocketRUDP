@@ -119,6 +119,12 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 		return false;
 	}
 
+	if (not sendPacketInfo->isReplyType)
+	{
+		std::string str = std::to_string(sendPacketInfo->sendPacketSequence) + " / Time : " + std::to_string(GetTickCount64() - sendPacketInfo->time) + '\n';
+		std::cout << str;
+	}
+
 	return true;
 }
 

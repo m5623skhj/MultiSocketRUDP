@@ -186,6 +186,12 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		return false;
 	}
 
+	if (not isReplyType)
+	{
+		std::cout << "Send Packet : " << inSendPacketSequence << '\n';
+		sendPacketInfo->time = GetTickCount64();
+	}
+
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	if (isReplyType == false)
 	{
@@ -210,7 +216,10 @@ void RUDPSession::SendHeartbeatPacket()
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
-	std::cout << "HeartbeatPacketSequence : " << packetSequence << '\n';
+	{
+		std::string str = "SendHeartbeatPacketSequence : " + std::to_string(packetSequence) + '\n';
+		std::cout << str;
+	}
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
@@ -250,13 +259,12 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
-	std::cout << "SendType RecvPacketSequence : " << packetSequence << '\n';
 	if (lastReceivedPacketSequence != packetSequence)
 	{
 		NetBuffer::AddRefCount(&recvPacket);
 		recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
 
-		std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << '\n';
+		//std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << '\n';
 
 		SendReplyToClient(packetSequence);
 
