@@ -81,18 +81,21 @@ void MultiSocketRUDPCore::StopServer()
 	CloseAllSessions();
 	delete[] rioCQList;
 
+	SetEvent(logicThreadEventStopHandle);
 	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
 	{
-		SetEvent(recvLogicThreadEventHandles[i]);
 		ioWorkerThreads[i].join();
 		recvLogicWorkerThreads[i].join();
 		retransmissionThreads[i].join();
+		CloseHandle(recvLogicThreadEventHandles[i]);
 	}
 
-	SetEvent(logicThreadEventStopHandle);
 	SetEvent(sessionReleaseEventHandle);
 	sessionReleaseThread.join();
 	heartbeatThread.join();
+
+	CloseHandle(logicThreadEventStopHandle);
+	CloseHandle(sessionReleaseEventHandle);
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -272,8 +275,8 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	recvLogicWorkerThreads.reserve(numOfWorkerThread);
 	retransmissionThreads.reserve(numOfWorkerThread);
 
-	logicThreadEventStopHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
-	sessionReleaseEventHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
+	logicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	sessionReleaseEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
@@ -283,7 +286,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	{
 		ioCompletedContexts.emplace_back();
 
-		recvLogicThreadEventHandles.emplace_back(CreateEvent(NULL, FALSE, FALSE, NULL));
+		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
 		sendPacketInfoList.emplace_back();
 		sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
 
@@ -670,7 +673,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 
 	contextResult->session->recvBuffer.recvBufferList.Enqueue(buffer);
 	ioCompletedContexts[threadId].Enqueue(contextResult);
-	SetEvent(recvLogicThreadEventHandles[threadId]);
+	ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr);
 
 	return DoRecv(*contextResult->session);
 }
