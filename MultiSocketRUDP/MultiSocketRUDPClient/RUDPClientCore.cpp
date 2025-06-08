@@ -101,8 +101,8 @@ void RUDPClientCore::SendConnectPacket()
 
 void RUDPClientCore::RunThreads()
 {
-	sendEventHandles[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
-	sendEventHandles[1] = CreateEvent(NULL, TRUE, FALSE, NULL);
+	sendEventHandles[0] = CreateSemaphore(nullptr, 0, LONG_MAX, nullptr);
+	sendEventHandles[1] = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 
 	recvThread = std::jthread([this]() { this->RunRecvThread(); });
 	sendThread = std::jthread([this]() { this->RunSendThread(); });
@@ -328,7 +328,7 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 		std::scoped_lock lock(sendBufferQueueLock);
 		sendBufferQueue.Enqueue(&buffer);
 
-		SetEvent(sendEventHandles[0]);
+		ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 	}
 }
 
@@ -448,7 +448,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 		sendBufferQueue.Enqueue(&buffer);
 	}
 
-	SetEvent(sendEventHandles[0]);
+	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 }
 
 WORD RUDPClientCore::GetPayloadLength(OUT const NetBuffer& buffer)
