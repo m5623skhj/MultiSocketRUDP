@@ -277,13 +277,12 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 		if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
-			SendReplyToServer(packetSequence);
+			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
 		}
 		else
 		{
-			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
+			SendReplyToServer(packetSequence);
 		}
-		SendReplyToServer(packetSequence);
 		break;
 	}
 	case PACKET_TYPE::SEND_REPLY_TYPE:
