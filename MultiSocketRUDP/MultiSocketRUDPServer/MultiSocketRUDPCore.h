@@ -48,7 +48,6 @@ struct SendPacketInfo
 	bool isErasedPacketInfo{};
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
-	UINT64 time = 0;
 
 	~SendPacketInfo()
 	{
@@ -212,8 +211,8 @@ private:
 	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
 	[[nodiscard]]
-	char InitReserveSession(RUDPSession& session);
-	void SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
+	char InitReserveSession(RUDPSession& session) const;
+	static void SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
 	std::jthread sessionBrokerThread{};

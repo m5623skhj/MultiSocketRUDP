@@ -25,7 +25,7 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 		return false;
 	}
 
-	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, MAX_OUT_STANDING_RECEIVE, 1, MAX_OUT_STANDING_SEND, 1, rioRecvCQ, rioSendCQ, &sessionId);
+	rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, 1, 1, 1, 1, rioRecvCQ, rioSendCQ, &sessionId);
 	if (rioRQ == RIO_INVALID_RQ)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
@@ -186,12 +186,6 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		return false;
 	}
 
-	if (not isReplyType)
-	{
-		std::cout << "Send Packet : " << inSendPacketSequence << '\n';
-		sendPacketInfo->time = GetTickCount64();
-	}
-
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	if (isReplyType == false)
 	{
@@ -244,7 +238,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	clientAddr = inClientAddr;
 	memset(&clientSockaddrInet, 0, sizeof(clientSockaddrInet));
 	clientSockaddrInet.Ipv4 = inClientAddr;
-	++lastReceivedPacketSequence;
+	++nextRecvPacketSequence;
 
 	OnConnected(sessionId);
 	SendReplyToClient(packetSequence);
@@ -260,9 +254,9 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
 
-	if (lastReceivedPacketSequence != packetSequence)
+	if (nextRecvPacketSequence != packetSequence)
 	{
-		if (lastReceivedPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
+		if (nextRecvPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
 		{
 			NetBuffer::AddRefCount(&recvPacket);
 			recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
@@ -286,13 +280,13 @@ bool RUDPSession::ProcessHoldingPacket()
 		NetBuffer* storedBuffer = nullptr;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			if (recvPacketHolderTop.packetSequence <= lastReceivedPacketSequence)
+			if (recvPacketHolderTop.packetSequence <= nextRecvPacketSequence)
 			{
 				recvPacketHolderQueue.pop();
 				recvHoldingPacketSequences.erase(recvPacketHolderTop.packetSequence);
 				continue;
 			}
-			else if (recvPacketHolderTop.packetSequence > lastReceivedPacketSequence)
+			else if (recvPacketHolderTop.packetSequence > nextRecvPacketSequence)
 			{
 				break;
 			}
@@ -314,7 +308,7 @@ bool RUDPSession::ProcessHoldingPacket()
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient)
 {
 	recvHoldingPacketSequences.erase(recvPacketSequence);
-	++lastReceivedPacketSequence;
+	++nextRecvPacketSequence;
 
 	PacketId packetId;
 	recvPacket >> packetId;
@@ -381,13 +375,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	}
 
 	core.EraseSendPacketInfo(sendPacketInfo, threadId);
-	nowInProcessingRecvPacket = true;
-	if (not ProcessHoldingPacket())
-	{
-		Disconnect();
-	}
-
-	nowInProcessingRecvPacket = false;
 }
 
 SessionIdType RUDPSession::GetSessionId() const

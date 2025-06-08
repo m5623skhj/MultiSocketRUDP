@@ -156,7 +156,7 @@ private:
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHoldingQueue;
 	std::mutex recvPacketHoldingQueueLock;
 
-	PacketSequence recvPacketSequence{ 1 };
+	PacketSequence nextRecvPacketSequence{ 1 };
 #pragma endregion RUDP
 
 public:
@@ -166,6 +166,7 @@ public:
 
 private:
 	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
+	void SendPacket(const SendPacketInfo& sendPacketInfo);
 	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
 	static inline void EncodePacket(OUT NetBuffer& packet);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);

@@ -131,7 +131,7 @@ private:
 	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
 	std::shared_mutex sendPacketInfoMapLock;
 
-	std::atomic<PacketSequence> lastReceivedPacketSequence{};
+	std::atomic<PacketSequence> nextRecvPacketSequence{};
 	struct RecvPacketInfoPriority
 	{
 		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh) const

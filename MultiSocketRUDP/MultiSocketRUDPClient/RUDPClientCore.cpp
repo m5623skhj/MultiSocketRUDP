@@ -209,7 +209,7 @@ void RUDPClientCore::RunRetransmissionThread()
 				break;
 			}
 
-			SendPacket(*sendPacketInfo->GetBuffer(), sendPacketInfo->sendPacketSequence);
+			SendPacket(*sendPacketInfo);
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
@@ -307,6 +307,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		return;
 	}
 
+	std::cout << "OnSendReply : " << packetSequence << '\n';
 	if (packetSequence == 0)
 	{
 		isConnected = true;
@@ -382,17 +383,17 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	{
 		auto holdingPacketInfo = recvPacketHoldingQueue.top();
 
-		if (holdingPacketInfo.packetSequence <= recvPacketSequence)
+		if (holdingPacketInfo.packetSequence < nextRecvPacketSequence)
 		{
 			recvPacketHoldingQueue.pop();
 			continue;
 		}
-		else if (holdingPacketInfo.packetSequence != recvPacketSequence + 1)
+		else if (holdingPacketInfo.packetSequence != nextRecvPacketSequence)
 		{
 			return nullptr;
 		}
 
-		++recvPacketSequence;
+		++nextRecvPacketSequence;
 		recvPacketHoldingQueue.pop();
 		if (holdingPacketInfo.packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
@@ -438,6 +439,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 	sendPacketInfo->Initialize(&buffer, inSendPacketSequence);
 	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
+	if (sendPacketInfo->retransmissionCount == 0)
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
@@ -448,6 +450,15 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 		sendBufferQueue.Enqueue(&buffer);
 	}
 
+	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+}
+
+void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
+{
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		sendBufferQueue.Enqueue(sendPacketInfo.buffer);
+	}
 	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 }
 

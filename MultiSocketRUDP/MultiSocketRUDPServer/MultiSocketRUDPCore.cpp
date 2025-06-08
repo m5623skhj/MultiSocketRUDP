@@ -123,12 +123,6 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 		return false;
 	}
 
-	if (not sendPacketInfo->isReplyType)
-	{
-		std::string str = std::to_string(sendPacketInfo->sendPacketSequence) + " / Time : " + std::to_string(GetTickCount64() - sendPacketInfo->time) + '\n';
-		std::cout << str;
-	}
-
 	return true;
 }
 
@@ -734,7 +728,7 @@ bool MultiSocketRUDPCore::DoRecv(const RUDPSession& session) const
 		return false;
 	}
 
-	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, NULL, NULL, 0, context.get()) == false)
+	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context.get()) == false)
 	{
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOReceiveEx() failed with {}", WSAGetLastError());

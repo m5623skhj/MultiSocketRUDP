@@ -72,7 +72,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			}
 
 			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("RunSessionBrokerThread accept falid with error {}", error);
+			log->logString = std::format("RunSessionBrokerThread accept failed with error {}", error);
 			Logger::GetInstance().WriteLog(log);
 			continue;
 		}
@@ -83,7 +83,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 
 	NetBuffer::Free(&sendBuffer);
 
-	auto log = Logger::MakeLogObject<ServerLog>();
+	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
 	Logger::GetInstance().WriteLog(log);
 }
@@ -171,12 +171,12 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, con
 void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
 {
 	char connectResultCode = 0;
-	auto session = AcquireSession();
+	const auto session = AcquireSession();
 	do
 	{
 		if (session == nullptr)
 		{
-			auto log = Logger::MakeLogObject<ServerLog>();
+			const auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = "Server is full of users";
 			Logger::GetInstance().WriteLog(log);
 			connectResultCode = 1;
@@ -203,7 +203,7 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 	}
 }
 
-char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session)
+char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 {
 	if (session.isConnected)
 	{
@@ -230,7 +230,7 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session)
 
 	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("InitializeRIO failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
@@ -239,7 +239,7 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session)
 
 	if (not DoRecv(session))
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("DoRecv failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 
