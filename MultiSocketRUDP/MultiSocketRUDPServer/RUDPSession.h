@@ -6,6 +6,7 @@
 #include "Queue.h"
 #include <shared_mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <queue>
 
 class MultiSocketRUDPCore;
@@ -139,6 +140,7 @@ private:
 		}
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
+	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
 
 private:
 	RecvBuffer recvBuffer;

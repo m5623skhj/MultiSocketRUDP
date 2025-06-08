@@ -259,19 +259,17 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
+
 	if (lastReceivedPacketSequence != packetSequence)
 	{
-		NetBuffer::AddRefCount(&recvPacket);
-		recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
-
-		//std::cout << "RecvPacketHolderQueueSequence : " << recvPacketHolderQueue.top().packetSequence << '\n';
-
-		SendReplyToClient(packetSequence);
-
-		return true;
+		if (lastReceivedPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
+		{
+			NetBuffer::AddRefCount(&recvPacket);
+			recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
+			recvHoldingPacketSequences.emplace(packetSequence);
+		}
 	}
-	
-	if (ProcessPacket(recvPacket, packetSequence) == false)
+	else if (ProcessPacket(recvPacket, packetSequence) == false)
 	{
 		return false;
 	}
@@ -291,9 +289,10 @@ bool RUDPSession::ProcessHoldingPacket()
 			if (recvPacketHolderTop.packetSequence <= lastReceivedPacketSequence)
 			{
 				recvPacketHolderQueue.pop();
+				recvHoldingPacketSequences.erase(recvPacketHolderTop.packetSequence);
 				continue;
 			}
-			else if (recvPacketHolderTop.packetSequence != lastReceivedPacketSequence + 1)
+			else if (recvPacketHolderTop.packetSequence > lastReceivedPacketSequence)
 			{
 				break;
 			}
@@ -314,6 +313,7 @@ bool RUDPSession::ProcessHoldingPacket()
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient)
 {
+	recvHoldingPacketSequences.erase(recvPacketSequence);
 	++lastReceivedPacketSequence;
 
 	PacketId packetId;
