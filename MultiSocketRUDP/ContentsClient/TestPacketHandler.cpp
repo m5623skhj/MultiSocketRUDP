@@ -3,7 +3,7 @@
 #include "Protocol.h"
 #include "RUDPClientCore.h"
 #include "Logger.h"
-#include "LogExtention.h"
+#include "LogExtension.h"
 #include <random>
 
 namespace

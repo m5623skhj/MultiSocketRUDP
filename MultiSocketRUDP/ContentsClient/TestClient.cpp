@@ -2,7 +2,7 @@
 #include "TestClient.h"
 #include "RUDPClientCore.h"
 #include "Logger.h"
-#include "LogExtention.h"
+#include "LogExtension.h"
 #include "Protocol.h"
 
 TestClient& TestClient::GetInst()

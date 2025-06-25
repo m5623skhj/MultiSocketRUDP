@@ -1,7 +1,7 @@
 #include "PreCompile.h"
 #include "RUDPClientCore.h"
 #include "Logger.h"
-#include "LogExtention.h"
+#include "LogExtension.h"
 
 RUDPClientCore& RUDPClientCore::GetInst()
 {

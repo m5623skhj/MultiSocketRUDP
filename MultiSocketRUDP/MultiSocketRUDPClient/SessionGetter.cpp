@@ -1,7 +1,7 @@
 #include "PreCompile.h"
 #include "RUDPClientCore.h"
 #include "Logger.h"
-#include "LogExtention.h"
+#include "LogExtension.h"
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)

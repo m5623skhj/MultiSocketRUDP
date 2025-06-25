@@ -146,7 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
-    <ClInclude Include="LogExtention.h" />
+    <ClInclude Include="LogExtension.h" />
     <ClInclude Include="RUDPClientCore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

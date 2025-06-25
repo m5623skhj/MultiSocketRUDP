@@ -59,7 +59,7 @@
     <ClInclude Include="RUDPClientCore.h">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClInclude>
-    <ClInclude Include="LogExtention.h">
+    <ClInclude Include="LogExtension.h">
       <Filter>소스 파일\Log</Filter>
     </ClInclude>
     <ClInclude Include="BuildConfig.h">
