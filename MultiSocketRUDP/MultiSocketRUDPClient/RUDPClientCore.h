@@ -6,6 +6,8 @@
 #include <thread>
 #include <mutex>
 #include <array>
+#include <map>
+
 #include "Queue.h"
 #include <queue>
 #include "../MultiSocketRUDPServer/PacketManager.h"
@@ -142,7 +144,7 @@ private:
 
 private:
 	std::atomic<PacketSequence> lastSendPacketSequence{};
-	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
 	std::mutex sendPacketInfoMapLock;
 
 	std::atomic<PacketSequence> lastReceivedPacketSequence{};

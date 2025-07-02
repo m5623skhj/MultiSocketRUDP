@@ -1,4 +1,6 @@
 #pragma once
+#include <map>
+
 #include "CoreType.h"
 #include <MSWSock.h>
 #include "LockFreeQueue.h"
@@ -128,7 +130,7 @@ private:
 	ThreadIdType threadId{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};
-	std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
 	std::shared_mutex sendPacketInfoMapLock;
 
 	std::atomic<PacketSequence> nextRecvPacketSequence{};
