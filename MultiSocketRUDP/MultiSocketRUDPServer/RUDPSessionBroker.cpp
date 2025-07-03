@@ -252,10 +252,9 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 void MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
 	EncodePacket(sendBuffer);
-	int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0);
-	if (result == SOCKET_ERROR)
+	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 	}

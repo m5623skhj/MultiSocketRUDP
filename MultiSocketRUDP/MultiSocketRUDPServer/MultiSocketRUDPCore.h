@@ -71,7 +71,7 @@ struct SendPacketInfo
 	}
 
 	[[nodiscard]]
-	inline NetBuffer* GetBuffer() { return buffer; }
+	inline NetBuffer* GetBuffer() const { return buffer; }
 };
 
 namespace MultiSocketRUDP
@@ -269,7 +269,7 @@ private:
 	[[nodiscard]]
 	static bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	[[nodiscard]]
-	int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
+	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
     [[nodiscard]]  
 	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId);
 	[[nodiscard]]

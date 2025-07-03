@@ -4,11 +4,11 @@
 namespace PacketHandlerUtil
 {
 	template <typename PacketType>
-	PacketHandler MakePacketHandler(PacketHandler targetFunction)
+	PacketHandler MakePacketHandler(const PacketHandler& targetFunction)
 	{
 		return [targetFunction](RUDPSession& session, IPacket& inPacket)
 		{
-			static_assert(std::is_base_of<IPacket, PacketType>::value, "MakePacketHandler() : PacketType must inherit from IPacket");
+			static_assert(std::is_base_of_v<IPacket, PacketType>, "MakePacketHandler() : PacketType must inherit from IPacket");
 
 			auto* packet = static_cast<PacketType*>(&inPacket);
 			return targetFunction(session, *packet);

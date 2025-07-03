@@ -9,7 +9,7 @@ RUDPClientCore& RUDPClientCore::GetInst()
 	return instance;
 }
 
-bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole)
+bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
@@ -359,10 +359,9 @@ void RUDPClientCore::DoSend()
 
 void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
-	UINT64 now = GetTickCount64();
-	UINT64 delta = now - tickSet.nowTick;
+	const UINT64 now = GetTickCount64();
 
-	if (delta < intervalMs)
+	if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
 	{
 		Sleep(static_cast<DWORD>(intervalMs - delta));
 	}

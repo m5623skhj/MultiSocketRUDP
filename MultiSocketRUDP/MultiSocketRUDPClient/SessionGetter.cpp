@@ -96,7 +96,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -105,7 +105,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("Socket creation failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		return false;
@@ -113,7 +113,7 @@ bool RUDPClientCore::GetSessionFromServer()
 
 	if (not TryConnectToSessionBroker())
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
+		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sessionBrokerSocket);

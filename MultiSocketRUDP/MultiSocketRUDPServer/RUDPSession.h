@@ -121,7 +121,7 @@ private:
 	// insert the client information into clientAddr below
 	std::string sessionKey{};
 	sockaddr_in clientAddr{};
-	SOCKADDR_INET clientSockaddrInet{};
+	SOCKADDR_INET clientSockAddrInet{};
 	PortType serverPort{ INVALID_PORT_NUMBER };
 	SOCKET sock{};
 	bool nowInReleaseThread{};

@@ -425,7 +425,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
-			auto context = GetIOCompletedContext(rioResults[i]);
+			const auto context = GetIOCompletedContext(rioResults[i]);
 			if (context == nullptr)
 			{
 				continue;
@@ -812,7 +812,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 
 	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, NULL, &context->clientAddrRIOBuffer, nullptr, 0, 0, context) == false)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
+		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOSendEx() failed with {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		contextPool.Free(context);
@@ -826,7 +826,7 @@ int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext*
 {
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
 
-	unsigned int totalSendSize = 0;
+	int totalSendSize = 0;
 	const int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
 
 	if (session.sendBuffer.reservedSendPacketInfo != nullptr)
