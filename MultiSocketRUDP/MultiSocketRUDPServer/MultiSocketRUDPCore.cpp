@@ -796,7 +796,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 		}
 	}
 
-	if (memcpy_s(context->clientAddrBuffer, sizeof(context->clientAddrBuffer), &session.clientSockaddrInet, sizeof(SOCKADDR_INET)) != NOERROR)
+	if (memcpy_s(context->clientAddrBuffer, sizeof(context->clientAddrBuffer), &session.clientSockAddrInet, sizeof(SOCKADDR_INET)) != NOERROR)
 	{
 		return nullptr;
 	}
@@ -822,11 +822,11 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 	return true;
 }
 
-int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
+unsigned int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId)
 {
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
 
-	int totalSendSize = 0;
+	unsigned int totalSendSize = 0;
 	const int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
 
 	if (session.sendBuffer.reservedSendPacketInfo != nullptr)

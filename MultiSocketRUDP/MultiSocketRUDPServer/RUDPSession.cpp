@@ -88,7 +88,7 @@ void RUDPSession::InitializeSession()
 	sessionId = INVALID_SESSION_ID;
 	sessionKey = {};
 	clientAddr = {};
-	clientSockaddrInet = {};
+	clientSockAddrInet = {};
 	lastSendPacketSequence = {};
 	nowInReleaseThread = {};
 
@@ -236,8 +236,8 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 		return;
 	}
 	clientAddr = inClientAddr;
-	memset(&clientSockaddrInet, 0, sizeof(clientSockaddrInet));
-	clientSockaddrInet.Ipv4 = inClientAddr;
+	memset(&clientSockAddrInet, 0, sizeof(clientSockAddrInet));
+	clientSockAddrInet.Ipv4 = inClientAddr;
 	++nextRecvPacketSequence;
 
 	OnConnected(sessionId);
@@ -389,7 +389,7 @@ sockaddr_in RUDPSession::GetSocketAddress() const
 
 SOCKADDR_INET RUDPSession::GetSocketAddressInet() const
 {
-	return clientSockaddrInet;
+	return clientSockAddrInet;
 }
 
 bool RUDPSession::IsConnected() const
