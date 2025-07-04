@@ -19,7 +19,7 @@ enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
 	OCCURED_ERROR = -1,
 	IS_ERASED_PACKET = -2,
 	STREAM_IS_FULL = -3,
-	IS_SENDED = -4,
+	IS_SENT = -4,
 };
 
 struct IOContext : RIO_BUF

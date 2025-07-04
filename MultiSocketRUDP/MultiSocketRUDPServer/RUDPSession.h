@@ -19,7 +19,7 @@ struct IOContext;
 
 struct RecvPacketInfo
 {
-	explicit RecvPacketInfo(NetBuffer* inBuffer, PacketSequence inPacketSequence)
+	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence)
 		: buffer(inBuffer)
 		, packetSequence(inPacketSequence)
 	{

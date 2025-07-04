@@ -375,9 +375,8 @@ void MultiSocketRUDPCore::CloseAllSessions()
 
 RUDPSession* MultiSocketRUDPCore::AcquireSession()
 {
-	RUDPSession* session = nullptr;
+	RUDPSession* session;
 	{
-		SessionIdType sessionId{};
 		std::scoped_lock lock(unusedSessionIdListLock);
 
 		if (unusedSessionIdList.empty() == true)
@@ -385,7 +384,7 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 			return nullptr;
 		}
 
-		sessionId = unusedSessionIdList.front();
+		const SessionIdType sessionId = unusedSessionIdList.front();
 		unusedSessionIdList.pop_front();
 
 		session = sessionArray[sessionId];
@@ -413,7 +412,6 @@ RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId)
 void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 {
 	RIORESULT rioResults[MAX_RIO_RESULT];
-	ULONG numOfResults = 0;
 
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
@@ -422,7 +420,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 	{
 		ZeroMemory(rioResults, sizeof(rioResults));
 
-		numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
+		const ULONG numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
 			const auto context = GetIOCompletedContext(rioResults[i]);
@@ -900,7 +898,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 	MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
 	if (packetSequenceSet.contains(key) == true)
 	{
-		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENDED;
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
 	}
 
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
