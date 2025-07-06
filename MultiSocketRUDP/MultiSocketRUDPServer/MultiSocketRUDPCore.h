@@ -147,6 +147,7 @@ private:
 
 private:
 	void CloseAllSessions();
+	void ClearAllSession();
 
 private:
 	bool threadStopFlag{};

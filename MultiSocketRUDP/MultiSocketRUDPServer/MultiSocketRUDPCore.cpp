@@ -39,7 +39,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not InitNetwork())
 	{
-		CloseAllSessions();
+		StopServer();
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitNetwork failed";
 		Logger::GetInstance().WriteLog(log);
@@ -48,7 +48,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not InitRIO())
 	{
-		CloseAllSessions();
+		StopServer();
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitRIO failed";
 		Logger::GetInstance().WriteLog(log);
@@ -57,7 +57,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not RunAllThreads())
 	{
-		CloseAllSessions();
 		StopServer();
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RunAllThreads() failed";
@@ -96,6 +95,8 @@ void MultiSocketRUDPCore::StopServer()
 
 	CloseHandle(logicThreadEventStopHandle);
 	CloseHandle(sessionReleaseEventHandle);
+
+	ClearAllSession();
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -353,11 +354,6 @@ SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
 
 void MultiSocketRUDPCore::CloseAllSessions()
 {
-	{
-		std::scoped_lock lock(unusedSessionIdListLock);
-		unusedSessionIdList.clear();
-	}
-
 	for (const auto& session : sessionArray)
 	{
 		if (session->sock != INVALID_SOCKET)
@@ -365,12 +361,31 @@ void MultiSocketRUDPCore::CloseAllSessions()
 			closesocket(session->sock);
 			continue;
 		}
-		delete session;
 	}
 
-	// need wait?
-	sessionArray.clear();
 	connectedUserCount = 0;
+}
+
+void MultiSocketRUDPCore::ClearAllSession()
+{
+	{
+		std::scoped_lock lock(unusedSessionIdListLock);
+		unusedSessionIdList.clear();
+	}
+
+	{
+		std::scoped_lock lock(releaseSessionIdListLock);
+		releaseSessionIdList.clear();
+	}
+
+	{
+		for (const auto& session : sessionArray)
+		{
+			delete session;
+		}
+
+		sessionArray.clear();
+	}
 }
 
 RUDPSession* MultiSocketRUDPCore::AcquireSession()
