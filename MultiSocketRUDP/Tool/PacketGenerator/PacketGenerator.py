@@ -152,11 +152,11 @@ def MakePacketClasss(packetList):
         
         generatedCode += f"class {packetName} : public IPacket\n" + "{\npublic:\n"
         generatedCode += f"\t{packetName}() = default;\n"
-        generatedCode += f"\tvirtual ~{packetName}() override = default;\n\npublic:\n"
-        generatedCode += "\tvirtual PacketId GetPacketId() const override;\n"
+        generatedCode += f"\t~{packetName}() override = default;\n\npublic:\n"
+        generatedCode += "\tPacketId GetPacketId() const override;\n"
         if items is not None:
-            generatedCode += "\tvirtual void BufferToPacket(NetBuffer& buffer) override;\n"
-            generatedCode += "\tvirtual void PacketToBuffer(NetBuffer& buffer) override;\n"
+            generatedCode += "\tvoid BufferToPacket(NetBuffer& buffer) override;\n"
+            generatedCode += "\tvoid PacketToBuffer(NetBuffer& buffer) override;\n"
             generatedCode += "\npublic:\n"
             for item in items:
                 generatedCode += f"\t{item['Type']} {item['Name']};\n"

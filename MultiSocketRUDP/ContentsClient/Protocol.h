@@ -59,32 +59,32 @@ class Ping : public IPacket
 {
 public:
 	Ping() = default;
-	virtual ~Ping() override = default;
+	~Ping() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
+	PacketId GetPacketId() const override;
 };
 
 class Pong : public IPacket
 {
 public:
 	Pong() = default;
-	virtual ~Pong() override = default;
+	~Pong() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
+	PacketId GetPacketId() const override;
 };
 
 class TestStringPacketReq : public IPacket
 {
 public:
 	TestStringPacketReq() = default;
-	virtual ~TestStringPacketReq() override = default;
+	~TestStringPacketReq() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
-	virtual void BufferToPacket(NetBuffer& buffer) override;
-	virtual void PacketToBuffer(NetBuffer& buffer) override;
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
 	std::string testString;
@@ -94,12 +94,12 @@ class TestStringPacketRes : public IPacket
 {
 public:
 	TestStringPacketRes() = default;
-	virtual ~TestStringPacketRes() override = default;
+	~TestStringPacketRes() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
-	virtual void BufferToPacket(NetBuffer& buffer) override;
-	virtual void PacketToBuffer(NetBuffer& buffer) override;
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
 	std::string echoString;
@@ -109,12 +109,12 @@ class TestPacketReq : public IPacket
 {
 public:
 	TestPacketReq() = default;
-	virtual ~TestPacketReq() override = default;
+	~TestPacketReq() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
-	virtual void BufferToPacket(NetBuffer& buffer) override;
-	virtual void PacketToBuffer(NetBuffer& buffer) override;
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
 	int order;
@@ -124,12 +124,12 @@ class TestPacketRes : public IPacket
 {
 public:
 	TestPacketRes() = default;
-	virtual ~TestPacketRes() override = default;
+	~TestPacketRes() override = default;
 
 public:
-	virtual PacketId GetPacketId() const override;
-	virtual void BufferToPacket(NetBuffer& buffer) override;
-	virtual void PacketToBuffer(NetBuffer& buffer) override;
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
 	int order;
