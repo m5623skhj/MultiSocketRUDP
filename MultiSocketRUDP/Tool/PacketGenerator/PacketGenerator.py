@@ -215,7 +215,7 @@ def GenerateHandlePacketInPacketHandlerCpp(packetList, originCode):
         if packet['Type'] == 'ReplyPacket':
             continue
         
-        candidateCode = f"bool HandlePacket(RUDPSession& session, {packet['PacketName']}& packet)"
+        candidateCode = f"static bool HandlePacket(const RUDPSession& session, {packet['PacketName']}& packet)"
         if candidateCode not in handlerCode:
             if handlerCode:
                 handlerCode += f"\n\n\t{candidateCode}"

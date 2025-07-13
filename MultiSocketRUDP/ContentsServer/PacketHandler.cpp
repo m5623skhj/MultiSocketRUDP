@@ -14,7 +14,7 @@
 
 namespace ContentsPacketHandler
 {
-	static bool HandlePacket(RUDPSession& session, Ping& packet)
+	static bool HandlePacket(const RUDPSession& session, Ping& packet)
 	{
 		auto pc = GET_PC(pc, session);
 		
@@ -24,7 +24,7 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
-	static bool HandlePacket(RUDPSession& session, TestPacketReq& packet)
+	static bool HandlePacket(const RUDPSession& session, TestPacketReq& packet)
 	{
 		auto pc = GET_PC(pc, session);
 
@@ -35,7 +35,7 @@ namespace ContentsPacketHandler
 		return true;
 	}
 
-	static bool HandlePacket(RUDPSession& session, TestStringPacketReq& packet)
+	static bool HandlePacket(const RUDPSession& session, TestStringPacketReq& packet)
 	{
 		auto pc = GET_PC(pc, session);
 
