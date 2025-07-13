@@ -62,6 +62,7 @@ public:
 	~Ping() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 };
 
@@ -72,6 +73,7 @@ public:
 	~Pong() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 };
 
@@ -82,6 +84,7 @@ public:
 	~TestStringPacketReq() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 	void BufferToPacket(NetBuffer& buffer) override;
 	void PacketToBuffer(NetBuffer& buffer) override;
@@ -97,6 +100,7 @@ public:
 	~TestStringPacketRes() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 	void BufferToPacket(NetBuffer& buffer) override;
 	void PacketToBuffer(NetBuffer& buffer) override;
@@ -112,6 +116,7 @@ public:
 	~TestPacketReq() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 	void BufferToPacket(NetBuffer& buffer) override;
 	void PacketToBuffer(NetBuffer& buffer) override;
@@ -127,6 +132,7 @@ public:
 	~TestPacketRes() override = default;
 
 public:
+	[[nodiscard]]
 	PacketId GetPacketId() const override;
 	void BufferToPacket(NetBuffer& buffer) override;
 	void PacketToBuffer(NetBuffer& buffer) override;

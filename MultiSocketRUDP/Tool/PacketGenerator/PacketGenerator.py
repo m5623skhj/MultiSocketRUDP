@@ -153,7 +153,7 @@ def MakePacketClasss(packetList):
         generatedCode += f"class {packetName} : public IPacket\n" + "{\npublic:\n"
         generatedCode += f"\t{packetName}() = default;\n"
         generatedCode += f"\t~{packetName}() override = default;\n\npublic:\n"
-        generatedCode += "\tPacketId GetPacketId() const override;\n"
+        generatedCode += "\t[[nodiscard]]\n\tPacketId GetPacketId() const override;\n"
         if items is not None:
             generatedCode += "\tvoid BufferToPacket(NetBuffer& buffer) override;\n"
             generatedCode += "\tvoid PacketToBuffer(NetBuffer& buffer) override;\n"

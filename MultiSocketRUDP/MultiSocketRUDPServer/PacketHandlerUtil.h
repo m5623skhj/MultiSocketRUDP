@@ -16,9 +16,9 @@ namespace PacketHandlerUtil
 	}
 
 	template <typename PacketType>
-	PacketHandler MappingHandler(bool (*targetFunction)(RUDPSession&, PacketType&))
+	PacketHandler MappingHandler(bool (*targetFunction)(const RUDPSession&, PacketType&))
 	{
-		return [targetFunction](RUDPSession& session, IPacket& inPacket) -> bool
+		return [targetFunction](const RUDPSession& session, IPacket& inPacket) -> bool
 		{
 			auto* packet = static_cast<PacketType*>(&inPacket);
 			return targetFunction(session, *packet);
