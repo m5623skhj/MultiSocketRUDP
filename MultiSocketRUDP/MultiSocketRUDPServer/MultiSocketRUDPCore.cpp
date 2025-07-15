@@ -4,6 +4,7 @@
 #include "EssentialHandler.h"
 #include "LogExtension.h"
 #include "Logger.h"
+#include "Ticker.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -92,6 +93,7 @@ void MultiSocketRUDPCore::StopServer()
 	SetEvent(sessionReleaseEventHandle);
 	sessionReleaseThread.join();
 	heartbeatThread.join();
+	Ticker::GetInstance().Stop();
 
 	CloseHandle(logicThreadEventStopHandle);
 	CloseHandle(sessionReleaseEventHandle);
@@ -275,6 +277,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
+	Ticker::GetInstance().Start();
 	sessionReleaseThread = std::jthread([this]() { RunSessionReleaseThread(); });
 	heartbeatThread = std::jthread([this]() { RunHeartbeatThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)

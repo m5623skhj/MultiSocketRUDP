@@ -31,6 +31,9 @@
     <Filter Include="소스 파일\Log">
       <UniqueIdentifier>{026f6f28-f811-456a-9506-993b77c3fe91}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Ticker">
+      <UniqueIdentifier>{95485981-a236-4c8c-98a7-f4b7e22f9024}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
@@ -66,6 +69,9 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="Ticker.cpp">
+      <Filter>소스 파일\Ticker</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
@@ -91,6 +97,9 @@
     </ClInclude>
     <ClInclude Include="LogExtension.h">
       <Filter>소스 파일\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Ticker.h">
+      <Filter>소스 파일\Ticker</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

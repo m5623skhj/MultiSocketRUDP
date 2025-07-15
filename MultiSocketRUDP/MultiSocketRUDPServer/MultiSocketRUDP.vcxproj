@@ -30,6 +30,7 @@
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
+    <ClCompile Include="Ticker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
@@ -40,6 +41,7 @@
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RUDPSession.h" />
+    <ClInclude Include="Ticker.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

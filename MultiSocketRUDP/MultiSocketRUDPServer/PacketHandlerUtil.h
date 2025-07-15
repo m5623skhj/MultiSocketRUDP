@@ -29,6 +29,6 @@ namespace PacketHandlerUtil
 	void RegisterPacket(bool (*targetFunction)(const RUDPSession&, PacketType&))
 	{
 		PacketHandler handler = PacketHandlerUtil::MakePacketHandler<PacketType>(PacketHandlerUtil::MappingHandler(targetFunction));
-		REGISTER_PACKET(PacketType, handler);
+		REGISTER_PACKET(PacketType, handler)
 	}
 }
