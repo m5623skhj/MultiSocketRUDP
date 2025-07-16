@@ -69,6 +69,7 @@
   * 일정 시간 마다 등록한 이벤트를 호출하는 객체입니다.
   * Ticker는 싱글턴 객체이며, Ticker에 TimerEvent를 등록하여 사용합니다.
   * Ticker는 스레드를 하나 생성하고, 이 스레드를 사용하여 TimerEvent의 시간을 확인하고 함수를 호출합니다.
+  * TimerEvent를 사용할 경우, 반드시 TimerEventCreator::Create()를 통해 생성해야 하며, Ticker::RegisterTimerEvent()를 통해 Ticker에 등록해야 정상 동작합니다.
 
 ---
 
