@@ -65,6 +65,11 @@
 	  * ConnectHandler
 	  * DisconnectHandler
 
+* Ticker와 TimerEvent
+  * 일정 시간 마다 등록한 이벤트를 호출하는 객체입니다.
+  * Ticker는 싱글턴 객체이며, Ticker에 TimerEvent를 등록하여 사용합니다.
+  * Ticker는 스레드를 하나 생성하고, 이 스레드를 사용하여 TimerEvent의 시간을 확인하고 함수를 호출합니다.
+
 ---
 
 2.2 클라이언트
