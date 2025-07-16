@@ -47,6 +47,7 @@ public:
 
 private:
 	void UpdateTick();
+	void UnregisterTimerEventImpl();
 
 private:
 	TickCounter tickCounter;
@@ -58,4 +59,7 @@ private:
 
 	std::shared_mutex timerEventsMutex;
 	std::map<TimerEventId, std::shared_ptr<TimerEvent>> timerEvents;
+
+	std::mutex unregisterListMutex;
+	std::vector<TimerEventId> unregisterTargetList;
 };
