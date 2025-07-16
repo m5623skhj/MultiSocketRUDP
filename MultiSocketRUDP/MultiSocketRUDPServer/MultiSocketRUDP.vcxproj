@@ -31,6 +31,7 @@
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
     <ClCompile Include="Ticker.cpp" />
+    <ClCompile Include="TimerEvent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
@@ -42,6 +43,7 @@
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RUDPSession.h" />
     <ClInclude Include="Ticker.h" />
+    <ClInclude Include="TimerEvent.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

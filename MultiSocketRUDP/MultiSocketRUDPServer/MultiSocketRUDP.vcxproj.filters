@@ -72,6 +72,9 @@
     <ClCompile Include="Ticker.cpp">
       <Filter>소스 파일\Ticker</Filter>
     </ClCompile>
+    <ClCompile Include="TimerEvent.cpp">
+      <Filter>소스 파일\Ticker</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
@@ -99,6 +102,9 @@
       <Filter>소스 파일\Log</Filter>
     </ClInclude>
     <ClInclude Include="Ticker.h">
+      <Filter>소스 파일\Ticker</Filter>
+    </ClInclude>
+    <ClInclude Include="TimerEvent.h">
       <Filter>소스 파일\Ticker</Filter>
     </ClInclude>
   </ItemGroup>

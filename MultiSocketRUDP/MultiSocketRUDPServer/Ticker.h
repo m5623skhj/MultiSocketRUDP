@@ -1,5 +1,8 @@
 #pragma once
 #include <thread>
+#include <map>
+#include <shared_mutex>
+#include "TimerEvent.h"
 
 class Ticker
 {
@@ -23,6 +26,7 @@ private:
 	struct alignas(std::hardware_destructive_interference_size) TickCounter
 	{
 		std::atomic<uint64_t> tickCount{ 0 };
+		std::atomic<uint64_t> nowMs{ 0 };
 	};
 
 public:
@@ -34,7 +38,12 @@ public:
 	bool IsRunning() const { return isRunning; }
 	[[nodiscard]]
 	uint64_t GetTickCount() const { return tickCounter.tickCount.load(std::memory_order_relaxed); }
+	[[nodiscard]]
+	uint64_t GetNowMs() const { return tickCounter.nowMs; }
 	void SetTickInterval(const int intervalMs) { tickInterval = intervalMs; }
+	[[nodiscard]]
+	bool RegisterTimerEvent(const std::shared_ptr<TimerEvent>& eventObject);
+	void UnregisterTimerEvent(const TimerEventId timerEventId);
 
 private:
 	void UpdateTick();
@@ -43,7 +52,10 @@ private:
 	TickCounter tickCounter;
 
 	bool isRunning = false;
-	int tickInterval = 16;
+	int tickInterval{ 16 };
 
 	std::jthread tickerThread;
+
+	std::shared_mutex timerEventsMutex;
+	std::map<TimerEventId, std::shared_ptr<TimerEvent>> timerEvents;
 };
