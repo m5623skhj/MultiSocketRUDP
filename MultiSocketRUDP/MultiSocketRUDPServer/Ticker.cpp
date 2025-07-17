@@ -2,11 +2,16 @@
 #include "Ticker.h"
 #include <ranges>
 
+using Clock = std::chrono::steady_clock;
+
 void Ticker::Start()
 {
-	unregisterTargetList.reserve(32);
+	if (unregisterTargetList.capacity() == 0)
+	{
+		unregisterTargetList.reserve(32);
+	}
 
-	tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count();
 	tickerThread = std::jthread([this]() { UpdateTick(); });
 }
 
@@ -22,7 +27,7 @@ void Ticker::UpdateTick()
 
 	while (isRunning)
 	{
-		tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count();
 		UnregisterTimerEventImpl();
 		{
 			std::shared_lock lock(timerEventsMutex);
@@ -82,5 +87,8 @@ bool Ticker::RegisterTimerEvent(const std::shared_ptr<TimerEvent>& eventObject)
 void Ticker::UnregisterTimerEvent(const TimerEventId timerEventId)
 {
 	std::scoped_lock lock(unregisterListMutex);
-	unregisterTargetList.emplace_back(timerEventId);
+	if (std::ranges::find(unregisterTargetList, timerEventId) == unregisterTargetList.end())
+	{
+		unregisterTargetList.push_back(timerEventId);
+	}
 }

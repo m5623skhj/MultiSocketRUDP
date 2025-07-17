@@ -26,7 +26,7 @@ private:
 	struct alignas(std::hardware_destructive_interference_size) TickCounter
 	{
 		std::atomic<uint64_t> tickCount{ 0 };
-		std::atomic<uint64_t> nowMs{ 0 };
+		uint64_t nowMs{ 0 };
 	};
 
 public:
