@@ -4,8 +4,9 @@
 
 using Clock = std::chrono::steady_clock;
 
-void Ticker::Start()
+void Ticker::Start(const unsigned int intervalMs)
 {
+	tickInterval = intervalMs;
 	if (unregisterTargetList.capacity() == 0)
 	{
 		unregisterTargetList.reserve(32);
@@ -19,6 +20,16 @@ void Ticker::Stop()
 {
 	isRunning = false;
 	tickerThread.join();
+
+	{
+		std::unique_lock lock(unregisterListMutex);
+		unregisterTargetList.clear();
+	}
+
+	{
+		std::unique_lock lock(timerEventsMutex);
+		timerEvents.clear();
+	}
 }
 
 void Ticker::UpdateTick()
