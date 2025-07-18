@@ -36,6 +36,10 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"TIMER_TICK_MS", (int*)&timerTickMs) == false)
+	{
+		return false;
+	}
 
 	// buffer
 	if (g_Paser.GetValue_Byte(buffer, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode) == false)

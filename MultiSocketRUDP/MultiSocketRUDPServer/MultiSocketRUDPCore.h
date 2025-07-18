@@ -235,6 +235,7 @@ private:
 	unsigned int retransmissionMs{};
 	unsigned int retransmissionThreadSleepMs{};
 	unsigned int heartbeatThreadSleepMs{};
+	unsigned int timerTickMs{};
 
 	// threads
 	std::vector<std::jthread> ioWorkerThreads;

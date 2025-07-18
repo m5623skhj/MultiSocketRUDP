@@ -277,7 +277,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
-	Ticker::GetInstance().Start();
+	Ticker::GetInstance().Start(timerTickMs);
 	sessionReleaseThread = std::jthread([this]() { RunSessionReleaseThread(); });
 	heartbeatThread = std::jthread([this]() { RunHeartbeatThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)

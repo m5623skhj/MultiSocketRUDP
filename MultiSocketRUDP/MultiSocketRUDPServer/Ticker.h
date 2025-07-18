@@ -30,7 +30,7 @@ private:
 	};
 
 public:
-	void Start();
+	void Start(const unsigned int intervalMs = 16);
 	void Stop();
 
 public:
@@ -40,7 +40,6 @@ public:
 	uint64_t GetTickCount() const { return tickCounter.tickCount.load(std::memory_order_relaxed); }
 	[[nodiscard]]
 	uint64_t GetNowMs() const { return tickCounter.nowMs; }
-	void SetTickInterval(const int intervalMs) { tickInterval = intervalMs; }
 	[[nodiscard]]
 	bool RegisterTimerEvent(const std::shared_ptr<TimerEvent>& eventObject);
 	void UnregisterTimerEvent(const TimerEventId timerEventId);
@@ -53,7 +52,7 @@ private:
 	TickCounter tickCounter;
 
 	bool isRunning = false;
-	int tickInterval{ 16 };
+	int tickInterval;
 
 	std::jthread tickerThread;
 
