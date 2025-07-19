@@ -211,7 +211,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	{
 		// For the purpose of obtaining the function table, any of the created sessions selected
 		if (WSAIoctl(tempSocket, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
-			, reinterpret_cast<void**>(&rioFunctionTable), sizeof(rioFunctionTable), &bytes, NULL, NULL))
+			, &rioFunctionTable, sizeof(rioFunctionTable), &bytes, nullptr, nullptr))
 		{
 			const auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER with {}", WSAGetLastError());
@@ -323,9 +323,9 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 	return true;
 }
 
-SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
+SOCKET MultiSocketRUDPCore::CreateRUDPSocket()
 {
-	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
+	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
@@ -340,7 +340,7 @@ SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 	serverAddr.sin_port = 0;
 
-	if (bind(sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+	if (bind(sock, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("Bind failed {}", WSAGetLastError());
@@ -350,7 +350,7 @@ SOCKET MultiSocketRUDPCore::CreateRUDPSocket() const
 	}
 
 	socklen_t len = sizeof(serverAddr);
-	getsockname(sock, (sockaddr*)&serverAddr, &len);
+	getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
 
 	return sock;
 }
@@ -690,7 +690,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 
 bool MultiSocketRUDPCore::SendIOCompleted(RUDPSession& session, const BYTE threadId)
 {
-	InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+	InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
 	return DoSend(session, threadId);
 }
 
@@ -759,7 +759,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType th
 {
 	while (true)
 	{
-		if (InterlockedCompareExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_SENDING, (UINT)IO_MODE::IO_NONE_SENDING))
+		if (InterlockedCompareExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_SENDING), static_cast<UINT>(IO_MODE::IO_NONE_SENDING)))
 		{
 			break;
 		}
@@ -767,7 +767,7 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType th
 		if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() == 0 &&
 			session.sendBuffer.reservedSendPacketInfo == nullptr)
 		{
-			InterlockedExchange((UINT*)&session.sendBuffer.ioMode, (UINT)IO_MODE::IO_NONE_SENDING);
+			InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
 			if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() > 0)
 			{
 				continue;
@@ -826,7 +826,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 {
 	context->session = &session;
 
-	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, NULL, &context->clientAddrRIOBuffer, nullptr, 0, 0, context) == false)
+	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, 0, 0, context) == false)
 	{
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RIOSendEx() failed with {}", WSAGetLastError());
@@ -984,7 +984,7 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
 {
 	static constexpr int payloadLengthPosition = 1;
 
-	return *((WORD*)(&buffer.m_pSerializeBuffer[payloadLengthPosition]));
+	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[payloadLengthPosition]);
 }
 
 void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet)

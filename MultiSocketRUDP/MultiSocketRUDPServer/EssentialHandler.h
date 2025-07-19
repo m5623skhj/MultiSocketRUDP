@@ -2,7 +2,6 @@
 #include "PacketManager.h"
 #include <unordered_map>
 #include <functional>
-#include "CoreType.h"
 
 using RUDPCoreEssentialFunction = std::function<bool(RUDPSession&)>;
 
@@ -23,7 +22,7 @@ public:
 
 	static bool IsRegisteredAllEssentialHandler();
 	static void PrintUnregisteredEssentialHandler();
-	static bool CallRegisteredHandler(RUDPSession& session, const ESSENTIAL_HANDLER_TYPE handlerType);
+	static bool CallRegisteredHandler(RUDPSession& session, ESSENTIAL_HANDLER_TYPE handlerType);
 
 private:
 	static void RegisterEssentialHandler(const RUDPCoreEssentialFunction& rudpCoreEssentialFunction, const ESSENTIAL_HANDLER_TYPE targetType)

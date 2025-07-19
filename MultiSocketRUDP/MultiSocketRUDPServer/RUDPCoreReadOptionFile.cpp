@@ -12,31 +12,31 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Short(buffer, L"CORE", L"NUM_OF_SOCKET", (short*)(&numOfSockets)) == false)
+	if (g_Paser.GetValue_Short(buffer, L"CORE", L"NUM_OF_SOCKET", reinterpret_cast<short*>(&numOfSockets)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Short(buffer, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", (short*)&maxPacketRetransmissionCount) == false)
+	if (g_Paser.GetValue_Short(buffer, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", reinterpret_cast<short*>(&maxPacketRetransmissionCount)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"WORKER_THREAD_ONE_FRAME_MS", (int*)&workerThreadOneFrameMs) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"WORKER_THREAD_ONE_FRAME_MS", reinterpret_cast<int*>(&workerThreadOneFrameMs)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_MS", (int*)&retransmissionMs) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_MS", reinterpret_cast<int*>(&retransmissionMs)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_THREAD_SLEEP_MS", (int*)&retransmissionThreadSleepMs) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_THREAD_SLEEP_MS", reinterpret_cast<int*>(&retransmissionThreadSleepMs)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"HEARTBEAT_THREAD_SLEEP_MS", (int*)&heartbeatThreadSleepMs) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"HEARTBEAT_THREAD_SLEEP_MS", reinterpret_cast<int*>(&heartbeatThreadSleepMs)) == false)
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"TIMER_TICK_MS", (int*)&timerTickMs) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"TIMER_TICK_MS", reinterpret_cast<int*>(&timerTickMs)) == false)
 	{
 		return false;
 	}
@@ -60,7 +60,7 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Short(buffer, L"SESSION_BROKER", L"SESSION_BROKER_PORT", (short*)&sessionBrokerPort) == false)
+	if (g_Paser.GetValue_Short(buffer, L"SESSION_BROKER", L"SESSION_BROKER_PORT", reinterpret_cast<short*>(&sessionBrokerPort)) == false)
 	{
 		return false;
 	}

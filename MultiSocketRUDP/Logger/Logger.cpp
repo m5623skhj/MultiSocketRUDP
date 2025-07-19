@@ -54,9 +54,9 @@ void Logger::RunLoggerThread(const bool isAlsoPrintToConsole)
 {
 	printToConsole = isAlsoPrintToConsole;
 
-	loggerEventHandles[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
-	loggerEventHandles[1] = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (loggerEventHandles[0] == NULL || loggerEventHandles[1] == NULL)
+	loggerEventHandles[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	loggerEventHandles[1] = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (loggerEventHandles[0] == nullptr || loggerEventHandles[1] == nullptr)
 	{
 		std::cout << "Logger event handle is invalid" << std::endl;
 		g_Dump.Crash();

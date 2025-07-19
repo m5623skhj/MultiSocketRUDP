@@ -62,7 +62,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	auto& sendBuffer = *NetBuffer::Alloc();
 	while (not threadStopFlag)
 	{
-		clientSocket = accept(sessionBrokerListenSocket, (sockaddr*)&clientAddr, &sockAddrSize);
+		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
 			auto error = WSAGetLastError();
@@ -105,7 +105,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 	serverAddr.sin_port = htons(listenPort);
 
-	if (bind(sessionBrokerListenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+	if (bind(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError());
@@ -170,7 +170,7 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, con
 
 void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
 {
-	char connectResultCode = 0;
+	char connectResultCode;
 	const auto session = AcquireSession();
 	do
 	{
@@ -225,7 +225,7 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 	
 	sockaddr_in serverAddr;
 	socklen_t len = sizeof(serverAddr);
-	getsockname(session.sock, (sockaddr*)&serverAddr, &len);
+	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
 	session.serverPort = ntohs(serverAddr.sin_port);
 
 	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)

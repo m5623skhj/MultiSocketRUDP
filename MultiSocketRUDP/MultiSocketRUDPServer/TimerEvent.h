@@ -26,11 +26,11 @@ public:
 	}
 
 protected:
-	explicit TimerEvent(const TimerEventId inTimerEventId, const TimerEventInterval inIntervalMs);
+	explicit TimerEvent(TimerEventId inTimerEventId, TimerEventInterval inIntervalMs);
 
 private:
 	virtual void Fire() = 0;
-	void SetNextTick(const uint64_t nowTickMs);
+	void SetNextTick(uint64_t nowTickMs);
 
 private:
 	TimerEventId timerEventId;

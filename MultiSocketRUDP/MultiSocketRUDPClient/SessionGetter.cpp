@@ -68,12 +68,12 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	FILE* fp;
 	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
 
-	int iJumpBOM = ftell(fp);
+	const int iJumpBOM = ftell(fp);
 	fseek(fp, 0, SEEK_END);
-	int iFileSize = ftell(fp);
+	const int iFileSize = ftell(fp);
 	fseek(fp, iJumpBOM, SEEK_SET);
-	int FileSize = (int)fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp);
-	int iAmend = iFileSize - FileSize; // 개행 문자와 파일 사이즈에 대한 보정값
+	const int fileSize = static_cast<int>(fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp));
+	const int iAmend = iFileSize - fileSize; // 개행 문자와 파일 사이즈에 대한 보정값
 	fclose(fp);
 
 	cBuffer[iFileSize - iAmend] = '\0';
@@ -81,7 +81,7 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 
 	if (!parser.GetValue_String(pBuff, L"SESSION_BROKER", L"IP", sessionBrokerIP))
 		return false;
-	if (!parser.GetValue_Short(pBuff, L"SESSION_BROKER", L"PORT", (short*)&sessionBrokerPort))
+	if (!parser.GetValue_Short(pBuff, L"SESSION_BROKER", L"PORT", reinterpret_cast<short*>(&sessionBrokerPort)))
 		return false;
 	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode))
 		return false;
@@ -133,7 +133,7 @@ bool RUDPClientCore::TryConnectToSessionBroker() const
 	bool connected{ false };
 	for (int i = 0; i < 5; ++i)
 	{
-		if (connect(sessionBrokerSocket, (sockaddr*)&sessionGetterAddr, sizeof(sessionGetterAddr)) == SOCKET_ERROR)
+		if (connect(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&sessionGetterAddr), sizeof(sessionGetterAddr)) == SOCKET_ERROR)
 		{
 			Sleep(1000);
 			{

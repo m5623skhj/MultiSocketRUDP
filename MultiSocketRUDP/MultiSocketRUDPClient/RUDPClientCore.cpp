@@ -121,7 +121,7 @@ void RUDPClientCore::RunRecvThread()
 		buffer->Init();
 		buffer->m_iWrite = 0;
 
-		const int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), RECV_BUFFER_SIZE, 0, (sockaddr*)&senderAddr, &senderLength);
+		const int bytesReceived = recvfrom(rudpSocket, buffer->GetBufferPtr(), RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr*>(&senderAddr), &senderLength);
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
@@ -347,7 +347,7 @@ void RUDPClientCore::DoSend()
 		}
 
 		EncodePacket(*packet);
-		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, (const sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 		{
 			auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = std::format("sendto() failed with error code {}", WSAGetLastError());
@@ -465,7 +465,7 @@ WORD RUDPClientCore::GetPayloadLength(OUT const NetBuffer& buffer)
 {
 	static constexpr int PAYLOAD_LENGTH_POSITION = 1;
 
-	return *((WORD*)(&buffer.m_pSerializeBuffer[buffer.m_iRead + PAYLOAD_LENGTH_POSITION]));
+	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[buffer.m_iRead + PAYLOAD_LENGTH_POSITION]);
 }
 
 void RUDPClientCore::EncodePacket(OUT NetBuffer& packet)
@@ -510,20 +510,20 @@ bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath
 	FILE* fp;
 	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
 
-	int iJumpBOM = ftell(fp);
+	const int iJumpBOM = ftell(fp);
 	fseek(fp, 0, SEEK_END);
-	int iFileSize = ftell(fp);
+	const int iFileSize = ftell(fp);
 	fseek(fp, iJumpBOM, SEEK_SET);
-	int FileSize = (int)fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp);
-	int iAmend = iFileSize - FileSize;
+	const int fileSize = static_cast<int>(fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp));
+	const int amend = iFileSize - fileSize;
 	fclose(fp);
 
-	cBuffer[iFileSize - iAmend] = '\0';
+	cBuffer[iFileSize - amend] = '\0';
 	WCHAR* pBuff = cBuffer;
 
-	if (!parser.GetValue_Short(pBuff, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", (short*)&maxPacketRetransmissionCount))
+	if (!parser.GetValue_Short(pBuff, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", reinterpret_cast<short*>(&maxPacketRetransmissionCount)))
 		return false;
-	if (!parser.GetValue_Int(pBuff, L"CORE", L"RETRANSMISSION_MS", (int*)&retransmissionThreadSleepMs))
+	if (!parser.GetValue_Int(pBuff, L"CORE", L"RETRANSMISSION_MS", reinterpret_cast<int*>(&retransmissionThreadSleepMs)))
 		return false;
 
 	return true;

@@ -110,23 +110,23 @@ public:
 	void StopServer();
 
 	[[nodiscard]]
-	inline bool IsServerStopped() const { return isServerStopped; }
+	bool IsServerStopped() const { return isServerStopped; }
 	[[nodiscard]]
-	inline unsigned short GetConnectedUserCount() const { return connectedUserCount; }
+	unsigned short GetConnectedUserCount() const { return connectedUserCount; }
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo);
 	[[nodiscard]]
 	bool DoRecv(const RUDPSession& session) const;
 	[[nodiscard]]
-	bool DoSend(OUT RUDPSession& session, const ThreadIdType threadId);
+	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
 	[[nodiscard]]
-	IOContext* MakeSendContext(OUT RUDPSession& session, const ThreadIdType threadId);
+	IOContext* MakeSendContext(OUT RUDPSession& session, ThreadIdType threadId);
 	[[nodiscard]]
 	bool TryRIOSend(OUT RUDPSession& session, IOContext* context);
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
-	void DisconnectSession(const SessionIdType disconnectTargetSessionId);
-	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId);
+	void DisconnectSession(SessionIdType disconnectTargetSessionId);
+	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 	inline void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
@@ -137,13 +137,13 @@ private:
 	[[nodiscard]]
 	bool InitRIO();
 	[[nodiscard]]
-	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBufferSize) const;
+	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, unsigned int targetBufferSize) const;
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
 	bool RunSessionBroker();
 	[[nodiscard]]
-	SOCKET CreateRUDPSocket() const;
+	static SOCKET CreateRUDPSocket();
 
 private:
 	void CloseAllSessions();
@@ -160,7 +160,7 @@ private:
 	[[nodiscard]]
 	RUDPSession* AcquireSession();
 	[[nodiscard]]
-	inline RUDPSession* GetUsingSession(const SessionIdType sessionId) const;
+	inline RUDPSession* GetUsingSession(SessionIdType sessionId) const;
 
 private:
 	// This container's size must not be increased any further
@@ -205,9 +205,9 @@ private:
 	RUDPSessionBroker sessionBroker;
 #else
 private:
-	void RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP);
+	void RunSessionBrokerThread(PortType listenPort, const std::string& rudpSessionIP);
 	[[nodiscard]]
-	bool OpenSessionBrokerSocket(const PortType listenPort);
+	bool OpenSessionBrokerSocket(PortType listenPort);
 	static void SetSessionKey(OUT RUDPSession& session);
 	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
@@ -221,12 +221,12 @@ private:
 #endif
 
 private:
-	void RunIOWorkerThread(const ThreadIdType threadId);
-	void RunRecvLogicWorkerThread(const ThreadIdType threadId);
-	void RunRetransmissionThread(const ThreadIdType threadId);
+	void RunIOWorkerThread(ThreadIdType threadId);
+	void RunRecvLogicWorkerThread(ThreadIdType threadId);
+	void RunRetransmissionThread(ThreadIdType threadId);
 	void RunSessionReleaseThread();
 	void RunHeartbeatThread() const;
-	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
+	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
 	unsigned char numOfWorkerThread{};
@@ -261,23 +261,23 @@ private:
 	[[nodiscard]]
 	IOContext* GetIOCompletedContext(RIORESULT& rioResult);
 	[[nodiscard]]
-	bool IOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
+	bool IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
 	[[nodiscard]]
-	bool RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId);
+	bool RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
 	[[nodiscard]]
-	inline bool SendIOCompleted(RUDPSession& session, const BYTE threadId);
+	inline bool SendIOCompleted(RUDPSession& session, BYTE threadId);
 
-	void OnRecvPacket(const BYTE threadId);
+	void OnRecvPacket(BYTE threadId);
 	[[nodiscard]]
 	static bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	[[nodiscard]]
-	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, const ThreadIdType threadId);
+	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
     [[nodiscard]]  
-	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId);
+	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, ThreadIdType threadId);
 	[[nodiscard]]
-	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId);
+	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, ThreadIdType threadId);
 	[[nodiscard]]
-	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, const ThreadIdType threadId);
+	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, ThreadIdType threadId);
 
 private:
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};

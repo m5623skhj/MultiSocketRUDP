@@ -30,7 +30,7 @@ private:
 	};
 
 public:
-	void Start(const unsigned int intervalMs = 16);
+	void Start(unsigned int intervalMs = 16);
 	void Stop();
 
 public:
@@ -42,7 +42,7 @@ public:
 	uint64_t GetNowMs() const { return tickCounter.nowMs; }
 	[[nodiscard]]
 	bool RegisterTimerEvent(const std::shared_ptr<TimerEvent>& eventObject);
-	void UnregisterTimerEvent(const TimerEventId timerEventId);
+	void UnregisterTimerEvent(TimerEventId timerEventId);
 
 private:
 	void UpdateTick();

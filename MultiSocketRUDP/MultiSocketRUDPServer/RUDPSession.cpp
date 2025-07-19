@@ -277,7 +277,7 @@ bool RUDPSession::ProcessHoldingPacket()
 
 	while (not recvPacketHolderQueue.empty())
 	{
-		NetBuffer* storedBuffer = nullptr;
+		NetBuffer* storedBuffer;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
 			if (recvPacketHolderTop.packetSequence <= nextRecvPacketSequence)
@@ -286,11 +286,12 @@ bool RUDPSession::ProcessHoldingPacket()
 				recvHoldingPacketSequences.erase(recvPacketHolderTop.packetSequence);
 				continue;
 			}
-			else if (recvPacketHolderTop.packetSequence > nextRecvPacketSequence)
+
+			if (recvPacketHolderTop.packetSequence > nextRecvPacketSequence)
 			{
 				break;
 			}
-			
+
 			packetSequence = recvPacketHolderTop.packetSequence;
 			storedBuffer = recvPacketHolderTop.buffer;
 			recvPacketHolderQueue.pop();
@@ -359,7 +360,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		return;
 	}
 
-	SendPacketInfo* sendPacketInfo = nullptr;
+	SendPacketInfo* sendPacketInfo;
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		if (const auto itor = sendPacketInfoMap.find(packetSequence); itor != sendPacketInfoMap.end())

@@ -36,11 +36,11 @@ private:
 public:
 	static PacketManager& GetInst();
 	[[nodiscard]]
-	static std::shared_ptr<IPacket> MakePacket(const PacketId packetId);
+	static std::shared_ptr<IPacket> MakePacket(PacketId packetId);
 	[[nodiscard]]
-	static PacketHandler GetPacketHandler(const PacketId packetId);
+	static PacketHandler GetPacketHandler(PacketId packetId);
 	[[nodiscard]]
-	static bool BufferToPacket(const PacketId packetId, NetBuffer& buffer, std::any& packet);
+	static bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
 	static void Init();
 
 public:
