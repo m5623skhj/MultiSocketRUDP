@@ -52,7 +52,7 @@ private:
 	TickCounter tickCounter;
 
 	bool isRunning = false;
-	int tickInterval;
+	unsigned int tickInterval;
 
 	std::jthread tickerThread;
 
