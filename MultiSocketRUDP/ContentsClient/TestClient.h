@@ -22,11 +22,11 @@ public:
 	static bool IsConnected();
 
 private:
-	static bool WaitingConnectToServer(const unsigned int maximumConnectWaitingCount);
+	static bool WaitingConnectToServer(unsigned int maximumConnectWaitingCount);
 	void RunTestThread();
-	bool ProcessPacketHandle(NetBuffer& buffer, const PACKET_ID packetId);
+	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
 	void SendAnyPacket();
-	void SendAnyPacket(const unsigned int sendCount);
+	void SendAnyPacket(unsigned int sendCount);
 
 private:
 	std::thread testThread;

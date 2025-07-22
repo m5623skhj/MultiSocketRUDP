@@ -12,7 +12,7 @@ Logger::Logger()
 
 	for (int i = 0; i < 2; ++i)
 	{
-		loggerEventHandles[i] = NULL;
+		loggerEventHandles[i] = nullptr;
 	}
 
 	const auto now = std::chrono::system_clock::now();
@@ -130,7 +130,7 @@ void Logger::WriteLog(const std::shared_ptr<LogBase>& logObject)
 {
 	logObject->SetLogTime();
 
-	std::lock_guard<std::mutex> guardLock(logQueueLock);
+	std::lock_guard guardLock(logQueueLock);
 	logWaitingQueue.push(logObject);
 
 	SetEvent(loggerEventHandles[0]);
@@ -143,7 +143,7 @@ void Logger::WriteLogToFile(const std::shared_ptr<LogBase>& logObject)
 
 	if (printToConsole == true)
 	{
-		std::osyncstream sync_out(std::cout);
-		sync_out << logJson << std::endl;
+		std::osyncstream syncOut(std::cout);
+		syncOut << logJson << std::endl;
 	}
 }

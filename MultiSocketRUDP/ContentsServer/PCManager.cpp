@@ -32,7 +32,7 @@ std::shared_ptr<PC> PCManager::FindPC(SessionIdType sessionId)
 	return itor->second;
 }
 
-bool PCManager::InsertPC(std::shared_ptr<PC> session)
+bool PCManager::InsertPC(const std::shared_ptr<PC>& session)
 {
 	std::unique_lock lock(pcMapLock);
 

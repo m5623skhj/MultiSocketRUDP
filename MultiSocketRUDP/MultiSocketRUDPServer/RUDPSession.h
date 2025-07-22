@@ -77,7 +77,7 @@ private:
 	void OnConnected(SessionIdType inSessionId);
 	void OnDisconnected();
 	[[nodiscard]]
-	inline bool SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType);
+	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType);
 
 	void SendHeartbeatPacket();
 
@@ -88,10 +88,10 @@ private:
 	[[nodiscard]]
 	bool OnRecvPacket(NetBuffer& recvPacket);
 	[[nodiscard]]
-	bool ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient = true);
+	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence, bool needReplyToClient = true);
 	[[nodiscard]]
 	bool ProcessHoldingPacket();
-	void SendReplyToClient(const PacketSequence recvPacketSequence);
+	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
 
 private:

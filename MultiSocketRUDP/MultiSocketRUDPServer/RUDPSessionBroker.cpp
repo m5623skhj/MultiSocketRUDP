@@ -130,13 +130,13 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 
 void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 {
-	auto MakeSessionKey = []() -> std::string
+	auto makeSessionKey = []() -> std::string
 	{
 		std::array<unsigned char, SESSION_KEY_SIZE> keyData;
 
-		auto now = std::chrono::system_clock::now();
-		auto duration = now.time_since_epoch();
-		auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+		const auto now = std::chrono::system_clock::now();
+		const auto duration = now.time_since_epoch();
+		const auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
 		std::seed_seq seed { static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
 		std::mt19937 gen(seed);
@@ -148,14 +148,14 @@ void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 		}
 
 		std::stringstream ss;
-		for (auto byte : keyData)
+		for (const auto byte : keyData)
 		{
 			ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
 		}
 
 		return ss.str();
 	};
-	session.sessionKey = MakeSessionKey();
+	session.sessionKey = makeSessionKey();
 }
 
 void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)

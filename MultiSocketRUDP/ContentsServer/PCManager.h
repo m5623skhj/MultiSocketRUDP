@@ -20,7 +20,7 @@ public:
 	[[nodiscard]]
 	std::shared_ptr<PC> FindPC(SessionIdType sessionId);
 	[[nodiscard]]
-	bool InsertPC(std::shared_ptr<PC> session);
+	bool InsertPC(const std::shared_ptr<PC>& session);
 	[[nodiscard]]
 	bool DeletePC(SessionIdType sessionId);
 	void ClearPCMap();

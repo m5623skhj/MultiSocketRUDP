@@ -602,10 +602,8 @@ void MultiSocketRUDPCore::RunHeartbeatThread() const
 
 void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 {
-	UINT64 now = GetTickCount64();
-	UINT64 delta = now - tickSet.nowTick;
-
-	if (delta < intervalMs)
+	const UINT64 now = GetTickCount64();
+	if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
 	{
 		Sleep(static_cast<DWORD>(intervalMs - delta));
 	}

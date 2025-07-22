@@ -26,15 +26,15 @@ bool EssentialHandlerManager::IsRegisteredAllEssentialHandler()
 
 void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 {
-	for (const auto& checker : essentialHandler | std::views::values)
+	for (const auto& [checker, _] : essentialHandler | std::views::values)
 	{
-		if (checker.first->IsRegisteredHandler())
+		if (checker->IsRegisteredHandler())
 		{
 			continue;
 		}
 
 		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = checker.first->GetHandlerType() + " is unregistered";
+		log->logString = checker->GetHandlerType() + " is unregistered";
 		Logger::GetInstance().WriteLog(log);
 	}
 }

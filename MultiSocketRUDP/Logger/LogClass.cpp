@@ -14,7 +14,7 @@ nlohmann::json LogBase::ObjectToJsonImpl()
 void LogBase::SetLogTime()
 {
 	const auto now = std::chrono::system_clock::now();
-	std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+	const std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
 	std::tm utcTime;
 
 	if (const auto error = gmtime_s(&utcTime, &currentTime); error != 0)

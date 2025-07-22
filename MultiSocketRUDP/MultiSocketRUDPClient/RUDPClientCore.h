@@ -59,7 +59,7 @@ public:
 	RUDPClientCore(RUDPClientCore&&) = delete;
 
 public:
-	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole);
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
 	void Stop();
 
 	inline bool IsStopped() const { return isStopped; }
@@ -128,10 +128,10 @@ private:
 
 	void OnRecvStream(NetBuffer& recvBuffer, int recvSize);
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
-	void OnSendReply(NetBuffer& recvPacket, const PacketSequence packetSequence);
-	void SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
+	void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence);
+	void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
 	void DoSend();
-	static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs);
+	static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
 	SOCKET rudpSocket{};
@@ -167,7 +167,7 @@ public:
 	void SendPacket(OUT IPacket& packet);
 
 private:
-	void SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence);
+	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
 	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
 	static inline void EncodePacket(OUT NetBuffer& packet);
