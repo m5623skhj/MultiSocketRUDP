@@ -55,6 +55,7 @@ void RUDPClientCore::Stop()
 	recvThread.join();
 	Logger::GetInstance().StopLoggerThread();
 
+	WSACleanup();
 	isStopped = true;
 }
 

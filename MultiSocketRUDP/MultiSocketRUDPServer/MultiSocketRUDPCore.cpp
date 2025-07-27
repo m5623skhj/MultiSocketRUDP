@@ -44,6 +44,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitNetwork failed";
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 
@@ -53,6 +54,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "InitRIO failed";
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 
@@ -62,6 +64,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = "RunAllThreads() failed";
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 
@@ -102,6 +105,7 @@ void MultiSocketRUDPCore::StopServer()
 
 	Logger::GetInstance().StopLoggerThread();
 
+	WSACleanup();
 	isServerStopped = true;
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Server stop";
@@ -187,6 +191,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		const auto log = Logger::MakeLogObject<ServerLog>();
 		log->logString = std::format("WSAStartup failed {}", result);
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 

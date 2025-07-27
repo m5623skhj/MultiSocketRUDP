@@ -99,6 +99,7 @@ bool RUDPClientCore::GetSessionFromServer()
 		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 
@@ -108,6 +109,7 @@ bool RUDPClientCore::GetSessionFromServer()
 		const auto log = Logger::MakeLogObject<ClientLog>();
 		log->logString = std::format("Socket creation failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
+		WSACleanup();
 		return false;
 	}
 
@@ -117,6 +119,7 @@ bool RUDPClientCore::GetSessionFromServer()
 		log->logString = std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError());
 		Logger::GetInstance().WriteLog(log);
 		closesocket(sessionBrokerSocket);
+		WSACleanup();
 		return false;
 	}
 
