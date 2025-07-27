@@ -143,11 +143,9 @@ bool RUDPClientCore::TryConnectToSessionBroker() const
 				continue;
 			}
 		}
-		else
-		{
-			connected = true;
-			break;
-		}
+
+		connected = true;
+		break;
 	}
 
 	return connected;
@@ -172,14 +170,12 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 			{
 				break;
 			}
-			else
-			{
-				auto log = Logger::MakeLogObject<ClientLog>();
-				log->logString = std::format("recv() failed in GetSessionFromServer() with error code {}", error);
-				Logger::GetInstance().WriteLog(log);
-				closesocket(sessionBrokerSocket);
-				return false;
-			}
+
+			auto log = Logger::MakeLogObject<ClientLog>();
+			log->logString = std::format("recv() failed in GetSessionFromServer() with error code {}", error);
+			Logger::GetInstance().WriteLog(log);
+			closesocket(sessionBrokerSocket);
+			return false;
 		}
 
 		totalReceivedBytes += bytesReceived;
@@ -193,7 +189,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 		{
 			continue;
 		}
-		else if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
+
+		if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
 		{
 			break;
 		}
