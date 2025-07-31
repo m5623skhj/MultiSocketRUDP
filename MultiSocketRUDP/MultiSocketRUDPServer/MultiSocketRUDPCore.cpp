@@ -17,7 +17,7 @@ MultiSocketRUDPCore::MultiSocketRUDPCore()
 {
 }
 
-bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, bool printLogToConsole)
+bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole)
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
@@ -38,6 +38,14 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		return false;
 	}
 
+	if (not SetSessionFactory(std::move(factoryFunc)))
+	{
+		const auto log = Logger::MakeLogObject<ServerLog>();
+		log->logString = "Session factory function is not set";
+		Logger::GetInstance().WriteLog(log);
+		return false;
+	}
+	
 	if (not InitNetwork())
 	{
 		StopServer();
@@ -183,6 +191,18 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 }
 
+bool MultiSocketRUDPCore::SetSessionFactory(SessionFactoryFunc&& factoryFunc)
+{
+	if (factoryFunc == nullptr)
+	{
+		return false;
+	}
+
+	sessionFactory = std::move(factoryFunc);
+	return true;
+}
+
+
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;
@@ -198,7 +218,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 	sessionArray.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
-		sessionArray.emplace_back(new RUDPSession(*this));
+		sessionArray.emplace_back(sessionFactory(*this));
 		sessionArray[socketNumber]->sessionId = static_cast<SessionIdType>(socketNumber);
 	}
 

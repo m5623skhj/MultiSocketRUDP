@@ -1,6 +1,7 @@
 #include "PreCompile.h"
 #include "TestServer.h"
 #include "Logger.h"
+#include "PC.h"
 
 TestServer& TestServer::GetInst()
 {
@@ -10,7 +11,12 @@ TestServer& TestServer::GetInst()
 
 bool TestServer::Start(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath)
 {
-	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath, true))
+	auto playerFactoryFunc = [](MultiSocketRUDPCore& inCore)
+	{
+		return new Player(inCore);
+	};
+
+	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath, std::move(playerFactoryFunc), true))
 	{
 		std::cout << "StartServer() failed" << std::endl;
 		Logger::GetInstance().StopLoggerThread();

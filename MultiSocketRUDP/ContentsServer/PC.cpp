@@ -22,3 +22,8 @@ void PC::SendPacket(IPacket& packet) const
 {
 	session.SendPacket(packet);
 }
+
+Player::Player(MultiSocketRUDPCore& inCore)
+	: RUDPSession(inCore)
+{
+}

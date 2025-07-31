@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <map>
 
 #include "CoreType.h"
@@ -54,10 +55,11 @@ class RUDPSession
 {
 	friend MultiSocketRUDPCore;
 
-private:
+protected:
 	RUDPSession() = delete;
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
+private:
 	[[nodiscard]]
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
 	[[nodiscard]]
@@ -152,3 +154,5 @@ private:
 private:
 	MultiSocketRUDPCore& core;
 };
+
+using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;

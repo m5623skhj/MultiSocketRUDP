@@ -106,7 +106,7 @@ public:
 
 public:
 	[[nodiscard]]
-	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, bool printLogToConsole = false);
+	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole = false);
 	void StopServer();
 
 	[[nodiscard]]
@@ -133,6 +133,8 @@ private:
 	[[nodiscard]]
 	bool ReadOptionFile(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
 	[[nodiscard]]
+	bool SetSessionFactory(SessionFactoryFunc&& factoryFunc);
+	[[nodiscard]]
 	bool InitNetwork();
 	[[nodiscard]]
 	bool InitRIO();
@@ -144,6 +146,8 @@ private:
 	bool RunSessionBroker();
 	[[nodiscard]]
 	static SOCKET CreateRUDPSocket();
+	[[nodiscard]]
+	SessionFactoryFunc sessionFactory{};
 
 private:
 	void CloseAllSessions();
