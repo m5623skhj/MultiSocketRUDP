@@ -1,25 +1,31 @@
 Packet:
   - Type: RequestPacket
     PacketName: Ping
+    Desc: Client send to server for ping
   - Type: ReplyPacket
     PacketName: Pong 
+    Desc: Server recv ping, then send to client pong response
   - Type: RequestPacket
     PacketName: TestStringPacketReq
+    Desc: Client send to string packet for test
     Items:
       - Type: std::string
         Name: testString
   - Type: ReplyPacket
     PacketName: TestStringPacketRes
+    Desc: Server recv TestStringPacketReq, then send to client for string test
     Items:
       - Type: std::string
         Name: echoString
   - Type: RequestPacket
     PacketName: TestPacketReq
+    Desc: Client send to server for test
     Items:
       - Type: int
         Name: order
   - Type: ReplyPacket
     PacketName: TestPacketRes
+    Desc: Server recv TestPacketReq, then send to client for test
     Items:
       - Type: int
         Name: order
