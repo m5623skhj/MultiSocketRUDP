@@ -94,7 +94,7 @@ void RUDPClientCore::SendConnectPacket()
 {
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
 	constexpr PacketSequence packetSequence = 0;
-	auto packetType = PACKET_TYPE::CONNECT_TYPE;
+	constexpr auto packetType = PACKET_TYPE::CONNECT_TYPE;
 	
 	connectPacket << packetType << packetSequence << sessionId << sessionKey;
 	SendPacket(connectPacket, packetSequence);
@@ -162,14 +162,14 @@ void RUDPClientCore::RunSendThread()
 		case WAIT_OBJECT_0 + 1:
 		{
 			DoSend();
-			auto log = Logger::MakeLogObject<ClientLog>();
+			const auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Send thread stopped";
 			Logger::GetInstance().WriteLog(log);
 			return;
 		}
 		default:
 		{
-			auto log = Logger::MakeLogObject<ClientLog>();
+			const auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = std::format("Invalid send thread wait result. Error is {}", WSAGetLastError());
 			Logger::GetInstance().WriteLog(log);
 			g_Dump.Crash();
@@ -417,13 +417,33 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 		return;
 	}
 
-	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
+	constexpr PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
 	PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
 	return SendPacket(*buffer, packetSequence);
 }
+
+#if _DEBUG
+void RUDPClientCore::SendPacketForTest(char* streamData, int streamSize)
+{
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		const auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = "Buffer is nullptr in RUDPSession::SendPacketForTest()";
+		Logger::GetInstance().WriteLog(log);
+		return;
+	}
+
+	constexpr auto packetType = PACKET_TYPE::SEND_TYPE;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
+	*buffer << packetType << packetSequence;
+	buffer->WriteBuffer(streamData, streamSize);
+	SendPacket(*buffer, packetSequence);
+}
+#endif
 
 void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence)
 {

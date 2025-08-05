@@ -166,6 +166,10 @@ public:
 	NetBuffer* GetReceivedPacket();
 	void SendPacket(OUT IPacket& packet);
 
+#if _DEBUG
+	void SendPacketForTest(char* streamData, int streamSize);
+#endif
+
 private:
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
