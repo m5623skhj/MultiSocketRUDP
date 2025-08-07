@@ -206,7 +206,7 @@ void RUDPClientCore::RunRetransmissionThread()
 				Logger::GetInstance().WriteLog(log);
 
 				isConnected = false;
-				Stop();
+				threadStopFlag = true;
 				break;
 			}
 
