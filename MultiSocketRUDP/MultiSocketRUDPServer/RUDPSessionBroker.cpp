@@ -71,9 +71,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 				break;
 			}
 
-			auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = std::format("RunSessionBrokerThread accept failed with error {}", error);
-			Logger::GetInstance().WriteLog(log);
+			LOG_ERROR(std::format("RunSessionBrokerThread accept failed with error {}", error));
 			continue;
 		}
 
@@ -93,10 +91,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	sessionBrokerListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerListenSocket == INVALID_SOCKET)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("RunSessionBrokerThread listen socket is invalid with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-
+		LOG_ERROR(std::format("RunSessionBrokerThread socket creation failed with error {}", WSAGetLastError()));
 		return false;
 	}
 
@@ -107,9 +102,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 
 	if (bind(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError()));
 
 		closesocket(sessionBrokerListenSocket);
 		return false;
@@ -117,9 +110,7 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 
 	if (listen(sessionBrokerListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("RunSessionBrokerThread listen failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("RunSessionBrokerThread listen failed with error {}", WSAGetLastError()));
 
 		closesocket(sessionBrokerListenSocket);
 		return false;
@@ -176,11 +167,7 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 	{
 		if (session == nullptr)
 		{
-			const auto log = Logger::MakeLogObject<ServerLog>();
-			log->logString = "Server is full of users";
-			Logger::GetInstance().WriteLog(log);
-			connectResultCode = 1;
-
+			LOG_ERROR("ReserveSession failed : session is nullptr");
 			break;
 		}
 
@@ -207,19 +194,13 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 {
 	if (session.isConnected)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "This session already connected";
-		Logger::GetInstance().WriteLog(log);
-
+		LOG_ERROR("This session already connected");
 		return 2;
 	}
 
 	if (session.sock = CreateRUDPSocket(); session.sock == INVALID_SOCKET)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("CreateRUDPSocket failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-
+		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
 		return 3;
 	}
 	
@@ -230,19 +211,13 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 
 	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)
 	{
-		const auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("InitializeRIO failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-
+		LOG_ERROR(std::format("RUDPSession::InitializeRIO failed with error {}", WSAGetLastError()));
 		return 4;
 	}
 
 	if (not DoRecv(session))
 	{
-		const auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("DoRecv failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
-
+		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return 5;
 	}
 
@@ -254,9 +229,7 @@ void MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OU
 	EncodePacket(sendBuffer);
 	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
 	{
-		const auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
 	}
 
 	closesocket(clientSocket);

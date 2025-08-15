@@ -21,3 +21,7 @@ public:
 			log->logString = LOG_STRING; \
 			Logger::GetInstance().WriteLog(log);
 #endif
+
+#define LOG_ERROR(LOG_STRING) auto log = Logger::MakeLogObject<ServerLog>(); \
+			log->logString = LOG_STRING; \
+			Logger::GetInstance().WriteLog(log);

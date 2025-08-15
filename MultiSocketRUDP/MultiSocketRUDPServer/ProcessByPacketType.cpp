@@ -1,4 +1,7 @@
 #include "PreCompile.h"
+
+#include "LogExtension.h"
+#include "Logger.h"
 #include "MultiSocketRUDPCore.h"
 
 bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
@@ -52,7 +55,7 @@ bool MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		break;
 	}
 	default:
-		// TODO : Write log
+		LOG_ERROR(std::format("Invalid packet type received: {}", static_cast<int>(packetType)));
 		break;
 	}
 	session.nowInProcessingRecvPacket = false;
