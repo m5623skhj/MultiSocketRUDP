@@ -67,9 +67,7 @@ bool RUDPClientCore::CreateRUDPSocket()
 
 	if (rudpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); rudpSocket == INVALID_SOCKET)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("socket() failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("socket() failed with error {}", WSAGetLastError()));
 		return false;
 	}
 
@@ -80,9 +78,7 @@ bool RUDPClientCore::CreateRUDPSocket()
 
 	if (bind(rudpSocket, reinterpret_cast<sockaddr*>(&recvAddr), sizeof(recvAddr)) == SOCKET_ERROR)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("bind() failed with error {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("bind() failed with error {}", WSAGetLastError()));
 		closesocket(rudpSocket);
 		return false;
 	}
@@ -169,9 +165,7 @@ void RUDPClientCore::RunSendThread()
 		}
 		default:
 		{
-			const auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = std::format("Invalid send thread wait result. Error is {}", WSAGetLastError());
-			Logger::GetInstance().WriteLog(log);
+			LOG_ERROR(std::format("RunSendThread() : Invalid send thread wait result. Error is {}", WSAGetLastError()));
 			g_Dump.Crash();
 		}
 		break;
@@ -201,10 +195,7 @@ void RUDPClientCore::RunRetransmissionThread()
 
 			if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				auto log = Logger::MakeLogObject<ClientLog>();
-				log->logString = "The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates";
-				Logger::GetInstance().WriteLog(log);
-
+				LOG_ERROR("The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates");
 				isConnected = false;
 				threadStopFlag = true;
 				break;
@@ -293,9 +284,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 	default:
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("Invalid packet type {}", static_cast<unsigned char>(packetType));
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("Invalid packet type received: {}", static_cast<unsigned char>(packetType)));
 		break;
 	}
 	}
@@ -341,19 +330,14 @@ void RUDPClientCore::DoSend()
 		NetBuffer* packet = nullptr;
 		if (not sendBufferQueue.Dequeue(&packet))
 		{
-			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = "sendBufferQueue.Dequeue() failed";
-			Logger::GetInstance().WriteLog(log);
+			LOG_ERROR("sendBufferQueue.Dequeue() failed");
 			continue;
 		}
 
 		EncodePacket(*packet);
 		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = std::format("sendto() failed with error code {}", WSAGetLastError());
-			Logger::GetInstance().WriteLog(log);
-			continue;
+			LOG_ERROR(std::format("sendto() failed with error code {}", WSAGetLastError()));
 		}
 	}
 }
@@ -381,7 +365,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	std::scoped_lock lock(recvPacketHoldingQueueLock);
 	while (not recvPacketHoldingQueue.empty())
 	{
-		auto holdingPacketInfo = recvPacketHoldingQueue.top();
+		const auto holdingPacketInfo = recvPacketHoldingQueue.top();
 
 		if (holdingPacketInfo.packetSequence < nextRecvPacketSequence)
 		{
@@ -411,9 +395,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Buffer is nullptr in RUDPSession::SendPacket()";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("Buffer is nullptr in RUDPSession::SendPacket()");
 		return;
 	}
 
@@ -431,9 +413,7 @@ void RUDPClientCore::SendPacketForTest(char* streamData, int streamSize)
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "Buffer is nullptr in RUDPSession::SendPacketForTest()";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("Buffer is nullptr in RUDPSession::SendPacketForTest()");
 		return;
 	}
 
@@ -450,9 +430,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "SendPacketInfo is nullptr in RUDPSession::SendPacket()";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("SendPacketInfo is nullptr in RUDPSession::SendPacket()");
 		NetBuffer::Free(&buffer);
 		return;
 	}
@@ -504,17 +482,13 @@ bool RUDPClientCore::ReadOptionFile(const std::wstring& clientCoreOptionFile, co
 {
 	if (not ReadClientCoreOptionFile(clientCoreOptionFile))
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "RUDPClientCore::ReadClientCoreOptionFile() failed";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("RUDPClientCore::ReadClientCoreOptionFile() failed");
 		return false;
 	}
 
 	if (not ReadSessionGetterOptionFile(sessionGetterOptionFilePath))
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "RunGetSessionFromServer::ReadOptionFile() failed";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("RUDPClientCore::ReadSessionGetterOptionFile() failed");
 		return false;
 	}
 

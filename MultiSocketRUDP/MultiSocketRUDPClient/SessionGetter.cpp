@@ -48,9 +48,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
 	if (not GetSessionFromServer())
 	{
-		auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "RunGetSessionFromServer::GetSessionFromServer() failed";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("RUDPClientCore::GetSessionFromServer() failed");
 		WSACleanup();
 		return false;
 	}
@@ -96,9 +94,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError()));
 		WSACleanup();
 		return false;
 	}
@@ -106,18 +102,14 @@ bool RUDPClientCore::GetSessionFromServer()
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("Socket creation failed in GetSessionFromServer() with error code {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("socket() failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
 		WSACleanup();
 		return false;
 	}
 
 	if (not TryConnectToSessionBroker())
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError());
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
 		closesocket(sessionBrokerSocket);
 		WSACleanup();
 		return false;
@@ -171,9 +163,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 				break;
 			}
 
-			auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = std::format("recv() failed in GetSessionFromServer() with error code {}", error);
-			Logger::GetInstance().WriteLog(log);
+			LOG_ERROR(std::format("recv() failed in GetSessionFromServer() with error code {}", error));
 			closesocket(sessionBrokerSocket);
 			return false;
 		}
@@ -207,9 +197,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
 	if (not receivedBuffer.Decode())
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = "SetTargetSessionInfo() failed with Decode()";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("SetTargetSessionInfo() failed with Decode()");
 		return false;
 	}
 
@@ -217,9 +205,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)
 	{
-		const auto log = Logger::MakeLogObject<ClientLog>();
-		log->logString = std::format("SetTargetSessionInfo() failed with connectResultCode {}", connectResultCode);
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("SetTargetSessionInfo() failed with connectResultCode {}", connectResultCode));
 		return false;
 	}
 

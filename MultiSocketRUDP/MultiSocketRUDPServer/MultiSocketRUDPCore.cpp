@@ -567,7 +567,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 		break;
 		default:
 		{
-			LOG_ERROR("Invalid release thread wait result. Error is {}", WSAGetLastError());
+			LOG_ERROR(std::format("RunSessionReleaseThread() : Invalid session release thread wait result. Error is {}", WSAGetLastError()));
 		}
 		break;
 		}
@@ -811,7 +811,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 
 	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context) == false)
 	{
-		LOG_ERROR("RIOSendEx() failed with error code {}", WSAGetLastError());
+		LOG_ERROR(std::format("RIOSendEx() failed with error code {}", WSAGetLastError()));
 		contextPool.Free(context);
 		return false;
 	}

@@ -33,9 +33,7 @@ void EssentialHandlerManager::PrintUnregisteredEssentialHandler()
 			continue;
 		}
 
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = checker->GetHandlerType() + " is unregistered";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR(std::format("{} is not registered", checker->GetHandlerType()));
 	}
 }
 

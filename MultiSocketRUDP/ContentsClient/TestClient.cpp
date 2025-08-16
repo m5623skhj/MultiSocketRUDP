@@ -56,10 +56,7 @@ bool TestClient::WaitingConnectToServer(const unsigned int maximumConnectWaiting
 
 		if (connectWaitingCount >= maximumConnectWaitingCount)
 		{
-			const auto log = Logger::MakeLogObject<ClientLog>();
-			log->logString = "Connect to server failed";
-			Logger::GetInstance().WriteLog(log);
-
+			LOG_ERROR("Waiting connect to server timeout");
 			return false;
 		}
 	}
@@ -88,9 +85,7 @@ void TestClient::RunTestThread()
 			*buffer >> packetId;
 			if (not ProcessPacketHandle(*buffer, packetId))
 			{
-				auto log = Logger::MakeLogObject<ClientLog>();
-				log->logString = std::format("ProcessPacketHandle failed by invalid packet id {}", log->logString += static_cast<unsigned int>(packetId));
-				Logger::GetInstance().WriteLog(log);
+				LOG_ERROR(std::format("ProcessPacketHandle failed by invalid packet id {}", static_cast<unsigned int>(packetId)));
 			}
 
 			NetBuffer::Free(buffer);
