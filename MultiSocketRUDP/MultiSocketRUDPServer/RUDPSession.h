@@ -83,6 +83,8 @@ private:
 
 	void SendHeartbeatPacket();
 
+	void CloseSocket();
+
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
 	// Call this function when the client sends a disconnect packet

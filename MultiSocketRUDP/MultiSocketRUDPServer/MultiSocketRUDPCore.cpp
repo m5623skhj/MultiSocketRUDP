@@ -360,8 +360,7 @@ void MultiSocketRUDPCore::CloseAllSessions()
 	{
 		if (session->sock != INVALID_SOCKET)
 		{
-			closesocket(session->sock);
-			continue;
+			session->CloseSocket();
 		}
 	}
 

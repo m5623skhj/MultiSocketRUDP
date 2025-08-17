@@ -128,8 +128,6 @@ void RUDPSession::Disconnect()
 			core.EraseSendPacketInfo(item, threadId);
 		}
 	}
-	closesocket(sock);
-	sock = INVALID_SOCKET;
 	OnDisconnected();
 
 	core.DisconnectSession(sessionId);
@@ -209,6 +207,12 @@ void RUDPSession::SendHeartbeatPacket()
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
+}
+
+void RUDPSession::CloseSocket()
+{
+	closesocket(sock);
+	sock = INVALID_SOCKET;
 }
 
 void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
