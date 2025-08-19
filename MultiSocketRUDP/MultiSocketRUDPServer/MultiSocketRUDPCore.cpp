@@ -642,7 +642,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	{
 		if (RecvIOCompleted(contextResult, transferred, threadId))
 		{
-			// Release session?
+			contextResult->session->Disconnect();
 		}
 		return true;
 	}

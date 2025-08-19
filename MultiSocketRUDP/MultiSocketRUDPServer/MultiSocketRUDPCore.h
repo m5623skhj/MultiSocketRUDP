@@ -61,7 +61,7 @@ struct SendPacketInfo
 		isReplyType = {};
 	}
 
-	inline void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
+	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
 	{
 		owner = inOwner;
 		buffer = inBuffer;
@@ -71,7 +71,7 @@ struct SendPacketInfo
 	}
 
 	[[nodiscard]]
-	inline NetBuffer* GetBuffer() const { return buffer; }
+	NetBuffer* GetBuffer() const { return buffer; }
 };
 
 namespace MultiSocketRUDP
