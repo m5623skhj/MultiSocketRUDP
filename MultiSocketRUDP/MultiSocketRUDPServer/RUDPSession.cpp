@@ -55,7 +55,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 		return false;
 	}
 
-	auto& context = recvBuffer.recvContext;
+	const auto& context = recvBuffer.recvContext;
 	context->InitContext(sessionId, RIO_OPERATION_TYPE::OP_RECV);
 	context->Length = RECV_BUFFER_SIZE;
 	context->Offset = 0;
@@ -94,7 +94,7 @@ void RUDPSession::InitializeSession()
 		sendBuffer.reservedSendPacketInfo = {};
 	}
 
-	int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.GetRestSize();
+	const int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.GetRestSize();
 	SendPacketInfo* eraseTarget = nullptr;
 	for (int i = 0; i < sendPacketInfoQueueSize; ++i)
 	{
@@ -115,8 +115,7 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
-	bool connectState{ true };
-	if (not isConnected.compare_exchange_strong(connectState, false))
+	if (bool connectState{ true }; not isConnected.compare_exchange_strong(connectState, false))
 	{
 		return;
 	}
@@ -149,7 +148,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
-	PacketSequence packetSequence = ++lastSendPacketSequence;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 

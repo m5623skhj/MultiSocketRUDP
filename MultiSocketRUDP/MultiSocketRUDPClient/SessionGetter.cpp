@@ -153,7 +153,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 	while (true)
 	{
-		int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE + df_HEADER_SIZE, 0);
+		const int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE + df_HEADER_SIZE, 0);
 		if (bytesReceived <= 0)
 		{
 			int error = WSAGetLastError();

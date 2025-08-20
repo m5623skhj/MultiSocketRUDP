@@ -58,7 +58,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		return;
 	}
 
-	int sockAddrSize = static_cast<int>(sizeof(clientAddr)); 
+	int sockAddrSize = sizeof(clientAddr); 
 	auto& sendBuffer = *NetBuffer::Alloc();
 	while (not threadStopFlag)
 	{
@@ -131,7 +131,7 @@ void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 
 		std::seed_seq seed { static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
 		std::mt19937 gen(seed);
-		std::uniform_int_distribution<int> dist(0, 255);
+		std::uniform_int_distribution dist(0, 255);
 
 		for (auto& byte : keyData)
 		{

@@ -173,7 +173,7 @@ public:
 private:
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
-	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
+	static inline WORD GetPayloadLength(const NetBuffer& buffer);
 	static inline void EncodePacket(OUT NetBuffer& packet);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);

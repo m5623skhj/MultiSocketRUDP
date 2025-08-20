@@ -6,8 +6,8 @@
 
 EssentialHandlerManager::EssentialHandlerManager()
 {
-	essentialHandler.insert({ ESSENTIAL_HANDLER_TYPE::ON_CONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnConnectedHandlerRegisterChecker>(), nullptr) });
-	essentialHandler.insert({ ESSENTIAL_HANDLER_TYPE::ON_DISCONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnDisconnectedHandlerRegisterChecker>(), nullptr) });
+	essentialHandler.insert({ ON_CONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnConnectedHandlerRegisterChecker>(), nullptr) });
+	essentialHandler.insert({ ON_DISCONNECTED_HANDLER_TYPE, std::make_pair(std::make_unique<OnDisconnectedHandlerRegisterChecker>(), nullptr) });
 }
 
 EssentialHandlerManager& EssentialHandlerManager::GetInst()

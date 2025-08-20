@@ -148,7 +148,7 @@ void RUDPClientCore::RunSendThread()
 {
 	while (true)
 	{
-		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
+		switch (WaitForMultipleObjects(sendEventHandles.size(), sendEventHandles.data(), FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
@@ -372,7 +372,8 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 			recvPacketHoldingQueue.pop();
 			continue;
 		}
-		else if (holdingPacketInfo.packetSequence != nextRecvPacketSequence)
+
+		if (holdingPacketInfo.packetSequence != nextRecvPacketSequence)
 		{
 			return nullptr;
 		}
@@ -408,7 +409,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 }
 
 #if _DEBUG
-void RUDPClientCore::SendPacketForTest(char* streamData, int streamSize)
+void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 {
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
@@ -460,7 +461,7 @@ void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
 	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 }
 
-WORD RUDPClientCore::GetPayloadLength(OUT const NetBuffer& buffer)
+WORD RUDPClientCore::GetPayloadLength(const NetBuffer& buffer)
 {
 	static constexpr int PAYLOAD_LENGTH_POSITION = 1;
 
