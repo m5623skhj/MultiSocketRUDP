@@ -449,7 +449,6 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 			{
 				contextPool.Free(context);
 				// error handling
-				continue;
 			}
 		}
 
@@ -616,7 +615,10 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 	if (rioResult.Status != 0)
 	{
 		LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
-		contextPool.Free(context);
+		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+		{
+			contextPool.Free(context);
+		}
 		return nullptr;
 	}
 
@@ -640,9 +642,10 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	{
 	case RIO_OPERATION_TYPE::OP_RECV:
 	{
-		if (RecvIOCompleted(contextResult, transferred, threadId))
+		if (not RecvIOCompleted(contextResult, transferred, threadId))
 		{
 			contextResult->session->Disconnect();
+			break;
 		}
 		return true;
 	}
