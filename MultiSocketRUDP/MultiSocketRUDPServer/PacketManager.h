@@ -1,5 +1,4 @@
 #pragma once
-
 #include <functional>
 #include <any>
 #include <unordered_map>
@@ -42,6 +41,52 @@ public:
 	[[nodiscard]]
 	static bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
 	static void Init();
+
+#pragma region TODO : Packet handler direct call
+public:
+	using PacketFactory = std::function<std::function<void()>(RUDPSession*, NetBuffer*)>;
+
+	static std::shared_ptr<IPacket> BufferToPacket(NetBuffer& buffer, const PacketId packetId)
+	{
+		std::shared_ptr<IPacket> packet = MakePacket(packetId);
+		if (packet != nullptr)
+		{
+			packet->BufferToPacket(buffer);
+		}
+
+		return packet;
+	}
+
+	template <typename DerivedType>
+	void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(IPacket&))
+	{
+		if (packetFactoryFunctionMap.contains(packetId) == true)
+		{
+			throw std::runtime_error("PacketManager::RegisterPacketHandler() : PacketId already registered");
+		}
+
+		packetFactoryMap[packetId] = [func, packetId](RUDPSession* session, NetBuffer* buffer)
+		-> std::function<void()>
+			{
+				DerivedType* derived = static_cast<DerivedType*>(session);
+				if (auto packet = BufferToPacket(*buffer, packetId); packet != nullptr)
+				{
+					return [derived, func, packet]()
+						{
+							derived->*func(packet.get());
+						};
+				}
+				else
+				{
+					return []() {};
+				}
+			};
+	}
+
+private:
+	std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
+
+#pragma endregion TODO : Packet handler direct call
 
 public:
 	using PacketFactoryFunction = std::function<std::shared_ptr<IPacket>()>;
