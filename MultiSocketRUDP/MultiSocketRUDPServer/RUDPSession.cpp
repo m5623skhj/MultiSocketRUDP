@@ -211,6 +211,11 @@ void RUDPSession::SendHeartbeatPacket()
 
 void RUDPSession::CloseSocket()
 {
+	if (sock == INVALID_SOCKET)
+	{
+		return;
+	}
+
 	closesocket(sock);
 	sock = INVALID_SOCKET;
 }
