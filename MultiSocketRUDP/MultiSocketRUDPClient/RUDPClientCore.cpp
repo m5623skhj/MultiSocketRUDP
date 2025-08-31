@@ -2,6 +2,7 @@
 #include "RUDPClientCore.h"
 #include "Logger.h"
 #include "LogExtension.h"
+#include "PacketManager.h"
 
 RUDPClientCore& RUDPClientCore::GetInst()
 {

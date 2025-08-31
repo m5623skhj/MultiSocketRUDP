@@ -1,7 +1,6 @@
 #pragma once
 #include <functional>
 #include <map>
-
 #include "CoreType.h"
 #include <MSWSock.h>
 #include "LockFreeQueue.h"

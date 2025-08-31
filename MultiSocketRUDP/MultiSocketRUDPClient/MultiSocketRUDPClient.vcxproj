@@ -140,13 +140,14 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
-    <ClCompile Include="..\MultiSocketRUDPServer\PacketManager.cpp" />
+    <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPClientCore.cpp" />
     <ClCompile Include="SessionGetter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="LogExtension.h" />
+    <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RUDPClientCore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

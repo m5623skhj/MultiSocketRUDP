@@ -10,9 +10,10 @@
 
 #include "Queue.h"
 #include <queue>
-#include "../MultiSocketRUDPServer/PacketManager.h"
 
 #pragma comment(lib, "ws2_32.lib")
+
+class IPacket;
 
 struct SendPacketInfo
 {
