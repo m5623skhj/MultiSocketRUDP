@@ -1,7 +1,7 @@
 #include "PreCompile.h"
 #include "TestServer.h"
 #include "Logger.h"
-#include "PC.h"
+#include "Player.h"
 
 TestServer& TestServer::GetInst()
 {

@@ -1,7 +1,6 @@
 #include "PreCompile.h"
 #include "PC.h"
 #include "RUDPSession.h"
-#include "Protocol.h"
 
 PC::PC(RUDPSession& inSession)
 	: session(inSession)
@@ -21,9 +20,4 @@ bool PC::IsConnected() const
 void PC::SendPacket(IPacket& packet) const
 {
 	session.SendPacket(packet);
-}
-
-Player::Player(MultiSocketRUDPCore& inCore)
-	: RUDPSession(inCore)
-{
 }

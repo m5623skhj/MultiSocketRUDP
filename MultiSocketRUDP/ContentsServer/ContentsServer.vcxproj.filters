@@ -25,6 +25,9 @@
     <Filter Include="소스 파일\PC">
       <UniqueIdentifier>{685caa2a-05df-4474-ace4-66d72f798148}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Player">
+      <UniqueIdentifier>{7acc8eab-cac8-483f-ba0e-0fd85856e386}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -48,6 +51,12 @@
     <ClCompile Include="PCManager.cpp">
       <Filter>소스 파일\PC</Filter>
     </ClCompile>
+    <ClCompile Include="PacketHandlerRegister.cpp">
+      <Filter>소스 파일\Protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="Player.cpp">
+      <Filter>소스 파일\Player</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketHandler.h">
@@ -70,6 +79,9 @@
     </ClInclude>
     <ClInclude Include="PCManager.h">
       <Filter>소스 파일\PC</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>소스 파일\Player</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
