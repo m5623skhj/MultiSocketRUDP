@@ -116,7 +116,7 @@ public:
 	bool IsConnected() const;
 
 protected:
-	using PacketFactory = std::function<std::function<void()>(RUDPSession*, NetBuffer*)>;
+	using PacketFactory = std::function<std::function<bool()>(RUDPSession*, NetBuffer*)>;
 
 	static std::shared_ptr<IPacket> BufferToPacket(NetBuffer& buffer, const PacketId packetId)
 	{
@@ -134,7 +134,7 @@ protected:
 	{
 		static_assert(std::is_base_of_v<IPacket, PacketType>, "PacketType must be derived from IPacket");
 		packetFactoryMap[packetId] = [func, packetId](RUDPSession* session, NetBuffer* buffer)
-			-> std::function<void()>
+			-> std::function<bool()>
 			{
 				DerivedType* derived = static_cast<DerivedType*>(session);
 				if (auto packet = BufferToPacket(*buffer, packetId); packet != nullptr)
@@ -142,12 +142,11 @@ protected:
 					return [derived, func, packet]()
 						{
 							(derived->*func)(static_cast<PacketType&>(*packet));
+							return true;
 						};
 				}
-				else
-				{
-					return []() {};
-				}
+
+				return []() { return false; };
 			};
 	}
 

@@ -158,12 +158,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 void RUDPSession::OnConnected(const SessionIdType inSessionId)
 {
 	sessionId = inSessionId;
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::ESSENTIAL_HANDLER_TYPE::ON_CONNECTED_HANDLER_TYPE);
-}
-
-void RUDPSession::OnDisconnected()
-{
-	EssentialHandlerManager::GetInst().CallRegisteredHandler(*this, EssentialHandlerManager::ESSENTIAL_HANDLER_TYPE::ON_DISCONNECTED_HANDLER_TYPE);
+	OnConnected();
 }
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType)
@@ -315,30 +310,19 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 	PacketId packetId;
 	recvPacket >> packetId;
 
-	const auto packetHandler = PacketManager::GetInst().GetPacketHandler(packetId);
-	if (packetHandler == nullptr)
+	auto const itor = packetFactoryMap.find(packetId);
+	if (itor == packetFactoryMap.end())
 	{
 		return false;
 	}
 
-	const auto packet = PacketManager::GetInst().MakePacket(packetId);
-	if (packet == nullptr)
+	if (not itor->second(this, &recvPacket)())
 	{
 		return false;
 	}
 
-	if (auto realPacket = std::any(packet.get()); not PacketManager::GetInst().BufferToPacket(packetId, recvPacket, realPacket))
-	{
-		return false;
-	}
-
-	const bool packetHandleResult = packetHandler(*this, *packet);
-	if (packetHandleResult == true && needReplyToClient == true)
-	{
-		SendReplyToClient(recvPacketSequence);
-	}
-
-	return packetHandleResult;
+	SendReplyToClient(recvPacketSequence);
+	return true;
 }
 
 void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
