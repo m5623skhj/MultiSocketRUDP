@@ -139,6 +139,7 @@
     <ClCompile Include="PC.cpp" />
     <ClCompile Include="PCManager.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="PlayerPacketHandler.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="RegisterEssentialHandler.cpp" />
     <ClCompile Include="TestServer.cpp" />

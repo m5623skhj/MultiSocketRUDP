@@ -9,6 +9,7 @@
 #include <shared_mutex>
 #include <unordered_set>
 #include <queue>
+#include "PacketManager.h"
 
 class MultiSocketRUDPCore;
 class IPacket;
@@ -112,6 +113,49 @@ public:
 	SOCKADDR_INET GetSocketAddressInet() const;
 	[[nodiscard]]
 	bool IsConnected() const;
+
+#pragma region TODO : Packet handler direct call
+protected:
+	using PacketFactory = std::function<std::function<void()>(RUDPSession*, NetBuffer*)>;
+
+	static std::shared_ptr<IPacket> BufferToPacket(NetBuffer& buffer, const PacketId packetId)
+	{
+		std::shared_ptr<IPacket> packet = PacketManager::GetInst().MakePacket(packetId);
+		if (packet != nullptr)
+		{
+			packet->BufferToPacket(buffer);
+		}
+
+		return packet;
+	}
+
+	template <typename DerivedType, typename PacketType>
+	void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(const PacketType&))
+	{
+		static_assert(std::is_base_of_v<IPacket, PacketType>, "PacketType must be derived from IPacket");
+		packetFactoryMap[packetId] = [func, packetId](RUDPSession* session, NetBuffer* buffer)
+			-> std::function<void()>
+			{
+				DerivedType* derived = static_cast<DerivedType*>(session);
+				if (auto packet = BufferToPacket(*buffer, packetId); packet != nullptr)
+				{
+					return [derived, func, packet]()
+						{
+							(derived->*func)(static_cast<PacketType&>(*packet));
+						};
+				}
+				else
+				{
+					return []() {};
+				}
+			};
+	}
+
+private:
+	std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
+
+#pragma endregion TODO : Packet handler direct call
+
 
 private:
 	std::atomic_bool isConnected{};

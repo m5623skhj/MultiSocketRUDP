@@ -57,6 +57,9 @@
     <ClCompile Include="Player.cpp">
       <Filter>소스 파일\Player</Filter>
     </ClCompile>
+    <ClCompile Include="PlayerPacketHandler.cpp">
+      <Filter>소스 파일\Player</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketHandler.h">

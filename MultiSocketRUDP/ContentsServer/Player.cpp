@@ -4,4 +4,5 @@
 Player::Player(MultiSocketRUDPCore& inCore)
 	: RUDPSession(inCore)
 {
+	RegisterAllPacketHandler();
 }
