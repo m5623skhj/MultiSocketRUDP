@@ -6,3 +6,13 @@ Player::Player(MultiSocketRUDPCore& inCore)
 {
 	RegisterAllPacketHandler();
 }
+
+void Player::OnConnected()
+{
+
+}
+
+void Player::OnDisconnected()
+{
+
+}

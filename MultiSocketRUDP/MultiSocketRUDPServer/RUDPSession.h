@@ -77,7 +77,8 @@ public:
 
 private:
 	void OnConnected(SessionIdType inSessionId);
-	void OnDisconnected();
+	virtual void OnConnected() {}
+	virtual void OnDisconnected() {}
 	[[nodiscard]]
 	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType);
 
@@ -114,7 +115,6 @@ public:
 	[[nodiscard]]
 	bool IsConnected() const;
 
-#pragma region TODO : Packet handler direct call
 protected:
 	using PacketFactory = std::function<std::function<void()>(RUDPSession*, NetBuffer*)>;
 
@@ -153,9 +153,6 @@ protected:
 
 private:
 	std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
-
-#pragma endregion TODO : Packet handler direct call
-
 
 private:
 	std::atomic_bool isConnected{};

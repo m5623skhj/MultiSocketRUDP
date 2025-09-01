@@ -9,6 +9,10 @@ public:
 	~Player() override = default;
 	explicit Player(MultiSocketRUDPCore& inCore);
 
+private:
+	void OnConnected() override;
+	void OnDisconnected() override;
+
 public:
 	void OnPing(const Ping& packet);
 	void OnTestPacketReq(const TestPacketReq& packet);
