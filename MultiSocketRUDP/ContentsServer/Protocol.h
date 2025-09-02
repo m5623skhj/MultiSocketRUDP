@@ -2,8 +2,8 @@
 
 #include <string>
 #include "NetServerSerializeBuffer.h"
-#include "../MultiSocketRUDPServer/PacketManager.h"
 #include "PacketIdType.h"
+#include "../MultiSocketRUDPServer/PacketManager.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet id type

@@ -3,6 +3,7 @@ import os
 import shutil
 import re
 import filecmp
+from typing import Dict, List, Set
 
 import PacketItemsFilePath
 import MakePacketItemsOnce
@@ -17,7 +18,11 @@ def CopyPacketFiles():
         shutil.copy(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.packetTypeFilePath + "_new")
         shutil.copy(PacketItemsFilePath.protocolHeaderPath, PacketItemsFilePath.protocolHeaderPath + "_new")
         shutil.copy(PacketItemsFilePath.protocolCppFileCppPath, PacketItemsFilePath.protocolCppFileCppPath + "_new")
-        shutil.copy(PacketItemsFilePath.packetHandlerFilePath, PacketItemsFilePath.packetHandlerFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath, PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath, PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.playerPacketHandlerCppFilePath, PacketItemsFilePath.playerPacketHandlerCppFilePath + "_new")
+        shutil.copy(PacketItemsFilePath.playerPacketHandlerHeaderFilePath, PacketItemsFilePath.playerPacketHandlerHeaderFilePath + "_new")
+        
     except FileNotFoundError as e:
         print(f"File not found: {e.filename}")
         return False
@@ -33,7 +38,10 @@ def ReplacePacketFiled():
         ReplaceFile(PacketItemsFilePath.packetTypeFilePath, PacketItemsFilePath.packetTypeFilePath + "_new")
         ReplaceFile(PacketItemsFilePath.protocolHeaderPath, PacketItemsFilePath.protocolHeaderPath + "_new")
         ReplaceFile(PacketItemsFilePath.protocolCppFileCppPath, PacketItemsFilePath.protocolCppFileCppPath + "_new")
-        ReplaceFile(PacketItemsFilePath.packetHandlerFilePath, PacketItemsFilePath.packetHandlerFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath, PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath, PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.playerPacketHandlerCppFilePath, PacketItemsFilePath.playerPacketHandlerCppFilePath + "_new")
+        ReplaceFile(PacketItemsFilePath.playerPacketHandlerHeaderFilePath, PacketItemsFilePath.playerPacketHandlerHeaderFilePath + "_new")
     except Exception as e:
         return
 
@@ -193,45 +201,11 @@ def GenerateInitInPacketHandlerCpp(packetList, originCode):
         if packet['Type'] == 'ReplyPacket':
             continue
         
-        candidateCode = f"PacketHandlerUtil::RegisterPacket<{packet['PacketName']}>(HandlePacket);"
+        candidateCode = f"PacketHandlerUtil::RegisterPacket<{packet['PacketName']}>();"
         if candidateCode not in targetCode:
             targetCode += f"\n\t\t{candidateCode}"
 
     modifiedCode = re.sub(pattern, f"void Init()\n\t{{{targetCode}\n\t}}", originCode, flags=re.DOTALL)
-    return True, modifiedCode
-
-
-def GenerateHandlePacketInPacketHandlerCpp(packetList, originCode):
-    namespacePattern = r'namespace ContentsPacketHandler\n{(.*?)\n\tvoid Init()'
-    match = re.search(namespacePattern, originCode, re.DOTALL)
-
-    if not match:
-        print("ContentsPacketHandler namespace not found in the file")
-        return False, None
-
-    handlerCode = "\n\t" + match.group(1).strip()
-    
-    for packet in packetList:
-        if packet['Type'] == 'ReplyPacket':
-            continue
-        
-        candidateCode = f"static bool HandlePacket(const RUDPSession& session, {packet['PacketName']}& packet)"
-        if candidateCode not in handlerCode:
-            if handlerCode:
-                handlerCode += f"\n\n\t{candidateCode}"
-            else:
-                handlerCode += f"\n\t{candidateCode}"
-            handlerCode += "\n\t{\n\t\treturn true;\n\t}"
-    
-    handlerCode += "\n\n\tvoid Init"
-   
-    modifiedCode = re.sub(namespacePattern, "namespace ContentsPacketHandler\n{" + handlerCode, originCode, flags=re.DOTALL)
-    
-    cleanCodePattern = "namespace ContentsPacketHandler\n\{\n\t\n"
-    match = re.search(cleanCodePattern, modifiedCode, re.DOTALL)
-    if match:
-        modifiedCode = re.sub(cleanCodePattern, "namespace ContentsPacketHandler\n{", modifiedCode, re.DOTALL)
-    
     return True, modifiedCode
 
 
@@ -287,20 +261,189 @@ def GenerateProtocolCpp(packetList):
 
 
 def GeneratePacketHandlerCpp(packetList):
-    with open(PacketItemsFilePath.packetHandlerFilePath, 'r') as file:
+    with open(PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath, 'r') as file:
         originCode = file.read()
     
-    state, modifiedCode = GenerateHandlePacketInPacketHandlerCpp(packetList, originCode)
-    if state == False:
-        return False
-    
-    state, modifiedCode = GenerateInitInPacketHandlerCpp(packetList, modifiedCode)
+    state, modifiedCode = GenerateInitInPacketHandlerCpp(packetList, originCode)
     if state == False:
         return False
 
-    targetFilePath = PacketItemsFilePath.packetHandlerFilePath + "_new"
+    targetFilePath = PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath + "_new"
     with open(targetFilePath, 'w') as file:
         file.write(modifiedCode)
+    return True
+
+
+def ExtractExistingPlayerHandlers(player_cpp_path: str) -> Set[str]:
+    if not os.path.exists(player_cpp_path):
+        return set()
+    
+    try:
+        with open(player_cpp_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'void\s+Player::On(\w+)\s*\('
+        matches = re.findall(pattern, content)
+        return set(matches)
+    except Exception as e:
+        print(f"Error reading ExtractExistingPlayerHandlers : {e}")
+        return set()
+
+
+def ExtractExistingPlayerHandlers(player_cpp_path: str) -> Set[str]:
+    if not os.path.exists(player_cpp_path):
+        return set()
+    
+    try:
+        with open(player_cpp_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'void\s+Player::On(\w+)\s*\('
+        matches = re.findall(pattern, content)
+        return set(matches)
+    except Exception as e:
+        print(f"Error reading Player.cpp: {e}")
+        return set()
+
+
+def ExtractExistingPlayerHandlerDeclarations(player_header_path: str) -> Set[str]:
+    if not os.path.exists(player_header_path):
+        return set()
+    
+    try:
+        with open(player_header_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'void\s+On(\w+)\s*\(const\s+\w+&\s+packet\)\s*;'
+        matches = re.findall(pattern, content)
+        return set(matches)
+    except Exception as e:
+        print(f"Error reading Player.h: {e}")
+        return set()
+
+
+def GetReplyPacketName(request_name: str, packets: List[Dict]) -> str:
+    if request_name.endswith('Req'):
+        reply_name = request_name[:-3] + 'Res'
+    elif request_name.endswith('Request'):
+        reply_name = request_name[:-7] + 'Response'
+    else:
+        for packet in packets:
+            if packet.get('Type') == 'ReplyPacket':
+                if request_name == 'Ping' and packet.get('PacketName') == 'Pong':
+                    return 'Pong'
+        reply_name = request_name + 'Response'
+    
+    return reply_name
+
+
+def GeneratePlayerHandlerCode(packet: Dict, packets: List[Dict]) -> str:
+    packet_name = packet.get('PacketName', '')
+    code = f"void Player::On{packet_name}(const {packet_name}& packet)\n{{\n\n}}\n"
+    
+    return code
+
+
+def GeneratePlayerPacketHandlerDeclarations(packetList):
+    existing_declarations = ExtractExistingPlayerHandlerDeclarations(PacketItemsFilePath.playerPacketHandlerHeaderFilePath)
+    
+    new_declarations = []
+    for packet in packetList:
+        if packet.get('Type') == 'RequestPacket':
+            packet_name = packet.get('PacketName', '')
+            if packet_name and packet_name not in existing_declarations:
+                declaration = f"\tvoid On{packet_name}(const {packet_name}& packet);"
+                new_declarations.append(declaration)
+    
+    if not new_declarations:
+        return True
+    
+    pragma_start = "#pragma region Packet Handler"
+    pragma_end = "#pragma endregion Packet Handler"
+    
+    if os.path.exists(PacketItemsFilePath.playerPacketHandlerHeaderFilePath):
+        try:
+            with open(PacketItemsFilePath.playerPacketHandlerHeaderFilePath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            pragma_start_pos = content.find(pragma_start)
+            pragma_end_pos = content.find(pragma_end)
+            
+            if pragma_start_pos != -1 and pragma_end_pos != -1:
+                before = content[:pragma_end_pos]
+                after = content[pragma_end_pos:]
+                
+                new_content = before + '\n'.join(new_declarations) + '\n' + after
+            else:
+                new_content = content + '\n' + pragma_start + '\npublic:\n'
+                new_content += '\n'.join(new_declarations) + '\n'
+                new_content += pragma_end + '\n'
+            
+            with open(PacketItemsFilePath.playerPacketHandlerHeaderFilePath + "_new", 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+        except Exception as e:
+            print(f"Error updating Player.h: {e}")
+            return False
+    
+    return True
+
+
+def GeneratePlayerPacketHandlers(packetList):
+    existing_handlers = ExtractExistingPlayerHandlers(PacketItemsFilePath.playerPacketHandlerCppFilePath)
+    
+    new_handlers = []
+    for packet in packetList:
+        if packet.get('Type') == 'RequestPacket':
+            packet_name = packet.get('PacketName', '')
+            if packet_name and packet_name not in existing_handlers:
+                handler_code = GeneratePlayerHandlerCode(packet, packetList)
+                new_handlers.append(handler_code)
+    
+    if not new_handlers:
+        return True
+    
+    pragma_start = "#pragma region Packet Handler"
+    pragma_end = "#pragma endregion Packet Handler"
+    
+    if os.path.exists(PacketItemsFilePath.playerPacketHandlerCppFilePath):
+        try:
+            with open(PacketItemsFilePath.playerPacketHandlerCppFilePath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            pragma_start_pos = content.find(pragma_start)
+            pragma_end_pos = content.find(pragma_end)
+            
+            if pragma_start_pos != -1 and pragma_end_pos != -1:
+                before = content[:pragma_end_pos]
+                after = content[pragma_end_pos:]
+                
+                new_content = before + '\n'.join(new_handlers) + '\n' + after
+            else:
+                new_content = content + '\n' + pragma_start + '\n'
+                new_content += '\n'.join(new_handlers) + '\n'
+                new_content += pragma_end + '\n'
+            
+            with open(PacketItemsFilePath.playerPacketHandlerCppFilePath + "_new", 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+        except Exception as e:
+            print(f"GeneratePlayerPacketHandlers : {e}")
+            return False
+    else:
+        try:
+            new_content = '#include "PreCompile.h"\n#include "Player.h"\n\n'
+            new_content += pragma_start + '\n'
+            new_content += '\n'.join(new_handlers) + '\n'
+            new_content += pragma_end + '\n'
+            
+            with open(PacketItemsFilePath.playerPacketHandlerCppFilePath + "_new", 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+        except Exception as e:
+            print(f"GeneratePlayerPacketHandlers : {e}")
+            return False
+    
     return True
 
 
@@ -336,6 +479,14 @@ def ProcessPacketGenerate():
 
     if GeneratePacketHandlerCpp(packetList) == False:
         print("Generate packet handler falied")
+        exit()
+        
+    if GeneratePlayerPacketHandlers(packetList) == False:
+        print("Generate player packet handlers failed")
+        exit()
+        
+    if GeneratePlayerPacketHandlerDeclarations(packetList) == False:
+        print("Generate player packet handler declarations failed")
         exit()
         
     ReplacePacketFiled()

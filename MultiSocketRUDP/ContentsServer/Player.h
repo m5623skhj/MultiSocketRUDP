@@ -13,11 +13,13 @@ private:
 	void OnConnected() override;
 	void OnDisconnected() override;
 
-public:
-	void OnPing(const Ping& packet);
-	void OnTestPacketReq(const TestPacketReq& packet);
-	void OnTestStringPacketReq(const TestStringPacketReq& packet);
-
 private:
 	void RegisterAllPacketHandler();
+
+#pragma region Packet Handler
+public:
+	void OnPing(const Ping& packet);
+	void OnTestStringPacketReq(const TestStringPacketReq& packet);
+	void OnTestPacketReq(const TestPacketReq& packet);
+#pragma endregion Packet Handler
 };

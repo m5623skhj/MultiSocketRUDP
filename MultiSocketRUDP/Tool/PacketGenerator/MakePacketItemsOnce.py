@@ -1,24 +1,77 @@
 import PacketItemsFilePath
 import os
 
-def MakePacketHandlerCppFile():
-    if not os.path.exists(PacketItemsFilePath.packetHandlerFilePath):
-        with open("PacketGenerator/PacketHandlerCppOrigin", 'r') as file:
+def MakePlayerPacketHandlerCppFile():
+    if not os.path.exists(PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath):
+        with open("PacketGenerator/PlayerPacketHandlerRegisterCppOrigin", 'r') as file:
             code = file.read()
         
-        with open(PacketItemsFilePath.packetHandlerFilePath, 'w') as file:
+        with open(PacketItemsFilePath.playerPacketHandlerRegisterCppFilePath, 'w') as file:
             file.write(code)
-            print("PacketHandler.cpp file created")
+            print("PlayerPacketHandlerRegister.cpp file created")
         
 
-def MakePacketHandlerHeaderFile():
-    if not os.path.exists(PacketItemsFilePath.packetHandlerHeaderFilePath):
-        with open("PacketGenerator/PacketHandlerHeaderOrigin", 'r') as file:
+def MakePlayerPacketHandlerHeaderFile():
+    if not os.path.exists(PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath):
+        with open("PacketGenerator/PlayerPacketHandlerRegisterHeaderOrigin", 'r') as file:
             code = file.read()
         
-        with open(PacketItemsFilePath.packetHandlerHeaderFilePath, 'w') as file:
+        with open(PacketItemsFilePath.playerPacketHandlerRegisterHeaderFilePath, 'w') as file:
             file.write(code)
-            print("PacketHander.h file created")
+            print("PlayerPacketHandlerRegister.h file created")
+
+
+def MakePlayerCppFile():
+    if not os.path.exists(PacketItemsFilePath.playerPacketHandlerCppFilePath):
+        code = '''#include "PreCompile.h"
+#include "Player.h"
+
+#pragma region Packet Handler
+#pragma endregion Packet Handler
+'''
+        
+        directory = os.path.dirname(PacketItemsFilePath.playerPacketHandlerCppFilePath)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        with open(PacketItemsFilePath.playerPacketHandlerCppFilePath, 'w') as file:
+            file.write(code)
+            print("Player.cpp file created")
+
+
+def MakePlayerHeaderFile():
+    if not os.path.exists(PacketItemsFilePath.playerPacketHandlerHeaderFilePath):
+        code = '''#pragma once
+#include "RUDPSession.h"
+#include "Protocol.h"
+
+class Player final : public RUDPSession
+{
+public:
+\tPlayer() = delete;
+\t~Player() override = default;
+\texplicit Player(MultiSocketRUDPCore& inCore);
+
+private:
+\tvoid OnConnected() override;
+\tvoid OnDisconnected() override;
+
+private:
+\tvoid RegisterAllPacketHandler();
+
+#pragma region Packet Handler
+public:
+#pragma endregion Packet Handler
+};
+'''
+        
+        directory = os.path.dirname(PacketItemsFilePath.playerPacketHandlerHeaderFilePath)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        with open(PacketItemsFilePath.playerPacketHandlerHeaderFilePath, 'w') as file:
+            file.write(code)
+            print("Player.h file created")
         
 
 def MakePacketIdTypeHeaderFile():
@@ -58,8 +111,10 @@ def MakeYamlFile():
             print("PacketDefine.yml file created")
 
 def MakePacketItemsOnce():
-    MakePacketHandlerCppFile()
-    MakePacketHandlerHeaderFile()
+    MakePlayerPacketHandlerCppFile()
+    MakePlayerPacketHandlerHeaderFile()
+    MakePlayerCppFile()  
+    MakePlayerHeaderFile()  # 새로 추가
     MakePacketIdTypeHeaderFile()
     MakeProtocolCppFile()
     MakeProtocolHeaderFile()

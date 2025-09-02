@@ -2,8 +2,10 @@
 packetTypeFilePath = '../ContentsServer/PacketIdType.h'
 protocolHeaderPath = '../ContentsServer/Protocol.h'
 protocolCppFileCppPath = '../ContentsServer/Protocol.cpp'
-packetHandlerFilePath = '../ContentsServer/PacketHandler.cpp'
-packetHandlerHeaderFilePath = '../ContentsServer/PacketHandler.h'
+playerPacketHandlerRegisterCppFilePath = '../ContentsServer/PlayerPacketHandlerRegister.cpp'
+playerPacketHandlerRegisterHeaderFilePath = '../ContentsServer/PlayerPacketHandlerRegister.h'
+playerPacketHandlerCppFilePath = '../ContentsServer/PlayerPacketHandler.cpp'
+playerPacketHandlerHeaderFilePath = '../ContentsServer/Player.h'
 ymlFilePath = 'PacketDefine.yml'
 
 # Client file path here

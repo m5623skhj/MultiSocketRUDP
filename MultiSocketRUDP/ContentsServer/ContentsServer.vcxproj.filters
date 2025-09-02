@@ -39,10 +39,10 @@
     <ClCompile Include="Player.cpp">
       <Filter>소스 파일\Player</Filter>
     </ClCompile>
-    <ClCompile Include="PlayerPacketHandler.cpp">
+    <ClCompile Include="PlayerPacketHandlerRegister.cpp">
       <Filter>소스 파일\Player</Filter>
     </ClCompile>
-    <ClCompile Include="PlayerPacketHandlerRegister.cpp">
+    <ClCompile Include="PlayerPacketHandler.cpp">
       <Filter>소스 파일\Player</Filter>
     </ClCompile>
   </ItemGroup>
@@ -55,9 +55,6 @@
     </ClInclude>
     <ClInclude Include="TestServer.h">
       <Filter>소스 파일\TestServer</Filter>
-    </ClInclude>
-    <ClInclude Include="Player.h">
-      <Filter>소스 파일\Player</Filter>
     </ClInclude>
     <ClInclude Include="PlayerPacketHandlerRegister.h">
       <Filter>소스 파일\Player</Filter>

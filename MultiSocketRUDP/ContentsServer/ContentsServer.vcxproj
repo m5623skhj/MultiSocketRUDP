@@ -143,7 +143,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketIdType.h" />
-    <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerPacketHandlerRegister.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="TestServer.h" />
