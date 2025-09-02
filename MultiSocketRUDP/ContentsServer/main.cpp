@@ -1,20 +1,18 @@
 #include "PreCompile.h"
-#include "PacketHandler.h"
-#include "RegisterEssentialHandler.h"
 #include "MultiSocketRUDPCore.h"
 #include "TestServer.h"
+#include "PlayerPacketHandlerRegister.h"
 
 int main()
 {
-	ContentsPacketHandler::Init();
-	EssentialHandler::RegisterAllEssentialHandler();
+	ContentsPacketRegister::Init();
 
 	if (not TestServer::GetInst().Start(L"ServerOptionFile/CoreOption.txt", L"ServerOptionFile/SessionBrokerOption.txt"))
 	{
-		std::cout << "StartServer() failed" << std::endl;
+		std::cout << "StartServer() failed" << '\n';
 		return 0;
 	}
-	std::cout << "Exit : ESC" << std::endl;
+	std::cout << "Exit : ESC" << '\n';
 
 	while (true)
 	{
@@ -31,7 +29,7 @@ int main()
 	{
 		Sleep(1000);
 	}
-	std::cout << "Server stopped" << std::endl;
+	std::cout << "Server stopped" << '\n';
 
 	return 0;
 }

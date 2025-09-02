@@ -51,9 +51,6 @@
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\PacketManager</Filter>
     </ClCompile>
-    <ClCompile Include="EssentialHandler.cpp">
-      <Filter>소스 파일\Handler</Filter>
-    </ClCompile>
     <ClCompile Include="ProcessByPacketType.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
@@ -91,9 +88,6 @@
     </ClInclude>
     <ClInclude Include="PacketManager.h">
       <Filter>소스 파일\PacketManager</Filter>
-    </ClInclude>
-    <ClInclude Include="EssentialHandler.h">
-      <Filter>소스 파일\Handler</Filter>
     </ClInclude>
     <ClInclude Include="PacketHandlerUtil.h">
       <Filter>소스 파일\Handler</Filter>

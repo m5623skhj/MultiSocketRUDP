@@ -1,7 +1,6 @@
 #include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 #include "BuildConfig.h"
-#include "EssentialHandler.h"
 #include "LogExtension.h"
 #include "Logger.h"
 #include "Ticker.h"
@@ -24,13 +23,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	if (not ReadOptionFile(coreOptionFilePath, sessionBrokerOptionFilePath))
 	{
 		LOG_ERROR("Option file read failed");
-		return false;
-	}
-
-	if (not EssentialHandlerManager::GetInst().IsRegisteredAllEssentialHandler())
-	{
-		LOG_ERROR("Essential handlers are not registered properly");
-		EssentialHandlerManager::GetInst().PrintUnregisteredEssentialHandler();
 		return false;
 	}
 

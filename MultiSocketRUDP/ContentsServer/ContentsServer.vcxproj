@@ -134,24 +134,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="PacketHandlerRegister.cpp" />
-    <ClCompile Include="PC.cpp" />
-    <ClCompile Include="PCManager.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="PlayerPacketHandler.cpp" />
+    <ClCompile Include="PlayerPacketHandlerRegister.cpp" />
     <ClCompile Include="Protocol.cpp" />
-    <ClCompile Include="RegisterEssentialHandler.cpp" />
     <ClCompile Include="TestServer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="PacketIdType.h" />
-    <ClInclude Include="PC.h" />
-    <ClInclude Include="PCManager.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="PlayerPacketHandlerRegister.h" />
     <ClInclude Include="Protocol.h" />
-    <ClInclude Include="RegisterEssentialHandler.h" />
     <ClInclude Include="TestServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

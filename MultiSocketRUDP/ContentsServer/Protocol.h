@@ -147,10 +147,8 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////
 
 #pragma region PacketHandler
-#define REGISTER_PACKET(PacketType, Handler){\
+#define REGISTER_PACKET(PacketType){\
 	PacketManager::GetInst().RegisterPacket<PacketType>();\
-	PacketManager::GetInst().RegisterPacketHandler<PacketType>(Handler);\
-	PacketManager::GetInst().RegisterBufferToPacketType<PacketType>();\
 }
 
 #pragma endregion PacketHandler
