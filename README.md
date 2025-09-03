@@ -56,15 +56,6 @@
   * 유저가 접속하면, 세션 브로커는 연결할 세션 정보와 세션 키를 발급하고 연결을 종료시킵니다.
     * 위에서 얻은 정보로 클라이언트가 패킷을 송신하면, 서버에서는 예약된 세션키를 비교하고 RUDPSession을 해당 클라이언트에게 귀속 시킵니다.
 
-* EssentialHandlerManager
-  * 필수적인 핸들러들을 등록 및 검사하는 싱글턴 객체입니다.
-  * 필수 핸들러들 중 등록되지 않은 핸들러가 존재한다면, 서버를 띄우는 것이 실패하게 됩니다.
-    * 시그니쳐는 RUDPCoreEssentialFunction = std::function<bool(RUDPSession&)>이며, 해당 형태의 핸들러만 등록됩니다.
-	* 핸들러는 Register~(RUDPCoreEssentialFunction&)로 등록합니다.
-	* 현재 필수 등록 핸들러 목록
-	  * ConnectHandler
-	  * DisconnectHandler
-
 * Ticker와 TimerEvent
   * 일정 시간 마다 등록한 이벤트를 호출하는 객체입니다.
   * Ticker는 싱글턴 객체이며, Ticker에 TimerEvent를 등록하여 사용합니다.
@@ -114,8 +105,11 @@
 
 3. Tools
    1. PacketGenerator
-      * PacketGenerate.bat 파일을 실행하면 PacketDefine.yml 파일을 참조하여 아래 파일들을 생성합니다.
-        * PacketHandler.cpp
+      * PacketGenerate.bat 파일을 실행하면 PacketDefine.yml 파일을 참조하여 아래 파일들을 생성 혹은 수정합니다.
+        * PlayerPacketHandler.cpp
+        * Player.h의 패킷 핸들러 부문
+        * PlayerPacketHandlerRegister.cpp
+        * PlayerPacketHandlerRegister.h
         * PacketHandler.h
         * Protocol.cpp
         * Protocol.h
@@ -123,7 +117,8 @@
       * 각 파일 생성 경로를 Tool/PacketGenerator/PacketItemsFilePath.py에 정의하면 해당 경로에 생성됩니다.
       * PacketDefine.yml 파일의 내용이 비어있을 경우, 파일의 삭제 및 생성을 시도하지 않습니다.
       * 해당하는 파일이 없을 경우 새로 생성합니다.
-        * 단, PacketHandler.cpp의 HandlePacket(RUDPSession& session, Packet& packet) 함수들은 제거되지 않으며, 해당 함수는 사용자가 직접 지워야 합니다(유저가 작성한 코드이므로, 삭제 책임도 유저가 가지도록 함).
+      * 각 파일들의 diff를 확인해 보고, 패킷 제네레이트의 결과물 파일이 이전 각 파일들의 원본과 비교하여 수정 사항이 없을 경우, 파일을 수정하지 않습니다.
+        * 필요 없는 빌드 횟수를 줄이기 위함입니다.
    2. RunDebug
       * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다. 
 
