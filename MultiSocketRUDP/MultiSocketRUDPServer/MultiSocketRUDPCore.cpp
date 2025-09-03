@@ -182,7 +182,6 @@ bool MultiSocketRUDPCore::SetSessionFactory(SessionFactoryFunc&& factoryFunc)
 	return true;
 }
 
-
 bool MultiSocketRUDPCore::InitNetwork()
 {
 	WSADATA wsaData;
@@ -350,10 +349,16 @@ void MultiSocketRUDPCore::CloseAllSessions()
 {
 	for (const auto& session : sessionArray)
 	{
+		if (session == nullptr)
+		{
+			continue;
+		}
+
 		if (session->sock != INVALID_SOCKET)
 		{
 			session->CloseSocket();
 		}
+		delete session;
 	}
 
 	connectedUserCount = 0;
