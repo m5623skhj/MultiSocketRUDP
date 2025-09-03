@@ -136,6 +136,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PacketHandlerRegister.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="PlayerManager.cpp" />
     <ClCompile Include="PlayerPacketHandler.cpp" />
     <ClCompile Include="PlayerPacketHandlerRegister.cpp" />
     <ClCompile Include="Protocol.cpp" />
@@ -143,6 +144,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PacketIdType.h" />
+    <ClInclude Include="PlayerManager.h" />
     <ClInclude Include="PlayerPacketHandlerRegister.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="TestServer.h" />

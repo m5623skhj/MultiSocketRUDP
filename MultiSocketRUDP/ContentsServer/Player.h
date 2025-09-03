@@ -2,6 +2,9 @@
 #include "RUDPSession.h"
 #include "Protocol.h"
 
+using PlayerIdType = unsigned long long;
+constexpr PlayerIdType InvalidPlayerId = 0;
+
 class Player final : public RUDPSession
 {
 public:
@@ -15,6 +18,13 @@ private:
 
 private:
 	void RegisterAllPacketHandler();
+
+public:
+	void SetPlayerId(const PlayerIdType inPlayerId) { playerId = inPlayerId; }
+	PlayerIdType GetPlayerId() const { return playerId; }
+
+private:
+	PlayerIdType playerId = InvalidPlayerId;
 
 #pragma region Packet Handler
 public:
