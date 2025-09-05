@@ -37,7 +37,7 @@
   * 스레드는 아래와 같이 구성됩니다.
     * WorkerThread : IO 처리를 담당합니다.
     * RecvLogicThread : 클라이언트에게 받은 패킷을 바탕으로 연결, 연결 해제, 패킷 핸들러 호출 등을 담당합니다.
-    * SessionBrokerThread : 클라이언트가 어떤 소켓에 연결을 할 것인지 알 수 있도록 지원해주는 스레드입니다.
+    * SessionBrokerThread : 클라이언트가 어떤 소켓과 통신 할 것인지 알 수 있도록 지원해주는 스레드입니다.
     * RetransmissionThread : 패킷 유실 등으로 인한 타임 아웃이 발생했을 때, 해당 패킷을 재전송해주는 스레드입니다.
       * 일정 횟수 재전송을 해보고, 응답이 오지 않을 경우, 클라이언트가 끊겼다고 판단하고, 해당 세션 목록들을 TimeoutThread에 이벤트로 전달합니다.
     * TimeoutThread : RetransmissionThread에서 타임아웃 되었다고 판단되는 세션들을 정리하는 스레드입니다.
