@@ -57,6 +57,7 @@ private:
 
 	bool printToConsole{};
 	std::string logFolder = "Log Folder";
+	std::atomic_int16_t currentConnectedClientCount{};
 };
 
 namespace LogHelper

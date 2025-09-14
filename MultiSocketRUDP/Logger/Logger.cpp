@@ -52,6 +52,11 @@ Logger& Logger::GetInstance()
 
 void Logger::RunLoggerThread(const bool isAlsoPrintToConsole)
 {
+	if (currentConnectedClientCount.fetch_add(1, std::memory_order_relaxed) > 0)
+	{
+		return;
+	}
+
 	printToConsole = isAlsoPrintToConsole;
 
 	loggerEventHandles[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -99,6 +104,11 @@ void Logger::Worker()
 
 void Logger::StopLoggerThread()
 {
+	if (currentConnectedClientCount.fetch_sub(0, std::memory_order_relaxed) != 1)
+	{
+		return;
+	}
+
 	SetEvent(loggerEventHandles[1]);
 	loggerThread.join();
 }
