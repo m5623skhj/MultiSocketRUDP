@@ -753,11 +753,11 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType th
 
 		{
 			std::scoped_lock lock(session.sendBuffer.sendPacketInfoQueueLock);
-			if (session.sendBuffer.sendPacketInfoQueue.size() == 0 &&
+			if (session.sendBuffer.sendPacketInfoQueue.empty() &&
 				session.sendBuffer.reservedSendPacketInfo == nullptr)
 			{
 				InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-				if (session.sendBuffer.sendPacketInfoQueue.size() > 0)
+				if (!session.sendBuffer.sendPacketInfoQueue.empty())
 				{
 					continue;
 				}
