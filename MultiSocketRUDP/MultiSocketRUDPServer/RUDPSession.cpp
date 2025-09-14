@@ -93,14 +93,15 @@ void RUDPSession::InitializeSession()
 		sendBuffer.reservedSendPacketInfo = {};
 	}
 
-	const int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.GetRestSize();
 	SendPacketInfo* eraseTarget = nullptr;
+	std::scoped_lock lock(sendBuffer.sendPacketInfoQueueLock);
+	const int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.size();
 	for (int i = 0; i < sendPacketInfoQueueSize; ++i)
 	{
-		if (sendBuffer.sendPacketInfoQueue.Dequeue(&eraseTarget))
-		{
-			sendPacketInfoPool->Free(eraseTarget);
-		}
+		const auto restItem = sendBuffer.sendPacketInfoQueue.front();
+		sendPacketInfoPool->Free(restItem);
+
+		sendBuffer.sendPacketInfoQueue.pop();
 	}
 }
 

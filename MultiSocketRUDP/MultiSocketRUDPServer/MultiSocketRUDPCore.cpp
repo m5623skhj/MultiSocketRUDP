@@ -110,7 +110,10 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 		buffer->Encode();
 	}
 
-	sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.Enqueue(sendPacketInfo);
+	{
+		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
+		sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.push(sendPacketInfo);
+	}
 
 	if (not DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
@@ -748,15 +751,18 @@ bool MultiSocketRUDPCore::DoSend(OUT RUDPSession& session, const ThreadIdType th
 			break;
 		}
 
-		if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() == 0 &&
-			session.sendBuffer.reservedSendPacketInfo == nullptr)
 		{
-			InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-			if (session.sendBuffer.sendPacketInfoQueue.GetRestSize() > 0)
+			std::scoped_lock lock(session.sendBuffer.sendPacketInfoQueueLock);
+			if (session.sendBuffer.sendPacketInfoQueue.size() == 0 &&
+				session.sendBuffer.reservedSendPacketInfo == nullptr)
 			{
-				continue;
+				InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+				if (session.sendBuffer.sendPacketInfoQueue.size() > 0)
+				{
+					continue;
+				}
+				break;
 			}
-			break;
 		}
 
 		IOContext* sendContext = MakeSendContext(session, threadId);
@@ -823,7 +829,11 @@ unsigned int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT I
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
 
 	unsigned int totalSendSize = 0;
-	const int bufferCount = session.sendBuffer.sendPacketInfoQueue.GetRestSize();
+	size_t bufferCount = 0;
+	{
+		std::scoped_lock lock(session.sendBuffer.sendPacketInfoQueueLock);
+		bufferCount = session.sendBuffer.sendPacketInfoQueue.size();
+	}
 
 	if (session.sendBuffer.reservedSendPacketInfo != nullptr)
 	{
@@ -833,7 +843,7 @@ unsigned int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT I
 		}
 	}
 
-	for (int i = 0; i < bufferCount; ++i)
+	for (size_t i = 0; i < bufferCount; ++i)
 	{
 		switch (StoredSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId))
 		{
@@ -889,9 +899,18 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, const ThreadIdType threadId)
 {
 	SendPacketInfo* sendPacketInfo;
+	{
+		std::scoped_lock lock(session.sendBuffer.sendPacketInfoQueueLock);
+		if (session.sendBuffer.sendPacketInfoQueue.empty() == true)
+		{
+			return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
+		}
 
-	session.sendBuffer.sendPacketInfoQueue.Dequeue(&sendPacketInfo);
-	MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
+		sendPacketInfo = session.sendBuffer.sendPacketInfoQueue.front();
+		session.sendBuffer.sendPacketInfoQueue.pop();
+	}
+
+	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
 	if (packetSequenceSet.contains(key) == true)
 	{
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;

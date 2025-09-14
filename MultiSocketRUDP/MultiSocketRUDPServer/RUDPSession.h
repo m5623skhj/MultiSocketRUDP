@@ -44,7 +44,8 @@ struct RecvBuffer
 
 struct SendBuffer
 {
-	CLockFreeQueue<SendPacketInfo*> sendPacketInfoQueue;
+	std::mutex sendPacketInfoQueueLock;
+	std::queue<SendPacketInfo*> sendPacketInfoQueue;
 	SendPacketInfo* reservedSendPacketInfo;
 	char rioSendBuffer[MAX_SEND_BUFFER_SIZE];
 	RIO_BUFFERID sendBufferId;
