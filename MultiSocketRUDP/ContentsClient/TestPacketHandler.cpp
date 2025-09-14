@@ -106,7 +106,7 @@ void TestClient::SendAnyPacket()
 	case 0:
 	{
 		Ping ping;
-		RUDPClientCore::GetInst().SendPacket(ping);
+		SendPacket(ping);
 	}
 	break;
 	case 1:
@@ -118,7 +118,7 @@ void TestClient::SendAnyPacket()
 			std::scoped_lock lock(orderListLock);
 			orderList.emplace_back(req.order);
 		}
-		RUDPClientCore::GetInst().SendPacket(req);
+		SendPacket(req);
 	}
 	break;
 	case 2:
@@ -130,7 +130,7 @@ void TestClient::SendAnyPacket()
 			std::scoped_lock lock(echoStringSetLock);
 			echoStringSet.emplace(echoString);
 		}
-		RUDPClientCore::GetInst().SendPacket(req);
+		SendPacket(req);
 	}
 	break;
 	default:

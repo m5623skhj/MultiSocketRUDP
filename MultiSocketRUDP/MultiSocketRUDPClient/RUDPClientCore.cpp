@@ -4,12 +4,6 @@
 #include "LogExtension.h"
 #include "PacketManager.h"
 
-RUDPClientCore& RUDPClientCore::GetInst()
-{
-	static RUDPClientCore instance;
-	return instance;
-}
-
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);

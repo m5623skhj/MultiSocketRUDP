@@ -4,25 +4,22 @@
 #include "PacketIdType.h"
 #include <mutex>
 #include <set>
+#include "RUDPClientCore.h"
 
-class TestClient
+class TestClient : public RUDPClientCore
 {
-private:
+public:
 	TestClient() = default;
-	~TestClient() = default;
+	~TestClient() override = default;
 	TestClient& operator=(const TestClient&) = delete;
 	TestClient(TestClient&&) = delete;
 
 public:
-	static TestClient& GetInst();
-
-public:
-	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile);
-	void Stop();
-	static bool IsConnected();
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile, bool printLogToConsole) override;
+	void Stop() override;
 
 private:
-	static bool WaitingConnectToServer(unsigned int maximumConnectWaitingCount);
+	bool WaitingConnectToServer(unsigned int maximumConnectWaitingCount) const;
 	void RunTestThread();
 	bool ProcessPacketHandle(NetBuffer& buffer, PACKET_ID packetId);
 	void SendAnyPacket();

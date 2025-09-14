@@ -3,20 +3,22 @@
 
 int main()
 {
-	if (not TestClient::GetInst().Start(L"ClientOptionFile/CoreOption.txt", L"ClientOptionFile/SessionGetterOption.txt"))
+	TestClient client;
+
+	if (not client.Start(L"ClientOptionFile/CoreOption.txt", L"ClientOptionFile/SessionGetterOption.txt", true))
 	{
-		TestClient::GetInst().Stop();
+		client.Stop();
 		return 0;
 	}
-	std::cout << "Exit : ESC" << std::endl;
+	std::cout << "Exit : ESC" << '\n';
 
 	while (true)
 	{
 		Sleep(1000);
 
-		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000 || not TestClient::GetInst().IsConnected())
+		if (GetAsyncKeyState(VK_ESCAPE) & 0x8000 || not client.IsConnected())
 		{
-			TestClient::GetInst().Stop();
+			client.Stop();
 			break;
 		}
 	}

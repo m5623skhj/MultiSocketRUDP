@@ -5,15 +5,9 @@
 #include "LogExtension.h"
 #include "Protocol.h"
 
-TestClient& TestClient::GetInst()
+bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile, const bool printLogToConsole)
 {
-	static TestClient instance;
-	return instance;
-}
-
-bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile)
-{
-	if (not RUDPClientCore::GetInst().Start(clientCoreOptionFile, sessionGetterOptionFile, true))
+	if (not RUDPClientCore::Start(clientCoreOptionFile, sessionGetterOptionFile, printLogToConsole))
 	{
 		std::cout << "Core start failed" << '\n';
 		return false;
@@ -35,21 +29,16 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 
 void TestClient::Stop()
 {
-	RUDPClientCore::GetInst().Stop();
+	RUDPClientCore::Stop();
 	testThread.join();
 
 	std::cout << "Client stopped" << '\n';
 }
 
-bool TestClient::IsConnected()
-{
-	return RUDPClientCore::GetInst().IsConnected();
-}
-
-bool TestClient::WaitingConnectToServer(const unsigned int maximumConnectWaitingCount)
+bool TestClient::WaitingConnectToServer(const unsigned int maximumConnectWaitingCount) const
 {
 	unsigned int connectWaitingCount = 0;
-	while (not RUDPClientCore::GetInst().IsConnected())
+	while (not IsConnected())
 	{
 		Sleep(1000);
 		++connectWaitingCount;
@@ -69,13 +58,13 @@ void TestClient::RunTestThread()
 	constexpr int firstSendCount = 5;
 	SendAnyPacket(firstSendCount);
 
-	while (not RUDPClientCore::GetInst().IsStopped())
+	while (not IsStopped())
 	{
 		constexpr unsigned int maxProcessPacketInOneTick = 100;
-		int remainPacketSize = static_cast<int>(min(RUDPClientCore::GetInst().GetRemainPacketSize(), maxProcessPacketInOneTick));
+		int remainPacketSize = static_cast<int>(min(GetRemainPacketSize(), maxProcessPacketInOneTick));
 		while (--remainPacketSize >= 0)
 		{
-			auto buffer = RUDPClientCore::GetInst().GetReceivedPacket();
+			const auto buffer = GetReceivedPacket();
 			if (buffer == nullptr)
 			{
 				continue;

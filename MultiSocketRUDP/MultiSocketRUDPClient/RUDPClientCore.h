@@ -50,22 +50,19 @@ struct RecvPacketInfo
 
 class RUDPClientCore
 {
-private:
-	RUDPClientCore() = default;
-
 public:
-	static RUDPClientCore& GetInst();
-	~RUDPClientCore() = default;
+	RUDPClientCore() = default;
+	virtual ~RUDPClientCore() = default;
 	RUDPClientCore& operator=(const RUDPClientCore&) = delete;
 	RUDPClientCore(RUDPClientCore&&) = delete;
 
+protected:
+	virtual bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
+	virtual void Stop();
+
 public:
-	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
-	void Stop();
-
-	inline bool IsStopped() const { return isStopped; }
-	inline bool IsConnected() const { return isConnected; }
-
+	bool IsStopped() const { return isStopped; }
+	bool IsConnected() const { return isConnected; }
 
 private:
 	bool CreateRUDPSocket();
