@@ -143,7 +143,7 @@ void RUDPClientCore::RunSendThread()
 {
 	while (true)
 	{
-		switch (WaitForMultipleObjects(sendEventHandles.size(), sendEventHandles.data(), FALSE, INFINITE))
+		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
@@ -292,7 +292,6 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		return;
 	}
 
-	std::cout << "OnSendReply : " << packetSequence << '\n';
 	if (packetSequence == 0)
 	{
 		isConnected = true;

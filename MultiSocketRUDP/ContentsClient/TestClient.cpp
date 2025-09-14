@@ -5,6 +5,8 @@
 #include "LogExtension.h"
 #include "Protocol.h"
 
+int clientCount = 0;
+
 bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFile, const bool printLogToConsole)
 {
 	if (not RUDPClientCore::Start(clientCoreOptionFile, sessionGetterOptionFile, printLogToConsole))
@@ -21,8 +23,9 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 		return false;
 	}
 
-	std::cout << "Client is running" << '\n';
-
+	++clientCount;
+	std::cout << std::format("Client connected to server. Current connected client count : {}\n", clientCount);
+	
 	testThread = std::thread{ &TestClient::RunTestThread, this };
 	return true;
 }
@@ -32,7 +35,7 @@ void TestClient::Stop()
 	RUDPClientCore::Stop();
 	testThread.join();
 
-	std::cout << "Client stopped" << '\n';
+	--clientCount;
 }
 
 bool TestClient::WaitingConnectToServer(const unsigned int maximumConnectWaitingCount) const

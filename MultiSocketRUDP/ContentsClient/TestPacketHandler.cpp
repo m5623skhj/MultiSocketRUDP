@@ -36,8 +36,8 @@ namespace
 	{
 		std::random_device rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> distr(10, MAX_RANDOM_STRING_SIZE);
-		return gen_random(distr(gen));
+		std::uniform_int_distribution<> dist(10, MAX_RANDOM_STRING_SIZE);
+		return gen_random(dist(gen));
 	}
 }
 
@@ -141,7 +141,6 @@ void TestClient::SendAnyPacket()
 	}
 
 	++packetSendCount;
-	std::cout << "Packet send count " << packetSendCount << '\n';
 }
 
 void TestClient::SendAnyPacket(const unsigned int sendCount)
