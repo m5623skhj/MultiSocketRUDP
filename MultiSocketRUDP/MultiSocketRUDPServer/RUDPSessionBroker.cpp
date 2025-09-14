@@ -59,7 +59,6 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	}
 
 	int sockAddrSize = sizeof(clientAddr); 
-	auto& sendBuffer = *NetBuffer::Alloc();
 	while (not threadStopFlag)
 	{
 		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
@@ -75,11 +74,11 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			continue;
 		}
 
+		auto& sendBuffer = *NetBuffer::Alloc();
 		ReserveSession(sendBuffer, rudpSessionIP);
 		SendSessionInfoToClient(clientSocket, sendBuffer);
+		NetBuffer::Free(&sendBuffer);
 	}
-
-	NetBuffer::Free(&sendBuffer);
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
@@ -161,7 +160,7 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, con
 
 void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
 {
-	char connectResultCode;
+	char connectResultCode = 0;
 	const auto session = AcquireSession();
 	do
 	{
