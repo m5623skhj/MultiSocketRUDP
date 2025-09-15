@@ -186,4 +186,4 @@ private:
 	unsigned int retransmissionThreadSleepMs{};
 };
 
-static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, false);
+static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

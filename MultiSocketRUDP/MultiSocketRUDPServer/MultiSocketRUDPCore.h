@@ -11,6 +11,8 @@
 #include <vector>
 #include <set>
 
+#include "MultiSocketRUDPCore.h"
+
 #pragma comment(lib, "ws2_32.lib")
 
 enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
@@ -38,41 +40,7 @@ struct IOContext : RIO_BUF
 	char localAddrBuffer[sizeof(SOCKADDR_INET)];
 };
 
-struct SendPacketInfo
-{
-	NetBuffer* buffer{};
-	RUDPSession* owner{};
-	PacketRetransmissionCount retransmissionCount{};
-	PacketSequence sendPacketSequence{};
-	unsigned long long retransmissionTimeStamp{};
-	bool isErasedPacketInfo{};
-	bool isReplyType{};
-	std::list<SendPacketInfo*>::iterator listItor;
-
-	~SendPacketInfo()
-	{
-		NetBuffer::Free(buffer);
-		owner = {};
-		retransmissionCount = {};
-		sendPacketSequence = {};
-		retransmissionTimeStamp = {};
-		listItor = {};
-		isErasedPacketInfo = {};
-		isReplyType = {};
-	}
-
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
-	{
-		owner = inOwner;
-		buffer = inBuffer;
-		sendPacketSequence = inSendPacketSequence;
-		isReplyType = inIsReplyType;
-		NetBuffer::AddRefCount(inBuffer);
-	}
-
-	[[nodiscard]]
-	NetBuffer* GetBuffer() const { return buffer; }
-};
+struct SendPacketInfo;
 
 namespace MultiSocketRUDP
 {
@@ -298,3 +266,60 @@ private:
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);
+
+struct SendPacketInfo
+{
+	NetBuffer* buffer{};
+	RUDPSession* owner{};
+	PacketRetransmissionCount retransmissionCount{};
+	PacketSequence sendPacketSequence{};
+	unsigned long long retransmissionTimeStamp{};
+	bool isErasedPacketInfo{};
+	bool isReplyType{};
+	std::list<SendPacketInfo*>::iterator listItor;
+	std::atomic_int8_t refCount{};
+
+	~SendPacketInfo()
+	{
+		owner = {};
+		retransmissionCount = {};
+		sendPacketSequence = {};
+		retransmissionTimeStamp = {};
+		listItor = {};
+		isErasedPacketInfo = {};
+		isReplyType = {};
+	}
+
+	void Initialize(RUDPSession * inOwner, NetBuffer * inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
+	{
+		owner = inOwner;
+		buffer = inBuffer;
+		sendPacketSequence = inSendPacketSequence;
+		isReplyType = inIsReplyType;
+
+		retransmissionCount = {};
+		retransmissionTimeStamp = {};
+	}
+
+	void AddRefCount()
+	{
+		refCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	static void Free(SendPacketInfo* deleteTarget)
+	{
+		if (deleteTarget == nullptr)
+		{
+			return;
+		}
+
+		if (deleteTarget->refCount.fetch_sub(1, std::memory_order_relaxed) == 1)
+		{
+			NetBuffer::Free(deleteTarget->buffer);
+			sendPacketInfoPool->Free(deleteTarget);
+		}
+	}
+
+	[[nodiscard]]
+	NetBuffer* GetBuffer() const { return buffer; }
+};

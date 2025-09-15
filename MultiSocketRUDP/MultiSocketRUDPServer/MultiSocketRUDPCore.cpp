@@ -117,7 +117,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 
 	if (not DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
-		sendPacketInfoPool->Free(sendPacketInfo);
+		SendPacketInfo::Free(sendPacketInfo);
 		return false;
 	}
 
@@ -164,7 +164,7 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 		}
 	} while (false);
 
-	sendPacketInfoPool->Free(eraseTarget);
+	SendPacketInfo::Free(eraseTarget);
 }
 
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
@@ -888,7 +888,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 	totalSendSize += static_cast<int>(useSize);
 	if (sendPacketInfo->isReplyType == true)
 	{
-		sendPacketInfoPool->Free(session.sendBuffer.reservedSendPacketInfo);
+		SendPacketInfo::Free(session.sendBuffer.reservedSendPacketInfo);
 	}
 
 	session.sendBuffer.reservedSendPacketInfo = nullptr;
@@ -943,7 +943,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 	memcpy_s(&session.sendBuffer.rioSendBuffer[beforeSendSize], MAX_SEND_BUFFER_SIZE - beforeSendSize, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	if (sendPacketInfo->isReplyType == true)
 	{
-		sendPacketInfoPool->Free(sendPacketInfo);
+		SendPacketInfo::Free(sendPacketInfo);
 	}
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;

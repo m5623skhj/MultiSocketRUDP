@@ -89,7 +89,7 @@ void RUDPSession::InitializeSession()
 
 	if (sendBuffer.reservedSendPacketInfo != nullptr)
 	{
-		sendPacketInfoPool->Free(sendBuffer.reservedSendPacketInfo);
+		SendPacketInfo::Free(sendBuffer.reservedSendPacketInfo);
 		sendBuffer.reservedSendPacketInfo = {};
 	}
 
@@ -99,7 +99,7 @@ void RUDPSession::InitializeSession()
 	for (int i = 0; i < sendPacketInfoQueueSize; ++i)
 	{
 		const auto restItem = sendBuffer.sendPacketInfoQueue.front();
-		sendPacketInfoPool->Free(restItem);
+		SendPacketInfo::Free(restItem);
 
 		sendBuffer.sendPacketInfoQueue.pop();
 	}
@@ -174,12 +174,16 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	if (isReplyType == false)
 	{
+		sendPacketInfo->AddRefCount();
+
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
 	}
 
 	if (not core.SendPacket(sendPacketInfo))
 	{
+		SendPacketInfo::Free(sendPacketInfo);
+
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.erase(inSendPacketSequence);
 
