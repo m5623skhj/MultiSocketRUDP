@@ -721,7 +721,6 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		{
 			NetBuffer::Free(buffer);
 		}
-		contextPool.Free(context);
 	}
 }
 
