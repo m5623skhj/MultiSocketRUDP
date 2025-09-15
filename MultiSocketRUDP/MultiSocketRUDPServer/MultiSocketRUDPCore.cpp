@@ -721,6 +721,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		{
 			NetBuffer::Free(buffer);
 		}
+		contextPool.Free(context);
 	}
 }
 
@@ -802,6 +803,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 
 	if (memcpy_s(context->clientAddrBuffer, sizeof(context->clientAddrBuffer), &session.clientSockAddrInet, sizeof(SOCKADDR_INET)) != NOERROR)
 	{
+		contextPool.Free(context);
 		return nullptr;
 	}
 	context->clientAddrRIOBuffer.Length = sizeof(context->clientAddrBuffer);
