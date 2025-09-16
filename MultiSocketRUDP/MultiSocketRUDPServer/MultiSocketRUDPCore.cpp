@@ -651,7 +651,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	}
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		return SendIOCompleted(*contextResult->session, threadId);
+		return SendIOCompleted(contextResult, threadId);
 	}
 	default:
 	{
@@ -679,10 +679,12 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 	return DoRecv(*contextResult->session);
 }
 
-bool MultiSocketRUDPCore::SendIOCompleted(RUDPSession& session, const BYTE threadId)
+bool MultiSocketRUDPCore::SendIOCompleted(OUT IOContext* ioContext, const BYTE threadId)
 {
-	InterlockedExchange(reinterpret_cast<UINT*>(&session.sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-	return DoSend(session, threadId);
+	InterlockedExchange(reinterpret_cast<UINT*>(&ioContext->session->sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+	contextPool.Free(ioContext);
+
+	return DoSend(*ioContext->session, threadId);
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)

@@ -237,7 +237,7 @@ private:
 	[[nodiscard]]
 	bool RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
 	[[nodiscard]]
-	inline bool SendIOCompleted(RUDPSession& session, BYTE threadId);
+	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
 	[[nodiscard]]
