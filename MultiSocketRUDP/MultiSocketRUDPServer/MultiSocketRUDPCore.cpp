@@ -382,6 +382,7 @@ void MultiSocketRUDPCore::ClearAllSession()
 	{
 		for (const auto& session : sessionArray)
 		{
+			contextPool.Free(session->recvBuffer.recvContext.get());
 			delete session;
 		}
 
