@@ -59,6 +59,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	}
 
 	int sockAddrSize = sizeof(clientAddr); 
+	NetBuffer sendBuffer;
 	while (not threadStopFlag)
 	{
 		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
@@ -74,10 +75,8 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			continue;
 		}
 
-		auto& sendBuffer = *NetBuffer::Alloc();
 		ReserveSession(sendBuffer, rudpSessionIP);
 		SendSessionInfoToClient(clientSocket, sendBuffer);
-		NetBuffer::Free(&sendBuffer);
 	}
 
 	const auto log = Logger::MakeLogObject<ServerLog>();

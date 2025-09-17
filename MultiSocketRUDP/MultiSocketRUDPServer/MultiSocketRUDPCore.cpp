@@ -669,6 +669,7 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 	const auto buffer = NetBuffer::Alloc();
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->session->recvBuffer.buffer, transferred) != 0)
 	{
+		NetBuffer::Free(buffer);
 		return false;
 	}
 	buffer->m_iWrite = static_cast<WORD>(transferred);
