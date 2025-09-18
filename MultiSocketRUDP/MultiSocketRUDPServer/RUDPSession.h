@@ -86,6 +86,7 @@ private:
 	void SendHeartbeatPacket();
 
 	void CloseSocket();
+	void UnregisterRIOBuffers();
 
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);

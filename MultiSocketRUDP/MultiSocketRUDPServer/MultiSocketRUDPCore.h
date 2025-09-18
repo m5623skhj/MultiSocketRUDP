@@ -96,6 +96,7 @@ public:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 	inline void PushToDisconnectTargetSession(RUDPSession& session);
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioFunctionTable; }
 
 private:
 	[[nodiscard]]

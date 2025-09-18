@@ -93,10 +93,9 @@ void RUDPSession::InitializeSession()
 		sendBuffer.reservedSendPacketInfo = {};
 	}
 
-	SendPacketInfo* eraseTarget = nullptr;
 	std::scoped_lock lock(sendBuffer.sendPacketInfoQueueLock);
-	const int sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.size();
-	for (int i = 0; i < sendPacketInfoQueueSize; ++i)
+	const size_t sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.size();
+	for (size_t i = 0; i < sendPacketInfoQueueSize; ++i)
 	{
 		const auto restItem = sendBuffer.sendPacketInfoQueue.front();
 		SendPacketInfo::Free(restItem);
@@ -216,7 +215,37 @@ void RUDPSession::CloseSocket()
 	}
 
 	closesocket(sock);
+	UnregisterRIOBuffers();
 	sock = INVALID_SOCKET;
+}
+
+void RUDPSession::UnregisterRIOBuffers()
+{
+	const auto& rioFunctionTable = core.GetRIOFunctionTable();
+	if (sendBuffer.sendBufferId != RIO_INVALID_BUFFERID)
+	{
+		rioFunctionTable.RIODeregisterBuffer(sendBuffer.sendBufferId);
+		sendBuffer.sendBufferId = RIO_INVALID_BUFFERID;
+	}
+	if (recvBuffer.recvContext != nullptr)
+	{
+		const auto& context = recvBuffer.recvContext;
+		if (context->BufferId != RIO_INVALID_BUFFERID)
+		{
+			rioFunctionTable.RIODeregisterBuffer(context->BufferId);
+			context->BufferId = RIO_INVALID_BUFFERID;
+		}
+		if (context->clientAddrRIOBuffer.BufferId != RIO_INVALID_BUFFERID)
+		{
+			rioFunctionTable.RIODeregisterBuffer(context->clientAddrRIOBuffer.BufferId);
+			context->clientAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
+		}
+		if (context->localAddrRIOBuffer.BufferId != RIO_INVALID_BUFFERID)
+		{
+			rioFunctionTable.RIODeregisterBuffer(context->localAddrRIOBuffer.BufferId);
+			context->localAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
+		}
+	}
 }
 
 void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
