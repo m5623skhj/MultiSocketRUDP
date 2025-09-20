@@ -37,6 +37,9 @@
     <Filter Include="소스 파일\MultiSocketRUDPCore\Session">
       <UniqueIdentifier>{8e34acbf-5811-4168-98bf-5cf5141d2d77}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\MemoryTracer">
+      <UniqueIdentifier>{5988ad38-7388-4406-8058-b5bb072ed9d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
@@ -75,6 +78,9 @@
     <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClCompile>
+    <ClCompile Include="MemoryTracer.cpp">
+      <Filter>소스 파일\MemoryTracer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
@@ -103,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="RUDPSession.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryTracer.h">
+      <Filter>소스 파일\MemoryTracer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

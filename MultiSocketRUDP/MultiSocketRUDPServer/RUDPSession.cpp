@@ -4,6 +4,7 @@
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
+#include "MemoryTracer.h"
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
@@ -140,6 +141,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	NetBuffer* buffer = NetBuffer::Alloc();
+	MemoryTracer::TrackObject(buffer, "SendPacket", __FILE__, __LINE__);
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("Buffer is nullptr in RUDPSession::SendPacket()");
@@ -181,7 +183,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 	if (not core.SendPacket(sendPacketInfo))
 	{
-		SendPacketInfo::Free(sendPacketInfo);
+		SendPacketInfo::Free(sendPacketInfo, 2);
 
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.erase(inSendPacketSequence);
@@ -189,12 +191,14 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		return false;
 	}
 
+	SendPacketInfo::Free(sendPacketInfo);
 	return true;
 }
 
 void RUDPSession::SendHeartbeatPacket()
 {
 	NetBuffer& buffer = *NetBuffer::Alloc();
+	MemoryTracer::TrackObject(&buffer, "SendHeartbeatPacket", __FILE__, __LINE__);
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
@@ -361,6 +365,7 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 {
 	NetBuffer& buffer = *NetBuffer::Alloc();
+	MemoryTracer::TrackObject(&buffer, "SendReplyToClient", __FILE__, __LINE__);
 
 	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
 	buffer << packetType << recvPacketSequence;

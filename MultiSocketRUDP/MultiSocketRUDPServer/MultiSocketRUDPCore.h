@@ -11,6 +11,7 @@
 #include <vector>
 #include <set>
 
+#include "MemoryTracer.h"
 #include "MultiSocketRUDPCore.h"
 
 #pragma comment(lib, "ws2_32.lib")
@@ -291,7 +292,7 @@ struct SendPacketInfo
 		isReplyType = {};
 	}
 
-	void Initialize(RUDPSession * inOwner, NetBuffer * inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
+	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
 	{
 		owner = inOwner;
 		buffer = inBuffer;
@@ -300,6 +301,8 @@ struct SendPacketInfo
 
 		retransmissionCount = {};
 		retransmissionTimeStamp = {};
+
+		refCount = 1;
 	}
 
 	void AddRefCount()
@@ -316,7 +319,25 @@ struct SendPacketInfo
 
 		if (deleteTarget->refCount.fetch_sub(1, std::memory_order_relaxed) == 1)
 		{
+			MemoryTracer::TrackObject(deleteTarget->buffer, "Free", __FILE__, __LINE__);
 			NetBuffer::Free(deleteTarget->buffer);
+
+			sendPacketInfoPool->Free(deleteTarget);
+		}
+	}
+	
+	static void Free(SendPacketInfo* deleteTarget, char subCount)
+	{
+		if (deleteTarget == nullptr)
+		{
+			return;
+		}
+
+		if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_relaxed) == 1)
+		{
+			MemoryTracer::TrackObject(deleteTarget->buffer, "Free", __FILE__, __LINE__);
+			NetBuffer::Free(deleteTarget->buffer);
+
 			sendPacketInfoPool->Free(deleteTarget);
 		}
 	}

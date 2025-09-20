@@ -4,6 +4,7 @@
 #include "LogExtension.h"
 #include "Logger.h"
 #include "Ticker.h"
+#include "MemoryTracer.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -111,6 +112,8 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 	}
 
 	{
+		sendPacketInfo->AddRefCount();
+
 		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
 		sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.push(sendPacketInfo);
 	}
@@ -667,8 +670,10 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const ULONG transferred, const BYTE threadId)
 {
 	const auto buffer = NetBuffer::Alloc();
+	MemoryTracer::TrackObject(buffer, "RecvIOCompleted", __FILE__, __LINE__);
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->session->recvBuffer.buffer, transferred) != 0)
 	{
+		MemoryTracer::TrackObject(buffer, "RecvIOCompleted", __FILE__, __LINE__);
 		NetBuffer::Free(buffer);
 		return false;
 	}
@@ -716,6 +721,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(clientAddr));
 			if (not ProcessByPacketType(*context->session, clientAddr, *buffer))
 			{
+				MemoryTracer::TrackObject(buffer, "OnRecvPacket1", __FILE__, __LINE__);
 				NetBuffer::Free(buffer);
 				return;
 			}
@@ -723,6 +729,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 
 		if (buffer != nullptr)
 		{
+			MemoryTracer::TrackObject(buffer, "OnRecvPacket2", __FILE__, __LINE__);
 			NetBuffer::Free(buffer);
 		}
 	}
@@ -834,7 +841,7 @@ unsigned int MultiSocketRUDPCore::MakeSendStream(OUT RUDPSession& session, OUT I
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
 
 	unsigned int totalSendSize = 0;
-	size_t bufferCount = 0;
+	size_t bufferCount;
 	{
 		std::scoped_lock lock(session.sendBuffer.sendPacketInfoQueueLock);
 		bufferCount = session.sendBuffer.sendPacketInfoQueue.size();

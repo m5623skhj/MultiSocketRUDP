@@ -23,6 +23,7 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
+    <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="ProcessByPacketType.cpp" />
@@ -36,6 +37,7 @@
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CoreType.h" />
     <ClInclude Include="LogExtension.h" />
+    <ClInclude Include="MemoryTracer.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
