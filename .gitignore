@@ -20,3 +20,5 @@ MultiSocketRUDP/ContentsServer/Log Folder/log_2025-01-23_16.txt
 MultiSocketRUDP/MultiSocketRUDP.slnLaunch.user
 MultiSocketRUDP/ContentsClient/Log Folder/
 MultiSocketRUDP/ContentsServer/Log Folder/
+MultiSocketRUDP/ContentsServer/MemoryTracer.log
+*.dmp
