@@ -289,14 +289,21 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 
 	if (nextRecvPacketSequence != packetSequence)
 	{
-		if (nextRecvPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
+		if (packetSequence < nextRecvPacketSequence)
+		{
+			SendReplyToClient(packetSequence);
+		}
+		else if (nextRecvPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
 		{
 			NetBuffer::AddRefCount(&recvPacket);
 			recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
 			recvHoldingPacketSequences.emplace(packetSequence);
 		}
+
+		return true;
 	}
-	else if (ProcessPacket(recvPacket, packetSequence) == false)
+
+	if (ProcessPacket(recvPacket, packetSequence) == false)
 	{
 		return false;
 	}
@@ -313,7 +320,7 @@ bool RUDPSession::ProcessHoldingPacket()
 		NetBuffer* storedBuffer;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			if (recvPacketHolderTop.packetSequence <= nextRecvPacketSequence)
+			if (recvPacketHolderTop.packetSequence == nextRecvPacketSequence)
 			{
 				recvPacketHolderQueue.pop();
 				recvHoldingPacketSequences.erase(recvPacketHolderTop.packetSequence);
