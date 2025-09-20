@@ -326,7 +326,7 @@ struct SendPacketInfo
 		}
 	}
 	
-	static void Free(SendPacketInfo* deleteTarget, char subCount)
+	static void Free(SendPacketInfo* deleteTarget, const char subCount)
 	{
 		if (deleteTarget == nullptr)
 		{
