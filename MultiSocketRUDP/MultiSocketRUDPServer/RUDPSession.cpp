@@ -173,7 +173,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	}
 
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
-	if (isReplyType == false)
+	if (not isReplyType)
 	{
 		sendPacketInfo->AddRefCount();
 
@@ -184,9 +184,11 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	if (not core.SendPacket(sendPacketInfo))
 	{
 		SendPacketInfo::Free(sendPacketInfo, 2);
-
-		std::unique_lock lock(sendPacketInfoMapLock);
-		sendPacketInfoMap.erase(inSendPacketSequence);
+		if (not isReplyType)
+		{
+			std::unique_lock lock(sendPacketInfoMapLock);
+			sendPacketInfoMap.erase(inSendPacketSequence);
+		}
 
 		return false;
 	}
@@ -330,7 +332,7 @@ bool RUDPSession::ProcessHoldingPacket()
 			recvPacketHolderQueue.pop();
 		}
 		
-		if (ProcessPacket(*storedBuffer, packetSequence, false) == false)
+		if (ProcessPacket(*storedBuffer, packetSequence) == false)
 		{
 			return false;
 		}
@@ -341,7 +343,7 @@ bool RUDPSession::ProcessHoldingPacket()
 	return true;
 }
 
-bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence, const bool needReplyToClient)
+bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
 	recvHoldingPacketSequences.erase(recvPacketSequence);
 	++nextRecvPacketSequence;

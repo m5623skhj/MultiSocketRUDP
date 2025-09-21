@@ -95,7 +95,7 @@ private:
 	[[nodiscard]]
 	bool OnRecvPacket(NetBuffer& recvPacket);
 	[[nodiscard]]
-	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence, bool needReplyToClient = true);
+	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence);
 	[[nodiscard]]
 	bool ProcessHoldingPacket();
 	void SendReplyToClient(PacketSequence recvPacketSequence);
