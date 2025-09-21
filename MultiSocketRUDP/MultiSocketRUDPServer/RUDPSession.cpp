@@ -320,13 +320,6 @@ bool RUDPSession::ProcessHoldingPacket()
 		NetBuffer* storedBuffer;
 		{
 			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			if (recvPacketHolderTop.packetSequence == nextRecvPacketSequence)
-			{
-				recvPacketHolderQueue.pop();
-				recvHoldingPacketSequences.erase(recvPacketHolderTop.packetSequence);
-				continue;
-			}
-
 			if (recvPacketHolderTop.packetSequence > nextRecvPacketSequence)
 			{
 				break;
@@ -341,6 +334,8 @@ bool RUDPSession::ProcessHoldingPacket()
 		{
 			return false;
 		}
+
+		NetBuffer::Free(storedBuffer);
 	}
 	
 	return true;
