@@ -451,7 +451,10 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 
 			if (not IOCompleted(context, rioResults[i].BytesTransferred, threadId))
 			{
-				contextPool.Free(context);
+				if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+				{
+					contextPool.Free(context);
+				}
 				// error handling
 			}
 		}
