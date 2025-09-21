@@ -204,10 +204,6 @@ void RUDPSession::SendHeartbeatPacket()
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
-	{
-		std::string str = "SendHeartbeatPacketSequence : " + std::to_string(packetSequence) + '\n';
-		std::cout << str;
-	}
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
