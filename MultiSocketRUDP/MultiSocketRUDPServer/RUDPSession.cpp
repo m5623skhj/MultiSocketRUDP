@@ -175,15 +175,13 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	if (not isReplyType)
 	{
-		sendPacketInfo->AddRefCount();
-
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
 	}
 
 	if (not core.SendPacket(sendPacketInfo))
 	{
-		SendPacketInfo::Free(sendPacketInfo, 2);
+		SendPacketInfo::Free(sendPacketInfo);
 		if (not isReplyType)
 		{
 			std::unique_lock lock(sendPacketInfoMapLock);

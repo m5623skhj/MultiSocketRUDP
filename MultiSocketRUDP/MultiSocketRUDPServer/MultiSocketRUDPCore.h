@@ -84,7 +84,7 @@ public:
 	unsigned short GetConnectedUserCount() const { return connectedUserCount; }
 
 public:
-	bool SendPacket(SendPacketInfo* sendPacketInfo);
+	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
 	[[nodiscard]]
 	bool DoRecv(const RUDPSession& session) const;
 	[[nodiscard]]
@@ -301,6 +301,7 @@ struct SendPacketInfo
 
 		retransmissionCount = {};
 		retransmissionTimeStamp = {};
+		isErasedPacketInfo = {};
 
 		refCount = 1;
 	}

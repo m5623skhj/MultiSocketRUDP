@@ -101,7 +101,7 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().WriteLog(log);
 }
 
-bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
+bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool needAddRefCount)
 {
 	if (const auto buffer = sendPacketInfo->GetBuffer(); buffer->m_bIsEncoded == false)
 	{
@@ -112,7 +112,10 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 	}
 
 	{
-		sendPacketInfo->AddRefCount();
+		if (needAddRefCount)
+		{
+			sendPacketInfo->AddRefCount();
+		}
 
 		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
 		sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.push(sendPacketInfo);
@@ -120,7 +123,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo)
 
 	if (not DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
-		SendPacketInfo::Free(sendPacketInfo);
+		SendPacketInfo::Free(sendPacketInfo, 2);
 		return false;
 	}
 
@@ -451,10 +454,6 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 
 			if (not IOCompleted(context, rioResults[i].BytesTransferred, threadId))
 			{
-				if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
-				{
-					contextPool.Free(context);
-				}
 				// error handling
 			}
 		}
@@ -531,7 +530,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 				continue;
 			}
 
-			SendPacket(sendPacketInfo);
+			SendPacket(sendPacketInfo, false);
 		}
 
 		if (numOfTimeoutSession > 0)
@@ -692,9 +691,10 @@ bool MultiSocketRUDPCore::RecvIOCompleted(OUT IOContext* contextResult, const UL
 bool MultiSocketRUDPCore::SendIOCompleted(OUT IOContext* ioContext, const BYTE threadId)
 {
 	InterlockedExchange(reinterpret_cast<UINT*>(&ioContext->session->sendBuffer.ioMode), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-	contextPool.Free(ioContext);
 
-	return DoSend(*ioContext->session, threadId);
+	const bool result = DoSend(*ioContext->session, threadId);
+	contextPool.Free(ioContext);
+	return result;
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
