@@ -454,7 +454,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 
 			if (not IOCompleted(context, rioResults[i].BytesTransferred, threadId))
 			{
-				// error handling
+				LOG_ERROR(std::format("IOCompleted() failed with io type {}", static_cast<INT8>(context->ioType)));
 			}
 		}
 
@@ -661,7 +661,6 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	}
 	default:
 	{
-		LOG_ERROR(std::format("Invalid rio operation type. Type is {}", static_cast<unsigned char>(contextResult->ioType)));
 	}
 	break;
 	}
