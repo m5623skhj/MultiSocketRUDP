@@ -36,10 +36,6 @@ public:
 	static PacketManager& GetInst();
 	[[nodiscard]]
 	static std::shared_ptr<IPacket> MakePacket(PacketId packetId);
-	[[nodiscard]]
-	static PacketHandler GetPacketHandler(PacketId packetId);
-	[[nodiscard]]
-	static bool BufferToPacket(PacketId packetId, NetBuffer& buffer, std::any& packet);
 	static void Init();
 
 #pragma region TODO : Packet handler direct call

@@ -395,7 +395,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	}
 
 	constexpr PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
-	PacketSequence packetSequence = ++lastSendPacketSequence;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
