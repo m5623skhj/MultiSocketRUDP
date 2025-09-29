@@ -612,7 +612,7 @@ void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const un
 
 IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 {
-	IOContext* context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
+	const auto context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
 	if (context == nullptr)
 	{
 		return nullptr;

@@ -143,7 +143,7 @@ void RUDPClientCore::RunSendThread()
 {
 	while (true)
 	{
-		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
+		switch (WaitForMultipleObjects(sendEventHandles.size(), sendEventHandles.data(), FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
