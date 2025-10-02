@@ -247,7 +247,7 @@ bool MultiSocketRUDPCore::InitRIO()
 		}
 	} while (false);
 	
-	if (tempSocket != INVALID_SOCKET && result == false)
+	if (tempSocket != INVALID_SOCKET)
 	{
 		closesocket(tempSocket);
 	}
