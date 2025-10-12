@@ -320,9 +320,7 @@ struct SendPacketInfo
 
 		if (deleteTarget->refCount.fetch_sub(1, std::memory_order_relaxed) == 1)
 		{
-			MemoryTracer::TrackObject(deleteTarget->buffer, "Free", __FILE__, __LINE__);
 			NetBuffer::Free(deleteTarget->buffer);
-
 			sendPacketInfoPool->Free(deleteTarget);
 		}
 	}
@@ -336,9 +334,7 @@ struct SendPacketInfo
 
 		if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_relaxed) == 1)
 		{
-			MemoryTracer::TrackObject(deleteTarget->buffer, "Free", __FILE__, __LINE__);
 			NetBuffer::Free(deleteTarget->buffer);
-
 			sendPacketInfoPool->Free(deleteTarget);
 		}
 	}
