@@ -618,19 +618,20 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 		return nullptr;
 	}
 
+	context->session = GetUsingSession(context->ownerSessionId);
+	if (context->session == nullptr)
+	{
+		return nullptr;
+	}
+
 	if (rioResult.Status != 0)
 	{
+		context->session->Disconnect();
 		LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
 		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
 		{
 			contextPool.Free(context);
 		}
-		return nullptr;
-	}
-
-	context->session = GetUsingSession(context->ownerSessionId);
-	if (context->session == nullptr)
-	{
 		return nullptr;
 	}
 

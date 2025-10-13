@@ -120,6 +120,7 @@ void RUDPSession::Disconnect()
 		return;
 	}
 
+	CloseSocket();
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		for (const auto& item : sendPacketInfoMap | std::views::values)
@@ -129,7 +130,6 @@ void RUDPSession::Disconnect()
 
 		sendPacketInfoMap.clear();
 	}
-	CloseSocket();
 	OnDisconnected();
 
 	core.DisconnectSession(sessionId);
