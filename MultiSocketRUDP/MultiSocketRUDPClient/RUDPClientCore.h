@@ -162,6 +162,7 @@ public:
 	unsigned int GetRemainPacketSize();
 	NetBuffer* GetReceivedPacket();
 	void SendPacket(OUT IPacket& packet);
+	void Disconnect();
 
 #if _DEBUG
 	void SendPacketForTest(char* streamData, int streamSize);

@@ -402,6 +402,21 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	return SendPacket(*buffer, packetSequence);
 }
 
+void RUDPClientCore::Disconnect()
+{
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		LOG_ERROR("Buffer is nullptr in RUDPSession::Disconnect()");
+		return;
+	}
+	constexpr PACKET_TYPE packetType = PACKET_TYPE::DISCONNECT_TYPE;
+	constexpr PacketSequence packetSequence = 0;
+	*buffer << packetType;
+	SendPacket(*buffer, packetSequence);
+	isConnected = false;
+}
+
 #if _DEBUG
 void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 {
