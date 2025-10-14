@@ -159,13 +159,14 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, con
 
 void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
 {
-	char connectResultCode = 0;
+	CONNECT_RESULT_CODE connectResultCode = CONNECT_RESULT_CODE::SUCCESS;
 	const auto session = AcquireSession();
 	do
 	{
 		if (session == nullptr)
 		{
 			LOG_ERROR("ReserveSession failed : session is nullptr");
+			connectResultCode = CONNECT_RESULT_CODE::SERVER_FULL;
 			break;
 		}
 
@@ -173,7 +174,7 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 	} while (false);
 	
 	sendBuffer << connectResultCode;
-	if (connectResultCode == 0)
+	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS)
 	{
 		SetSessionKey(*session);
 		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
@@ -181,25 +182,25 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 	}
 	else
 	{
-		if (session != nullptr && session->sock != INVALID_SOCKET)
+		if (session != nullptr)
 		{
 			session->Disconnect();
 		}
 	}
 }
 
-char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
+CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 {
 	if (session.isConnected)
 	{
 		LOG_ERROR("This session already connected");
-		return 2;
+		return CONNECT_RESULT_CODE::ALREADY_CONNECTED_SESSION;
 	}
 
 	if (session.sock = CreateRUDPSocket(); session.sock == INVALID_SOCKET)
 	{
 		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
-		return 3;
+		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
 	
 	sockaddr_in serverAddr;
@@ -210,16 +211,16 @@ char MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)
 	{
 		LOG_ERROR(std::format("RUDPSession::InitializeRIO failed with error {}", WSAGetLastError()));
-		return 4;
+		return CONNECT_RESULT_CODE::RIO_INIT_FAILED;
 	}
 
 	if (not DoRecv(session))
 	{
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
-		return 5;
+		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
 	}
 
-	return 0;
+	return CONNECT_RESULT_CODE::SUCCESS;
 }
 
 void MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)

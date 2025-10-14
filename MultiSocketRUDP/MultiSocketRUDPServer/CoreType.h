@@ -43,6 +43,16 @@ enum class PACKET_TYPE : unsigned char
 	, HEARTBEAT_REPLY_TYPE
 };
 
+enum class CONNECT_RESULT_CODE : unsigned char
+{
+	SUCCESS = 0
+	, SERVER_FULL
+	, ALREADY_CONNECTED_SESSION
+	, CREATE_SOCKET_FAILED
+	, RIO_INIT_FAILED
+	, DO_RECV_FAILED
+};
+
 struct TickSet
 {
 	UINT64 nowTick = 0;
