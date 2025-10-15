@@ -214,9 +214,12 @@ void RUDPSession::CloseSocket()
 		return;
 	}
 
-	closesocket(sock);
-	UnregisterRIOBuffers();
-	sock = INVALID_SOCKET;
+	std::unique_lock lock(socketLock);
+	{
+		closesocket(sock);
+		UnregisterRIOBuffers();
+		sock = INVALID_SOCKET;
+	}
 }
 
 void RUDPSession::UnregisterRIOBuffers()

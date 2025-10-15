@@ -743,10 +743,18 @@ bool MultiSocketRUDPCore::DoRecv(const RUDPSession& session) const
 		return false;
 	}
 
-	if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context.get()) == false)
 	{
-		LOG_ERROR(std::format("RIOReceiveEx() failed with error code {}", WSAGetLastError()));
-		return false;
+		std::shared_lock lock(session.socketLock);
+		if (session.sock == INVALID_SOCKET)
+		{
+			return false;
+		}
+
+		if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context.get()) == false)
+		{
+			LOG_ERROR(std::format("RIOReceiveEx() failed with error code {}", WSAGetLastError()));
+			return false;
+		}
 	}
 
 	return true;
@@ -825,11 +833,19 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 {
 	context->session = &session;
 
-	if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context) == false)
 	{
-		LOG_ERROR(std::format("RIOSendEx() failed with error code {}", WSAGetLastError()));
-		contextPool.Free(context);
-		return false;
+		std::shared_lock lock(session.socketLock);
+		if (session.sock == INVALID_SOCKET)
+		{
+			return false;
+		}
+
+		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context) == false)
+		{
+			LOG_ERROR(std::format("RIOSendEx() failed with error code {}", WSAGetLastError()));
+			contextPool.Free(context);
+			return false;
+		}
 	}
 
 	return true;

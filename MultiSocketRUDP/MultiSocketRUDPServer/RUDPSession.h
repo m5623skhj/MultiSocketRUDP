@@ -168,6 +168,7 @@ private:
 	SOCKADDR_INET clientSockAddrInet{};
 	PortType serverPort{ INVALID_PORT_NUMBER };
 	SOCKET sock{};
+	mutable std::shared_mutex socketLock;
 	bool nowInReleaseThread{};
 	bool nowInProcessingRecvPacket{};
 	bool isUsingSession{};
