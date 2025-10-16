@@ -22,3 +22,8 @@ MultiSocketRUDP/ContentsClient/Log Folder/
 MultiSocketRUDP/ContentsServer/Log Folder/
 MultiSocketRUDP/ContentsServer/MemoryTracer.log
 *.dmp
+MultiSocketRUDPBotTester/.vs/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/Debug/net9.0-windows/MultiSocketRUDPBotTester.deps.json
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/Debug/net9.0-windows/MultiSocketRUDPBotTester.dll
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/obj/
