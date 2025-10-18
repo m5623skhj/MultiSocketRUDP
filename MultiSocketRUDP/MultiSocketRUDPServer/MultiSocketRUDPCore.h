@@ -116,8 +116,6 @@ private:
 	bool RunSessionBroker();
 	[[nodiscard]]
 	static SOCKET CreateRUDPSocket();
-	[[nodiscard]]
-	SessionFactoryFunc sessionFactory{};
 
 private:
 	void CloseAllSessions();
@@ -142,6 +140,7 @@ private:
 	std::list<SessionIdType> unusedSessionIdList;
 	std::recursive_mutex unusedSessionIdListLock;
 	std::atomic_uint16_t connectedUserCount{};
+	SessionFactoryFunc sessionFactory{};
 
 private:
 	std::vector<std::list<SendPacketInfo*>> sendPacketInfoList;
