@@ -4,11 +4,12 @@ namespace MultiSocketRUDPBotTester.Buffer
 {
     public class NetBuffer
     {
-        private const int BUFFER_SIZE = 10000;
+        private const int BUFFER_SIZE = 1024;
         private const int HEADER_SIZE = 5;
         private byte[] buffer;
         private int readPos;
         private int writePos;
+        private bool isEndoded = false;
 
         public static byte HeaderCode { get; set; } = 0x89;
         public static byte XORKey { get; set; } = 0x32;
@@ -177,8 +178,13 @@ namespace MultiSocketRUDPBotTester.Buffer
             return result;
         }
 
-        public byte[] Encode()
+        public void Encode()
         {
+            if (isEndoded)
+            {
+                return;
+            }
+
             int payloadLength = writePos - HEADER_SIZE;
 
             buffer[0] = HeaderCode;
@@ -211,7 +217,6 @@ namespace MultiSocketRUDPBotTester.Buffer
 
             byte[] result = new byte[writePos];
             Array.Copy(buffer, result, writePos);
-            return result;
         }
 
         public bool Decode(byte[] data)
@@ -261,6 +266,16 @@ namespace MultiSocketRUDPBotTester.Buffer
             byte[] payload = new byte[payloadSize];
             Array.Copy(buffer, HEADER_SIZE, payload, 0, payloadSize);
             return payload;
+        }
+
+        public int GetLength()
+        {
+            return writePos;
+        }
+
+        public byte[] GetPacketBuffer()
+        {
+            return buffer;
         }
     }
 }
