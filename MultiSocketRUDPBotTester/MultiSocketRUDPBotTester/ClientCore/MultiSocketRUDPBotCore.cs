@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CleintCore
+namespace ClientCore
 {
     public class MultiSocketRUDPBotCore
     {

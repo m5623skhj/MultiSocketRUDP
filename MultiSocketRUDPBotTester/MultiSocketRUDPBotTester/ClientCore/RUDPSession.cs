@@ -4,11 +4,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CleintCore
+namespace ClientCore
 {
     public enum SessionState
     {
@@ -49,6 +50,8 @@ namespace CleintCore
     class RUDPSession
     {
         public SessionInfo sessionInfo { get; private set; }
+        private UdpClient udpClient;
+        private IPEndPoint serverEndPoint;
 
         private UInt64 lastSendSequence;
         private UInt64 expectedRecvSequence;
@@ -98,30 +101,57 @@ namespace CleintCore
 
         private SessionBrokerResponse ParseSessionBrokerResponse(byte[] data, int length)
         {
-            var netBuffer = new NetBuffer();
+            var buffer = new NetBuffer();
 
             var encodedData = new byte[length];
             Array.Copy(data, encodedData, length);
 
-            if (!netBuffer.Decode(encodedData))
+            if (!buffer.Decode(encodedData))
             {
                 throw new Exception("Failed to decode session broker response");
             }
 
             var response = new SessionBrokerResponse();
-            response.resultCode = (ConnectResultCode)netBuffer.ReadByte();
+            response.resultCode = (ConnectResultCode)buffer.ReadByte();
 
             if (response.resultCode != ConnectResultCode.SUCCESS)
             {
                 return response;
             }
 
-            response.serverIp = netBuffer.ReadString();
-            response.serverPort = netBuffer.ReadUShort();
-            response.sessionId = netBuffer.ReadUShort();
-            response.sessionKey = netBuffer.ReadString();
+            response.serverIp = buffer.ReadString();
+            response.serverPort = buffer.ReadUShort();
+            response.sessionId = buffer.ReadUShort();
+            response.sessionKey = buffer.ReadString();
 
             return response;
+        }
+
+        public async Task<bool> ConnectToServerAsync()
+        {
+            udpClient = new UdpClient();
+            serverEndPoint = new IPEndPoint(IPAddress.Parse(sessionInfo.serverIp), sessionInfo.serverPort);
+
+            var connectPacket = BuildConnectPacket();
+            await udpClient.SendAsync(connectPacket.GetPacketBuffer(), connectPacket.GetLength(), serverEndPoint);
+
+            return true;
+        }
+
+        public bool SendPacket(NetBuffer packetBuffer)
+        {
+
+
+            return true;
+        }
+
+        private NetBuffer BuildConnectPacket()
+        {
+            var buffer = new NetBuffer();
+            
+
+
+            return buffer;
         }
     }
 }
