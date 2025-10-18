@@ -1,4 +1,4 @@
-﻿using CleintCore;
+﻿using ClientCore;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
