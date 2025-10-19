@@ -5,7 +5,10 @@ namespace MultiSocketRUDPBotTester.Buffer
     public class NetBuffer
     {
         private const int BUFFER_SIZE = 1024;
-        private const int HEADER_SIZE = 5;
+        private const int HEADER_SIZE = 18;
+        private const int PACKET_TYPE_POS = 5;
+        private const int PACKET_SEQUENCE_POS = 6;
+        private const int PACKET_ID_POS = 14;
         private byte[] buffer;
         private int readPos;
         private int writePos;
@@ -276,6 +279,30 @@ namespace MultiSocketRUDPBotTester.Buffer
         public byte[] GetPacketBuffer()
         {
             return buffer;
+        }
+
+        public void InsertPacketType(PacketType type)
+        {
+            buffer[PACKET_TYPE_POS] = (byte)type;
+        }
+
+        public void InsertPacketSequence(PacketSequence seq)
+        {
+            Span<byte> span = buffer.AsSpan(PACKET_SEQUENCE_POS, 8);
+            BitConverter.TryWriteBytes(span, seq);
+        }
+
+        public void InsertPacketId(PacketId id)
+        {
+            Span<byte> span = buffer.AsSpan(PACKET_ID_POS, 4);
+            BitConverter.TryWriteBytes(span, id);
+        }
+
+        public void BuildConnectPacket(ushort sessionId, string sessionKey)
+        {
+            writePos = PACKET_ID_POS;
+            WriteUShort(sessionId);
+            WriteString(sessionKey);
         }
     }
 }
