@@ -9,32 +9,30 @@ namespace ClientCore
 {
     public class SendPacketInfo
     {
-        public SendPacketInfo(NetBuffer inSendedBuffer, PacketSequence inPacketSequence, UInt64 inSendTimeStamp)
+        public SendPacketInfo(NetBuffer inSendedBuffer)
         {
             sendedBuffer = inSendedBuffer;
-            packetSequence = inPacketSequence;
-            sendTimeStamp = inSendTimeStamp;
         }
 
-        void RefreshSendPacketInfo(UInt64 now)
+        public void RefreshSendPacketInfo(UInt64 now)
         {
             sendTimeStamp = now;
             ++retransmissionCount;
         }
 
-        bool IsRetransmissionTime(UInt64 now)
+        public bool IsRetransmissionTime(UInt64 now)
         {
             return (now - sendTimeStamp) >= RETRANSMISSION_TIMEOUT_MS;
         }
 
-        bool IsExceedMaxRetransmissionCount()
+        public bool IsExceedMaxRetransmissionCount()
         {
             return retransmissionCount >= RETRANSMISSION_MAX_COUNT;
         }
 
-        private NetBuffer sendedBuffer { get; }
-        public PacketSequence packetSequence { get; }
-        private UInt64 sendTimeStamp { get; set; }
+        public NetBuffer sendedBuffer { get; }
+        public PacketSequence packetSequence { get; } = 0;
+        private UInt64 sendTimeStamp { get; set; } = 0;
         private PacketRetransmissionCount retransmissionCount = 0;
 
         private static readonly UInt64 RETRANSMISSION_TIMEOUT_MS = 32;

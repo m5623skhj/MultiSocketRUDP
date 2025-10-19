@@ -40,7 +40,7 @@ namespace ClientCore
 
     public class SessionInfo
     {
-        public UInt64 sessionId { get; set; }
+        public ushort sessionId { get; set; }
         public string sessionKey { get; set; }
         public SessionState sessionState { get; set; }
         public string serverIp { get; set; }
@@ -132,24 +132,47 @@ namespace ClientCore
             udpClient = new UdpClient();
             serverEndPoint = new IPEndPoint(IPAddress.Parse(sessionInfo.serverIp), sessionInfo.serverPort);
 
-            var connectPacket = BuildConnectPacket();
-            await udpClient.SendAsync(connectPacket.GetPacketBuffer(), connectPacket.GetLength(), serverEndPoint);
+            var connectPacket = MakeConnectPacket();
+            if (connectPacket == null)
+            {
+                return false;
+            }
+            await SendConnectPacket(connectPacket);
 
             return true;
         }
 
-        public bool SendPacket(NetBuffer packetBuffer)
+        public async Task<bool> SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)
         {
+            packetBuffer.InsertPacketType(packetType);
+            packetBuffer.InsertPacketSequence(++lastSendSequence);
+            packetBuffer.InsertPacketId(packetId);
 
+            packetBuffer.Encode();
+            await SendPacket(new SendPacketInfo(packetBuffer));
 
             return true;
         }
 
-        private NetBuffer BuildConnectPacket()
+        private async Task<bool> SendConnectPacket(NetBuffer packetBuffer)
+        {
+            await SendPacket(new SendPacketInfo(MakeConnectPacket()));
+
+            return true;
+        }
+
+        private async Task<bool> SendPacket(SendPacketInfo sendPacketInfo)
+        {
+            sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
+            await udpClient.SendAsync(sendPacketInfo.sendedBuffer.GetPacketBuffer(), sendPacketInfo.sendedBuffer.GetLength(), serverEndPoint);
+
+            return true;
+        }
+
+        private NetBuffer MakeConnectPacket()
         {
             var buffer = new NetBuffer();
-            
-
+            buffer.BuildConnectPacket(sessionInfo.sessionId, sessionInfo.sessionKey);
 
             return buffer;
         }
