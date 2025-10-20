@@ -176,5 +176,26 @@ namespace ClientCore
 
             return buffer;
         }
+
+        private async Task ReceiveAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var result = await udpClient.ReceiveAsync();
+                    //ProcessReceivedPacket(result.Buffer);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch (Exception ex)
+            {
+                if (cancellationToken.IsCancellationRequested == false)
+                {
+                    // log
+                }
+            }
+        }
     }
 }
