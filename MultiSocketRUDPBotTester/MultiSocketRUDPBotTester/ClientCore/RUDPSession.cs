@@ -77,7 +77,7 @@ namespace ClientCore
 
             var buffer = new byte[1024];
             var recvTask = await stream.ReadAsync(buffer, 0, buffer.Length);
-            
+
             int bytesRead = recvTask;
             if (bytesRead == 0)
             {
@@ -184,7 +184,7 @@ namespace ClientCore
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var result = await udpClient.ReceiveAsync();
-                    //ProcessReceivedPacket(result.Buffer);
+                    ProcessReceivedPacket(result.Buffer);
                 }
             }
             catch (OperationCanceledException) { }
@@ -195,6 +195,38 @@ namespace ClientCore
                 {
                     // log
                 }
+            }
+        }
+
+        private void ProcessReceivedPacket(byte[] data)
+        {
+            var buffer = new NetBuffer();
+            if (buffer.Decode(data) == false)
+            {
+                // log
+                return;
+            }
+
+            var packetType = (PacketType)buffer.ReadByte();
+            var packetSequence = buffer.ReadULong();
+            switch (packetType)
+            {
+                case PacketType.SEND_TYPE:
+                case PacketType.HEARTBEAT_TYPE:
+                    {
+                        // SendReplyToServer(packetSequence);
+                    }
+                    break;
+                case PacketType.SEND_REPLY_TYPE:
+                    {
+                        // OnSendReply(packetSequence);
+                    }
+                    break;
+                default:
+                    {
+                        // log
+                    }
+                    break;
             }
         }
     }
