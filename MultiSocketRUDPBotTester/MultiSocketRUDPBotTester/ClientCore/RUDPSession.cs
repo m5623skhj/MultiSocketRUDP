@@ -56,6 +56,8 @@ namespace ClientCore
         private UInt64 lastSendSequence;
         private UInt64 expectedRecvSequence;
 
+        private bool isConnected = false;
+
         public RUDPSession()
         {
             sessionInfo = new SessionInfo
@@ -219,7 +221,7 @@ namespace ClientCore
                     break;
                 case PacketType.SEND_REPLY_TYPE:
                     {
-                        // OnSendReply(packetSequence);
+                        OnSendReply(buffer, packetSequence);
                     }
                     break;
                 default:
@@ -228,6 +230,21 @@ namespace ClientCore
                     }
                     break;
             }
+        }
+
+        private void OnSendReply(NetBuffer recvPacket, PacketSequence packetSequence)
+        {
+            if (packetSequence < expectedRecvSequence)
+            {
+                return;
+            }
+
+            if (packetSequence == 0)
+            {
+                isConnected = true;
+            }
+
+            // Erase send packet info container by packetSequence
         }
     }
 }
