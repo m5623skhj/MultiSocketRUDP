@@ -53,8 +53,11 @@ namespace ClientCore
         private UdpClient udpClient;
         private IPEndPoint serverEndPoint;
 
-        private UInt64 lastSendSequence;
-        private UInt64 expectedRecvSequence;
+        private PacketSequence lastSendSequence;
+        private PacketSequence expectedRecvSequence;
+
+        private HashSet<PacketSequence> holdingSequences = new HashSet<PacketSequence>();
+        private object holdingSequencesLock = new object();
 
         private bool isConnected = false;
 
@@ -245,6 +248,32 @@ namespace ClientCore
             }
 
             // Erase send packet info container by packetSequence
+        }
+
+        private async Task DisconnectAsync()
+        {
+            isConnected = false;
+            sessionInfo.sessionState = SessionState.Disconnecting;
+
+            var disconnectPacket = BuildDisconnectPacket();
+            await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength(), serverEndPoint);
+            udpClient.Close();
+
+            Cleanup();
+
+            sessionInfo.sessionState = SessionState.Disconnected;
+        }
+
+        private NetBuffer BuildDisconnectPacket()
+        {
+            var netBuffer = new NetBuffer();
+            netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
+            netBuffer.WriteULong(0);
+            return netBuffer;
+        }
+
+        private void Cleanup()
+        {
         }
     }
 }
