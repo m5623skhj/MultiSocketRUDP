@@ -58,6 +58,8 @@ namespace ClientCore
 
         private HashSet<PacketSequence> holdingSequences = new HashSet<PacketSequence>();
         private object holdingSequencesLock = new object();
+        private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new SortedDictionary<PacketSequence, NetBuffer>();
+        private object holdingPacketsLock = new object();
 
         private bool isConnected = false;
 
