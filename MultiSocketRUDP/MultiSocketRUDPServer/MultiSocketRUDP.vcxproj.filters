@@ -81,6 +81,9 @@
     <ClCompile Include="MemoryTracer.cpp">
       <Filter>소스 파일\MemoryTracer</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">

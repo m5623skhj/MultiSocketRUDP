@@ -54,6 +54,9 @@
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RUDPClientCore.h">

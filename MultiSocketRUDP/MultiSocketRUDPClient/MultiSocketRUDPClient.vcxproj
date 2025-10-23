@@ -140,6 +140,7 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
+    <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RUDPClientCore.cpp" />
     <ClCompile Include="SessionGetter.cpp" />
