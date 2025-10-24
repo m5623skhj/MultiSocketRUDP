@@ -2,12 +2,15 @@
 #include <vector>
 #include <cstdint>
 #include <optional>
+#include <bcrypt.h>
+#include <Windows.h>
+#include "../MultiSocketRUDPServer/CoreType.h"
 
 class CryptoHelper
 {
 private:
-	CryptoHelper() = default;
-	~CryptoHelper() = default;
+	CryptoHelper();
+	~CryptoHelper();
 	CryptoHelper(CryptoHelper&) = delete;
 	CryptoHelper& operator=(const CryptoHelper&) = delete;
 	CryptoHelper(CryptoHelper&&) = delete;
@@ -21,10 +24,26 @@ public:
 	}
 
 public:
-	std::optional<std::vector<char>> HmacSha256WithCng(const char* key, size_t keyLength, const char* data, size_t dataLength);
-	std::optional<std::vector<char>> HmacSha256WithCng(const std::vector<char>& key, const std::vector<char>& data);
+	bool EncryptAESGCM(
+		const std::vector<char>& key,
+		const std::vector<char>& nonce,
+		const std::vector<char>& plaintext,
+		std::vector<char>& ciphertext,
+		std::vector<char>& tag
+	);
+
+	bool DecryptAESGCM(
+		const std::vector<char>& key,
+		const std::vector<char>& nonce,
+		const std::vector<char>& ciphertext,
+		const std::vector<char>& tag,
+		std::vector<char>& plaintext
+	);
+
+	static std::vector<char> GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence);
 
 private:
-	BCRYPT_ALG_HANDLE algHandle = nullptr;
+	BCRYPT_ALG_HANDLE aesAlg = nullptr;
+	BCRYPT_ALG_HANDLE hmacAlg = nullptr;
 	DWORD hashObjectLength = 0;
 };
