@@ -11,7 +11,7 @@ class CryptoHelper
 private:
 	CryptoHelper();
 	~CryptoHelper();
-	CryptoHelper(CryptoHelper&) = delete;
+	CryptoHelper(const CryptoHelper&) = delete;
 	CryptoHelper& operator=(const CryptoHelper&) = delete;
 	CryptoHelper(CryptoHelper&&) = delete;
 	CryptoHelper& operator=(CryptoHelper&&) = delete;
@@ -44,6 +44,4 @@ public:
 
 private:
 	BCRYPT_ALG_HANDLE aesAlg = nullptr;
-	BCRYPT_ALG_HANDLE hmacAlg = nullptr;
-	DWORD hashObjectLength = 0;
 };
