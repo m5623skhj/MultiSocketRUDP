@@ -29,16 +29,19 @@ public:
 		const std::vector<char>& nonce,
 		const std::vector<char>& plaintext,
 		std::vector<char>& ciphertext,
-		std::vector<char>& tag
+		std::vector<char>& tag,
+		const BCRYPT_KEY_HANDLE keyHandle
 	);
-
 	bool DecryptAESGCM(
 		const std::vector<char>& key,
 		const std::vector<char>& nonce,
 		const std::vector<char>& ciphertext,
 		const std::vector<char>& tag,
-		std::vector<char>& plaintext
+		std::vector<char>& plaintext,
+		const BCRYPT_KEY_HANDLE keyHandle
 	);
+	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(const std::vector<char>& key);
+	void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	static std::vector<char> GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence);
 

@@ -41,32 +41,20 @@ CryptoHelper::~CryptoHelper()
 	}
 }
 
-std::vector<char> CryptoHelper::GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence)
-{
-	if (sessionSalt.size() != 8)
-	{
-		return {};
-	}
-
-	std::vector<char> nonce;
-	nonce.resize(NONCE_SIZE);
-	memcpy(nonce.data(), sessionSalt.data(), 8);
-	nonce[8] = (packetSequence >> 24) & 0xFF;
-	nonce[9] = (packetSequence >> 16) & 0xFF;
-	nonce[10] = (packetSequence >> 8) & 0xFF;
-	nonce[11] = packetSequence & 0xFF;
-
-	return nonce;
-}
-
 bool CryptoHelper::EncryptAESGCM(
 	const std::vector<char>& key,
 	const std::vector<char>& nonce,
 	const std::vector<char>& plaintext,
 	std::vector<char>& ciphertext,
-	std::vector<char>& tag
+	std::vector<char>& tag,
+	const BCRYPT_KEY_HANDLE keyHandle
 )
 {
+	if (keyHandle == nullptr)
+	{
+		return false;
+	}
+
 	if (key.size() != AES_KEY_SIZE_128 &&
 		key.size() != AES_KEY_SIZE_192 &&
 		key.size() != AES_KEY_SIZE_256)
@@ -75,22 +63,6 @@ bool CryptoHelper::EncryptAESGCM(
 	}
 
 	if (nonce.size() != NONCE_SIZE)
-	{
-		return false;
-	}
-
-	BCRYPT_KEY_HANDLE keyHandle = nullptr;
-	NTSTATUS status = BCryptGenerateSymmetricKey(
-		aesAlg,
-		&keyHandle,
-		nullptr,
-		0,
-		reinterpret_cast<PUCHAR>(const_cast<char*>(key.data())),
-		static_cast<ULONG>(key.size()),
-		0
-	);
-
-	if (not BCRYPT_SUCCESS(status) || keyHandle == nullptr)
 	{
 		return false;
 	}
@@ -107,7 +79,7 @@ bool CryptoHelper::EncryptAESGCM(
 	ciphertext.resize(plaintext.size());
 	ULONG bytesDone = 0;
 
-	status = BCryptEncrypt(
+	auto status = BCryptEncrypt(
 		keyHandle,
 		reinterpret_cast<PUCHAR>(const_cast<char*>(plaintext.data())),
 		static_cast<ULONG>(plaintext.size()),
@@ -120,7 +92,6 @@ bool CryptoHelper::EncryptAESGCM(
 		0
 	);
 
-	BCryptDestroyKey(keyHandle);
 	return BCRYPT_SUCCESS(status);
 }
 
@@ -129,9 +100,15 @@ bool CryptoHelper::DecryptAESGCM(
 	const std::vector<char>& nonce,
 	const std::vector<char>& ciphertext,
 	const std::vector<char>& tag,
-	std::vector<char>& plaintext
+	std::vector<char>& plaintext,
+	const BCRYPT_KEY_HANDLE keyHandle
 )
 {
+	if (keyHandle == nullptr)
+	{
+		return false;
+	}
+
 	if (key.size() != AES_KEY_SIZE_128 &&
 		key.size() != AES_KEY_SIZE_192 &&
 		key.size() != AES_KEY_SIZE_256)
@@ -140,22 +117,6 @@ bool CryptoHelper::DecryptAESGCM(
 	}
 
 	if (nonce.size() != NONCE_SIZE)
-	{
-		return false;
-	}
-
-	BCRYPT_KEY_HANDLE hKey = nullptr;
-	NTSTATUS status = BCryptGenerateSymmetricKey(
-		aesAlg,
-		&hKey,
-		nullptr,
-		0,
-		reinterpret_cast<PUCHAR>(const_cast<char*>(key.data())),
-		static_cast<ULONG>(key.size()),
-		0
-	);
-
-	if (not BCRYPT_SUCCESS(status))
 	{
 		return false;
 	}
@@ -170,8 +131,8 @@ bool CryptoHelper::DecryptAESGCM(
 	plaintext.resize(ciphertext.size());
 	ULONG bytesDone = 0;
 
-	status = BCryptDecrypt(
-		hKey,
+	auto status = BCryptDecrypt(
+		keyHandle,
 		reinterpret_cast<PUCHAR>(const_cast<char*>(ciphertext.data())),
 		static_cast<ULONG>(ciphertext.size()),
 		&authInfo,
@@ -183,6 +144,49 @@ bool CryptoHelper::DecryptAESGCM(
 		0
 	);
 
-	BCryptDestroyKey(hKey);
 	return BCRYPT_SUCCESS(status);
+}
+
+BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(const std::vector<char>& key)
+{
+	BCRYPT_KEY_HANDLE keyHandle = nullptr;
+	NTSTATUS status = BCryptGenerateSymmetricKey(
+		aesAlg,
+		&keyHandle,
+		nullptr,
+		0,
+		reinterpret_cast<PUCHAR>(const_cast<char*>(key.data())),
+		static_cast<ULONG>(key.size()),
+		0
+	);
+
+	return BCRYPT_SUCCESS(status) ? keyHandle : nullptr;
+}
+
+void CryptoHelper::DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle)
+{
+	if (keyHandle == nullptr)
+	{
+		return;
+	}
+
+	BCryptDestroyKey(keyHandle);
+}
+
+std::vector<char> CryptoHelper::GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence)
+{
+	if (sessionSalt.size() != 8)
+	{
+		return {};
+	}
+
+	std::vector<char> nonce;
+	nonce.resize(NONCE_SIZE);
+	memcpy(nonce.data(), sessionSalt.data(), 8);
+	nonce[8] = (packetSequence >> 24) & 0xFF;
+	nonce[9] = (packetSequence >> 16) & 0xFF;
+	nonce[10] = (packetSequence >> 8) & 0xFF;
+	nonce[11] = packetSequence & 0xFF;
+
+	return nonce;
 }
