@@ -84,6 +84,9 @@
     <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\TLS\TLSHelper.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
