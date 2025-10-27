@@ -13,6 +13,8 @@
 
 #include "MemoryTracer.h"
 #include "MultiSocketRUDPCore.h"
+#include "../Common/TLS/TLSHelper.h"
+
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -192,6 +194,8 @@ private:
 	std::jthread sessionBrokerThread{};
 	SOCKET sessionBrokerListenSocket{ INVALID_SOCKET };
 #endif
+
+	TLSHelper::TLSHelperServer tlsHelper;
 
 private:
 	void RunIOWorkerThread(ThreadIdType threadId);

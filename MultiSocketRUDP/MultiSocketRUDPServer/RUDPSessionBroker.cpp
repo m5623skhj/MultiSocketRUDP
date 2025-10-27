@@ -8,7 +8,6 @@
 #include "LogExtension.h"
 #include "Logger.h"
 
-
 #if USE_IOCP_SESSION_BROKER
 bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
 {
@@ -51,10 +50,17 @@ void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
 #else
 void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP)
 {
+	if (tlsHelper.Initialize() == false)
+	{
+		LOG_ERROR("RunSessionBrokerThread tlsHelper.Initialize failed");
+		return;
+	}
+
 	SOCKET clientSocket = INVALID_SOCKET;
 	sockaddr_in clientAddr;
 	if (not OpenSessionBrokerSocket(listenPort))
 	{
+		LOG_ERROR("RunSessionBrokerThread OpenSessionBrokerSocket failed");
 		return;
 	}
 
@@ -72,6 +78,13 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			}
 
 			LOG_ERROR(std::format("RunSessionBrokerThread accept failed with error {}", error));
+			continue;
+		}
+
+		if (tlsHelper.Handshake(clientSocket) == false)
+		{
+			LOG_ERROR("RunSessionBrokerThread tlsHelper.Handshake failed");
+			closesocket(clientSocket);
 			continue;
 		}
 

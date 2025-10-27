@@ -10,6 +10,7 @@
 
 #include "Queue.h"
 #include <queue>
+#include "../Common/TLS/TLSHelper.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -106,6 +107,9 @@ private:
 	SOCKET sessionBrokerSocket{};
 
 #endif
+
+	TLSHelper::TLSHelperClient tlsHelper;
+
 private:
 	bool SetTargetSessionInfo(OUT NetBuffer& receivedBuffer);
 
