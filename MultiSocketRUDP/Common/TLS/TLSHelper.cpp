@@ -6,7 +6,8 @@
 
 namespace TLSHelper
 {
-	constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
+    constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
+
     TLSHelperBase::TLSHelperBase()
     {
         ZeroMemory(&credHandle, sizeof(credHandle));
@@ -204,11 +205,44 @@ namespace TLSHelper
         return true;
     }
 
+    TLSHelperServer::TLSHelperServer(const std::wstring& inStoreName, const std::wstring& inCertSubjectName)
+		: storeName(inStoreName)
+		, certSubjectName(inCertSubjectName)
+    {
+    }
+
     bool TLSHelperServer::Initialize()
     {
+        HCERTSTORE hStore = CertOpenStore(
+            CERT_STORE_PROV_SYSTEM,
+            0,
+            0,
+            CERT_SYSTEM_STORE_LOCAL_MACHINE,
+			storeName.c_str()
+        );
+        if (!hStore)
+            return false;
+
+        PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
+            hStore,
+            X509_ASN_ENCODING,
+            0,
+            CERT_FIND_SUBJECT_STR,
+			certSubjectName.c_str(),
+            nullptr
+        );
+
+        if (not pCertContext)
+        {
+            CertCloseStore(hStore, 0);
+            return false;
+        }
+
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER;
+        cred.cCreds = 1;
+        cred.paCred = &pCertContext;
         cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
 
         SECURITY_STATUS status = AcquireCredentialsHandle(
@@ -222,6 +256,9 @@ namespace TLSHelper
             &credHandle,
             nullptr
         );
+
+        CertFreeCertificateContext(pCertContext);
+        CertCloseStore(hStore, 0);
 
         return status == SEC_E_OK;
     }

@@ -4,7 +4,7 @@
 class TestServer
 {
 private:
-	TestServer() = default;
+	TestServer();
 	~TestServer() = default;
 	TestServer& operator=(const TestServer&) = delete;
 	TestServer(TestServer&&) = delete;

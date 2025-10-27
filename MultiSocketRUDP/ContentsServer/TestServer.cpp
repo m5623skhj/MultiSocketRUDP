@@ -2,6 +2,12 @@
 #include "TestServer.h"
 #include "Logger.h"
 #include "Player.h"
+#include "../Common/TLS/TLSHelper.h"
+
+TestServer::TestServer()
+	: serverCore(TLSHelper::StoreNames::MY, L"DevServerCert")
+{
+}
 
 TestServer& TestServer::GetInst()
 {

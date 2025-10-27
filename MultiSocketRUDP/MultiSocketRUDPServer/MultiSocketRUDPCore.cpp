@@ -12,8 +12,9 @@ void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPER
 	ioType = inIOType;
 }
 
-MultiSocketRUDPCore::MultiSocketRUDPCore()
+MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName)
 	: contextPool(2, false)
+	, tlsHelper(sessionBrokerCertStoreName, sessionBrokerCertSubjectName)
 {
 }
 

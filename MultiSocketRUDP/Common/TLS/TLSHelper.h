@@ -10,6 +10,15 @@
 
 namespace TLSHelper
 {
+	namespace StoreNames
+	{
+		constexpr const wchar_t* MY = L"MY";
+		constexpr const wchar_t* ROOT = L"ROOT";
+		constexpr const wchar_t* CA = L"CA";
+		constexpr const wchar_t* TRUST = L"TRUST";
+		constexpr const wchar_t* AuthRoot = L"AuthRoot";
+	};
+
 	class TLSHelperBase
 	{
 	public:
@@ -34,6 +43,9 @@ namespace TLSHelper
 	class TLSHelperClient : public TLSHelperBase
 	{
 	public:
+		~TLSHelperClient() override = default;
+
+	public:
 		bool Initialize() override;
 		bool Handshake(SOCKET socket) override;
 	};
@@ -41,7 +53,15 @@ namespace TLSHelper
 	class TLSHelperServer : public TLSHelperBase
 	{
 	public:
+		explicit TLSHelperServer(const std::wstring& inStoreName, const std::wstring& inCertSubjectName);
+		~TLSHelperServer() override = default;
+
+	public:
 		bool Initialize() override;
 		bool Handshake(SOCKET socket) override;
+
+	private:
+		std::wstring storeName{};
+		std::wstring certSubjectName{};
 	};
 }

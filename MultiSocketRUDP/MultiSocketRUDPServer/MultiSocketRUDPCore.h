@@ -72,7 +72,7 @@ namespace MultiSocketRUDP
 class MultiSocketRUDPCore
 {
 public:
-	MultiSocketRUDPCore();
+	explicit MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName);
 	virtual ~MultiSocketRUDPCore() = default;
 
 public:
