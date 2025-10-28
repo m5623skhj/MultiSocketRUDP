@@ -217,11 +217,14 @@ namespace TLSHelper
             CERT_STORE_PROV_SYSTEM,
             0,
             0,
-            CERT_SYSTEM_STORE_LOCAL_MACHINE,
+            CERT_SYSTEM_STORE_CURRENT_USER,
 			storeName.c_str()
         );
-        if (!hStore)
+
+        if (not hStore)
+        {
             return false;
+        }
 
         PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
             hStore,
