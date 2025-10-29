@@ -4,6 +4,9 @@
 #include <windows.h>
 #include <security.h>
 #include <schannel.h>
+#include <vector>
+#include <string>
+#include <optional>
 
 #pragma comment(lib, "Secur32.lib")
 #pragma comment(lib, "Crypt32.lib")
@@ -18,6 +21,8 @@ namespace TLSHelper
 		constexpr const wchar_t* TRUST = L"TRUST";
 		constexpr const wchar_t* AuthRoot = L"AuthRoot";
 	};
+
+	static std::optional<std::vector<char>> GenerateSecureRandomBytes(unsigned short length);
 
 	class TLSHelperBase
 	{
