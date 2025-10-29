@@ -22,8 +22,6 @@ namespace TLSHelper
 		constexpr const wchar_t* AuthRoot = L"AuthRoot";
 	};
 
-	static std::optional<std::vector<char>> GenerateSecureRandomBytes(unsigned short length);
-
 	class TLSHelperBase
 	{
 	public:

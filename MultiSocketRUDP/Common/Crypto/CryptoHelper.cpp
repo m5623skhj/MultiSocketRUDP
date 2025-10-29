@@ -173,6 +173,26 @@ void CryptoHelper::DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle)
 	BCryptDestroyKey(keyHandle);
 }
 
+std::optional<std::string> CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
+{
+	std::string bytes;
+	bytes.reserve(length);
+
+	auto status = BCryptGenRandom(
+		nullptr,
+		reinterpret_cast<PUCHAR>(bytes.data()),
+		length,
+		BCRYPT_USE_SYSTEM_PREFERRED_RNG
+	);
+
+	if (not BCRYPT_SUCCESS(status))
+	{
+		return std::nullopt;
+	}
+
+	return bytes;
+}
+
 std::vector<char> CryptoHelper::GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence)
 {
 	if (sessionSalt.size() != 8)

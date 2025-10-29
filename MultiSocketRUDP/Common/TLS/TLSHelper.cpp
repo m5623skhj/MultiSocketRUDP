@@ -9,26 +9,6 @@ namespace TLSHelper
 {
     constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
 
-    std::optional<std::vector<char>> GenerateSecureRandomBytes(unsigned short length)
-    {
-        std::vector<char> bytes;
-		bytes.reserve(length);
-
-		auto status = BCryptGenRandom(
-			nullptr,
-			reinterpret_cast<PUCHAR>(bytes.data()),
-			length,
-			BCRYPT_USE_SYSTEM_PREFERRED_RNG
-		);
-
-		if (not BCRYPT_SUCCESS(status))
-		{
-            return std::nullopt;
-		}
-
-        return bytes;
-    }
-
     TLSHelperBase::TLSHelperBase()
     {
         ZeroMemory(&credHandle, sizeof(credHandle));

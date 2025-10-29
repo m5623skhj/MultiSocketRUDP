@@ -4,6 +4,7 @@
 #include <optional>
 #include <bcrypt.h>
 #include <Windows.h>
+#include <string>
 #include "../MultiSocketRUDPServer/CoreType.h"
 
 class CryptoHelper
@@ -43,6 +44,7 @@ public:
 	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(const std::vector<char>& key);
 	void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
+	static std::optional<std::string> GenerateSecureRandomBytes(unsigned short length);
 	static std::vector<char> GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence);
 
 private:
