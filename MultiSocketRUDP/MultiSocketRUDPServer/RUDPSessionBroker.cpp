@@ -7,6 +7,7 @@
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
+#include "../Common/Crypto/CryptoHelper.h"
 
 #if USE_IOCP_SESSION_BROKER
 bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
@@ -134,13 +135,19 @@ void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 {
 	auto makeSessionKey = []() -> std::string
 	{
+		if (auto generatedKey = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); generatedKey.has_value())
+		{
+			return generatedKey.value();
+		}
+		
+		std::stringstream ss;
 		std::array<unsigned char, SESSION_KEY_SIZE> keyData;
 
 		const auto now = std::chrono::system_clock::now();
 		const auto duration = now.time_since_epoch();
 		const auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
-		std::seed_seq seed { static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
+		std::seed_seq seed{ static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
 		std::mt19937 gen(seed);
 		std::uniform_int_distribution dist(0, 255);
 
@@ -149,7 +156,6 @@ void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
 			byte = static_cast<unsigned char>(dist(gen));
 		}
 
-		std::stringstream ss;
 		for (const auto byte : keyData)
 		{
 			ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
