@@ -163,7 +163,8 @@ private:
 	// then insert the generated key into the packet and send it
 	// if the connectKey matches, verifying it as a valid key,
 	// insert the client information into clientAddr below
-	std::string sessionKey{};
+	std::vector<unsigned char> sessionKey{};
+	std::vector<unsigned char> sessionSalt{};
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
 	PortType serverPort{ INVALID_PORT_NUMBER };

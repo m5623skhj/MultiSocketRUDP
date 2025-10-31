@@ -16,6 +16,7 @@ constexpr unsigned short MAX_RIO_RESULT = 1024;
 constexpr unsigned int MAX_SEND_BUFFER_SIZE = 32768;
 constexpr int RECV_BUFFER_SIZE = 16384;
 constexpr unsigned char SESSION_KEY_SIZE = 16;
+constexpr unsigned char SESSION_SALT_SIZE = 16;
 constexpr unsigned int LOGIC_THREAD_STOP_SLEEP_TIME = 10000;
 
 #pragma region RIO
@@ -51,6 +52,7 @@ enum class CONNECT_RESULT_CODE : unsigned char
 	, CREATE_SOCKET_FAILED
 	, RIO_INIT_FAILED
 	, DO_RECV_FAILED
+	, SESSION_KEY_GENERATION_FAILED
 };
 
 struct TickSet

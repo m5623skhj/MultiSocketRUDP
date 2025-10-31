@@ -255,7 +255,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 {
 	PacketSequence packetSequence;
 	SessionIdType inputSessionId;
-	std::string inputSessionKey;
+	std::vector<unsigned char> inputSessionKey;
 
 	recvPacket >> packetSequence >> inputSessionId >> inputSessionKey;
 	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != inputSessionId || sessionKey != inputSessionKey)

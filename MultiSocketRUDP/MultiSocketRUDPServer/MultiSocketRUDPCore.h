@@ -183,7 +183,12 @@ private:
 	void RunSessionBrokerThread(PortType listenPort, const std::string& rudpSessionIP);
 	[[nodiscard]]
 	bool OpenSessionBrokerSocket(PortType listenPort);
-	static void SetSessionKey(OUT RUDPSession& session);
+	[[nodiscard]]
+	static bool InitSessionCrypto(OUT RUDPSession& session);
+	[[nodiscard]]
+	static bool GenerateSessionKey(OUT RUDPSession& session);
+	[[nodiscard]]
+	static bool GenerateSaltKey(OUT RUDPSession& session);
 	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
 	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
 	[[nodiscard]]
