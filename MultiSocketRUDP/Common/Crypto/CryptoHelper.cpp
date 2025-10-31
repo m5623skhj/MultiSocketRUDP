@@ -176,7 +176,7 @@ void CryptoHelper::DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle)
 std::optional<std::string> CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
 {
 	std::string bytes;
-	bytes.reserve(length);
+	bytes.resize(length);
 
 	auto status = BCryptGenRandom(
 		nullptr,
