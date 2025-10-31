@@ -193,7 +193,7 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 	} while (false);
 	
 	sendBuffer << connectResultCode;
-	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS)
+	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
 		SetSessionKey(*session);
 		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
