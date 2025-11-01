@@ -131,49 +131,40 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	return true;
 }
 
-void MultiSocketRUDPCore::SetSessionKey(OUT RUDPSession& session)
+bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
 {
-	auto makeSessionKey = []() -> std::string
+	return GenerateSessionKey(session) && GenerateSaltKey(session);
+}
+
+bool MultiSocketRUDPCore::GenerateSessionKey(OUT RUDPSession& session)
+{
+	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); bytes.has_value())
 	{
-		if (auto generatedKey = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); generatedKey.has_value())
-		{
-			return generatedKey.value();
-		}
-		
-		std::stringstream ss;
-		std::array<unsigned char, SESSION_KEY_SIZE> keyData;
+		session.sessionKey.assign(bytes->begin(), bytes->end());
+		return true;
+	}
 
-		const auto now = std::chrono::system_clock::now();
-		const auto duration = now.time_since_epoch();
-		const auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+	return false;
+}
 
-		std::seed_seq seed{ static_cast<unsigned int>(nowMs & 0xFFFFFFFF), static_cast<unsigned int>((nowMs >> 32) & 0xFFFFFFFF) };
-		std::mt19937 gen(seed);
-		std::uniform_int_distribution dist(0, 255);
+bool MultiSocketRUDPCore::GenerateSaltKey(OUT RUDPSession& session)
+{
+	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE); bytes.has_value())
+	{
+		session.sessionSalt.assign(bytes->begin(), bytes->end());
+		return true;
+	}
 
-		for (auto& byte : keyData)
-		{
-			byte = static_cast<unsigned char>(dist(gen));
-		}
-
-		for (const auto byte : keyData)
-		{
-			ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-		}
-
-		return ss.str();
-	};
-	session.sessionKey = makeSessionKey();
+	return false;
 }
 
 void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
 {
 	const PortType targetPort = session.serverPort;
 	const SessionIdType sessionId = session.sessionId;
-	std::string sessionKey = session.sessionKey;
 
 	//Send rudp session information packet to client
-	buffer << rudpSessionIP << targetPort << sessionId << sessionKey;
+	buffer << rudpSessionIP << targetPort << sessionId << session.sessionKey << session.sessionSalt;
 }
 
 void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
@@ -192,10 +183,18 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 		connectResultCode = InitReserveSession(*session);
 	} while (false);
 	
+	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS)
+	{
+		if (not InitSessionCrypto(*session))
+		{
+			LOG_ERROR("ReserveSession failed : InitSessionCrypto failed");
+			connectResultCode = CONNECT_RESULT_CODE::SESSION_KEY_GENERATION_FAILED;
+		}
+	}
+
 	sendBuffer << connectResultCode;
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
-		SetSessionKey(*session);
 		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
 		++connectedUserCount;
 	}
