@@ -117,7 +117,8 @@ private:
 	std::string serverIp{};
 	PortType port{};
 	SessionIdType sessionId{};
-	std::string sessionKey{};
+	std::vector<unsigned char> sessionKey{};
+	std::vector<unsigned char> sessionSalt{};
 
 #pragma endregion SessionGetter
 

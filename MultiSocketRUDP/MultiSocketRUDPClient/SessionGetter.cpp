@@ -224,7 +224,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 		return false;
 	}
 
-	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey;
+	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
 	return true;
 }
 
