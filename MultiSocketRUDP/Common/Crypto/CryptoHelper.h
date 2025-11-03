@@ -25,27 +25,47 @@ public:
 	}
 
 public:
-	bool EncryptAESGCM(
-		const std::vector<char>& key,
-		const std::vector<char>& nonce,
-		const std::vector<char>& plaintext,
-		std::vector<char>& ciphertext,
-		std::vector<char>& tag,
+	static bool EncryptAESGCM(
+		const std::vector<unsigned char>& key,
+		const std::vector<unsigned char>& nonce,
+		const std::vector<unsigned char>& plaintext,
+		std::vector<unsigned char>& ciphertext,
+		std::vector<unsigned char>& tag,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
-	bool DecryptAESGCM(
-		const std::vector<char>& key,
-		const std::vector<char>& nonce,
-		const std::vector<char>& ciphertext,
-		const std::vector<char>& tag,
-		std::vector<char>& plaintext,
+	static bool DecryptAESGCM(
+		const std::vector<unsigned char>& key,
+		const std::vector<unsigned char>& nonce,
+		const std::vector<unsigned char>& ciphertext,
+		const std::vector<unsigned char>& tag,
+		std::vector<unsigned char>& plaintext,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
-	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(const std::vector<char>& key);
+	static bool EncryptAESGCM(
+		const std::vector<unsigned char>& key,
+		const std::vector<unsigned char>& nonce,
+		const char* plaintext,
+		size_t plaintextSize,
+		char* ciphertext,
+		size_t ciphertextBufferSize,
+		std::vector<unsigned char>& tag,
+		const BCRYPT_KEY_HANDLE keyHandle
+	);
+	static bool DecryptAESGCM(
+		const std::vector<unsigned char>& key,
+		const std::vector<unsigned char>& nonce,
+		const char* ciphertext,
+		size_t ciphertextSize,
+		const std::vector<unsigned char>& tag,
+		char* plaintext,
+		size_t plaintextBufferSize,
+		const BCRYPT_KEY_HANDLE keyHandle
+	);
+	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(const std::vector<unsigned char>& key);
 	void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);
-	static std::vector<char> GenerateNonce(const std::vector<char>& sessionSalt, PacketSequence packetSequence);
+	static std::vector<unsigned char> GenerateNonce(const std::vector<unsigned char>& sessionSalt, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
 
 private:
 	BCRYPT_ALG_HANDLE aesAlg = nullptr;

@@ -55,6 +55,12 @@ enum class CONNECT_RESULT_CODE : unsigned char
 	, SESSION_KEY_GENERATION_FAILED
 };
 
+enum class PACKET_DIRECTION : uint8_t
+{
+	CLIENT_TO_SERVER = 0,
+	SERVER_TO_CLIENT = 1,
+};
+
 struct TickSet
 {
 	UINT64 nowTick = 0;

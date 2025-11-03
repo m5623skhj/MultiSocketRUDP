@@ -119,6 +119,7 @@ private:
 	SessionIdType sessionId{};
 	std::vector<unsigned char> sessionKey{};
 	std::vector<unsigned char> sessionSalt{};
+	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 
 #pragma endregion SessionGetter
 
@@ -177,7 +178,7 @@ private:
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
 	static inline WORD GetPayloadLength(const NetBuffer& buffer);
-	static inline void EncodePacket(OUT NetBuffer& packet);
+	inline void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);
 	bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath);

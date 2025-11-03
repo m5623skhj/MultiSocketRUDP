@@ -2,6 +2,7 @@
 #include "RUDPClientCore.h"
 #include "Logger.h"
 #include "LogExtension.h"
+#include "../Common/Crypto/CryptoHelper.h"
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -225,7 +226,9 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	}
 
 	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
-	return true;
+	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(sessionKey);
+
+	return sessionKeyHandle != nullptr;
 }
 
 #endif
