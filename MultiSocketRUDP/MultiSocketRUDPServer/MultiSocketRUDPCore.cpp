@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "Ticker.h"
 #include "MemoryTracer.h"
+#include "../Common/Crypto/CryptoHelper.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -109,6 +110,8 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		buffer->m_iWriteLast = buffer->m_iWrite;
 		buffer->m_iWrite = 0;
 		buffer->m_iRead = 0;
+		std::vector<uint8_t> authTag;
+
 		buffer->Encode();
 	}
 
@@ -1012,11 +1015,22 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
 
 void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet)
 {
-	if (packet.m_bIsEncoded == false)
+	constexpr unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	constexpr unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	if (packet.m_bIsEncoded == true)
 	{
-		packet.m_iWriteLast = packet.m_iWrite;
-		packet.m_iWrite = 0;
-		packet.m_iRead = 0;
-		packet.Encode();
+		return;
 	}
+
+	//CryptoHelper::EncryptAESGCM(sessionKey,
+	//	nonce,
+	//	buffer->m_pSerializeBuffer[], 
+	//	buffer->m_pSerializeBuffer[],
+	//	authTag,
+	//	sessionKeyHandle;
+	
+	packet.m_iWriteLast = packet.m_iWrite;
+	packet.m_iWrite = 0;
+	packet.m_iRead = 0;
+	packet.Encode();
 }

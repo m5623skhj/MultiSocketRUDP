@@ -165,6 +165,7 @@ private:
 	// insert the client information into clientAddr below
 	std::vector<unsigned char> sessionKey{};
 	std::vector<unsigned char> sessionSalt{};
+	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
 	PortType serverPort{ INVALID_PORT_NUMBER };
