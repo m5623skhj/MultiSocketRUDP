@@ -144,7 +144,7 @@ void RUDPClientCore::RunSendThread()
 {
 	while (true)
 	{
-		switch (WaitForMultipleObjects(sendEventHandles.size(), sendEventHandles.data(), FALSE, INFINITE))
+		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
@@ -309,6 +309,7 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 	auto& buffer = *NetBuffer::Alloc();
 
 	buffer << packetType << inRecvPacketSequence;
+	EncodePacket(buffer, inRecvPacketSequence, PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY);
 
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
@@ -329,7 +330,6 @@ void RUDPClientCore::DoSend()
 			continue;
 		}
 
-		//EncodePacket(*packet);
 		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 		{
 			LOG_ERROR(std::format("sendto() failed with error code {}", WSAGetLastError()));
@@ -450,6 +450,8 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 	if (sendPacketInfo->retransmissionCount == 0)
 	{
+		EncodePacket(buffer, inSendPacketSequence, PACKET_DIRECTION::CLIENT_TO_SERVER);
+
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
 	}

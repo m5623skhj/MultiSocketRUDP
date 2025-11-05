@@ -58,7 +58,9 @@ enum class CONNECT_RESULT_CODE : unsigned char
 enum class PACKET_DIRECTION : uint8_t
 {
 	CLIENT_TO_SERVER = 0,
-	SERVER_TO_CLIENT = 1,
+	CLIENT_TO_SERVER_REPLY = 1,
+	SERVER_TO_CLIENT = 2,
+	SERVER_TO_CLIENT_REPLY = 3,
 };
 
 struct TickSet
