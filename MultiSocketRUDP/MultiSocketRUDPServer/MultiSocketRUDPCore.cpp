@@ -1013,7 +1013,7 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
 	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[payloadLengthPosition]);
 }
 
-void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet)
+void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet, const RUDPSession& owner, const PACKET_DIRECTION direction)
 {
 	constexpr unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
 	constexpr unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
