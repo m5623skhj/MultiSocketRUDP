@@ -329,15 +329,13 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(const std::vector<unsigne
 	std::vector<unsigned char> nonce;
 	nonce.resize(NONCE_SIZE);
 	memcpy(nonce.data(), sessionSalt.data(), 8);
-	nonce[8] = (packetSequence >> 24) & 0x7F;
+	nonce[8] = (packetSequence >> 24) & 0x3F;
 	nonce[9] = (packetSequence >> 16) & 0xFF;
 	nonce[10] = (packetSequence >> 8) & 0xFF;
 	nonce[11] = packetSequence & 0xFF;
 
-	if (direction == PACKET_DIRECTION::SERVER_TO_CLIENT)
-	{
-		nonce[8] |= 0x80;
-	}
+	uint8_t directionBits = static_cast<uint8_t>(direction) << 6;
+	nonce[8] |= directionBits;
 
 	return nonce;
 }
