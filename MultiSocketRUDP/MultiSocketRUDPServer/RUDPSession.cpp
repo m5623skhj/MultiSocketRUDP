@@ -5,6 +5,7 @@
 #include "LogExtension.h"
 #include "Logger.h"
 #include "MemoryTracer.h"
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
@@ -178,6 +179,19 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
+	}
+
+	if (buffer.m_bIsEncoded == false)
+	{
+		PACKET_DIRECTION direction = isReplyType ? PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY : PACKET_DIRECTION::SERVER_TO_CLIENT;
+		PacketCryptoHelper::EncodePacket(
+			buffer,
+			inSendPacketSequence,
+			direction,
+			sessionKey,
+			sessionSalt,
+			sessionKeyHandle
+		);
 	}
 
 	if (not core.SendPacket(sendPacketInfo))

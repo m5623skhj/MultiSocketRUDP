@@ -270,8 +270,6 @@ private:
 #pragma endregion RIO
 
 private:
-	static void EncodePacket(OUT NetBuffer& packet);
-	static void EncodePacket(OUT NetBuffer& packet, const RUDPSession& owner, const PACKET_DIRECTION direction);
 	[[nodiscard]]
 	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
 };

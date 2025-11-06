@@ -107,6 +107,9 @@ private:
 	[[nodiscard]]
 	bool IsReleasing() const;
 
+private:
+	void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
+
 public:
 	[[nodiscard]]
 	SessionIdType GetSessionId() const;

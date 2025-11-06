@@ -3,7 +3,7 @@
 #include "Logger.h"
 #include "LogExtension.h"
 #include "PacketManager.h"
-#include "../Common/Crypto/CryptoHelper.h"
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
@@ -309,7 +309,14 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 	auto& buffer = *NetBuffer::Alloc();
 
 	buffer << packetType << inRecvPacketSequence;
-	EncodePacket(buffer, inRecvPacketSequence, PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY);
+	PacketCryptoHelper::EncodePacket(
+		buffer,
+		inRecvPacketSequence,
+		PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
+		sessionKey,
+		sessionSalt,
+		sessionKeyHandle
+	);
 
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
@@ -450,7 +457,14 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 	if (sendPacketInfo->retransmissionCount == 0)
 	{
-		EncodePacket(buffer, inSendPacketSequence, PACKET_DIRECTION::CLIENT_TO_SERVER);
+		PacketCryptoHelper::EncodePacket(
+			buffer,
+			inSendPacketSequence,
+			PACKET_DIRECTION::CLIENT_TO_SERVER,
+			sessionKey,
+			sessionSalt,
+			sessionKeyHandle
+		);
 
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
@@ -478,33 +492,6 @@ WORD RUDPClientCore::GetPayloadLength(const NetBuffer& buffer)
 	constexpr int PAYLOAD_LENGTH_POSITION = 1;
 
 	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[buffer.m_iRead + PAYLOAD_LENGTH_POSITION]);
-}
-
-void RUDPClientCore::EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
-{
-	constexpr unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence)  + sizeof(PacketId);
-	constexpr unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
-	if (packet.m_bIsEncoded == true)
-	{
-		return;
-	}
-
-	std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, packetSequence, direction);
-	std::vector<unsigned char> authTag;
-
-	CryptoHelper::EncryptAESGCM(
-		sessionKey,
-		nonce,
-		&packet.m_pSerializeBuffer[bodyOffset],
-		packet.GetUseSize() - bodyOffsetWithNotHeader,
-		&packet.m_pSerializeBuffer[bodyOffset],
-		packet.GetAllUseSize(),
-		authTag,
-		sessionKeyHandle
-	);
-	packet.WriteBuffer(reinterpret_cast<char*>(authTag.data()), static_cast<int>(authTag.size()));
-
-	packet.m_bIsEncoded = true;
 }
 
 bool RUDPClientCore::ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)

@@ -5,7 +5,6 @@
 #include "Logger.h"
 #include "Ticker.h"
 #include "MemoryTracer.h"
-#include "../Common/Crypto/CryptoHelper.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -105,22 +104,23 @@ void MultiSocketRUDPCore::StopServer()
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool needAddRefCount)
 {
-	if (const auto buffer = sendPacketInfo->GetBuffer(); buffer->m_bIsEncoded == false)
+	if (sendPacketInfo == nullptr || sendPacketInfo->owner == nullptr || sendPacketInfo->GetBuffer() == nullptr)
 	{
-		buffer->m_iWriteLast = buffer->m_iWrite;
-		buffer->m_iWrite = 0;
-		buffer->m_iRead = 0;
-		std::vector<uint8_t> authTag;
-
-		buffer->Encode();
+		LOG_ERROR("SendPacketInfo or its owner or its buffer is nullptr in MultiSocketRUDPCore::SendPacket()");
+		return false;
 	}
 
+	if (needAddRefCount)
 	{
-		if (needAddRefCount)
-		{
-			sendPacketInfo->AddRefCount();
-		}
+		sendPacketInfo->AddRefCount();
+	}
 
+	NetBuffer* buffer = sendPacketInfo->GetBuffer();
+	buffer->m_iWriteLast = buffer->m_iWrite;
+	buffer->m_iWrite = 0;
+	buffer->m_iRead = 0;
+
+	{
 		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
 		sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.push(sendPacketInfo);
 	}
@@ -1011,26 +1011,4 @@ WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
 	static constexpr int payloadLengthPosition = 1;
 
 	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[payloadLengthPosition]);
-}
-
-void MultiSocketRUDPCore::EncodePacket(OUT NetBuffer& packet, const RUDPSession& owner, const PACKET_DIRECTION direction)
-{
-	constexpr unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
-	constexpr unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
-	if (packet.m_bIsEncoded == true)
-	{
-		return;
-	}
-
-	//CryptoHelper::EncryptAESGCM(sessionKey,
-	//	nonce,
-	//	buffer->m_pSerializeBuffer[], 
-	//	buffer->m_pSerializeBuffer[],
-	//	authTag,
-	//	sessionKeyHandle;
-	
-	packet.m_iWriteLast = packet.m_iWrite;
-	packet.m_iWrite = 0;
-	packet.m_iRead = 0;
-	packet.Encode();
 }
