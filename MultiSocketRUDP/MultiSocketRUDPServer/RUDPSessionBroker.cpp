@@ -243,7 +243,6 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 
 void MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
-	EncodePacket(sendBuffer);
 	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
