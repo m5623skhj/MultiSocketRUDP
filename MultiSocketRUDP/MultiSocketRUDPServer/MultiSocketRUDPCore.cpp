@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "Ticker.h"
 #include "MemoryTracer.h"
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -717,7 +718,17 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 				break;
 			}
 
-			if (not buffer->Decode() || buffer->GetUseSize() != GetPayloadLength(*buffer))
+			if (not PacketCryptoHelper::DecodePacket(
+				*buffer,
+				context->session->sessionKey,
+				context->session->sessionSalt,
+				context->session->sessionKeyHandle
+			))
+			{
+				break;
+			}
+
+			if (buffer->GetUseSize() != GetPayloadLength(*buffer))
 			{
 				break;
 			}
