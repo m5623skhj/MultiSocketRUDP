@@ -7,6 +7,8 @@
 #include <string>
 #include "../MultiSocketRUDPServer/CoreType.h"
 
+constexpr size_t AUTH_TAG_SIZE = 16;
+
 class CryptoHelper
 {
 private:
@@ -56,7 +58,7 @@ public:
 		const std::vector<unsigned char>& nonce,
 		const char* ciphertext,
 		size_t ciphertextSize,
-		const std::vector<unsigned char>& tag,
+		const char* tag,
 		char* plaintext,
 		size_t plaintextBufferSize,
 		const BCRYPT_KEY_HANDLE keyHandle

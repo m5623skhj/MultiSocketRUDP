@@ -8,7 +8,6 @@ constexpr size_t AES_KEY_SIZE_128 = 16;
 constexpr size_t AES_KEY_SIZE_192 = 24;
 constexpr size_t AES_KEY_SIZE_256 = 32;
 constexpr size_t NONCE_SIZE = 12;
-constexpr size_t TAG_SIZE = 16;
 
 CryptoHelper::CryptoHelper()
 {
@@ -72,7 +71,7 @@ bool CryptoHelper::EncryptAESGCM(
 	authInfo.pbNonce = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(nonce.data()));
 	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
 
-	tag.resize(TAG_SIZE);
+	tag.resize(AUTH_TAG_SIZE);
 	authInfo.pbTag = reinterpret_cast<PUCHAR>(tag.data());
 	authInfo.cbTag = static_cast<ULONG>(tag.size());
 
@@ -190,7 +189,7 @@ bool CryptoHelper::EncryptAESGCM(
 	authInfo.pbNonce = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(nonce.data()));
 	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
 
-	tag.resize(TAG_SIZE);
+	tag.resize(AUTH_TAG_SIZE);
 	authInfo.pbTag = reinterpret_cast<PUCHAR>(tag.data());
 	authInfo.cbTag = static_cast<ULONG>(tag.size());
 
@@ -216,7 +215,7 @@ bool CryptoHelper::DecryptAESGCM(
 	const std::vector<unsigned char>& nonce,
 	const char* ciphertext,
 	size_t ciphertextSize,
-	const std::vector<unsigned char>& tag,
+	const char* tag,
 	char* plaintext,
 	size_t plaintextBufferSize,
 	const BCRYPT_KEY_HANDLE keyHandle
@@ -253,8 +252,8 @@ bool CryptoHelper::DecryptAESGCM(
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
 	authInfo.pbNonce = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(nonce.data()));
 	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
-	authInfo.pbTag = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(tag.data()));
-	authInfo.cbTag = static_cast<ULONG>(tag.size());
+	authInfo.pbTag = reinterpret_cast<PUCHAR>(const_cast<char*>(tag));
+	authInfo.cbTag = AUTH_TAG_SIZE;
 
 	ULONG bytesDone = 0;
 	auto status = BCryptDecrypt(
