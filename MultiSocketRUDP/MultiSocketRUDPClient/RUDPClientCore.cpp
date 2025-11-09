@@ -235,7 +235,13 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		
 		recvBuffer.ReadBuffer(recvPacketBuffer->GetWriteBufferPtr(), payloadLength);
 		recvPacketBuffer->m_iWrite = static_cast<WORD>(packetSize);
-		if (not recvPacketBuffer->Decode())
+		
+		if (not PacketCryptoHelper::DecodePacket(
+			*recvPacketBuffer,
+			sessionKey,
+			sessionSalt,
+			sessionKeyHandle
+		))
 		{
 			NetBuffer::Free(recvPacketBuffer);
 			break;
