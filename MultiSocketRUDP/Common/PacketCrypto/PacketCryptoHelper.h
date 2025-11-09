@@ -23,7 +23,7 @@ public:
 			&packet.m_pSerializeBuffer[bodyOffset],
 			packet.GetUseSize() - bodyOffsetWithNotHeader,
 			&packet.m_pSerializeBuffer[bodyOffset],
-			packet.GetAllUseSize(),
+			packet.GetAllUseSize() - bodyOffsetWithNotHeader,
 			authTag,
 			sessionKeyHandle
 		);
