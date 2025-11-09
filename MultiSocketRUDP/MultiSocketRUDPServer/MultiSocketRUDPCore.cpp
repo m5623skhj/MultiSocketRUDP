@@ -718,17 +718,17 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 				break;
 			}
 
+			if (buffer->GetUseSize() != GetPayloadLength(*buffer))
+			{
+				break;
+			}
+
 			if (not PacketCryptoHelper::DecodePacket(
 				*buffer,
 				context->session->sessionKey,
 				context->session->sessionSalt,
 				context->session->sessionKeyHandle
 			))
-			{
-				break;
-			}
-
-			if (buffer->GetUseSize() != GetPayloadLength(*buffer))
 			{
 				break;
 			}
