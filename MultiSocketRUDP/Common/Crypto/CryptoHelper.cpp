@@ -35,7 +35,7 @@ CryptoHelper::~CryptoHelper()
 {
 	if (aesAlg != nullptr)
 	{
-		BCryptCloseAlgorithmProvider(aesAlg, 0);
+		std::ignore = BCryptCloseAlgorithmProvider(aesAlg, 0);
 		aesAlg = nullptr;
 	}
 }
@@ -78,7 +78,7 @@ bool CryptoHelper::EncryptAESGCM(
 	ciphertext.resize(plaintext.size());
 	ULONG bytesDone = 0;
 
-	auto status = BCryptEncrypt(
+	const auto status = BCryptEncrypt(
 		keyHandle,
 		reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(plaintext.data())),
 		static_cast<ULONG>(plaintext.size()),
@@ -130,7 +130,7 @@ bool CryptoHelper::DecryptAESGCM(
 	plaintext.resize(ciphertext.size());
 	ULONG bytesDone = 0;
 
-	auto status = BCryptDecrypt(
+	const auto status = BCryptDecrypt(
 		keyHandle,
 		reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(ciphertext.data())),
 		static_cast<ULONG>(ciphertext.size()),
@@ -150,9 +150,9 @@ bool CryptoHelper::EncryptAESGCM(
 	const std::vector<unsigned char>& key,
 	const std::vector<unsigned char>& nonce,
 	const char* plaintext,
-	size_t plaintextSize,
+	const size_t plaintextSize,
 	char* ciphertext,
-	size_t ciphertextBufferSize,
+	const size_t ciphertextBufferSize,
 	std::vector<unsigned char>& tag,
 	const BCRYPT_KEY_HANDLE keyHandle
 )
@@ -194,7 +194,7 @@ bool CryptoHelper::EncryptAESGCM(
 	authInfo.cbTag = static_cast<ULONG>(tag.size());
 
 	ULONG bytesDone = 0;
-	auto status = BCryptEncrypt(
+	const auto status = BCryptEncrypt(
 		keyHandle,
 		reinterpret_cast<PUCHAR>(const_cast<char*>(plaintext)),
 		static_cast<ULONG>(plaintextSize),
@@ -214,10 +214,10 @@ bool CryptoHelper::DecryptAESGCM(
 	const std::vector<unsigned char>& key,
 	const std::vector<unsigned char>& nonce,
 	const char* ciphertext,
-	size_t ciphertextSize,
+	const size_t ciphertextSize,
 	const char* tag,
 	char* plaintext,
-	size_t plaintextBufferSize,
+	const size_t plaintextBufferSize,
 	const BCRYPT_KEY_HANDLE keyHandle
 )
 {
@@ -272,15 +272,15 @@ bool CryptoHelper::DecryptAESGCM(
 	return BCRYPT_SUCCESS(status);
 }
 
-BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(const std::vector<unsigned char>& key)
+BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(const std::vector<unsigned char>& key) const
 {
 	BCRYPT_KEY_HANDLE keyHandle = nullptr;
-	NTSTATUS status = BCryptGenerateSymmetricKey(
+	const NTSTATUS status = BCryptGenerateSymmetricKey(
 		aesAlg,
 		&keyHandle,
 		nullptr,
 		0,
-		reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(key.data())),
+		const_cast<unsigned char*>(key.data()),
 		static_cast<ULONG>(key.size()),
 		0
 	);
@@ -288,14 +288,14 @@ BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(const std::vector<unsigned
 	return BCRYPT_SUCCESS(status) ? keyHandle : nullptr;
 }
 
-void CryptoHelper::DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle)
+void CryptoHelper::DestroySymmetricKeyHandle(const BCRYPT_KEY_HANDLE keyHandle)
 {
 	if (keyHandle == nullptr)
 	{
 		return;
 	}
 
-	BCryptDestroyKey(keyHandle);
+	std::ignore = BCryptDestroyKey(keyHandle);
 }
 
 std::optional<std::vector<unsigned char>> CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
@@ -333,7 +333,7 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(const std::vector<unsigne
 	nonce[10] = (packetSequence >> 8) & 0xFF;
 	nonce[11] = packetSequence & 0xFF;
 
-	uint8_t directionBits = static_cast<uint8_t>(direction) << 6;
+	const uint8_t directionBits = static_cast<uint8_t>(direction) << 6;
 	nonce[8] |= directionBits;
 
 	return nonce;
