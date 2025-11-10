@@ -213,7 +213,7 @@ namespace TLSHelper
 
     bool TLSHelperServer::Initialize()
     {
-        HCERTSTORE hStore = CertOpenStore(
+        const HCERTSTORE hStore = CertOpenStore(
             CERT_STORE_PROV_SYSTEM,
             0,
             0,
@@ -321,7 +321,6 @@ namespace TLSHelper
 
             if (status != SEC_I_CONTINUE_NEEDED && status != SEC_E_OK)
             {
-                free(outBuffers[0].pvBuffer);
                 return false;
             }
 
@@ -332,7 +331,6 @@ namespace TLSHelper
                 const int sent = send(socket, static_cast<const char*>(outBuffers[0].pvBuffer) + totalSent, sendSize - totalSent, 0);
                 if (sent == SOCKET_ERROR)
                 {
-                    free(outBuffers[0].pvBuffer);
                     return false;
                 }
                 totalSent += sent;
@@ -345,7 +343,6 @@ namespace TLSHelper
         handshakeCompleted = true;
         QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
 
-        free(outBuffers[0].pvBuffer);
         return true;
     }
 }
