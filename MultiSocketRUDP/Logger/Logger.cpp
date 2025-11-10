@@ -110,7 +110,11 @@ void Logger::StopLoggerThread()
 	}
 
 	SetEvent(loggerEventHandles[1]);
-	loggerThread.join();
+
+	if (loggerThread.joinable())
+	{
+		loggerThread.join();
+	}
 }
 
 void Logger::CreateFolderIfNotExists(const std::string& folderPath)

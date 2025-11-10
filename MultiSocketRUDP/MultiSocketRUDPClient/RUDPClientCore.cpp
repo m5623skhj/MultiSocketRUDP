@@ -46,13 +46,27 @@ void RUDPClientCore::Stop()
 	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
 
-	retransmissionThread.join();
-	sendThread.join();
-	recvThread.join();
-	Logger::GetInstance().StopLoggerThread();
+	JoinThreads();
 
 	WSACleanup();
 	isStopped = true;
+}
+
+void RUDPClientCore::JoinThreads()
+{
+	if (retransmissionThread.joinable())
+	{
+		retransmissionThread.join();
+	}
+	if (sendThread.joinable())
+	{
+		sendThread.join();
+	}
+	if (recvThread.joinable())
+	{
+		recvThread.join();
+	}
+	Logger::GetInstance().StopLoggerThread();
 }
 
 bool RUDPClientCore::CreateRUDPSocket()
