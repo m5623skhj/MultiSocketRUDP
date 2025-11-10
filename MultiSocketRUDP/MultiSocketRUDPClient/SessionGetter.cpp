@@ -211,12 +211,6 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
-	if (not receivedBuffer.Decode())
-	{
-		LOG_ERROR("SetTargetSessionInfo() failed with Decode()");
-		return false;
-	}
-
 	char connectResultCode;
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)
