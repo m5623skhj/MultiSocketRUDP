@@ -70,7 +70,10 @@ void MultiSocketRUDPCore::StopServer()
 	sessionBroker.Stop();
 #else
 	closesocket(sessionBrokerListenSocket);
-	sessionBrokerThread.join();
+	if (sessionBrokerThread.joinable())
+	{
+		sessionBrokerThread.join();
+	}
 #endif
 	CloseAllSessions();
 	delete[] rioCQList;
@@ -78,15 +81,31 @@ void MultiSocketRUDPCore::StopServer()
 	SetEvent(logicThreadEventStopHandle);
 	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
 	{
-		ioWorkerThreads[i].join();
-		recvLogicWorkerThreads[i].join();
-		retransmissionThreads[i].join();
+		if (ioWorkerThreads[i].joinable())
+		{
+			ioWorkerThreads[i].join();
+		}
+		if (recvLogicWorkerThreads[i].joinable())
+		{
+			recvLogicWorkerThreads[i].join();
+		}
+		if (retransmissionThreads[i].joinable())
+		{
+			retransmissionThreads[i].join();
+		}
+
 		CloseHandle(recvLogicThreadEventHandles[i]);
 	}
 
 	SetEvent(sessionReleaseEventHandle);
-	sessionReleaseThread.join();
-	heartbeatThread.join();
+	if (sessionReleaseThread.joinable())
+	{
+		sessionReleaseThread.join();
+	}
+	if (heartbeatThread.joinable())
+	{
+		heartbeatThread.join();
+	}
 	Ticker::GetInstance().Stop();
 
 	CloseHandle(logicThreadEventStopHandle);
