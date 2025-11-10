@@ -27,7 +27,7 @@ namespace TLSHelper
         }
     }
 
-    bool TLSHelperBase::EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize)
+    bool TLSHelperBase::EncryptData(const char* plainData, const size_t plainSize, char* encryptedBuffer, size_t& encryptedSize)
     {
         if (not handshakeCompleted)
         {
@@ -38,7 +38,7 @@ namespace TLSHelper
         SecBuffer buffers[4];
 
         buffers[0].BufferType = SECBUFFER_DATA;
-        buffers[0].pvBuffer = (void*)plainData;
+        buffers[0].pvBuffer = reinterpret_cast<void*>(const_cast<char*>(plainData));
         buffers[0].cbBuffer = static_cast<unsigned long>(plainSize);
 
         buffers[1].BufferType = SECBUFFER_STREAM_HEADER;
@@ -69,7 +69,7 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperBase::DecryptData(const char* encryptedData, size_t encryptedSize, char* plainBuffer, size_t& plainSize)
+    bool TLSHelperBase::DecryptData(const char* encryptedData, const size_t encryptedSize, char* plainBuffer, size_t& plainSize)
     {
         if (not handshakeCompleted)
         {
@@ -80,7 +80,7 @@ namespace TLSHelper
         SecBuffer buffers[2];
 
         buffers[0].BufferType = SECBUFFER_DATA;
-        buffers[0].pvBuffer = (void*)encryptedData;
+        buffers[0].pvBuffer = reinterpret_cast<void*>(const_cast<char*>(encryptedData));
         buffers[0].cbBuffer = static_cast<unsigned long>(encryptedSize);
 
         buffers[1].BufferType = SECBUFFER_EMPTY;
@@ -140,7 +140,6 @@ namespace TLSHelper
 
         std::vector<char> recvBuffer(HANDSHAKE_BUFFER_SIZE);
         SecBufferDesc inBufferDesc{};
-        SecBuffer inBuffers[1];
 
         CtxtHandle* pContext = nullptr;
         DWORD contextAttr;
@@ -148,7 +147,8 @@ namespace TLSHelper
 
         do
         {
-            status = InitializeSecurityContext(
+	        SecBuffer inBuffers[1];
+	        status = InitializeSecurityContext(
                 &credHandle,
                 pContext,
                 nullptr,
@@ -169,17 +169,16 @@ namespace TLSHelper
                 return false;
             }
 
-            send(socket, (const char*)outBuffers[0].pvBuffer, outBuffers[0].cbBuffer, 0);
+            send(socket, static_cast<const char*>(outBuffers[0].pvBuffer), static_cast<int>(outBuffers[0].cbBuffer), 0);
             if (status == SEC_E_OK)
             {
                 break;
             }
 
-            int received = 0;
-            int totalReceived = 0;
+	        int totalReceived = 0;
             do
             {
-                received = recv(socket, recvBuffer.data() + totalReceived, (int)recvBuffer.size() - totalReceived, 0);
+                const int received = recv(socket, recvBuffer.data() + totalReceived, static_cast<int>(recvBuffer.size()) - totalReceived, 0);
                 if (received <= 0)
                 {
                     free(outBuffers[0].pvBuffer);
@@ -249,7 +248,7 @@ namespace TLSHelper
         cred.paCred = &pCertContext;
         cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
 
-        SECURITY_STATUS status = AcquireCredentialsHandle(
+        const SECURITY_STATUS status = AcquireCredentialsHandle(
             nullptr,
             const_cast<LPWSTR>(UNISP_NAME),
             SECPKG_CRED_INBOUND,
@@ -267,12 +266,12 @@ namespace TLSHelper
         return status == SEC_E_OK;
     }
 
-    bool TLSHelperServer::Handshake(SOCKET socket)
+    bool TLSHelperServer::Handshake(const SOCKET socket)
     {
         handshakeCompleted = false;
 
         SecBufferDesc inBufferDesc, outBufferDesc;
-        SecBuffer inBuffers[1], outBuffers[1];
+        SecBuffer outBuffers[1];
         DWORD contextAttr;
         SECURITY_STATUS status;
 
@@ -285,15 +284,14 @@ namespace TLSHelper
         outBufferDesc.ulVersion = SECBUFFER_VERSION;
 
         CtxtHandle* pContext = nullptr;
-        char recvBuffer[HANDSHAKE_BUFFER_SIZE];
-
         do
         {
-            int received = 0;
-            int totalReceived = 0;
+	        char recvBuffer[HANDSHAKE_BUFFER_SIZE];
+	        SecBuffer inBuffers[1];
+	        int totalReceived = 0;
             do
             {
-                received = recv(socket, recvBuffer, sizeof(recvBuffer) - totalReceived, 0);
+                const int received = recv(socket, recvBuffer, static_cast<int>(sizeof(recvBuffer)) - totalReceived, 0);
                 if (received <= 0)
                 {
                     free(outBuffers[0].pvBuffer);
@@ -328,10 +326,10 @@ namespace TLSHelper
             }
 
             int totalSent = 0;
-            int sendSize = outBuffers[0].cbBuffer;
+            const int sendSize = static_cast<int>(outBuffers[0].cbBuffer);
             while (totalSent < sendSize)
             {
-                int sent = send(socket, (const char*)outBuffers[0].pvBuffer + totalSent, sendSize - totalSent, 0);
+                const int sent = send(socket, static_cast<const char*>(outBuffers[0].pvBuffer) + totalSent, sendSize - totalSent, 0);
                 if (sent == SOCKET_ERROR)
                 {
                     free(outBuffers[0].pvBuffer);
