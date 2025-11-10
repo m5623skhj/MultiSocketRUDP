@@ -60,6 +60,7 @@ public:
 protected:
 	virtual bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
 	virtual void Stop();
+	void JoinThreads();
 
 public:
 	bool IsStopped() const { return isStopped; }
