@@ -63,7 +63,7 @@ public:
 		size_t plaintextBufferSize,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
-	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(const std::vector<unsigned char>& key) const;
+	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* key) const;
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);

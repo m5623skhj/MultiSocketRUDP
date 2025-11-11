@@ -272,16 +272,16 @@ bool CryptoHelper::DecryptAESGCM(
 	return BCRYPT_SUCCESS(status);
 }
 
-BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(const std::vector<unsigned char>& key) const
+BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const
 {
 	BCRYPT_KEY_HANDLE keyHandle = nullptr;
 	const NTSTATUS status = BCryptGenerateSymmetricKey(
 		aesAlg,
 		&keyHandle,
-		nullptr,
-		0,
-		const_cast<unsigned char*>(key.data()),
-		static_cast<ULONG>(key.size()),
+		keyObject,
+		KEY_OBJECT_BUFFER_SIZE,
+		sessionKey,
+		SESSION_KEY_SIZE,
 		0
 	);
 
