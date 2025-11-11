@@ -26,6 +26,7 @@ public:
 			sessionKeyHandle
 		);
 		packet.WriteBuffer(reinterpret_cast<char*>(authTag.data()), static_cast<int>(authTag.size()));
+		SetHeader(packet);
 
 		packet.m_bIsEncoded = true;
 	}
@@ -69,6 +70,15 @@ public:
 			bodySize,
 			sessionKeyHandle
 			);
+	}
+
+	static void SetHeader(OUT NetBuffer& netBuffer)
+	{
+		netBuffer.m_pSerializeBuffer[0] = NetBuffer::m_byHeaderCode;
+		*(reinterpret_cast<short*>(&netBuffer.m_pSerializeBuffer[1])) = static_cast<short>(netBuffer.m_iWrite - df_HEADER_SIZE);
+
+		netBuffer.m_iRead = 0;
+		netBuffer.m_iWriteLast = netBuffer.m_iWrite;
 	}
 
 private:
