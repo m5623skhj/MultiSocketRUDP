@@ -89,8 +89,13 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 			continue;
 		}
 
-		ReserveSession(sendBuffer, rudpSessionIP);
-		SendSessionInfoToClient(clientSocket, sendBuffer);
+		if (const auto session = ReserveSession(sendBuffer, rudpSessionIP); session != nullptr)
+		{
+			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
+			{
+				session->Disconnect();
+			}
+		}
 	}
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
@@ -167,9 +172,9 @@ void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, con
 	buffer << rudpSessionIP << targetPort << sessionId << session.sessionKey << session.sessionSalt;
 }
 
-void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
+RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
 {
-	CONNECT_RESULT_CODE connectResultCode = CONNECT_RESULT_CODE::SUCCESS;
+	CONNECT_RESULT_CODE connectResultCode;
 	const auto session = AcquireSession();
 	do
 	{
@@ -205,6 +210,8 @@ void MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::s
 			session->Disconnect();
 		}
 	}
+
+	return session;
 }
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
@@ -241,15 +248,18 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 	return CONNECT_RESULT_CODE::SUCCESS;
 }
 
-void MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
+bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
 	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
+		return false;
 	}
 
 	closesocket(clientSocket);
 	sendBuffer.Init();
+
+	return true;
 }
 
 #endif

@@ -190,10 +190,12 @@ private:
 	[[nodiscard]]
 	static bool GenerateSaltKey(OUT RUDPSession& session);
 	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
-	void ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
+	[[nodiscard]]
+	RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
 	[[nodiscard]]
 	CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const;
-	static void SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
+	[[nodiscard]]
+	static bool SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 
 private:
 	std::jthread sessionBrokerThread{};
