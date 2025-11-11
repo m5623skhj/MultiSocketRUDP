@@ -8,6 +8,7 @@
 #include "LogExtension.h"
 #include "Logger.h"
 #include "../Common/Crypto/CryptoHelper.h"
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 #if USE_IOCP_SESSION_BROKER
 bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
@@ -197,6 +198,7 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 		}
 	}
 
+	sendBuffer.Init();
 	sendBuffer << connectResultCode;
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
@@ -250,12 +252,15 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 
 bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
+	PacketCryptoHelper::SetHeader(sendBuffer);
+
 	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
 		return false;
 	}
 
+	shutdown(clientSocket, SD_SEND);
 	closesocket(clientSocket);
 	sendBuffer.Init();
 

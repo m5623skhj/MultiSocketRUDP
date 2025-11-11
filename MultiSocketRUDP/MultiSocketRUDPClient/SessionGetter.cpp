@@ -169,7 +169,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 	while (true)
 	{
-		const int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE + df_HEADER_SIZE, 0);
+		const int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE, 0);
 		if (bytesReceived <= 0)
 		{
 			int error = WSAGetLastError();
@@ -203,6 +203,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 	}
 	closesocket(sessionBrokerSocket);
 
+	recvBuffer.m_iRead = df_HEADER_SIZE;
 	const bool retval = SetTargetSessionInfo(recvBuffer);
 	NetBuffer::Free(&recvBuffer);
 
