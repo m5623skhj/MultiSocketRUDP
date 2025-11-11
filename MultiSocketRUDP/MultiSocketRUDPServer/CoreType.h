@@ -17,6 +17,7 @@ constexpr unsigned int MAX_SEND_BUFFER_SIZE = 32768;
 constexpr int RECV_BUFFER_SIZE = 16384;
 constexpr unsigned char SESSION_KEY_SIZE = 16;
 constexpr unsigned char SESSION_SALT_SIZE = 16;
+constexpr int KEY_OBJECT_BUFFER_SIZE = 1024;
 constexpr unsigned int LOGIC_THREAD_STOP_SLEEP_TIME = 10000;
 
 #pragma region RIO
