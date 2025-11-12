@@ -17,14 +17,14 @@ public:
 		);
 	}
 
-	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		if (packet.m_bIsEncoded == true)
 		{
 			return;
 		}
 
-		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltLen, packetSequence, direction);
+		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		unsigned char authTag[AUTH_TAG_SIZE];
 
 		CryptoHelper::EncryptAESGCM(
@@ -53,7 +53,7 @@ public:
 		);
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		constexpr int minimumPacketSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
 		constexpr int packetSequenceOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE);
@@ -76,7 +76,7 @@ public:
 
 		PACKET_DIRECTION direction = DetermineDirection(packetDirection);
 
-		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltLen, packetSequence, direction);
+		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		if (nonce.empty())
 		{
 			return false;

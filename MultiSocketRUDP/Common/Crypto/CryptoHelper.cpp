@@ -122,9 +122,9 @@ bool CryptoHelper::DecryptAESGCM(
 
 	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
-	authInfo.pbNonce = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(nonce.data()));
+	authInfo.pbNonce = const_cast<unsigned char*>(nonce.data());
 	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
-	authInfo.pbTag = reinterpret_cast<PUCHAR>(const_cast<unsigned char*>(tag.data()));
+	authInfo.pbTag = const_cast<unsigned char*>(tag.data());
 	authInfo.cbTag = static_cast<ULONG>(tag.size());
 
 	plaintext.resize(ciphertext.size());
@@ -283,14 +283,14 @@ void CryptoHelper::DestroySymmetricKeyHandle(const BCRYPT_KEY_HANDLE keyHandle)
 	std::ignore = BCryptDestroyKey(keyHandle);
 }
 
-std::optional<std::vector<unsigned char>> CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
+std::optional<std::vector<unsigned char>> CryptoHelper::GenerateSecureRandomBytes(const unsigned short length)
 {
 	std::vector<unsigned char> bytes;
 	bytes.resize(length);
 
-	auto status = BCryptGenRandom(
+	const auto status = BCryptGenRandom(
 		nullptr,
-		reinterpret_cast<PUCHAR>(bytes.data()),
+		bytes.data(),
 		length,
 		BCRYPT_USE_SYSTEM_PREFERRED_RNG
 	);
@@ -308,9 +308,9 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(const std::vector<unsigne
 	return GenerateNonce(sessionSalt.data(), sessionSalt.size(), packetSequence, direction);
 }
 
-std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
+std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltSize, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
 {
-	if (sessionSalt == nullptr || sessionSaltLen != 8)
+	if (sessionSalt == nullptr || sessionSaltSize != 8)
 	{
 		return {};
 	}
