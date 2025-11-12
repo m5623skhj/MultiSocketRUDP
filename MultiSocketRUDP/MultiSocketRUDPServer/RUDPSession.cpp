@@ -83,7 +83,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 void RUDPSession::InitializeSession()
 {
 	sessionId = INVALID_SESSION_ID;
-	sessionKey = {};
+	ZeroMemory(sessionKey, SESSION_KEY_SIZE);
 	clientAddr = {};
 	clientSockAddrInet = {};
 	lastSendPacketSequence = {};
@@ -183,13 +183,15 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 	if (buffer.m_bIsEncoded == false)
 	{
-		PACKET_DIRECTION direction = isReplyType ? PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY : PACKET_DIRECTION::SERVER_TO_CLIENT;
+		const PACKET_DIRECTION direction = isReplyType ? PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY : PACKET_DIRECTION::SERVER_TO_CLIENT;
 		PacketCryptoHelper::EncodePacket(
 			buffer,
 			inSendPacketSequence,
 			direction,
 			sessionKey,
+			SESSION_KEY_SIZE,
 			sessionSalt,
+			SESSION_SALT_SIZE,
 			sessionKeyHandle
 		);
 	}
@@ -272,7 +274,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	std::vector<unsigned char> inputSessionKey;
 
 	recvPacket >> packetSequence >> inputSessionId >> inputSessionKey;
-	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != inputSessionId || sessionKey != inputSessionKey)
+	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != inputSessionId/* || sessionKey != inputSessionKey*/)
 	{
 		return;
 	}

@@ -163,8 +163,8 @@ private:
 	// then insert the generated key into the packet and send it
 	// if the connectKey matches, verifying it as a valid key,
 	// insert the client information into clientAddr below
-	std::vector<unsigned char> sessionKey{};
-	std::vector<unsigned char> sessionSalt{};
+	unsigned char sessionKey[SESSION_KEY_SIZE];
+	unsigned char sessionSalt[SESSION_SALT_SIZE];
 	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};

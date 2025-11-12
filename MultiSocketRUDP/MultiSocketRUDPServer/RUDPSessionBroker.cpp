@@ -146,7 +146,7 @@ bool MultiSocketRUDPCore::GenerateSessionKey(OUT RUDPSession& session)
 {
 	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); bytes.has_value())
 	{
-		session.sessionKey.assign(bytes->begin(), bytes->end());
+		std::copy_n(bytes->begin(), SESSION_KEY_SIZE, session.sessionKey);
 		return true;
 	}
 
@@ -157,7 +157,7 @@ bool MultiSocketRUDPCore::GenerateSaltKey(OUT RUDPSession& session)
 {
 	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE); bytes.has_value())
 	{
-		session.sessionSalt.assign(bytes->begin(), bytes->end());
+		std::copy_n(bytes->begin(), SESSION_SALT_SIZE, session.sessionSalt);
 		return true;
 	}
 
