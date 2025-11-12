@@ -118,8 +118,9 @@ private:
 	std::string serverIp{};
 	PortType port{};
 	SessionIdType sessionId{};
-	std::vector<unsigned char> sessionKey{};
-	std::vector<unsigned char> sessionSalt{};
+	unsigned char sessionKey[SESSION_KEY_SIZE];
+	unsigned char sessionSalt[SESSION_SALT_SIZE];
+	unsigned char keyObjectBuffer[KEY_OBJECT_BUFFER_SIZE];
 	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 
 #pragma endregion SessionGetter

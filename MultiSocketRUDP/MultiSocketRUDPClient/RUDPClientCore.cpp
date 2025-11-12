@@ -249,11 +249,13 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		
 		recvBuffer.ReadBuffer(recvPacketBuffer->GetWriteBufferPtr(), payloadLength);
 		recvPacketBuffer->m_iWrite = static_cast<WORD>(packetSize);
-		
+
 		if (not PacketCryptoHelper::DecodePacket(
 			*recvPacketBuffer,
 			sessionKey,
+			SESSION_KEY_SIZE,
 			sessionSalt,
+			SESSION_SALT_SIZE,
 			sessionKeyHandle
 		))
 		{
@@ -334,7 +336,9 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 		inRecvPacketSequence,
 		PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
 		sessionKey,
+		SESSION_KEY_SIZE,
 		sessionSalt,
+		SESSION_SALT_SIZE,
 		sessionKeyHandle
 	);
 
@@ -482,7 +486,9 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 			inSendPacketSequence,
 			PACKET_DIRECTION::CLIENT_TO_SERVER,
 			sessionKey,
+			SESSION_KEY_SIZE,
 			sessionSalt,
+			SESSION_SALT_SIZE,
 			sessionKeyHandle
 		);
 
