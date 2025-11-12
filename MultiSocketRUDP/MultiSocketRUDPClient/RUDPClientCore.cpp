@@ -252,8 +252,6 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 
 		if (not PacketCryptoHelper::DecodePacket(
 			*recvPacketBuffer,
-			sessionKey,
-			SESSION_KEY_SIZE,
 			sessionSalt,
 			SESSION_SALT_SIZE,
 			sessionKeyHandle
@@ -335,8 +333,6 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 		buffer,
 		inRecvPacketSequence,
 		PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
-		sessionKey,
-		SESSION_KEY_SIZE,
 		sessionSalt,
 		SESSION_SALT_SIZE,
 		sessionKeyHandle
@@ -485,8 +481,6 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 			buffer,
 			inSendPacketSequence,
 			PACKET_DIRECTION::CLIENT_TO_SERVER,
-			sessionKey,
-			SESSION_KEY_SIZE,
 			sessionSalt,
 			SESSION_SALT_SIZE,
 			sessionKeyHandle

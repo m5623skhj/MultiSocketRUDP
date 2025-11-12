@@ -147,8 +147,6 @@ bool CryptoHelper::DecryptAESGCM(
 }
 
 bool CryptoHelper::EncryptAESGCM(
-	const unsigned char* key,
-	const size_t sessionKeySize,
 	const unsigned char* nonce,
 	const size_t nonceSize,
 	const char* plaintext,
@@ -160,13 +158,6 @@ bool CryptoHelper::EncryptAESGCM(
 )
 {
 	if (keyHandle == nullptr)
-	{
-		return false;
-	}
-
-	if (sessionKeySize != AES_KEY_SIZE_128 &&
-		sessionKeySize != AES_KEY_SIZE_192 &&
-		sessionKeySize != AES_KEY_SIZE_256)
 	{
 		return false;
 	}
@@ -212,8 +203,6 @@ bool CryptoHelper::EncryptAESGCM(
 }
 
 bool CryptoHelper::DecryptAESGCM(
-	const unsigned char* key,
-	const size_t sessionKeySize,
 	const unsigned char* nonce,
 	const size_t nonceSize,
 	const char* ciphertext,
@@ -225,13 +214,6 @@ bool CryptoHelper::DecryptAESGCM(
 )
 {
 	if (keyHandle == nullptr)
-	{
-		return false;
-	}
-
-	if (sessionKeySize != AES_KEY_SIZE_128 &&
-		sessionKeySize != AES_KEY_SIZE_192 &&
-		sessionKeySize != AES_KEY_SIZE_256)
 	{
 		return false;
 	}

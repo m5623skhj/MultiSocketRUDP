@@ -44,8 +44,6 @@ public:
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
 	static bool EncryptAESGCM(
-		const unsigned char* key,
-		const size_t sessionKeySize,
 		const unsigned char* nonce,
 		const size_t nonceSize,
 		const char* plaintext,
@@ -56,8 +54,6 @@ public:
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
 	static bool DecryptAESGCM(
-		const unsigned char* key,
-		const size_t sessionKeySize,
 		const unsigned char* nonce,
 		const size_t nonceSize,
 		const char* ciphertext,

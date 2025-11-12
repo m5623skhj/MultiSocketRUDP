@@ -744,8 +744,6 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 
 			if (not PacketCryptoHelper::DecodePacket(
 				*buffer,
-				context->session->sessionKey,
-				SESSION_KEY_SIZE,
 				context->session->sessionSalt,
 				SESSION_SALT_SIZE,
 				context->session->sessionKeyHandle

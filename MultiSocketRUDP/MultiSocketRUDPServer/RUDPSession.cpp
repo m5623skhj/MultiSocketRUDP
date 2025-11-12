@@ -188,8 +188,6 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 			buffer,
 			inSendPacketSequence,
 			direction,
-			sessionKey,
-			SESSION_KEY_SIZE,
 			sessionSalt,
 			SESSION_SALT_SIZE,
 			sessionKeyHandle

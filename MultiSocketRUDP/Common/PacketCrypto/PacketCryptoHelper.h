@@ -5,21 +5,19 @@
 class PacketCryptoHelper
 {
 public:
-	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionKey, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		EncodePacket(
 			packet,
 			packetSequence,
 			direction,
-			sessionKey.data(),
-			sessionKey.size(),
 			sessionSalt.data(),
 			sessionSalt.size(),
 			sessionKeyHandle
 		);
 	}
 
-	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionKey, const size_t sessionKeyLen, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		if (packet.m_bIsEncoded == true)
 		{
@@ -30,8 +28,6 @@ public:
 		unsigned char authTag[AUTH_TAG_SIZE];
 
 		CryptoHelper::EncryptAESGCM(
-			sessionKey,
-			sessionKeyLen,
 			nonce.data(),
 			nonce.size(),
 			&packet.m_pSerializeBuffer[bodyOffset],
@@ -47,19 +43,17 @@ public:
 		packet.m_bIsEncoded = true;
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionKey, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		return DecodePacket(
 			packet,
-			sessionKey.data(),
-			sessionKey.size(),
 			sessionSalt.data(),
 			sessionSalt.size(),
 			sessionKeyHandle
 		);
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionKey, const size_t sessionKeyLen, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltLen, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
 		constexpr int minimumPacketSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
 		constexpr int packetSequenceOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE);
@@ -89,8 +83,6 @@ public:
 		}
 
 		return CryptoHelper::DecryptAESGCM(
-			sessionKey,
-			sessionKeyLen,
 			nonce.data(),
 			nonce.size(),
 			&packet.m_pSerializeBuffer[bodyOffset],
