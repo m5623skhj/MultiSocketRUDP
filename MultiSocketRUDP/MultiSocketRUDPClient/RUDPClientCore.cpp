@@ -102,7 +102,7 @@ void RUDPClientCore::SendConnectPacket()
 	constexpr PacketSequence packetSequence = 0;
 	constexpr auto packetType = PACKET_TYPE::CONNECT_TYPE;
 	
-	connectPacket << packetType << packetSequence << sessionId;
+	connectPacket << packetType << packetSequence;
 	SendPacket(connectPacket, packetSequence);
 }
 
@@ -541,10 +541,10 @@ bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath
 	FILE* fp;
 	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
 
-	const int iJumpBOM = ftell(fp);
+	const int iJumpBom = ftell(fp);
 	fseek(fp, 0, SEEK_END);
 	const int iFileSize = ftell(fp);
-	fseek(fp, iJumpBOM, SEEK_SET);
+	fseek(fp, iJumpBom, SEEK_SET);
 	const int fileSize = static_cast<int>(fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp));
 	const int amend = iFileSize - fileSize;
 	fclose(fp);
