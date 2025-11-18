@@ -103,6 +103,8 @@ private:
 
 private:
 	[[nodiscard]]
+	bool CanProcessPacket(const sockaddr_in& targetClientAddr) const;
+	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
 	[[nodiscard]]
 	bool IsReleasing() const;
@@ -172,7 +174,7 @@ private:
 	SOCKET sock{};
 	mutable std::shared_mutex socketLock;
 	bool nowInReleaseThread{};
-	bool nowInProcessingRecvPacket{};
+	std::atomic_bool nowInProcessingRecvPacket{};
 	bool isUsingSession{};
 	ThreadIdType threadId{};
 

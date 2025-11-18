@@ -251,8 +251,7 @@ private:
 	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
-	[[nodiscard]]
-	static bool ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
+	static void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
 	[[nodiscard]]
 	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
     [[nodiscard]]  

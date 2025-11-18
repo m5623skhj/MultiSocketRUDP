@@ -5,7 +5,6 @@
 #include "Logger.h"
 #include "Ticker.h"
 #include "MemoryTracer.h"
-#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -742,23 +741,9 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 				break;
 			}
 
-			if (not PacketCryptoHelper::DecodePacket(
-				*buffer,
-				context->session->sessionSalt,
-				SESSION_SALT_SIZE,
-				context->session->sessionKeyHandle
-			))
-			{
-				break;
-			}
-
 			sockaddr_in clientAddr;
 			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(clientAddr));
-			if (not ProcessByPacketType(*context->session, clientAddr, *buffer))
-			{
-				NetBuffer::Free(buffer);
-				return;
-			}
+			ProcessByPacketType(*context->session, clientAddr, *buffer);
 		} while (false);
 
 		if (buffer != nullptr)

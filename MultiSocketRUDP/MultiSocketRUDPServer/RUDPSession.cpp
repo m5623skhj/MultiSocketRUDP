@@ -435,6 +435,11 @@ bool RUDPSession::IsConnected() const
 	return isConnected;
 }
 
+bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
+{
+	return CheckMyClient(clientAddr) && IsReleasing();
+}
+
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 {
 	if (clientAddr.sin_addr.S_un.S_addr != targetClientAddr.sin_addr.S_un.S_addr ||
