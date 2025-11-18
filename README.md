@@ -18,11 +18,11 @@
 
 아래는 약식으로 그린 Connect, Recv, Send의 흐름도 입니다.
 
-![RUDP-페이지-3 drawio](https://github.com/user-attachments/assets/d7fefb55-c949-4fdd-9ba0-04cae1749b9b)
+<img width="1063" height="541" alt="image" src="https://github.com/user-attachments/assets/b1f2dc47-24a7-4221-bb8a-8d871cc74003" />
 
-![RUDP-페이지-1 drawio](https://github.com/user-attachments/assets/8b7e2985-e021-4383-b9ec-8fe81e9061b5)
+<img width="964" height="331" alt="image" src="https://github.com/user-attachments/assets/3985f92b-019a-4b63-982d-ccd704f6fe9a" />
 
-![RUDP-페이지-2 drawio](https://github.com/user-attachments/assets/913fd4c0-0655-4f3e-b290-2bb2662490c3)
+<img width="814" height="422" alt="image" src="https://github.com/user-attachments/assets/9697a196-4806-466e-abf5-dd0443bdab4e" />
 
 ---
 
