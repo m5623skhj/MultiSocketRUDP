@@ -14,8 +14,8 @@ void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPER
 }
 
 MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName)
-	: contextPool(2, false)
-	, tlsHelper(sessionBrokerCertStoreName, sessionBrokerCertSubjectName)
+	: tlsHelper(sessionBrokerCertStoreName, sessionBrokerCertSubjectName)
+	, contextPool(2, false)
 {
 }
 
@@ -352,7 +352,7 @@ bool MultiSocketRUDPCore::RunSessionBroker()
 
 SOCKET MultiSocketRUDPCore::CreateRUDPSocket()
 {
-	SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
+	const SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
 	if (sock == INVALID_SOCKET)
 	{
 		LOG_ERROR(std::format("WSASocket failed with error code {}", WSAGetLastError()));
@@ -1038,7 +1038,7 @@ bool MultiSocketRUDPCore::RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo
 
 WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
 {
-	static constexpr int payloadLengthPosition = 1;
+	static constexpr int PAYLOAD_LENGTH_POSITION = 1;
 
-	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[payloadLengthPosition]);
+	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[PAYLOAD_LENGTH_POSITION]);
 }
