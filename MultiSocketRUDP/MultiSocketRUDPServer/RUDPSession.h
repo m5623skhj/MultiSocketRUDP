@@ -3,7 +3,6 @@
 #include <map>
 #include "CoreType.h"
 #include <MSWSock.h>
-#include "LockFreeQueue.h"
 #include "NetServerSerializeBuffer.h"
 #include "Queue.h"
 #include <shared_mutex>
