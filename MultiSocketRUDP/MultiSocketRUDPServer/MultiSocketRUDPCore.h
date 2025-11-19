@@ -86,6 +86,14 @@ public:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
+	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
+	[[nodiscard]]
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioFunctionTable; }
+
+	// Never call this function directly. It should only be called within RDPSession::Disconnect()
+	void DisconnectSession(SessionIdType disconnectTargetSessionId);
+
+private:
 	[[nodiscard]]
 	bool DoRecv(const RUDPSession& session) const;
 	[[nodiscard]]
@@ -94,11 +102,7 @@ public:
 	IOContext* MakeSendContext(OUT RUDPSession& session, ThreadIdType threadId);
 	[[nodiscard]]
 	bool TryRIOSend(OUT RUDPSession& session, IOContext* context);
-	// Never call this function directly. It should only be called within RDPSession::Disconnect()
-	void DisconnectSession(SessionIdType disconnectTargetSessionId);
-	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 	inline void PushToDisconnectTargetSession(RUDPSession& session);
-	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioFunctionTable; }
 
 private:
 	[[nodiscard]]
