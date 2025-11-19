@@ -681,10 +681,16 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	}
 	case RIO_OPERATION_TYPE::OP_SEND:
 	{
-		return SendIOCompleted(contextResult, threadId);
+		if (not SendIOCompleted(contextResult, threadId))
+		{
+			contextResult->session->Disconnect();
+			break;
+		}
+		return true;
 	}
 	default:
 	{
+		LOG_ERROR(std::format("Invalid IO operation type in IOCompleted()", static_cast<char>(contextResult->ioType)));
 	}
 	break;
 	}
