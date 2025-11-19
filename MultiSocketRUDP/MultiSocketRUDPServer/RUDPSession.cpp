@@ -160,7 +160,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 
 void RUDPSession::OnConnected(const SessionIdType inSessionId)
 {
-	sessionId = inSessionId;
+	UNREFERENCED_PARAMETER(inSessionId);
 	OnConnected();
 }
 
