@@ -318,9 +318,9 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		sendPacketInfoList.emplace_back();
 		sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
 
-		ioWorkerThreads.emplace_back([this, id]() { this->RunIOWorkerThread(static_cast<ThreadIdType>(id)); });
-		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(static_cast<ThreadIdType>(id)); });
-		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(static_cast<ThreadIdType>(id)); });
+		ioWorkerThreads.emplace_back([this, id]() { this->RunIOWorkerThread(id); });
+		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(id); });
+		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(id); });
 	}
 
 	Sleep(1000);
