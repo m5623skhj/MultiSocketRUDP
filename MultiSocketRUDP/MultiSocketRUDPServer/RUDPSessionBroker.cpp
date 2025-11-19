@@ -260,7 +260,6 @@ bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OU
 		return false;
 	}
 
-	shutdown(clientSocket, SD_SEND);
 	closesocket(clientSocket);
 	sendBuffer.Init();
 
