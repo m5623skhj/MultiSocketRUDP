@@ -65,6 +65,14 @@ enum class PACKET_DIRECTION : uint8_t
 	INVALID = 255
 };
 
+enum class SESSION_STATE : uint8_t
+{
+	DISCONNECTED = 0,
+	RESERVED = 1,
+	CONNECTED = 2,
+	RELEASING = 3
+};
+
 struct TickSet
 {
 	UINT64 nowTick = 0;

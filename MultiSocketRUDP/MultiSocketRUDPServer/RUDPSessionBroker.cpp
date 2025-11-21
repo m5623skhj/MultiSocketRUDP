@@ -213,12 +213,13 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 		}
 	}
 
+	session->sessionState = SESSION_STATE::RESERVED;
 	return session;
 }
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
 {
-	if (session.isConnected)
+	if (session.IsConnected())
 	{
 		LOG_ERROR("This session already connected");
 		return CONNECT_RESULT_CODE::ALREADY_CONNECTED_SESSION;

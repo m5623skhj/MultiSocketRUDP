@@ -116,7 +116,9 @@ public:
 	[[nodiscard]]
 	SOCKADDR_INET GetSocketAddressInet() const;
 	[[nodiscard]]
-	bool IsConnected() const;
+	bool IsConnected() const { return sessionState == SESSION_STATE::CONNECTED; }
+	[[nodiscard]]
+	bool IsUsingSession() const { return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED; }
 
 protected:
 	using PacketFactory = std::function<std::function<bool()>(RUDPSession*, NetBuffer*)>;
@@ -157,7 +159,7 @@ private:
 	std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
 
 private:
-	std::atomic_bool isConnected{};
+	std::atomic<SESSION_STATE> sessionState{ SESSION_STATE::DISCONNECTED };
 	SessionIdType sessionId = INVALID_SESSION_ID;
 	// a connectKey seems to be necessary
 	// generate and store a key on the TCP connection side,
@@ -174,7 +176,6 @@ private:
 	mutable std::shared_mutex socketLock;
 	bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
-	bool isUsingSession{};
 	ThreadIdType threadId{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};

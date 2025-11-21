@@ -116,7 +116,7 @@ RUDPSession::~RUDPSession()
 
 void RUDPSession::Disconnect()
 {
-	if (bool connectState{ true }; not isConnected.compare_exchange_strong(connectState, false))
+	if (auto connectState{ SESSION_STATE::CONNECTED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::RELEASING))
 	{
 		return;
 	}
@@ -138,7 +138,7 @@ void RUDPSession::Disconnect()
 
 bool RUDPSession::SendPacket(IPacket& packet)
 {
-	if (not isConnected)
+	if (not IsConnected())
 	{
 		return false;
 	}
@@ -161,6 +161,8 @@ bool RUDPSession::SendPacket(IPacket& packet)
 void RUDPSession::OnConnected(const SessionIdType inSessionId)
 {
 	UNREFERENCED_PARAMETER(inSessionId);
+
+	sessionState = SESSION_STATE::CONNECTED;
 	OnConnected();
 }
 
@@ -277,7 +279,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 		return;
 	}
 
-	if (bool connectState{ false }; not isConnected.compare_exchange_strong(connectState, true))
+	if (auto connectState{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::CONNECTED))
 	{
 		return;
 	}
@@ -428,11 +430,6 @@ sockaddr_in RUDPSession::GetSocketAddress() const
 SOCKADDR_INET RUDPSession::GetSocketAddressInet() const
 {
 	return clientSockAddrInet;
-}
-
-bool RUDPSession::IsConnected() const
-{
-	return isConnected;
 }
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const

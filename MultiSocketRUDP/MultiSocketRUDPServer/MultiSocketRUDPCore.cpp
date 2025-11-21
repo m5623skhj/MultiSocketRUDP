@@ -155,15 +155,15 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId)
 {
-	if (disconnectTargetSessionId >= sessionArray.size() || not sessionArray[disconnectTargetSessionId]->isUsingSession)
+	if (disconnectTargetSessionId >= sessionArray.size() || sessionArray[disconnectTargetSessionId]->sessionState != SESSION_STATE::RELEASING)
 	{
 		return;
 	}
 
+	sessionArray[disconnectTargetSessionId]->sessionState = SESSION_STATE::DISCONNECTED;
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
 		unusedSessionIdList.emplace_back(disconnectTargetSessionId);
-		sessionArray[disconnectTargetSessionId]->isUsingSession = false;
 	}
 	--connectedUserCount;
 
@@ -434,12 +434,6 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 		unusedSessionIdList.pop_front();
 
 		session = sessionArray[sessionId];
-		if (session->isUsingSession == true)
-		{
-			unusedSessionIdList.push_back(sessionId);
-			return nullptr;
-		}
-		session->isUsingSession = true;
 	}
 
 	return session;
@@ -447,7 +441,7 @@ RUDPSession* MultiSocketRUDPCore::AcquireSession()
 
 RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId) const
 {
-	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->isUsingSession)
+	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->IsUsingSession())
 	{
 		return nullptr;
 	}
@@ -610,7 +604,7 @@ void MultiSocketRUDPCore::RunHeartbeatThread() const
 	{
 		for (const auto& session : sessionArray)
 		{
-			if (session->isUsingSession == false || session->isConnected == false)
+			if (session->IsUsingSession() == false)
 			{
 				continue;
 			}
