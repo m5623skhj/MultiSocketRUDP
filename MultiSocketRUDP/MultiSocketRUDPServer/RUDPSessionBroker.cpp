@@ -214,6 +214,7 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 	}
 
 	session->sessionState = SESSION_STATE::RESERVED;
+	session->sessionReservedTime = GetTickCount64();
 	return session;
 }
 

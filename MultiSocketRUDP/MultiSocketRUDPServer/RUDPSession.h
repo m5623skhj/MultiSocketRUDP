@@ -84,6 +84,8 @@ private:
 
 	void SendHeartbeatPacket();
 
+	bool CheckReservedSessionTimeout(unsigned long long now) const;
+	void AbortReservedSession();
 	void CloseSocket();
 	void UnregisterRIOBuffers();
 
@@ -117,6 +119,8 @@ public:
 	SOCKADDR_INET GetSocketAddressInet() const;
 	[[nodiscard]]
 	bool IsConnected() const { return sessionState == SESSION_STATE::CONNECTED; }
+	[[nodiscard]]
+	bool IsReserved() const { return sessionState == SESSION_STATE::RESERVED; }
 	[[nodiscard]]
 	bool IsUsingSession() const { return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED; }
 
@@ -192,6 +196,9 @@ private:
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
 	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
+
+	unsigned long long sessionReservedTime{};
+	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
 
 private:
 	RecvBuffer recvBuffer;

@@ -88,6 +88,7 @@ void RUDPSession::InitializeSession()
 	clientSockAddrInet = {};
 	lastSendPacketSequence = {};
 	nowInReleaseThread = {};
+	sessionReservedTime = {};
 
 	if (sendBuffer.reservedSendPacketInfo != nullptr)
 	{
@@ -221,6 +222,22 @@ void RUDPSession::SendHeartbeatPacket()
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false);
+}
+
+bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const
+{
+	return (sessionState.load() == SESSION_STATE::RESERVED) && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);
+}
+
+void RUDPSession::AbortReservedSession()
+{
+	if (auto connectState{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::RELEASING))
+	{
+		return;
+	}
+
+	CloseSocket();
+	core.DisconnectSession(sessionId);
 }
 
 void RUDPSession::CloseSocket()
