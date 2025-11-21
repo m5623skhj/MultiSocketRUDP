@@ -602,14 +602,24 @@ void MultiSocketRUDPCore::RunHeartbeatThread() const
 
 	while (not threadStopFlag)
 	{
+		const auto now = GetTickCount64();
+
 		for (const auto& session : sessionArray)
 		{
-			if (session->IsUsingSession() == false)
+			if (session->IsConnected() == true)
 			{
-				continue;
+				session->SendHeartbeatPacket();
 			}
 
-			session->SendHeartbeatPacket();
+			if (session->IsReserved() == true)
+			{
+				// Waiting 30 seconds
+				if (session->CheckReservedSessionTimeout(now) == true)
+				{
+					// if not connected within the time, disconnect the session
+					session->AbortReservedSession();
+				}
+			}
 		}
 
 		SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
