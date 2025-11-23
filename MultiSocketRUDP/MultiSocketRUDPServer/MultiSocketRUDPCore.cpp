@@ -542,7 +542,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 
 			if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
 			{
-				PushToDisconnectTargetSession(*sendPacketInfo->owner);
+				sendPacketInfo->owner->DoDisconnect();
 				++numOfTimeoutSession;
 				continue;
 			}
@@ -653,7 +653,7 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
 
 	if (rioResult.Status != 0)
 	{
-		context->session->Disconnect();
+		context->session->DoDisconnect();
 		LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
 		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
 		{
@@ -678,7 +678,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	{
 		if (not RecvIOCompleted(contextResult, transferred, threadId))
 		{
-			contextResult->session->Disconnect();
+			contextResult->session->DoDisconnect();
 			break;
 		}
 		return true;
@@ -687,7 +687,7 @@ bool MultiSocketRUDPCore::IOCompleted(OUT IOContext* contextResult, const ULONG 
 	{
 		if (not SendIOCompleted(contextResult, threadId))
 		{
-			contextResult->session->Disconnect();
+			contextResult->session->DoDisconnect();
 			break;
 		}
 		return true;
@@ -926,7 +926,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 	if (useSize < MAX_SEND_BUFFER_SIZE)
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
-		PushToDisconnectTargetSession(session);
+		session.DoDisconnect();
 		SetEvent(sessionReleaseEventHandle);
 
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
@@ -976,7 +976,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 	if (useSize > MAX_SEND_BUFFER_SIZE)
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is over MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
-		PushToDisconnectTargetSession(session);
+		session.DoDisconnect();
 		SetEvent(sessionReleaseEventHandle);
 
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;

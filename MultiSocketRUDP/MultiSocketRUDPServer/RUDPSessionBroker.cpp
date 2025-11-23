@@ -94,7 +94,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		{
 			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
 			{
-				session->Disconnect();
+				session->DoDisconnect();
 			}
 		}
 	}
@@ -209,11 +209,10 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 	{
 		if (session != nullptr)
 		{
-			session->Disconnect();
+			session->DoDisconnect();
 		}
 	}
 
-	session->sessionState = SESSION_STATE::RESERVED;
 	session->sessionReservedTime = GetTickCount64();
 	return session;
 }
@@ -248,6 +247,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
 	}
+	session.sessionState = SESSION_STATE::RESERVED;
 
 	return CONNECT_RESULT_CODE::SUCCESS;
 }

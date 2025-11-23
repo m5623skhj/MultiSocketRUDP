@@ -115,9 +115,22 @@ RUDPSession::~RUDPSession()
 	}
 }
 
+void RUDPSession::DoDisconnect()
+{
+	if (auto expectReserved{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(expectReserved, SESSION_STATE::RELEASING))
+	{
+		if (auto expectConnected{ SESSION_STATE::CONNECTED }; not sessionState.compare_exchange_strong(expectConnected, SESSION_STATE::RELEASING))
+		{
+			return;
+		}
+	}
+
+	core.PushToDisconnectTargetSession(*this);
+}
+
 void RUDPSession::Disconnect()
 {
-	if (auto connectState{ SESSION_STATE::CONNECTED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::RELEASING))
+	if (sessionState != SESSION_STATE::RELEASING)
 	{
 		return;
 	}
@@ -311,7 +324,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
-	Disconnect();
+	DoDisconnect();
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)

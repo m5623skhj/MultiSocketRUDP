@@ -92,6 +92,7 @@ public:
 
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(SessionIdType disconnectTargetSessionId);
+	inline void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
 	[[nodiscard]]
@@ -102,7 +103,6 @@ private:
 	IOContext* MakeSendContext(OUT RUDPSession& session, ThreadIdType threadId);
 	[[nodiscard]]
 	bool TryRIOSend(OUT RUDPSession& session, IOContext* context);
-	inline void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
 	[[nodiscard]]

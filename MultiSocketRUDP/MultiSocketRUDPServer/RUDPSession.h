@@ -72,7 +72,7 @@ public:
 	virtual ~RUDPSession();
 
 public:
-	void Disconnect();
+	void DoDisconnect();
 	bool SendPacket(IPacket& packet);
 
 private:
@@ -91,6 +91,7 @@ private:
 
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
+	void Disconnect();
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
 	[[nodiscard]]

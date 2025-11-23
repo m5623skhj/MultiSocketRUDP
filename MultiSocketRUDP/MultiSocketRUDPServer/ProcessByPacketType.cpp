@@ -46,7 +46,7 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 
 		if (session.OnRecvPacket(recvPacket) == false)
 		{
-			session.Disconnect();
+			session.DoDisconnect();
 		}
 		break;
 	}
