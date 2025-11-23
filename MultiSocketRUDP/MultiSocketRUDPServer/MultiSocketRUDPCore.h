@@ -92,7 +92,7 @@ public:
 
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(SessionIdType disconnectTargetSessionId);
-	inline void PushToDisconnectTargetSession(RUDPSession& session);
+	void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
 	[[nodiscard]]
