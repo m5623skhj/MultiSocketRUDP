@@ -26,14 +26,15 @@ public:
 
 		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		unsigned char authTag[AUTH_TAG_SIZE];
+		const int bodySize = packet.GetUseSize() - bodyOffsetWithNotHeader;
 
 		CryptoHelper::EncryptAESGCM(
 			nonce.data(),
 			nonce.size(),
 			&packet.m_pSerializeBuffer[bodyOffset],
-			packet.GetUseSize() - bodyOffsetWithNotHeader,
+			bodySize,
 			&packet.m_pSerializeBuffer[bodyOffset],
-			packet.GetAllUseSize() - bodyOffsetWithNotHeader,
+			bodySize,
 			authTag,
 			sessionKeyHandle
 		);
