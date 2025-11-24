@@ -4,6 +4,7 @@
 #include "LogExtension.h"
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
+#include "../ContentsClient/PacketIdType.h"
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
@@ -101,8 +102,9 @@ void RUDPClientCore::SendConnectPacket()
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
 	constexpr PacketSequence packetSequence = 0;
 	constexpr auto packetType = PACKET_TYPE::CONNECT_TYPE;
+	constexpr auto packetId = PACKET_ID::CONNECT_REQUEST;
 	
-	connectPacket << packetType << packetSequence;
+	connectPacket << packetType << packetSequence << packetId;
 	SendPacket(connectPacket, packetSequence);
 }
 
