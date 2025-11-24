@@ -14,8 +14,6 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
 
-	session.nowInProcessingRecvPacket = true;
-
 	switch (packetType)
 	{
 	case PACKET_TYPE::CONNECT_TYPE:
@@ -66,6 +64,4 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		LOG_ERROR(std::format("Invalid packet type received: {}", static_cast<int>(packetType)));
 		break;
 	}
-
-	session.nowInProcessingRecvPacket = false;
 }
