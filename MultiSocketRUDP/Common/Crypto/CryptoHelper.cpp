@@ -310,7 +310,7 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(const std::vector<unsigne
 
 std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltSize, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
 {
-	if (sessionSalt == nullptr || sessionSaltSize != 8)
+	if (sessionSalt == nullptr || sessionSaltSize != SESSION_SALT_SIZE)
 	{
 		return {};
 	}
