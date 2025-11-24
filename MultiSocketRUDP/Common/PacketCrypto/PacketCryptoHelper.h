@@ -56,22 +56,24 @@ public:
 
 	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
 	{
-		constexpr int minimumPacketSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
+        // Since the packet type has already been extracted earlier, it is not extracted here
+		constexpr int minimumPacketSize = sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
 		constexpr int packetSequenceOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE);
+		constexpr int sizeOfHeaderWithPacketType = df_HEADER_SIZE + sizeof(PACKET_TYPE);
 
-		const int packetAllUseSize = packet.GetAllUseSize();
-		if (packetAllUseSize - df_HEADER_SIZE < minimumPacketSize)
+		const int packetUseSize = packet.GetUseSize();
+		if (packetUseSize < minimumPacketSize)
 		{
 			return false;
 		}
 
-		uint8_t packetDirection = packet.m_pSerializeBuffer[packetAllUseSize - AUTH_TAG_SIZE];
+		uint8_t packetDirection = packet.m_pSerializeBuffer[packetUseSize - AUTH_TAG_SIZE];
 
 		uint64_t packetSequence = 0;
 		memcpy(&packetSequence, &packet.m_pSerializeBuffer[packetSequenceOffset], sizeof(packetSequence));
 
-		size_t authTagOffset = packetAllUseSize - AUTH_TAG_SIZE;
-		size_t bodySize = packetAllUseSize - AUTH_TAG_SIZE - bodyOffset;
+		size_t authTagOffset = packet.m_iWrite - AUTH_TAG_SIZE;
+		size_t bodySize = packetUseSize + sizeOfHeaderWithPacketType - AUTH_TAG_SIZE - bodyOffset;
 
 		const unsigned char* authTag = reinterpret_cast<const unsigned char*>(&packet.m_pSerializeBuffer[authTagOffset]);
 
