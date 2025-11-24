@@ -39,7 +39,7 @@ public:
 		const std::vector<unsigned char>& key,
 		const std::vector<unsigned char>& nonce,
 		const std::vector<unsigned char>& ciphertext,
-		const std::vector<unsigned char>& tag,
+		std::vector<unsigned char>& tag,
 		std::vector<unsigned char>& plaintext,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
@@ -50,7 +50,7 @@ public:
 		const size_t plaintextSize,
 		char* ciphertext,
 		const size_t ciphertextBufferSize,
-		const unsigned char* tag,
+		unsigned char* tag,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
 	static bool DecryptAESGCM(
