@@ -140,12 +140,12 @@ void Logger::WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQu
 	}
 }
 
-void Logger::WriteLog(const std::shared_ptr<LogBase>& logObject)
+void Logger::WriteLog(std::shared_ptr<LogBase> logObject)
 {
 	logObject->SetLogTime();
 
 	std::scoped_lock lock(logQueueLock);
-	logWaitingQueue.push(logObject);
+	logWaitingQueue.push(std::move(logObject));
 
 	SetEvent(loggerEventHandles[0]);
 }
@@ -157,7 +157,9 @@ void Logger::WriteLogToFile(const std::shared_ptr<LogBase>& logObject)
 
 	if (printToConsole == true)
 	{
-		std::osyncstream syncOut(std::cout);
-		syncOut << logJson << '\n';
+		static std::mutex consoleMutex;
+		std::scoped_lock lock(consoleMutex);
+
+		std::cout << logJson << '\n';
 	}
 }
