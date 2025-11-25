@@ -173,6 +173,7 @@ private:
 	// insert the client information into clientAddr below
 	unsigned char sessionKey[SESSION_KEY_SIZE];
 	unsigned char sessionSalt[SESSION_SALT_SIZE];
+	std::vector<unsigned char> keyObjectBuffer;
 	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};

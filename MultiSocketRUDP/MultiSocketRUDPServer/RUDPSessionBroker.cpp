@@ -139,6 +139,15 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 
 bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
 {
+	session.keyObjectBuffer.resize(CryptoHelper::GetTLSInstance().GetKeyOjbectSize());
+
+	session.sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(session.keyObjectBuffer.data(), session.sessionKey);
+	if (session.sessionKeyHandle == nullptr)
+	{
+		LOG_ERROR("InitSessionCrypto failed : GetSymmetricKeyHandle failed");
+		return false;
+	}
+
 	return GenerateSessionKey(session) && GenerateSaltKey(session);
 }
 

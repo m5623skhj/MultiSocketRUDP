@@ -221,7 +221,9 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	}
 
 	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
-	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
+
+	keyObjectBuffer.resize(CryptoHelper::GetTLSInstance().GetKeyOjbectSize());
+	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObjectBuffer.data(), sessionKey);
 
 	return sessionKeyHandle != nullptr;
 }

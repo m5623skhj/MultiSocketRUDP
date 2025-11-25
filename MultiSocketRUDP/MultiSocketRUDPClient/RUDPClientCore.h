@@ -120,7 +120,7 @@ private:
 	SessionIdType sessionId{};
 	unsigned char sessionKey[SESSION_KEY_SIZE];
 	unsigned char sessionSalt[SESSION_SALT_SIZE];
-	unsigned char keyObjectBuffer[KEY_OBJECT_BUFFER_SIZE];
+	std::vector<unsigned char> keyObjectBuffer;
 	BCRYPT_KEY_HANDLE sessionKeyHandle{};
 
 #pragma endregion SessionGetter

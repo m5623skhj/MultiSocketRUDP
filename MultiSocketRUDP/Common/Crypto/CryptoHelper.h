@@ -63,7 +63,10 @@ public:
 		const size_t plaintextBufferSize,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
+	[[nodiscard]]
 	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* key) const;
+	[[nodiscard]]
+	ULONG GetKeyOjbectSize() const { return keyObjectSize; }
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);
@@ -72,4 +75,5 @@ public:
 
 private:
 	BCRYPT_ALG_HANDLE aesAlg = nullptr;
+	ULONG keyObjectSize{};
 };

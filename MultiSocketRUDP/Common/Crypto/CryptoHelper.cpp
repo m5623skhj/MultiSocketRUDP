@@ -29,6 +29,20 @@ CryptoHelper::CryptoHelper()
 	{
 		throw std::runtime_error("BCryptSetProperty(GCM) failed");
 	}
+
+	status = BCryptGetProperty(
+		aesAlg,
+		BCRYPT_OBJECT_LENGTH,
+		reinterpret_cast<PUCHAR>(&keyObjectSize),
+		sizeof(ULONG),
+		&keyObjectSize,
+		0
+	);
+
+	if (not BCRYPT_SUCCESS(status))
+	{
+		throw std::runtime_error("BCryptGetProperty(OBJECT_LENGTH) failed");
+	}
 }
 
 CryptoHelper::~CryptoHelper()
