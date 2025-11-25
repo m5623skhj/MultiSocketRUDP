@@ -33,7 +33,10 @@ bool TestClient::Start(const std::wstring& clientCoreOptionFile, const std::wstr
 void TestClient::Stop()
 {
 	RUDPClientCore::Stop();
-	testThread.join();
+	if (testThread.joinable())
+	{
+		testThread.join();
+	}
 
 	--clientCount;
 }
