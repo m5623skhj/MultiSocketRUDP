@@ -104,6 +104,7 @@
     * Packet sequence 8byte
     * Packet id 4byte
     * Packet body nbyte
+    * Auth tag 16byte
 
 ---
 
