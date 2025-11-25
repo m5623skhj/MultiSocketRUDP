@@ -19,7 +19,7 @@ void LogBase::SetLogTime()
 
 	if (const auto error = gmtime_s(&utcTime, &currentTime); error != 0)
 	{
-		std::cout << "Error in gmtime_s() : " << error << std::endl;
+		std::cout << "Error in gmtime_s() : " << error << '\n';
 		g_Dump.Crash();
 	}
 	const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
