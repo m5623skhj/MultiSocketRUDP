@@ -139,8 +139,12 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 
 bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
 {
-	session.keyObjectBuffer.resize(CryptoHelper::GetTLSInstance().GetKeyOjbectSize());
+	if (not GenerateSessionKey(session) || not GenerateSaltKey(session))
+	{
+		return false;
+	}
 
+	session.keyObjectBuffer.resize(CryptoHelper::GetTLSInstance().GetKeyOjbectSize());
 	session.sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(session.keyObjectBuffer.data(), session.sessionKey);
 	if (session.sessionKeyHandle == nullptr)
 	{
@@ -148,7 +152,7 @@ bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
 		return false;
 	}
 
-	return GenerateSessionKey(session) && GenerateSaltKey(session);
+	return true;
 }
 
 bool MultiSocketRUDPCore::GenerateSessionKey(OUT RUDPSession& session)
