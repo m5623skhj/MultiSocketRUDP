@@ -741,6 +741,11 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		NetBuffer* buffer = nullptr;
 		do
 		{
+			if (context->session == nullptr)
+			{
+				break;
+			}
+
 			context->session->nowInProcessingRecvPacket = true;
 			if (context->session->recvBuffer.recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
 			{
