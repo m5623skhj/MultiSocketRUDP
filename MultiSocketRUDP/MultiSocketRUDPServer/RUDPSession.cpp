@@ -300,11 +300,11 @@ void RUDPSession::UnregisterRIOBuffers()
 void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
 {
 	PacketSequence packetSequence;
-	SessionIdType inputSessionId;
-	std::vector<unsigned char> inputSessionKey;
+	PacketId packetId;
+	SessionIdType recvSessionId;
 
-	recvPacket >> packetSequence >> inputSessionId;
-	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != inputSessionId)
+	recvPacket >> packetSequence >> packetId >> recvSessionId;
+	if (packetSequence != LOGIN_PACKET_SEQUENCE || packetId != 0 || sessionId != recvSessionId)
 	{
 		return;
 	}

@@ -101,9 +101,9 @@ void RUDPClientCore::SendConnectPacket()
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
 	constexpr PacketSequence packetSequence = 0;
 	constexpr auto packetType = PACKET_TYPE::CONNECT_TYPE;
-	constexpr auto packetId = PACKET_ID::CONNECT_REQUEST;
+	constexpr PacketId packetId = 0;
 	
-	connectPacket << packetType << packetSequence << packetId;
+	connectPacket << packetType << packetSequence << packetId << sessionId;
 	SendPacket(connectPacket, packetSequence);
 }
 
