@@ -144,7 +144,7 @@ void Logger::WriteLog(const std::shared_ptr<LogBase>& logObject)
 {
 	logObject->SetLogTime();
 
-	std::lock_guard guardLock(logQueueLock);
+	std::scoped_lock lock(logQueueLock);
 	logWaitingQueue.push(logObject);
 
 	SetEvent(loggerEventHandles[0]);
@@ -158,6 +158,6 @@ void Logger::WriteLogToFile(const std::shared_ptr<LogBase>& logObject)
 	if (printToConsole == true)
 	{
 		std::osyncstream syncOut(std::cout);
-		syncOut << logJson << std::endl;
+		syncOut << logJson << '\n';
 	}
 }
