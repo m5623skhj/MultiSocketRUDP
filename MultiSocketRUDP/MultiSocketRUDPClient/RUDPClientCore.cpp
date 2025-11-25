@@ -4,7 +4,6 @@
 #include "LogExtension.h"
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
-#include "../ContentsClient/PacketIdType.h"
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {

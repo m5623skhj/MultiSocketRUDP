@@ -3,7 +3,6 @@
 enum class PACKET_ID : unsigned int
 {
 	INVALID_PACKET_ID = 0
-	, CONNECT_REQUEST
 	, PING
 	, PONG
 	, TEST_STRING_PACKET_REQ
