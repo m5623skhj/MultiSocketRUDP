@@ -169,7 +169,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence, false);
+	return SendPacket(*buffer, packetSequence, false, false);
 }
 
 void RUDPSession::OnConnected(const SessionIdType inSessionId)
@@ -180,7 +180,7 @@ void RUDPSession::OnConnected(const SessionIdType inSessionId)
 	OnConnected();
 }
 
-bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType)
+bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType, const bool isCorePacket)
 {
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
@@ -206,7 +206,8 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 			direction,
 			sessionSalt,
 			SESSION_SALT_SIZE,
-			sessionKeyHandle
+			sessionKeyHandle,
+			isCorePacket
 		);
 	}
 
@@ -234,7 +235,7 @@ void RUDPSession::SendHeartbeatPacket()
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	buffer << packetType << packetSequence;
 
-	std::ignore = SendPacket(buffer, packetSequence, false);
+	std::ignore = SendPacket(buffer, packetSequence, false, true);
 }
 
 bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const
@@ -414,9 +415,10 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
-	buffer << packetType << recvPacketSequence;
+	constexpr PacketId packetId = 0;
+	buffer << packetType << recvPacketSequence << packetId;
 
-	std::ignore = SendPacket(buffer, recvPacketSequence, true);
+	std::ignore = SendPacket(buffer, recvPacketSequence, true, true);
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)

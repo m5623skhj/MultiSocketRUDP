@@ -101,10 +101,9 @@ void RUDPClientCore::SendConnectPacket()
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
 	constexpr PacketSequence packetSequence = 0;
 	constexpr auto packetType = PACKET_TYPE::CONNECT_TYPE;
-	constexpr PacketId packetId = 0;
 	
-	connectPacket << packetType << packetSequence << packetId << sessionId;
-	SendPacket(connectPacket, packetSequence);
+	connectPacket << packetType << packetSequence << sessionId;
+	SendPacket(connectPacket, packetSequence, true);
 }
 
 void RUDPClientCore::RunThreads()
@@ -286,11 +285,11 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 		if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
-			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
+			SendReplyToServer(packetSequence, true, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
 		}
 		else
 		{
-			SendReplyToServer(packetSequence);
+			SendReplyToServer(packetSequence, true);
 		}
 		break;
 	}
@@ -325,7 +324,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	}
 }
 
-void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType)
+void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const bool isCorePacket, const PACKET_TYPE packetType)
 {
 	auto& buffer = *NetBuffer::Alloc();
 
@@ -336,7 +335,8 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 		PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
 		sessionSalt,
 		SESSION_SALT_SIZE,
-		sessionKeyHandle
+		sessionKeyHandle,
+		isCorePacket
 	);
 
 	{
@@ -428,7 +428,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence);
+	return SendPacket(*buffer, packetSequence, false);
 }
 
 void RUDPClientCore::Disconnect()
@@ -442,7 +442,7 @@ void RUDPClientCore::Disconnect()
 	constexpr PACKET_TYPE packetType = PACKET_TYPE::DISCONNECT_TYPE;
 	constexpr PacketSequence packetSequence = 0;
 	*buffer << packetType;
-	SendPacket(*buffer, packetSequence);
+	SendPacket(*buffer, packetSequence, true);
 	isConnected = false;
 }
 
@@ -460,11 +460,11 @@ void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence;
 	buffer->WriteBuffer(streamData, streamSize);
-	SendPacket(*buffer, packetSequence);
+	SendPacket(*buffer, packetSequence, true);
 }
 #endif
 
-void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence)
+void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isCorePacket)
 {
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
@@ -484,7 +484,8 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 			PACKET_DIRECTION::CLIENT_TO_SERVER,
 			sessionSalt,
 			SESSION_SALT_SIZE,
-			sessionKeyHandle
+			sessionKeyHandle,
+			isCorePacket
 		);
 
 		std::unique_lock lock(sendPacketInfoMapLock);

@@ -80,7 +80,7 @@ private:
 	virtual void OnConnected() {}
 	virtual void OnDisconnected() {}
 	[[nodiscard]]
-	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType);
+	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
 
 	void SendHeartbeatPacket();
 

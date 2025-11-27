@@ -5,7 +5,7 @@
 class PacketCryptoHelper
 {
 public:
-	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
 	{
 		EncodePacket(
 			packet,
@@ -13,11 +13,12 @@ public:
 			direction,
 			sessionSalt.data(),
 			sessionSalt.size(),
-			sessionKeyHandle
+			sessionKeyHandle,
+			isCorePacket
 		);
 	}
 
-	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
 	{
 		if (packet.m_bIsEncoded == true)
 		{
@@ -26,7 +27,8 @@ public:
 
 		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		unsigned char authTag[AUTH_TAG_SIZE];
-		const int bodySize = packet.GetUseSize() - bodyOffsetWithNotHeader;
+		const int bodyOffset = isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader;
+		const int bodySize = packet.GetUseSize() - bodyOffset;
 
 		CryptoHelper::EncryptAESGCM(
 			nonce.data(),
@@ -122,4 +124,5 @@ private:
 private:
 	static const unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
 	static const unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	static const unsigned int bodyOffsetWithNotHeaderForCorePacket = sizeof(PACKET_TYPE) + sizeof(PacketSequence);
 };
