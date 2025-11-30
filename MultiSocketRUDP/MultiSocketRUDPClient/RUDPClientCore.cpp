@@ -268,7 +268,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	case PACKET_TYPE::SEND_TYPE:
 	{
 		isCorePacket = false;
-		[[fallthrough]]
+		[[fallthrough]];
 	}
 	case PACKET_TYPE::HEARTBEAT_TYPE:
 	{
