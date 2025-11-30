@@ -260,9 +260,10 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 {
 	PACKET_TYPE packetType;
 	PacketSequence packetSequence;
-	receivedBuffer >> packetType >> packetSequence;
+	receivedBuffer >> packetType;
 
 	bool isCorePacket = true;
+	auto direction = PACKET_DIRECTION::SERVER_TO_CLIENT;
 
 	switch (packetType)
 	{
@@ -278,12 +279,14 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 			sessionSalt,
 			SESSION_SALT_SIZE,
 			sessionKeyHandle,
-			isCorePacket
+			isCorePacket,
+			direction
 		))
 		{
 			return;
 		}
 
+		receivedBuffer >> packetSequence;
 		NetBuffer::AddRefCount(&receivedBuffer);
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
@@ -302,17 +305,21 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 	case PACKET_TYPE::SEND_REPLY_TYPE:
 	{
+		direction = PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY;
+
 		if (not PacketCryptoHelper::DecodePacket(
 			receivedBuffer,
 			sessionSalt,
 			SESSION_SALT_SIZE,
 			sessionKeyHandle,
-			isCorePacket
+			isCorePacket,
+			direction
 		))
 		{
 			return;
 		}
 
+		receivedBuffer >> packetSequence;
 		OnSendReply(receivedBuffer, packetSequence);
 		break;
 	}

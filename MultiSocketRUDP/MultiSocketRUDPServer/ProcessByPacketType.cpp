@@ -6,7 +6,7 @@
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 #define DECODE_PACKET() \
-if (not PacketCryptoHelper::DecodePacket(recvPacket, session.sessionSalt, SESSION_SALT_SIZE, session.sessionKeyHandle, isCorePacket)) \
+if (not PacketCryptoHelper::DecodePacket(recvPacket, session.sessionSalt, SESSION_SALT_SIZE, session.sessionKeyHandle, isCorePacket, direction)) \
 { break; }
 
 void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
@@ -15,6 +15,7 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	recvPacket >> packetType;
 
 	bool isCorePacket = true;
+	auto direction = PACKET_DIRECTION::CLIENT_TO_SERVER;
 
 	switch (packetType)
 	{
@@ -58,6 +59,8 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 		{
 			break;
 		}
+
+		direction = PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY;
 		DECODE_PACKET()
 
 		session.OnSendReply(recvPacket);

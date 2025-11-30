@@ -46,18 +46,19 @@ public:
 		packet.m_bIsEncoded = true;
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
+	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket, const PACKET_DIRECTION direction)
 	{
 		return DecodePacket(
 			packet,
 			sessionSalt.data(),
 			sessionSalt.size(),
 			sessionKeyHandle,
-			isCorePacket
+			isCorePacket,
+			direction
 		);
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
+	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket, const PACKET_DIRECTION direction)
 	{
         // Since the packet type has already been extracted earlier, it is not extracted here
 		constexpr int minimumPacketSize = sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
@@ -72,8 +73,6 @@ public:
 			return false;
 		}
 
-		uint8_t packetDirection = packet.m_pSerializeBuffer[packetUseSize - AUTH_TAG_SIZE];
-
 		PacketSequence packetSequence = 0;
 		memcpy(&packetSequence, &packet.m_pSerializeBuffer[packetSequenceOffset], sizeof(packetSequence));
 
@@ -82,8 +81,6 @@ public:
 		size_t bodySize = packetUseSize + sizeOfHeaderWithPacketType - AUTH_TAG_SIZE - bodyOffset;
 
 		const unsigned char* authTag = reinterpret_cast<const unsigned char*>(&packet.m_pSerializeBuffer[authTagOffset]);
-
-		PACKET_DIRECTION direction = DetermineDirection(packetDirection);
 
 		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		if (nonce.empty())
