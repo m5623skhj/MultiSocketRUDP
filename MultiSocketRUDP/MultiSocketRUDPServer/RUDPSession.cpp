@@ -301,11 +301,10 @@ void RUDPSession::UnregisterRIOBuffers()
 void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
 {
 	PacketSequence packetSequence;
-	PacketId packetId;
 	SessionIdType recvSessionId;
 
-	recvPacket >> packetSequence >> packetId >> recvSessionId;
-	if (packetSequence != LOGIN_PACKET_SEQUENCE || packetId != 0 || sessionId != recvSessionId)
+	recvPacket >> packetSequence >> recvSessionId;
+	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != recvSessionId)
 	{
 		return;
 	}
