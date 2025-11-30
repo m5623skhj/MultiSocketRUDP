@@ -414,8 +414,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
-	constexpr PacketId packetId = 0;
-	buffer << packetType << recvPacketSequence << packetId;
+	buffer << packetType << recvPacketSequence;
 
 	std::ignore = SendPacket(buffer, recvPacketSequence, true, true);
 }
