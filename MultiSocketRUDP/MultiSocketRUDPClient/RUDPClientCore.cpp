@@ -250,17 +250,6 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		recvBuffer.ReadBuffer(recvPacketBuffer->GetWriteBufferPtr(), payloadLength);
 		recvPacketBuffer->m_iWrite = static_cast<WORD>(packetSize);
 
-		if (not PacketCryptoHelper::DecodePacket(
-			*recvPacketBuffer,
-			sessionSalt,
-			SESSION_SALT_SIZE,
-			sessionKeyHandle
-		))
-		{
-			NetBuffer::Free(recvPacketBuffer);
-			break;
-		}
-
 		ProcessRecvPacket(*recvPacketBuffer);
 		NetBuffer::Free(recvPacketBuffer);
 	}
@@ -272,11 +261,28 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	PacketSequence packetSequence;
 	receivedBuffer >> packetType >> packetSequence;
 
+	bool isCorePacket = true;
+
 	switch (packetType)
 	{
 	case PACKET_TYPE::SEND_TYPE:
+	{
+		isCorePacket = false;
+		[[fallthrough]]
+	}
 	case PACKET_TYPE::HEARTBEAT_TYPE:
 	{
+		if (not PacketCryptoHelper::DecodePacket(
+			receivedBuffer,
+			sessionSalt,
+			SESSION_SALT_SIZE,
+			sessionKeyHandle,
+			isCorePacket
+		))
+		{
+			return;
+		}
+
 		NetBuffer::AddRefCount(&receivedBuffer);
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
@@ -295,6 +301,17 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 	}
 	case PACKET_TYPE::SEND_REPLY_TYPE:
 	{
+		if (not PacketCryptoHelper::DecodePacket(
+			receivedBuffer,
+			sessionSalt,
+			SESSION_SALT_SIZE,
+			sessionKeyHandle,
+			isCorePacket
+		))
+		{
+			return;
+		}
+
 		OnSendReply(receivedBuffer, packetSequence);
 		break;
 	}

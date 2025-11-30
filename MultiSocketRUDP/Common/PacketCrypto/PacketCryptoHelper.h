@@ -46,25 +46,28 @@ public:
 		packet.m_bIsEncoded = true;
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static bool DecodePacket(OUT NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
 	{
 		return DecodePacket(
 			packet,
 			sessionSalt.data(),
 			sessionSalt.size(),
-			sessionKeyHandle
+			sessionKeyHandle,
+			isCorePacket
 		);
 	}
 
-	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle)
+	static bool DecodePacket(OUT NetBuffer& packet, const unsigned char* sessionSalt, const size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
 	{
         // Since the packet type has already been extracted earlier, it is not extracted here
 		constexpr int minimumPacketSize = sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE;
+		constexpr int minimumCorePacketSize = sizeof(PacketSequence) + AUTH_TAG_SIZE;
 		constexpr int packetSequenceOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE);
 		constexpr int sizeOfHeaderWithPacketType = df_HEADER_SIZE + sizeof(PACKET_TYPE);
 
 		const int packetUseSize = packet.GetUseSize();
-		if (packetUseSize < minimumPacketSize)
+		const int minimumRecvPacketSize = isCorePacket ? minimumCorePacketSize : minimumPacketSize;
+		if (packetUseSize < minimumRecvPacketSize)
 		{
 			return false;
 		}
