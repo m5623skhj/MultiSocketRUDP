@@ -248,6 +248,7 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		recvSize -= packetSize;
 		
 		recvBuffer.ReadBuffer(recvPacketBuffer->GetWriteBufferPtr(), payloadLength);
+		recvPacketBuffer->m_iRead = df_HEADER_SIZE;
 		recvPacketBuffer->m_iWrite = static_cast<WORD>(packetSize);
 
 		ProcessRecvPacket(*recvPacketBuffer);
