@@ -27,8 +27,8 @@ public:
 
 		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		unsigned char authTag[AUTH_TAG_SIZE];
-		const int bodyOffset = isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader;
-		const int bodySize = packet.GetUseSize() - bodyOffset;
+		const int bodySize = packet.GetUseSize() - (isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader);
+		const int bodyOffset = isCorePacket ? bodyOffsetWithHeaderForCorePacket : bodyOffsetWithHeader;
 
 		CryptoHelper::EncryptAESGCM(
 			nonce.data(),
@@ -74,9 +74,10 @@ public:
 
 		uint8_t packetDirection = packet.m_pSerializeBuffer[packetUseSize - AUTH_TAG_SIZE];
 
-		uint64_t packetSequence = 0;
+		PacketSequence packetSequence = 0;
 		memcpy(&packetSequence, &packet.m_pSerializeBuffer[packetSequenceOffset], sizeof(packetSequence));
 
+		const int bodyOffset = isCorePacket ? (df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence)) : (df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 		size_t authTagOffset = packet.m_iWrite - AUTH_TAG_SIZE;
 		size_t bodySize = packetUseSize + sizeOfHeaderWithPacketType - AUTH_TAG_SIZE - bodyOffset;
 
@@ -125,7 +126,8 @@ private:
 	}
 
 private:
-	static const unsigned int bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	static const unsigned int bodyOffsetWithHeader = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	static const unsigned int bodyOffsetWithHeaderForCorePacket = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
 	static const unsigned int bodyOffsetWithNotHeader = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
 	static const unsigned int bodyOffsetWithNotHeaderForCorePacket = sizeof(PACKET_TYPE) + sizeof(PacketSequence);
 };
