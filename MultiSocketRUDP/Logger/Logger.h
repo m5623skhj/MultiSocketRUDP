@@ -16,6 +16,7 @@ private:
 
 public:
 	static Logger& GetInstance();
+	static bool IsAlive() { return isAlive.load(std::memory_order_acquire); }
 
 #pragma region Thread
 public:
@@ -58,6 +59,8 @@ private:
 	bool printToConsole{};
 	std::string logFolder = "Log Folder";
 	std::atomic_int16_t currentConnectedClientCount{};
+
+	static inline std::atomic<bool> isAlive{ false };
 };
 
 namespace LogHelper
