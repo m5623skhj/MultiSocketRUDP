@@ -4,9 +4,6 @@
 
 #pragma comment(lib, "Bcrypt.lib")
 
-constexpr size_t AES_KEY_SIZE_128 = 16;
-constexpr size_t AES_KEY_SIZE_192 = 24;
-constexpr size_t AES_KEY_SIZE_256 = 32;
 constexpr size_t NONCE_SIZE = 12;
 
 CryptoHelper::CryptoHelper()
@@ -30,12 +27,13 @@ CryptoHelper::CryptoHelper()
 		throw std::runtime_error("BCryptSetProperty(GCM) failed");
 	}
 
+	ULONG cbResult = 0;
 	status = BCryptGetProperty(
 		aesAlg,
 		BCRYPT_OBJECT_LENGTH,
 		reinterpret_cast<PUCHAR>(&keyObjectSize),
 		sizeof(ULONG),
-		&keyObjectSize,
+		&cbResult,
 		0
 	);
 
