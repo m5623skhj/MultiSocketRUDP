@@ -217,7 +217,7 @@ void RUDPClientCore::RunRetransmissionThread()
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 
-	auto log = Logger::MakeLogObject<ClientLog>();
+	const auto log = Logger::MakeLogObject<ClientLog>();
 	log->logString = "Retransmission thread stopped";
 	Logger::GetInstance().WriteLog(log);
 }
@@ -448,7 +448,7 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 		return;
 	}
 
-	constexpr PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
+	constexpr auto packetType = PACKET_TYPE::SEND_TYPE;
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
@@ -464,7 +464,7 @@ void RUDPClientCore::Disconnect()
 		LOG_ERROR("Buffer is nullptr in RUDPSession::Disconnect()");
 		return;
 	}
-	constexpr PACKET_TYPE packetType = PACKET_TYPE::DISCONNECT_TYPE;
+	constexpr auto packetType = PACKET_TYPE::DISCONNECT_TYPE;
 	constexpr PacketSequence packetSequence = 0;
 	*buffer << packetType;
 	SendPacket(*buffer, packetSequence, true);
@@ -536,9 +536,9 @@ void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
 
 WORD RUDPClientCore::GetPayloadLength(const NetBuffer& buffer)
 {
-	constexpr int PAYLOAD_LENGTH_POSITION = 1;
+	constexpr int payloadLengthPosition = 1;
 
-	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[buffer.m_iRead + PAYLOAD_LENGTH_POSITION]);
+	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[buffer.m_iRead + payloadLengthPosition]);
 }
 
 bool RUDPClientCore::ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)
