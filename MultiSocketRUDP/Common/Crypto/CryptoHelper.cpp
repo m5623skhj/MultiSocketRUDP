@@ -55,112 +55,6 @@ CryptoHelper::~CryptoHelper()
 }
 
 bool CryptoHelper::EncryptAESGCM(
-	const std::vector<unsigned char>& key,
-	const std::vector<unsigned char>& nonce,
-	const std::vector<unsigned char>& plaintext,
-	std::vector<unsigned char>& ciphertext,
-	std::vector<unsigned char>& tag,
-	const BCRYPT_KEY_HANDLE keyHandle
-)
-{
-	if (keyHandle == nullptr)
-	{
-		return false;
-	}
-
-	if (key.size() != AES_KEY_SIZE_128 &&
-		key.size() != AES_KEY_SIZE_192 &&
-		key.size() != AES_KEY_SIZE_256)
-	{
-		return false;
-	}
-
-	if (nonce.size() != NONCE_SIZE)
-	{
-		return false;
-	}
-
-	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
-	BCRYPT_INIT_AUTH_MODE_INFO(authInfo)
-	authInfo.pbNonce = const_cast<unsigned char*>(nonce.data());
-	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
-
-	tag.resize(AUTH_TAG_SIZE);
-	authInfo.pbTag = tag.data();
-	authInfo.cbTag = static_cast<ULONG>(tag.size());
-
-	ciphertext.resize(plaintext.size());
-	ULONG bytesDone = 0;
-
-	const auto status = BCryptEncrypt(
-		keyHandle,
-		const_cast<unsigned char*>(plaintext.data()),
-		static_cast<ULONG>(plaintext.size()),
-		&authInfo,
-		nullptr,
-		0,
-		ciphertext.data(),
-		static_cast<ULONG>(ciphertext.size()),
-		&bytesDone,
-		0
-	);
-
-	return BCRYPT_SUCCESS(status);
-}
-
-bool CryptoHelper::DecryptAESGCM(
-	const std::vector<unsigned char>& key,
-	const std::vector<unsigned char>& nonce,
-	const std::vector<unsigned char>& ciphertext,
-	std::vector<unsigned char>& tag,
-	std::vector<unsigned char>& plaintext,
-	const BCRYPT_KEY_HANDLE keyHandle
-)
-{
-	if (keyHandle == nullptr)
-	{
-		return false;
-	}
-
-	if (key.size() != AES_KEY_SIZE_128 &&
-		key.size() != AES_KEY_SIZE_192 &&
-		key.size() != AES_KEY_SIZE_256)
-	{
-		return false;
-	}
-
-	if (nonce.size() != NONCE_SIZE)
-	{
-		return false;
-	}
-
-	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
-	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
-	authInfo.pbNonce = const_cast<unsigned char*>(nonce.data());
-	authInfo.cbNonce = static_cast<ULONG>(nonce.size());
-	authInfo.pbTag = tag.data();
-	authInfo.cbTag = static_cast<ULONG>(tag.size());
-
-	plaintext.resize(ciphertext.size());
-	ULONG bytesDone = 0;
-
-	const auto status = BCryptDecrypt(
-		keyHandle,
-		const_cast<unsigned char*>(ciphertext.data()),
-		static_cast<ULONG>(ciphertext.size()),
-		&authInfo,
-		nullptr,
-		0,
-		plaintext.data(),
-		static_cast<ULONG>(plaintext.size()),
-		&bytesDone,
-		0
-	);
-
-	return BCRYPT_SUCCESS(status);
-}
-
-bool CryptoHelper::EncryptAESGCM(
 	const unsigned char* nonce,
 	const size_t nonceSize,
 	const char* plaintext,
@@ -273,12 +167,17 @@ bool CryptoHelper::DecryptAESGCM(
 
 BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const
 {
+	if (keyObjectSize == 0)
+	{
+		return nullptr;
+	}
+
 	BCRYPT_KEY_HANDLE keyHandle = nullptr;
 	const NTSTATUS status = BCryptGenerateSymmetricKey(
 		aesAlg,
 		&keyHandle,
 		keyObject,
-		KEY_OBJECT_BUFFER_SIZE,
+		keyObjectSize,
 		sessionKey,
 		SESSION_KEY_SIZE,
 		0
@@ -315,11 +214,6 @@ std::optional<std::vector<unsigned char>> CryptoHelper::GenerateSecureRandomByte
 	}
 
 	return bytes;
-}
-
-std::vector<unsigned char> CryptoHelper::GenerateNonce(const std::vector<unsigned char>& sessionSalt, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
-{
-	return GenerateNonce(sessionSalt.data(), sessionSalt.size(), packetSequence, direction);
 }
 
 std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltSize, const PacketSequence packetSequence, const PACKET_DIRECTION direction)

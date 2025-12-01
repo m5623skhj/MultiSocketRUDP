@@ -28,22 +28,6 @@ public:
 
 public:
 	static bool EncryptAESGCM(
-		const std::vector<unsigned char>& key,
-		const std::vector<unsigned char>& nonce,
-		const std::vector<unsigned char>& plaintext,
-		std::vector<unsigned char>& ciphertext,
-		std::vector<unsigned char>& tag,
-		const BCRYPT_KEY_HANDLE keyHandle
-	);
-	static bool DecryptAESGCM(
-		const std::vector<unsigned char>& key,
-		const std::vector<unsigned char>& nonce,
-		const std::vector<unsigned char>& ciphertext,
-		std::vector<unsigned char>& tag,
-		std::vector<unsigned char>& plaintext,
-		const BCRYPT_KEY_HANDLE keyHandle
-	);
-	static bool EncryptAESGCM(
 		const unsigned char* nonce,
 		const size_t nonceSize,
 		const char* plaintext,
@@ -64,13 +48,12 @@ public:
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
 	[[nodiscard]]
-	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* key) const;
+	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const;
 	[[nodiscard]]
 	ULONG GetKeyOjbectSize() const { return keyObjectSize; }
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);
-	static std::vector<unsigned char> GenerateNonce(const std::vector<unsigned char>& sessionSalt, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
 	static std::vector<unsigned char> GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
 
 private:
