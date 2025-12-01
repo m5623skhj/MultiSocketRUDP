@@ -144,8 +144,11 @@ bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
 		return false;
 	}
 
-	session.keyObjectBuffer.resize(CryptoHelper::GetTLSInstance().GetKeyOjbectSize());
-	session.sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(session.keyObjectBuffer.data(), session.sessionKey);
+	if (session.keyObjectBuffer == nullptr)
+	{
+		session.keyObjectBuffer = new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()];
+	}
+	session.sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(session.keyObjectBuffer, session.sessionKey);
 	if (session.sessionKeyHandle == nullptr)
 	{
 		LOG_ERROR("InitSessionCrypto failed : GetSymmetricKeyHandle failed");

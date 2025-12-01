@@ -50,6 +50,8 @@ void RUDPClientCore::Stop()
 
 	WSACleanup();
 	isStopped = true;
+
+	delete[] keyObjectBuffer;
 }
 
 void RUDPClientCore::JoinThreads()

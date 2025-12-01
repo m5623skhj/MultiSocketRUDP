@@ -113,6 +113,8 @@ RUDPSession::~RUDPSession()
 	{
 		closesocket(sock);
 	}
+
+	delete[] keyObjectBuffer;
 }
 
 void RUDPSession::DoDisconnect()
@@ -464,7 +466,7 @@ SOCKADDR_INET RUDPSession::GetSocketAddressInet() const
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
 {
-	return CheckMyClient(clientAddr) && IsReleasing();
+	return CheckMyClient(clientAddr) && not IsReleasing();
 }
 
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
