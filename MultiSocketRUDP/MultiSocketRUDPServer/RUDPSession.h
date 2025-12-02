@@ -88,6 +88,7 @@ private:
 	void AbortReservedSession();
 	void CloseSocket();
 	void UnregisterRIOBuffers();
+	static void SetMaximumPacketHoldingQueueSize(unsigned char size);
 
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
@@ -198,6 +199,7 @@ private:
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
 	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
+	static size_t maximumHoldingPacketQueueSize;
 
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;

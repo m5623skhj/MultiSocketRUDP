@@ -40,6 +40,10 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
+	if (g_Paser.GetValue_Byte(buffer, L"CORE", L"MAX_HOLDING_PACKET_QUEUE_SIZE", &maxHoldingPacketQueueSize) == false)
+	{
+		return false;
+	}
 
 	// buffer
 	if (g_Paser.GetValue_Byte(buffer, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode) == false)

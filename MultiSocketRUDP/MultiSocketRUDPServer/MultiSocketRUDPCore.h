@@ -223,6 +223,7 @@ private:
 	unsigned int retransmissionThreadSleepMs{};
 	unsigned int heartbeatThreadSleepMs{};
 	unsigned int timerTickMs{};
+	BYTE maxHoldingPacketQueueSize{};
 
 	// threads
 	std::vector<std::jthread> ioWorkerThreads;

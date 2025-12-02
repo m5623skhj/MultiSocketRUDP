@@ -230,6 +230,7 @@ bool MultiSocketRUDPCore::InitNetwork()
 		sessionArray.emplace_back(sessionFactory(*this));
 		sessionArray[socketNumber]->sessionId = static_cast<SessionIdType>(socketNumber);
 	}
+	RUDPSession::SetMaximumPacketHoldingQueueSize(maxHoldingPacketQueueSize);
 
 	return true;
 }
