@@ -30,6 +30,7 @@
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="ProcessByPacketType.cpp" />
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
+    <ClCompile Include="RUDPFlowController.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
     <ClCompile Include="Ticker.cpp" />
@@ -43,6 +44,7 @@
     <ClInclude Include="MultiSocketRUDPCore.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
+    <ClInclude Include="RUDPFlowController.h" />
     <ClInclude Include="RUDPSession.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />

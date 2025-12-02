@@ -87,6 +87,9 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPFlowController.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreType.h">
@@ -118,6 +121,9 @@
     </ClInclude>
     <ClInclude Include="MemoryTracer.h">
       <Filter>소스 파일\MemoryTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPFlowController.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
