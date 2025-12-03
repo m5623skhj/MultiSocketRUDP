@@ -40,4 +40,8 @@ private:
 
 	static constexpr BYTE INITIAL_CWND = 4;
 	static constexpr BYTE MAX_CWND = 255;
+
+#ifdef _DEBUG
+	unsigned int duplicateAckCount{};
+#endif
 };

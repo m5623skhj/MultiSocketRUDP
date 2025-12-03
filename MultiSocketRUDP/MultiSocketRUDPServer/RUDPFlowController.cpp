@@ -33,6 +33,9 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 {
 	if (replySequence <= lastReplySequence)
 	{
+#ifdef _DEBUG
+		++duplicateAckCount;
+#endif
 		return;
 	}
 
