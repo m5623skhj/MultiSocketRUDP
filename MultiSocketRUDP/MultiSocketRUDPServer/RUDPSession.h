@@ -200,6 +200,7 @@ private:
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
 	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
 	static size_t maximumHoldingPacketQueueSize;
+	std::atomic_uchar sequenceViolationCounter{};
 
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
