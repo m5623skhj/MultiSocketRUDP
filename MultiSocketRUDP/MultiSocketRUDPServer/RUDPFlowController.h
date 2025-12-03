@@ -42,6 +42,6 @@ private:
 	static constexpr BYTE MAX_CWND = 255;
 
 #ifdef _DEBUG
-	unsigned int duplicateAckCount{};
+	unsigned int duplicateReplyCount{};
 #endif
 };
