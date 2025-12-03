@@ -1,65 +1,43 @@
 #pragma once
 #include "CoreType.h"
 
-enum class CongestionState : BYTE
-{
-	SLOW_START = 0,
-	CONGESTION_AVOIDANCE,
-	FAST_RECOVERY,
-};
-
 class RUDPFlowController
 {
 public:
-	RUDPFlowController() = delete;
 	explicit RUDPFlowController(BYTE inReceiveWindowSize);
+	~RUDPFlowController() = default;
 
 public:
 	[[nodiscard]]
-	PacketSequence GetReceiveWindowEnd(PacketSequence nextReceiveSequence) const;
-	[[nodiscard]]
-	BYTE GetSendWindowSize() const { return static_cast<BYTE>(sendWindowSize); }
-	[[nodiscard]]
-	BYTE GetEffectiveSendWindowSize() const;
-
-	void OnAckReceived(PacketSequence ackedSequence);
-	void OnTimeout();
-	void OnDuplicateAck(PacketSequence duplicateSequence);
-
-	void UpdateReceiverWindow(BYTE newReceiverWindowSize);
+	PacketSequence GetReceiveWindowEnd(PacketSequence nextRecvSeq) const noexcept;
 
 	[[nodiscard]]
-	CongestionState GetCongestionState() const { return congestionState; }
-	[[nodiscard]]
-	unsigned int GetCongestionWindow() const { return cwnd; }
-	[[nodiscard]]
-	unsigned int GetSlowStartThreshold() const { return ssthresh; }
+	bool CanSendPacket(PacketSequence nextSendSequence, PacketSequence lastAckedSequence) const noexcept;
+
+	void UpdateReceiverWindow(BYTE newReceiverWindowSize) noexcept;
+
+	void OnReplyReceived(PacketSequence replySequence) noexcept;
+	void OnCongestionEvent() noexcept;
+	void OnTimeout() noexcept;
 
 	[[nodiscard]]
-	bool CanSendPacket(PacketSequence nextSendSequence, PacketSequence lastAckedSequence) const;
+	unsigned int GetCwnd() const noexcept { return cwnd; }
+	[[nodiscard]]
+	BYTE GetReceiverAdvertisedWindow() const noexcept { return receiverAdvertisedWindow; }
+	[[nodiscard]]
+	PacketSequence GetLastAckedSequence() const noexcept { return lastReplySequence; }
 
 private:
-	void EnterSlowStart();
-	void EnterCongestionAvoidance();
-	void EnterFastRecovery();
-
-	void UpdateCongestionWindow();
+	[[nodiscard]]
+	BYTE GetEffectiveSendWindowSize() const noexcept;
 
 private:
 	BYTE receiveWindowSize{};
 	BYTE receiverAdvertisedWindow{};
+	BYTE cwnd{};
+	PacketSequence lastReplySequence{};
+	bool inRecovery{};
 
-	unsigned int sendWindowSize{};
-	unsigned int cwnd{ 1 };
-	unsigned int ssthresh{ 65535 };
-
-	CongestionState congestionState{ CongestionState::SLOW_START };
-	unsigned int duplicateAckCount{};
-	PacketSequence lastDuplicateAckSequence{};
-	unsigned int ackCountInCongestionAvoidance{};
-
-	static constexpr unsigned int INITIAL_CWND = 1;
-	static constexpr unsigned int INITIAL_SSTHRESH = 65535;
-	static constexpr unsigned int MAX_CWND = 255;
-	static constexpr unsigned int DUPLICATE_ACK_THRESHOLD = 3;
+	static constexpr BYTE INITIAL_CWND = 4;
+	static constexpr BYTE MAX_CWND = 255;
 };

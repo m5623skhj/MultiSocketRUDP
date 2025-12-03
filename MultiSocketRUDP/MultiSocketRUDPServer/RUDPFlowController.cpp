@@ -5,129 +5,66 @@
 RUDPFlowController::RUDPFlowController(const BYTE inReceiveWindowSize)
 	: receiveWindowSize(inReceiveWindowSize)
 	, receiverAdvertisedWindow(inReceiveWindowSize)
-	, sendWindowSize(inReceiveWindowSize)
+	, cwnd(INITIAL_CWND)
 {
+	if (cwnd == 0)
+    {
+		cwnd = 1;
+    }
 }
 
-PacketSequence RUDPFlowController::GetReceiveWindowEnd(const PacketSequence nextReceiveSequence) const
+PacketSequence RUDPFlowController::GetReceiveWindowEnd(const PacketSequence nextRecvSeq) const noexcept
 {
-	return nextReceiveSequence + receiveWindowSize;
-}
-BYTE RUDPFlowController::GetEffectiveSendWindowSize() const
-{
-	const unsigned int effectiveWindow = min(cwnd, static_cast<unsigned int>(receiverAdvertisedWindow));
-	return static_cast<BYTE>(min(effectiveWindow, static_cast<unsigned int>(MAX_CWND)));
+	return nextRecvSeq + static_cast<PacketSequence>(receiveWindowSize);
 }
 
-void RUDPFlowController::OnAckReceived(const PacketSequence ackedSequence)
+bool RUDPFlowController::CanSendPacket(const PacketSequence nextSendSequence, const PacketSequence lastAckedSequence) const noexcept
 {
-	if (ackedSequence != lastDuplicateAckSequence)
-	{
-		duplicateAckCount = 0;
-		lastDuplicateAckSequence = ackedSequence;
-	}
-
-	switch (congestionState)
-	{
-	case CongestionState::SLOW_START:
-	{
-		cwnd = min(cwnd + 1, MAX_CWND);
-
-		if (cwnd >= ssthresh)
-		{
-			EnterCongestionAvoidance();
-		}
-	}
-	break;
-	case CongestionState::CONGESTION_AVOIDANCE:
-	{
-		++ackCountInCongestionAvoidance;
-		if (ackCountInCongestionAvoidance >= cwnd)
-		{
-			cwnd = min(cwnd + 1, MAX_CWND);
-			ackCountInCongestionAvoidance = 0;
-		}
-	}
-	break;
-	case CongestionState::FAST_RECOVERY:
-	{
-		cwnd = ssthresh;
-		EnterCongestionAvoidance();
-	}
-	break;
-	}
-
-	UpdateCongestionWindow();
+	const PacketSequence outstanding = nextSendSequence > lastAckedSequence ? nextSendSequence - lastAckedSequence : 0;
+	return outstanding < static_cast<PacketSequence>(GetEffectiveSendWindowSize());
 }
 
-void RUDPFlowController::OnTimeout()
-{
-	ssthresh = max(cwnd / 2, static_cast<unsigned int>(2));
-	cwnd = INITIAL_CWND;
-	EnterSlowStart();
-
-	duplicateAckCount = 0;
-}
-
-void RUDPFlowController::OnDuplicateAck(const PacketSequence duplicateSequence)
-{
-	if (duplicateSequence == lastDuplicateAckSequence)
-	{
-		++duplicateAckCount;
-	}
-	else
-	{
-		duplicateAckCount = 1;
-		lastDuplicateAckSequence = duplicateSequence;
-	}
-
-	if (duplicateAckCount >= DUPLICATE_ACK_THRESHOLD)
-	{
-		if (congestionState != CongestionState::FAST_RECOVERY)
-		{
-			ssthresh = max(cwnd / 2, static_cast<unsigned int>(2));
-			cwnd = ssthresh + DUPLICATE_ACK_THRESHOLD;
-			EnterFastRecovery();
-		}
-		else
-		{
-			cwnd = min(cwnd + 1, MAX_CWND);
-		}
-	}
-
-	UpdateCongestionWindow();
-}
-
-void RUDPFlowController::UpdateReceiverWindow(const BYTE newReceiverWindowSize)
+void RUDPFlowController::UpdateReceiverWindow(const BYTE newReceiverWindowSize) noexcept
 {
 	receiverAdvertisedWindow = newReceiverWindowSize;
 }
 
-bool RUDPFlowController::CanSendPacket(const PacketSequence nextSendSequence, const PacketSequence lastAckedSequence) const
+void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noexcept
 {
-	const PacketSequence outstandingPackets = nextSendSequence - lastAckedSequence;
-	return outstandingPackets < GetEffectiveSendWindowSize();
+	if (replySequence <= lastReplySequence)
+	{
+		return;
+	}
+
+	if (const PacketSequence sequenceGap = replySequence - lastReplySequence - 1; sequenceGap > 0)
+	{
+    	OnCongestionEvent();
+    }
+
+	lastReplySequence = replySequence;
+	if (not inRecovery)
+	{
+    	cwnd = min(cwnd + 1, MAX_CWND);
+    }
+	else
+    {
+    	inRecovery = false;
+    }
 }
 
-void RUDPFlowController::EnterSlowStart()
+void RUDPFlowController::OnCongestionEvent() noexcept
 {
-	congestionState = CongestionState::SLOW_START;
-	ackCountInCongestionAvoidance = 0;
+	cwnd = max(cwnd / 2, 1);
+	inRecovery = true;
 }
 
-void RUDPFlowController::EnterCongestionAvoidance()
+void RUDPFlowController::OnTimeout() noexcept
 {
-	congestionState = CongestionState::CONGESTION_AVOIDANCE;
-	ackCountInCongestionAvoidance = 0;
+	cwnd = 1;
+	inRecovery = true;
 }
 
-void RUDPFlowController::EnterFastRecovery()
+BYTE RUDPFlowController::GetEffectiveSendWindowSize() const noexcept
 {
-	congestionState = CongestionState::FAST_RECOVERY;
-	ackCountInCongestionAvoidance = 0;
-}
-
-void RUDPFlowController::UpdateCongestionWindow()
-{
-	sendWindowSize = GetEffectiveSendWindowSize();
+	return min(min(receiverAdvertisedWindow, cwnd), MAX_CWND);
 }
