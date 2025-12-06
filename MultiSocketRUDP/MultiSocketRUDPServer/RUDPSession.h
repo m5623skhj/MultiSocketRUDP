@@ -57,7 +57,6 @@ class RUDPSession
 	friend MultiSocketRUDPCore;
 
 protected:
-	RUDPSession() = delete;
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
 private:
