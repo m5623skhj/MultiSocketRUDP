@@ -10,9 +10,13 @@
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
-	: sock(INVALID_SOCKET)
-	, core(inCore)
+	: sessionKey{}
+	, sessionSalt{}
+	, sock(INVALID_SOCKET)
 	, flowController(maximumHoldingPacketQueueSize)
+	, recvBuffer()
+	, sendBuffer()
+	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
