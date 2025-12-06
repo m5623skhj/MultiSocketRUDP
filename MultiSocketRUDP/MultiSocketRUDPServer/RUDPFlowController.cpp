@@ -44,6 +44,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 	if (const PacketSequence sequenceGap = replySequence - lastReplySequence - 1; sequenceGap > GAP_THRESHOLD)
 	{
     	OnCongestionEvent();
+		inRecovery = true;
     }
 
 	lastReplySequence = replySequence;
