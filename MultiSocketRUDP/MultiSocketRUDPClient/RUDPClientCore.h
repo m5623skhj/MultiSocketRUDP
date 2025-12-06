@@ -2,7 +2,7 @@
 #include "NetServerSerializeBuffer.h"
 #include "NetClient.h"
 #include "BuildConfig.h"
-#include "../MultiSocketRUDPServer/CoreType.h"
+#include "../Common/etc/CoreType.h"
 #include <thread>
 #include <mutex>
 #include <array>

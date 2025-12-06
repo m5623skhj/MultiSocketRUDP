@@ -1,7 +1,7 @@
 #pragma once
 #include <functional>
 #include <map>
-#include "CoreType.h"
+#include "../Common/etc/CoreType.h"
 #include <MSWSock.h>
 #include "NetServerSerializeBuffer.h"
 #include "Queue.h"
@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <queue>
 #include "PacketManager.h"
-#include "RUDPFlowController.h"
+#include "../Common/FlowController/RUDPFlowController.h"
 
 class MultiSocketRUDPCore;
 class IPacket;

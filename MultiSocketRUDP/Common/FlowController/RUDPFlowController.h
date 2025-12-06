@@ -1,5 +1,5 @@
 #pragma once
-#include "CoreType.h"
+#include "../etc/CoreType.h"
 
 class RUDPFlowController
 {

@@ -24,13 +24,13 @@
     <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
     <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp" />
+    <ClCompile Include="..\Common\FlowController\RUDPFlowController.cpp" />
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
     <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="ProcessByPacketType.cpp" />
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
-    <ClCompile Include="RUDPFlowController.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
     <ClCompile Include="Ticker.cpp" />
@@ -38,13 +38,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
-    <ClInclude Include="CoreType.h" />
     <ClInclude Include="LogExtension.h" />
     <ClInclude Include="MemoryTracer.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
-    <ClInclude Include="RUDPFlowController.h" />
     <ClInclude Include="RUDPSession.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />

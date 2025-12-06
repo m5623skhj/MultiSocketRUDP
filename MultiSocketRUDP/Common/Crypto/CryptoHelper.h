@@ -5,7 +5,7 @@
 #include <bcrypt.h>
 #include <Windows.h>
 #include <string>
-#include "../MultiSocketRUDPServer/CoreType.h"
+#include "../Common/etc/CoreType.h"
 
 constexpr size_t AUTH_TAG_SIZE = 16;
 
