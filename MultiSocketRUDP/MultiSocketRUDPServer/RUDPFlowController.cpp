@@ -31,6 +31,8 @@ void RUDPFlowController::UpdateReceiverWindow(const BYTE newReceiverWindowSize) 
 
 void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noexcept
 {
+	// GAP_THRESHOLD can be adjusted appropriately.
+	static constexpr PacketSequence GAP_THRESHOLD = 5;
 	if (replySequence <= lastReplySequence)
 	{
 #ifdef _DEBUG
@@ -39,7 +41,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 		return;
 	}
 
-	if (const PacketSequence sequenceGap = replySequence - lastReplySequence - 1; sequenceGap > 0)
+	if (const PacketSequence sequenceGap = replySequence - lastReplySequence - 1; sequenceGap > GAP_THRESHOLD)
 	{
     	OnCongestionEvent();
     }
@@ -69,5 +71,6 @@ void RUDPFlowController::OnTimeout() noexcept
 
 BYTE RUDPFlowController::GetEffectiveSendWindowSize() const noexcept
 {
-	return min(min(receiverAdvertisedWindow, cwnd), MAX_CWND);
+	const unsigned int effectiveWindow = std::min<unsigned int>(receiverAdvertisedWindow, cwnd);
+	return static_cast<BYTE>(effectiveWindow);
 }
