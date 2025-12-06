@@ -9,11 +9,15 @@ public:
 	~RUDPReceiveWindow() = default;
 
 public:
+	[[nodiscard]]
 	bool CanReceive(PacketSequence inSequence) const noexcept;
 	void MarkReceived(PacketSequence inSequence) noexcept;
 
+	[[nodiscard]]
 	PacketSequence GetWindowStart() const noexcept { return windowStart; }
+	[[nodiscard]]
 	PacketSequence GetWindowEnd() const noexcept;
+	[[nodiscard]]
 	BYTE GetWindowSize() const noexcept { return windowSize; }
 
 private:

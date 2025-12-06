@@ -12,6 +12,7 @@ public:
 	}
 
 public:
+	[[nodiscard]]
 	bool CanSend(PacketSequence nextSend, PacketSequence lastAck) noexcept
 	{
 		return flowController.CanSendPacket(nextSend, lastAck);
@@ -27,6 +28,7 @@ public:
 		flowController.OnTimeout();
 	}
 
+	[[nodiscard]]
 	bool CanAccept(PacketSequence seq) const noexcept
 	{
 		return receiveWindow.CanReceive(seq);
@@ -37,11 +39,13 @@ public:
 		receiveWindow.MarkReceived(seq);
 	}
 
+	[[nodiscard]]
 	PacketSequence GetReceiveWindowEnd() const noexcept
 	{
 		return receiveWindow.GetWindowEnd();
 	}
 
+	[[nodiscard]]
 	BYTE GetCwnd() const noexcept
 	{
 		return flowController.GetCwnd();

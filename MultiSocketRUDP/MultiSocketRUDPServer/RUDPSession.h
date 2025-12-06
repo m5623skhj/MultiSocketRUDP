@@ -84,6 +84,7 @@ private:
 
 	void SendHeartbeatPacket();
 
+	[[nodiscard]]
 	bool CheckReservedSessionTimeout(unsigned long long now) const;
 	void AbortReservedSession();
 	void CloseSocket();
@@ -129,6 +130,7 @@ public:
 protected:
 	using PacketFactory = std::function<std::function<bool()>(RUDPSession*, NetBuffer*)>;
 
+	[[nodiscard]]
 	static std::shared_ptr<IPacket> BufferToPacket(NetBuffer& buffer, const PacketId packetId)
 	{
 		std::shared_ptr<IPacket> packet = PacketManager::GetInst().MakePacket(packetId);
