@@ -224,13 +224,13 @@ bool MultiSocketRUDPCore::InitNetwork()
 		return false;
 	}
 
+	RUDPSession::SetMaximumPacketHoldingQueueSize(maxHoldingPacketQueueSize);
 	sessionArray.reserve(numOfSockets);
 	for (auto socketNumber = 0; socketNumber < numOfSockets; ++socketNumber)
 	{
 		sessionArray.emplace_back(sessionFactory(*this));
 		sessionArray[socketNumber]->sessionId = static_cast<SessionIdType>(socketNumber);
 	}
-	RUDPSession::SetMaximumPacketHoldingQueueSize(maxHoldingPacketQueueSize);
 
 	return true;
 }

@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <queue>
 #include "PacketManager.h"
+#include "RUDPFlowController.h"
 
 class MultiSocketRUDPCore;
 class IPacket;
@@ -88,7 +89,7 @@ private:
 	void AbortReservedSession();
 	void CloseSocket();
 	void UnregisterRIOBuffers();
-	static void SetMaximumPacketHoldingQueueSize(unsigned char size);
+	static void SetMaximumPacketHoldingQueueSize(BYTE size);
 
 private:
 	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
@@ -184,6 +185,7 @@ private:
 	bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
+	RUDPFlowController flowController;
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
@@ -199,7 +201,7 @@ private:
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
 	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
-	static size_t maximumHoldingPacketQueueSize;
+	static BYTE maximumHoldingPacketQueueSize;
 	std::atomic_uchar sequenceViolationCounter{};
 
 	unsigned long long sessionReservedTime{};

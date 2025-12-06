@@ -7,11 +7,12 @@
 #include "MemoryTracer.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
-size_t RUDPSession::maximumHoldingPacketQueueSize = 0;
+BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
-	  , core(inCore)
+	, core(inCore)
+	, flowController(maximumHoldingPacketQueueSize)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
@@ -301,7 +302,7 @@ void RUDPSession::UnregisterRIOBuffers()
 	}
 }
 
-void RUDPSession::SetMaximumPacketHoldingQueueSize(const unsigned char size)
+void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
 {
 	maximumHoldingPacketQueueSize = size;
 }
