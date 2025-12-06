@@ -4,28 +4,28 @@
 class RUDPFlowController
 {
 public:
-    explicit RUDPFlowController();
-    ~RUDPFlowController() = default;
+	explicit RUDPFlowController();
+	~RUDPFlowController() = default;
 
 public:
-    bool CanSendPacket(PacketSequence nextSendSequence, PacketSequence lastAckedSequence) const noexcept;
+	bool CanSendPacket(PacketSequence nextSendSequence, PacketSequence lastAckedSequence) const noexcept;
 
-    void OnReplyReceived(PacketSequence replySequence) noexcept;
-    void OnCongestionEvent() noexcept;
-    void OnTimeout() noexcept;
+	void OnReplyReceived(PacketSequence replySequence) noexcept;
+	void OnCongestionEvent() noexcept;
+	void OnTimeout() noexcept;
 
-    BYTE GetCwnd() const noexcept { return cwnd; }
-    PacketSequence GetLastAckedSequence() const noexcept { return lastReplySequence; }
+	BYTE GetCwnd() const noexcept { return cwnd; }
+	PacketSequence GetLastAckedSequence() const noexcept { return lastReplySequence; }
 
 private:
-    unsigned int cwnd{};
-    PacketSequence lastReplySequence{};
-    bool inRecovery{};
+	BYTE cwnd{};
+	PacketSequence lastReplySequence{};
+	bool inRecovery{};
 
-    static constexpr BYTE INITIAL_CWND = 4;
-    static constexpr BYTE MAX_CWND = 255;
+	static constexpr BYTE INITIAL_CWND = 4;
+	static constexpr BYTE MAX_CWND = 255;
 
 #ifdef _DEBUG
-    BYTE duplicateReplyCount{};
+	BYTE duplicateReplyCount{};
 #endif
 };

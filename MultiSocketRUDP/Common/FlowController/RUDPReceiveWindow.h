@@ -5,19 +5,20 @@
 class RUDPReceiveWindow
 {
 public:
-    explicit RUDPReceiveWindow(BYTE recvWindowSize);
-    ~RUDPReceiveWindow() = default;
+	explicit RUDPReceiveWindow(BYTE recvWindowSize);
+	~RUDPReceiveWindow() = default;
 
 public:
-    bool CanReceive(PacketSequence inSequence) const noexcept;
-    void MarkReceived(PacketSequence inSequence) noexcept;
+	bool CanReceive(PacketSequence inSequence) const noexcept;
+	void MarkReceived(PacketSequence inSequence) noexcept;
 
-    PacketSequence GetWindowStart() const noexcept { return windowStart; }
-    PacketSequence GetWindowEnd(PacketSequence nextRecv) const noexcept;
-    BYTE GetWindowSize() const noexcept { return windowSize; }
+	PacketSequence GetWindowStart() const noexcept { return windowStart; }
+	PacketSequence GetWindowEnd() const noexcept;
+	BYTE GetWindowSize() const noexcept { return windowSize; }
 
 private:
-    PacketSequence windowStart{};
-    BYTE windowSize{};
-    std::vector<bool> receivedFlags;
+	PacketSequence windowStart{};
+	BYTE windowSize{};
+	std::vector<bool> receivedFlags;
+	size_t startIndex{};
 };
