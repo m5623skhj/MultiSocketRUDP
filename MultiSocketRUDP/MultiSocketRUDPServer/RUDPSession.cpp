@@ -13,7 +13,7 @@ RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sessionKey{}
 	, sessionSalt{}
 	, sock(INVALID_SOCKET)
-	, flowController(maximumHoldingPacketQueueSize)
+	, flowManager(maximumHoldingPacketQueueSize)
 	, recvBuffer()
 	, sendBuffer()
 	, core(inCore)

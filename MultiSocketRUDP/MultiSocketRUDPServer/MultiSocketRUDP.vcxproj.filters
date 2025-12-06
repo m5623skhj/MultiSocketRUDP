@@ -90,6 +90,9 @@
     <ClCompile Include="..\Common\FlowController\RUDPFlowController.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\FlowController\RUDPReceiveWindow.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MultiSocketRUDPCore.h">

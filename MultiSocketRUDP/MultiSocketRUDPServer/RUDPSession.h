@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <queue>
 #include "PacketManager.h"
-#include "../Common/FlowController/RUDPFlowController.h"
+#include "../Common/FlowController/RUDPFlowManager.h"
 
 class MultiSocketRUDPCore;
 class IPacket;
@@ -184,7 +184,7 @@ private:
 	bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
-	RUDPFlowController flowController;
+	RUDPFlowManager flowManager;
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
