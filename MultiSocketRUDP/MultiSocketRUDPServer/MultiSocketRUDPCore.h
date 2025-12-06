@@ -11,9 +11,7 @@
 #include <vector>
 #include <set>
 
-#include "MemoryTracer.h"
 #include "../Common/TLS/TLSHelper.h"
-
 
 #pragma comment(lib, "ws2_32.lib")
 
