@@ -1,12 +1,72 @@
 ﻿<Window x:Class="MultiSocketRUDPBotTester.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MultiSocketRUDPBotTester"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="MainWindow" Height="400" Width="800">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
+        <!-- Left Panel: Start / Stop Buttons -->
+        <StackPanel Grid.Column="0"
+                    VerticalAlignment="Top"
+                    Width="180">
+            <Button Content="Start Bot Test"
+                    Height="35"
+                    Click="StartBotTest_Click"/>
+            <Button Content="Stop Bot Test"
+                    Height="35"
+                    Click="StopBotTest_Click"/>
+        </StackPanel>
+
+        <!-- Right Panel: Inputs -->
+        <StackPanel Grid.Column="1"
+                    VerticalAlignment="Top"
+                    Width="300">
+
+            <!-- Host IP -->
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Host IP:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="HostIpTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"/>
+            </Grid>
+
+            <!-- Host Port -->
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Host Port:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="HostPortTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"/>
+            </Grid>
+
+            <!-- Bot Count -->
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Insert Bot Count:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="BotCountTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"/>
+            </Grid>
+
+        </StackPanel>
     </Grid>
 </Window>
