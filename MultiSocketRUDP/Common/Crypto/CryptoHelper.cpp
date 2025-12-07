@@ -84,7 +84,7 @@ bool CryptoHelper::EncryptAESGCM(
 	}
 
 	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
-	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
+	BCRYPT_INIT_AUTH_MODE_INFO(authInfo)
 	authInfo.pbNonce = const_cast<unsigned char*>(nonce);
 	authInfo.cbNonce = static_cast<ULONG>(nonceSize);
 
@@ -140,7 +140,7 @@ bool CryptoHelper::DecryptAESGCM(
 	}
 
 	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
-	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
+	BCRYPT_INIT_AUTH_MODE_INFO(authInfo)
 	authInfo.pbNonce = const_cast<unsigned char*>(nonce);
 	authInfo.cbNonce = static_cast<ULONG>(nonceSize);
 	authInfo.pbTag = const_cast<unsigned char*>(tag);
