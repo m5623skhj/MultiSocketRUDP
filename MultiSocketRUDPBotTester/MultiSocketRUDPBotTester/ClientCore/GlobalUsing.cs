@@ -1,0 +1,1 @@
+﻿global using SessionIdType = System.ComponentModel.UInt16Converter;
