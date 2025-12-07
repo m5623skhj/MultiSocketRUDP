@@ -32,7 +32,9 @@ namespace TLSHelper
 		virtual bool Initialize() = 0;
 		virtual bool Handshake(SOCKET socket) = 0;
 
+		[[nodiscard]]
 		bool EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize);
+		[[nodiscard]]
 		bool DecryptData(const char* encryptedData, size_t encryptedSize, char* plainBuffer, size_t& plainSize);
 
 	protected:
@@ -49,7 +51,9 @@ namespace TLSHelper
 		~TLSHelperClient() override = default;
 
 	public:
+		[[nodiscard]]
 		bool Initialize() override;
+		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 	};
 
@@ -60,7 +64,9 @@ namespace TLSHelper
 		~TLSHelperServer() override = default;
 
 	public:
+		[[nodiscard]]
 		bool Initialize() override;
+		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 
 	private:

@@ -30,7 +30,7 @@ public:
 		const int bodySize = packet.GetUseSize() - (isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader);
 		const int bodyOffset = isCorePacket ? bodyOffsetWithHeaderForCorePacket : bodyOffsetWithHeader;
 
-		CryptoHelper::EncryptAESGCM(
+		if (not CryptoHelper::EncryptAESGCM(
 			nonce.data(),
 			nonce.size(),
 			&packet.m_pSerializeBuffer[bodyOffset],
@@ -39,7 +39,11 @@ public:
 			bodySize,
 			authTag,
 			sessionKeyHandle
-		);
+		))
+		{
+			LOG_ERROR("PacketCryptoHelper::EncodePacket() : EncryptAESGCM() failed.");
+			return;
+		}
 
 		packet.WriteBuffer(reinterpret_cast<char*>(authTag), AUTH_TAG_SIZE);
 		SetHeader(packet);

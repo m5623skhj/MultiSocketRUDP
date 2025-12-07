@@ -20,6 +20,7 @@ private:
 	CryptoHelper& operator=(CryptoHelper&&) = delete;
 
 public:
+	[[nodiscard]]
 	static CryptoHelper& GetTLSInstance()
 	{
 		thread_local CryptoHelper instance;
@@ -27,6 +28,7 @@ public:
 	}
 
 public:
+	[[nodiscard]]
 	static bool EncryptAESGCM(
 		const unsigned char* nonce,
 		const size_t nonceSize,
@@ -37,6 +39,7 @@ public:
 		unsigned char* tag,
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
+	[[nodiscard]]
 	static bool DecryptAESGCM(
 		const unsigned char* nonce,
 		const size_t nonceSize,
@@ -53,7 +56,9 @@ public:
 	ULONG GetKeyOjbectSize() const { return keyObjectSize; }
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
+	[[nodiscard]]
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);
+	[[nodiscard]]
 	static std::vector<unsigned char> GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
 
 private:
