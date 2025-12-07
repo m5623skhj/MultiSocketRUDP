@@ -85,13 +85,12 @@ namespace ClientCore
             var buffer = new byte[1024];
             var recvTask = await stream.ReadAsync(buffer, 0, buffer.Length);
 
-            int bytesRead = recvTask;
-            if (bytesRead == 0)
+            if (recvTask == 0)
             {
                 return false;
             }
 
-            var response = ParseSessionBrokerResponse(buffer, bytesRead);
+            var response = ParseSessionBrokerResponse(buffer, recvTask);
             if (response.resultCode != ConnectResultCode.SUCCESS)
             {
                 sessionInfo.sessionState = SessionState.Disconnected;

@@ -47,8 +47,10 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteUInt(uint value)
         {
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
+            {
                 buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+            }
         }
 
         public void WriteInt(int value)
@@ -58,7 +60,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteULong(ulong value)
         {
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
                 buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
         }
 
@@ -108,7 +110,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public ushort ReadUShort()
         {
-            ushort value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
+            var value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
             readPos += 2;
             return value;
         }
@@ -120,7 +122,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public uint ReadUInt()
         {
-            uint value = (uint)(
+            var value = (uint)(
                 buffer[readPos] |
                 (buffer[readPos + 1] << 8) |
                 (buffer[readPos + 2] << 16) |
@@ -137,7 +139,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         public ulong ReadULong()
         {
             ulong value = 0;
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
                 value |= ((ulong)buffer[readPos + i]) << (8 * i);
             readPos += 8;
             return value;
@@ -162,8 +164,8 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public string ReadString()
         {
-            uint length = ReadUInt();
-            string value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
+            var length = ReadUInt();
+            var value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
             readPos += (int)length;
             return value;
         }
@@ -188,17 +190,17 @@ namespace MultiSocketRUDPBotTester.Buffer
                 return;
             }
 
-            int payloadLength = writePos - HEADER_SIZE;
+            var payloadLength = writePos - HEADER_SIZE;
 
             buffer[0] = HeaderCode;
             buffer[1] = (byte)(payloadLength & 0xFF);
             buffer[2] = (byte)((payloadLength >> 8) & 0xFF);
 
-            byte randCode = (byte)(new Random().Next(0, 256));
+            var randCode = (byte)(new Random().Next(0, 256));
             buffer[3] = randCode;
 
-            ushort payloadSum = 0;
-            for (int i = HEADER_SIZE; i < writePos; i++)
+            var payloadSum = 0;
+            for (var i = HEADER_SIZE; i < writePos; i++)
             {
                 payloadSum += buffer[i];
             }
@@ -207,18 +209,18 @@ namespace MultiSocketRUDPBotTester.Buffer
 
             byte beforeRandomXOR = 0;
             byte beforeFixedXOR = 0;
-            ushort numOfRoutine = 1;
+            var numOfRoutine = 1;
 
-            for (int i = 4; i < writePos; i++)
+            for (var i = 4; i < writePos; i++)
             {
-                byte cur = buffer[i];
+                var cur = buffer[i];
                 beforeRandomXOR = (byte)(cur ^ (beforeRandomXOR + randCode + numOfRoutine));
                 beforeFixedXOR = (byte)(beforeRandomXOR ^ (beforeFixedXOR + XORKey + numOfRoutine));
                 buffer[i] = beforeFixedXOR;
                 numOfRoutine++;
             }
 
-            byte[] result = new byte[writePos];
+            var result = new byte[writePos];
             Array.Copy(buffer, result, writePos);
         }
 
@@ -226,21 +228,21 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             if (data.Length < HEADER_SIZE) return false;
 
-            byte randCode = data[3];
-            byte xorCode = XORKey;
-            ushort numOfRoutine = 1;
+            var randCode = data[3];
+            var xorCode = XORKey;
+            var numOfRoutine = 1;
 
-            byte saveEncoded = data[4];
-            byte saveRandom = (byte)(data[4] ^ (xorCode + numOfRoutine));
+            var saveEncoded = data[4];
+            var saveRandom = (byte)(data[4] ^ (xorCode + numOfRoutine));
             data[4] = (byte)(saveRandom ^ (randCode + numOfRoutine));
 
             numOfRoutine++;
-            byte beforeEncoded = saveEncoded;
-            byte beforeRandom = saveRandom;
+            var beforeEncoded = saveEncoded;
+            var beforeRandom = saveRandom;
 
-            ushort payloadSum = 0;
+            var payloadSum = 0;
 
-            for (int i = HEADER_SIZE; i < data.Length; i++)
+            for (var i = HEADER_SIZE; i < data.Length; i++)
             {
                 saveEncoded = data[i];
                 saveRandom = (byte)(data[i] ^ (beforeEncoded + xorCode + numOfRoutine));
@@ -265,8 +267,8 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public byte[] GetPayload()
         {
-            int payloadSize = writePos - HEADER_SIZE;
-            byte[] payload = new byte[payloadSize];
+            var payloadSize = writePos - HEADER_SIZE;
+            var payload = new byte[payloadSize];
             Array.Copy(buffer, HEADER_SIZE, payload, 0, payloadSize);
             return payload;
         }
@@ -288,13 +290,13 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void InsertPacketSequence(PacketSequence seq)
         {
-            Span<byte> span = buffer.AsSpan(PACKET_SEQUENCE_POS, 8);
+            var span = buffer.AsSpan(PACKET_SEQUENCE_POS, 8);
             BitConverter.TryWriteBytes(span, seq);
         }
 
         public void InsertPacketId(PacketId id)
         {
-            Span<byte> span = buffer.AsSpan(PACKET_ID_POS, 4);
+            var span = buffer.AsSpan(PACKET_ID_POS, 4);
             BitConverter.TryWriteBytes(span, id);
         }
 
