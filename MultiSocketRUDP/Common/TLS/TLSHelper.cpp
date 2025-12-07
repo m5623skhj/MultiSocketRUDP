@@ -57,8 +57,7 @@ namespace TLSHelper
         bufferDesc.pBuffers = buffers;
         bufferDesc.ulVersion = SECBUFFER_VERSION;
 
-        SECURITY_STATUS status = EncryptMessage(&ctxtHandle, 0, &bufferDesc, 0);
-        if (status != SEC_E_OK)
+        if (const SECURITY_STATUS status = EncryptMessage(&ctxtHandle, 0, &bufferDesc, 0); status != SEC_E_OK)
         {
             return false;
         }
@@ -91,8 +90,7 @@ namespace TLSHelper
         bufferDesc.pBuffers = buffers;
         bufferDesc.ulVersion = SECBUFFER_VERSION;
 
-        SECURITY_STATUS status = DecryptMessage(&ctxtHandle, &bufferDesc, 0, nullptr);
-        if (status != SEC_E_OK && status != SEC_I_RENEGOTIATE)
+        if (const SECURITY_STATUS status = DecryptMessage(&ctxtHandle, &bufferDesc, 0, nullptr); status != SEC_E_OK && status != SEC_I_RENEGOTIATE)
         {
             return false;
         }
@@ -125,7 +123,7 @@ namespace TLSHelper
         return status == SEC_E_OK;
     }
 
-    bool TLSHelperClient::Handshake(SOCKET socket)
+    bool TLSHelperClient::Handshake(const SOCKET socket)
     {
         handshakeCompleted = false;
 
