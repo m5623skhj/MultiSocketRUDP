@@ -1,1 +1,1 @@
-﻿global using SessionIdType = System.ComponentModel.UInt16Converter;
+﻿global using SessionIdType = System.UInt16;
