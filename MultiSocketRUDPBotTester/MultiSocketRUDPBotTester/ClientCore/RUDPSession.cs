@@ -1,13 +1,7 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
+using Serilog;
 
 namespace ClientCore
 {
@@ -189,7 +183,7 @@ namespace ClientCore
             {
                 if (cancellationToken.IsCancellationRequested == false)
                 {
-                    // log
+                    Log.Error("Cancellation request failed with {}", ex.ToString());
                 }
             }
         }
@@ -199,7 +193,7 @@ namespace ClientCore
             var buffer = new NetBuffer();
             if (buffer.Decode(data) == false)
             {
-                // log
+                Log.Error("Buffer decode failed");
                 return;
             }
 
@@ -220,7 +214,7 @@ namespace ClientCore
                     break;
                 default:
                     {
-                        // log
+                        Log.Error("Invalid packet type {}", packetType);
                     }
                     break;
             }
