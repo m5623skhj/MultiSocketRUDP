@@ -34,7 +34,7 @@ namespace ClientCore
 
     public class SessionInfo
     {
-        public ushort sessionId { get; set; }
+        public SessionIdType sessionId { get; set; }
         public string sessionKey { get; set; }
         public SessionState sessionState { get; set; }
         public string serverIp { get; set; }
@@ -43,6 +43,11 @@ namespace ClientCore
 
     public class RUDPSession
     {
+        public RUDPSession(byte[] sessionInfoStream)
+        {
+            MakeSessionInfo(sessionInfoStream);
+        }
+
         public SessionInfo SessionInfo { get; private set; } = new()
         {
             sessionState = SessionState.Disconnected,
@@ -61,38 +66,17 @@ namespace ClientCore
 
         private bool isConnected = false;
 
-        public async Task<bool> GetSessionInfoFromServerAsync(string sessionBrokerIp, ushort sessionBrokerPort)
+        private void MakeSessionInfo(byte[] sessionInfoStream)
         {
-            SessionInfo.sessionState = SessionState.Connecting;
-
-            using var sessionGetter = new TcpClient();
-            await sessionGetter.ConnectAsync(sessionBrokerIp, sessionBrokerPort);
-
-            var stream = sessionGetter.GetStream();
-
-            var buffer = new byte[1024];
-            var recvTask = await stream.ReadAsync(buffer, 0, buffer.Length);
-
-            if (recvTask == 0)
-            {
-                return false;
-            }
-
-            var response = ParseSessionBrokerResponse(buffer, recvTask);
-            if (response.resultCode != ConnectResultCode.SUCCESS)
-            {
-                SessionInfo.sessionState = SessionState.Disconnected;
-                return false;
-            }
-
-            SessionInfo.sessionId = response.sessionId;
-            SessionInfo.sessionKey = response.sessionKey;
-            SessionInfo.serverIp = response.serverIp;
-            SessionInfo.serverPort = response.serverPort;
-
-            return true;
+            // sessionInfoStream to session info
+            // If session info is invalid, throw exception
         }
 
+        public SessionIdType GetSessionId()
+        {
+            return SessionInfo.sessionId;
+        }
+        
         private static SessionBrokerResponse ParseSessionBrokerResponse(byte[] data, int length)
         {
             var buffer = new NetBuffer();
@@ -123,15 +107,9 @@ namespace ClientCore
             return response;
         }
 
-        public async Task<bool> ConnectToServerAsync()
+        public void Disconnect()
         {
-            udpClient = new UdpClient();
-            serverEndPoint = new IPEndPoint(IPAddress.Parse(SessionInfo.serverIp), SessionInfo.serverPort);
-
-            var connectPacket = MakeConnectPacket();
-            await SendConnectPacket(connectPacket);
-
-            return true;
+            Cleanup();
         }
 
         public async Task<bool> SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)

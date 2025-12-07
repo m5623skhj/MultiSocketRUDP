@@ -300,7 +300,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             BitConverter.TryWriteBytes(span, id);
         }
 
-        public void BuildConnectPacket(ushort sessionId, string sessionKey)
+        public void BuildConnectPacket(SessionIdType sessionId, string sessionKey)
         {
             writePos = PACKET_ID_POS;
             WriteUShort(sessionId);

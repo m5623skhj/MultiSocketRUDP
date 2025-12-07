@@ -6,8 +6,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 {
     public class SessionGetter
     {
-        private TcpClient tcpClient = null!;
-        private SslStream sslStream = null!;
+        private TcpClient? tcpClient = null!;
+        private SslStream? sslStream = null!;
 
         public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
         {
@@ -42,13 +42,16 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public async Task<int> ReceiveAsync(byte[] buffer)
         {
-            return await sslStream.ReadAsync(buffer, 0, buffer.Length);
+            return await sslStream?.ReadAsync(buffer, 0, buffer.Length)!;
         }
 
         public void Close()
         {
             sslStream?.Close();
             tcpClient?.Close();
+
+            sslStream = null;
+            tcpClient = null;
         }
     }
 }
