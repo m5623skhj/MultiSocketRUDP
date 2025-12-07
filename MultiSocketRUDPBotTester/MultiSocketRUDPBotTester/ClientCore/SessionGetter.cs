@@ -6,8 +6,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 {
     public class SessionGetter
     {
-        private TcpClient tcpClient;
-        private SslStream sslStream;
+        private TcpClient tcpClient = null!;
+        private SslStream sslStream = null!;
 
         public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
         {

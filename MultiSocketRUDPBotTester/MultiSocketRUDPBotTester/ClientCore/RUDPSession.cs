@@ -47,35 +47,29 @@ namespace ClientCore
         public ushort serverPort { get; set; }
     }
 
-    class RUDPSession
+    public class RUDPSession
     {
-        public SessionInfo sessionInfo { get; private set; }
-        private UdpClient udpClient;
-        private IPEndPoint serverEndPoint;
+        public SessionInfo SessionInfo { get; private set; } = new()
+        {
+            sessionState = SessionState.Disconnected,
+        };
 
-        private PacketSequence lastSendSequence;
-        private PacketSequence expectedRecvSequence;
+        private UdpClient udpClient = null!;
+        private IPEndPoint serverEndPoint = null!;
 
-        private HashSet<PacketSequence> holdingSequences = new HashSet<PacketSequence>();
+        private PacketSequence lastSendSequence = 0;
+        private PacketSequence expectedRecvSequence = 0;
+
+        private HashSet<PacketSequence> holdingSequences = [];
         private object holdingSequencesLock = new object();
         private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new SortedDictionary<PacketSequence, NetBuffer>();
         private object holdingPacketsLock = new object();
 
         private bool isConnected = false;
 
-        public RUDPSession()
-        {
-            sessionInfo = new SessionInfo
-            {
-                sessionState = SessionState.Disconnected,
-            };
-            lastSendSequence = 0;
-            expectedRecvSequence = 0;
-        }
-
         public async Task<bool> GetSessionInfoFromServerAsync(string sessionBrokerIp, ushort sessionBrokerPort)
         {
-            sessionInfo.sessionState = SessionState.Connecting;
+            SessionInfo.sessionState = SessionState.Connecting;
 
             using var sessionGetter = new TcpClient();
             await sessionGetter.ConnectAsync(sessionBrokerIp, sessionBrokerPort);
@@ -93,14 +87,14 @@ namespace ClientCore
             var response = ParseSessionBrokerResponse(buffer, recvTask);
             if (response.resultCode != ConnectResultCode.SUCCESS)
             {
-                sessionInfo.sessionState = SessionState.Disconnected;
+                SessionInfo.sessionState = SessionState.Disconnected;
                 return false;
             }
 
-            sessionInfo.sessionId = response.sessionId;
-            sessionInfo.sessionKey = response.sessionKey;
-            sessionInfo.serverIp = response.serverIp;
-            sessionInfo.serverPort = response.serverPort;
+            SessionInfo.sessionId = response.sessionId;
+            SessionInfo.sessionKey = response.sessionKey;
+            SessionInfo.serverIp = response.serverIp;
+            SessionInfo.serverPort = response.serverPort;
 
             return true;
         }
@@ -138,7 +132,7 @@ namespace ClientCore
         public async Task<bool> ConnectToServerAsync()
         {
             udpClient = new UdpClient();
-            serverEndPoint = new IPEndPoint(IPAddress.Parse(sessionInfo.serverIp), sessionInfo.serverPort);
+            serverEndPoint = new IPEndPoint(IPAddress.Parse(SessionInfo.serverIp), SessionInfo.serverPort);
 
             var connectPacket = MakeConnectPacket();
             await SendConnectPacket(connectPacket);
@@ -161,7 +155,6 @@ namespace ClientCore
         private async Task<bool> SendConnectPacket(NetBuffer packetBuffer)
         {
             await SendPacket(new SendPacketInfo(MakeConnectPacket()));
-
             return true;
         }
 
@@ -169,14 +162,13 @@ namespace ClientCore
         {
             sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
             await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketBuffer(), sendPacketInfo.SentBuffer.GetLength(), serverEndPoint);
-
             return true;
         }
 
         private NetBuffer MakeConnectPacket()
         {
             var buffer = new NetBuffer();
-            buffer.BuildConnectPacket(sessionInfo.sessionId, sessionInfo.sessionKey);
+            buffer.BuildConnectPacket(SessionInfo.sessionId, SessionInfo.sessionKey);
 
             return buffer;
         }
@@ -187,7 +179,7 @@ namespace ClientCore
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var result = await udpClient.ReceiveAsync();
+                    var result = await udpClient.ReceiveAsync(cancellationToken);
                     ProcessReceivedPacket(result.Buffer);
                 }
             }
@@ -252,7 +244,7 @@ namespace ClientCore
         private async Task DisconnectAsync()
         {
             isConnected = false;
-            sessionInfo.sessionState = SessionState.Disconnecting;
+            SessionInfo.sessionState = SessionState.Disconnecting;
 
             var disconnectPacket = BuildDisconnectPacket();
             await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength(), serverEndPoint);
@@ -260,7 +252,7 @@ namespace ClientCore
 
             Cleanup();
 
-            sessionInfo.sessionState = SessionState.Disconnected;
+            SessionInfo.sessionState = SessionState.Disconnected;
         }
 
         private NetBuffer BuildDisconnectPacket()

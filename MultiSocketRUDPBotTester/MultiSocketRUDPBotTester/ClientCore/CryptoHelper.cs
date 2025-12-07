@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
-    internal class CryptoHelper
+    public class CryptoHelper
     {
+
     }
 }
