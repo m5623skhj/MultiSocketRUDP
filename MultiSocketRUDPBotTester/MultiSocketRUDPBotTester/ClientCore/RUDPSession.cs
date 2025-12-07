@@ -106,7 +106,7 @@ namespace ClientCore
             return true;
         }
 
-        private SessionBrokerResponse ParseSessionBrokerResponse(byte[] data, int length)
+        private static SessionBrokerResponse ParseSessionBrokerResponse(byte[] data, int length)
         {
             var buffer = new NetBuffer();
 
@@ -118,8 +118,10 @@ namespace ClientCore
                 throw new Exception("Failed to decode session broker response");
             }
 
-            var response = new SessionBrokerResponse();
-            response.resultCode = (ConnectResultCode)buffer.ReadByte();
+            var response = new SessionBrokerResponse
+            {
+                resultCode = (ConnectResultCode)buffer.ReadByte()
+            };
 
             if (response.resultCode != ConnectResultCode.SUCCESS)
             {
@@ -140,10 +142,6 @@ namespace ClientCore
             serverEndPoint = new IPEndPoint(IPAddress.Parse(sessionInfo.serverIp), sessionInfo.serverPort);
 
             var connectPacket = MakeConnectPacket();
-            if (connectPacket == null)
-            {
-                return false;
-            }
             await SendConnectPacket(connectPacket);
 
             return true;
@@ -171,7 +169,7 @@ namespace ClientCore
         private async Task<bool> SendPacket(SendPacketInfo sendPacketInfo)
         {
             sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
-            await udpClient.SendAsync(sendPacketInfo.sendedBuffer.GetPacketBuffer(), sendPacketInfo.sendedBuffer.GetLength(), serverEndPoint);
+            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketBuffer(), sendPacketInfo.SentBuffer.GetLength(), serverEndPoint);
 
             return true;
         }

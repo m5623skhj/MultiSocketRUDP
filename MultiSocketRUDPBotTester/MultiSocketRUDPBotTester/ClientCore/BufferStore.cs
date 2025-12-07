@@ -9,9 +9,9 @@ namespace ClientCore
 {
     public class SendPacketInfo
     {
-        public SendPacketInfo(NetBuffer inSendedBuffer)
+        public SendPacketInfo(NetBuffer inSentBuffer)
         {
-            sendedBuffer = inSendedBuffer;
+            SentBuffer = inSentBuffer;
         }
 
         public void RefreshSendPacketInfo(UInt64 now)
@@ -30,7 +30,7 @@ namespace ClientCore
             return retransmissionCount >= RETRANSMISSION_MAX_COUNT;
         }
 
-        public NetBuffer sendedBuffer { get; }
+        public NetBuffer SentBuffer { get; }
         public PacketSequence packetSequence { get; } = 0;
         private UInt64 sendTimeStamp { get; set; } = 0;
         private PacketRetransmissionCount retransmissionCount = 0;
@@ -56,21 +56,12 @@ namespace ClientCore
 
             public SendPacketInfo? PeekSendBuffer()
             {
-                if (sendBufferQueue.Count == 0)
-                {
-                    return null;
-                }
-
-                return sendBufferQueue.Peek();
+                return sendBufferQueue.Count == 0 ? null : sendBufferQueue.Peek();
             }
 
             public SendPacketInfo? DequeueSendBuffer()
             {
-                if (sendBufferQueue.Count == 0)
-                {
-                    return null;
-                }
-                return sendBufferQueue.Dequeue();
+                return sendBufferQueue.Count == 0 ? null : sendBufferQueue.Dequeue();
             }
         }
     }

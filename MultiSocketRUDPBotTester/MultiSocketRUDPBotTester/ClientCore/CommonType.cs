@@ -15,7 +15,7 @@ public enum PacketType : byte
 
 public static class CommonFunc
 {
-    static public ulong GetNowMs()
+    public static ulong GetNowMs()
     {
         return (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
