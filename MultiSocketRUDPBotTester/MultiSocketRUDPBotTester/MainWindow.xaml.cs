@@ -30,7 +30,7 @@ namespace MultiSocketRUDPBotTester
             timer.Start();
         }
 
-        private void StartBotTest_Click(object sender, RoutedEventArgs e)
+        private async void StartBotTest_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -39,11 +39,12 @@ namespace MultiSocketRUDPBotTester
                 HostPortTextBox.IsEnabled = false;
                 BotCountTextBox.IsEnabled = false;
 
-                BotTesterCore.Instance.StartBotTest(numOfBot);
+                await BotTesterCore.Instance.StartBotTest(numOfBot);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"error {ex.Message}");
+                BotTesterCore.Instance.StopBotTest();
             }
         }
 

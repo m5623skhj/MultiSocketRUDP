@@ -40,9 +40,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 checkCertificateRevocation: true);
         }
 
-        public async Task<int> ReceiveAsync(byte[] buffer)
+        public async Task<int> ReceiveAsync(byte[] buffer, int offset)
         {
-            return await sslStream?.ReadAsync(buffer, 0, buffer.Length)!;
+            return await sslStream?.ReadAsync(buffer, offset, buffer.Length - offset)!;
         }
 
         public void Close()

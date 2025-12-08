@@ -1,5 +1,6 @@
 ﻿using ClientCore;
 using Serilog;
+using System;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
@@ -14,28 +15,23 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private string hostIp = "";
         private UInt16 hostPort = 0;
 
-        public async void StartBotTest(UInt16 numOfBot)
+        public async Task StartBotTest(UInt16 numOfBot)
         {
-            try
+            for (var i = 0; i < numOfBot; ++i)
             {
-                var buffer = new byte[1024];
-                for (var i = 0; i < numOfBot; ++i)
+                var rudpSession = await GetSessionInfoFromSessionBroker();
+                if (rudpSession == null)
                 {
-                    await sessionGetter.ConnectAsync(hostIp, hostPort);
-                    var receivedBytes = await sessionGetter.ReceiveAsync(buffer);
-
-                    var rudpSession = new RUDPSession(buffer[..receivedBytes]);
-                    lock (sessionDictionaryLock)
-                    {
-                        sessionDictionary.Add(rudpSession.GetSessionId(), rudpSession);
-                    }
-
-                    sessionGetter.Close();
+                    Log.Error("StartBotTest() failed to get session info from session broker");
+                    return;
                 }
-            }
-            catch (Exception e)
-            {
-                Log.Error("StartBotTest() error with {}", e);
+
+                lock (sessionDictionaryLock)
+                {
+                    sessionDictionary.Add(rudpSession.GetSessionId(), rudpSession);
+                }
+
+                sessionGetter.Close();
             }
         }
 
@@ -57,6 +53,47 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 return (UInt16)sessionDictionary.Count;
             }
+        }
+
+        private async Task<RUDPSession?> GetSessionInfoFromSessionBroker()
+        {
+            var buffer = new byte[1024];
+            var totalBytes = 0;
+            var payloadLength = 0;
+            try
+            {
+                await sessionGetter.ConnectAsync(hostIp, hostPort);
+                while (true)
+                {
+                    var receivedBytes = await sessionGetter.ReceiveAsync(buffer, totalBytes);
+                    if (receivedBytes == 0)
+                    {
+                        break;
+                    }
+
+                    totalBytes += receivedBytes;
+                    if (totalBytes < GlobalConstants.packetHeaderSize)
+                    {
+                        continue;
+                    }
+
+                    if (payloadLength == 0)
+                    {
+                        payloadLength = BitConverter.ToUInt16(buffer, GlobalConstants.payloadPosition);
+                    }
+
+                    if (totalBytes >= payloadLength + GlobalConstants.packetHeaderSize)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"GetSessionInfoFromSessionBroker failed with {e.Message}");
+            }
+
+            return new RUDPSession(buffer[..totalBytes]);
         }
     }
 }
