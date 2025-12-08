@@ -186,14 +186,14 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 		totalReceivedBytes += bytesReceived;
 		recvBuffer.MoveWritePos(bytesReceived - df_HEADER_SIZE);
-		if (totalReceivedBytes >= df_HEADER_SIZE && payloadLength == 0)
-		{
-			recvBuffer >> code >> payloadLength;
-		}
-
 		if (totalReceivedBytes < df_HEADER_SIZE)
 		{
 			continue;
+		}
+
+		if (totalReceivedBytes >= df_HEADER_SIZE && payloadLength == 0)
+		{
+			recvBuffer >> code >> payloadLength;
 		}
 
 		if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
