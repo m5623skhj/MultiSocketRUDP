@@ -191,7 +191,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 			continue;
 		}
 
-		if (totalReceivedBytes >= df_HEADER_SIZE && payloadLength == 0)
+		if (payloadLength == 0)
 		{
 			recvBuffer >> code >> payloadLength;
 		}
