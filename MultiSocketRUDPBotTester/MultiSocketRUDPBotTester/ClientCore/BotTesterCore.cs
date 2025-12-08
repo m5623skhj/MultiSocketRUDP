@@ -93,7 +93,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 throw new Exception($"GetSessionInfoFromSessionBroker failed with {e.Message}");
             }
 
-            return new RUDPSession(buffer[..totalBytes]);
+            return new RUDPSession(buffer[GlobalConstants.packetHeaderSize..totalBytes]);
         }
     }
 }
