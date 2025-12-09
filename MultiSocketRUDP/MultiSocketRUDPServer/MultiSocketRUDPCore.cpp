@@ -561,12 +561,6 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 			SendPacket(sendPacketInfo, false);
 		}
 
-		if (numOfTimeoutSession > 0)
-		{
-			SetEvent(sessionReleaseEventHandle);
-			numOfTimeoutSession = {};
-		}
-
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
@@ -949,7 +943,6 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::ReservedSendPacketInfoToS
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
-		SetEvent(sessionReleaseEventHandle);
 
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
@@ -999,7 +992,6 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is over MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
-		SetEvent(sessionReleaseEventHandle);
 
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
