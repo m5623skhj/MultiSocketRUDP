@@ -22,21 +22,17 @@ namespace ClientCore
         RIO_INIT_FAILED = 4,
         DO_RECV_FAILED = 5
     }
-
-    public class SessionBrokerResponse
-    {
-        public ConnectResultCode resultCode { get; set; }
-        public string serverIp { get; set; }
-        public ushort serverPort { get; set; }
-        public ushort sessionId { get; set; }
-        public string sessionKey { get; set; }
-    }
-
+    
     public class SessionInfo
     {
         public SessionIdType sessionId { get; set; }
         public string sessionKey { get; set; }
+        public string sessionSalt { get; set; }
         public SessionState sessionState { get; set; }
+    }
+
+    public class TargetServerInfo
+    {
         public string serverIp { get; set; }
         public ushort serverPort { get; set; }
     }
@@ -53,6 +49,8 @@ namespace ClientCore
             sessionState = SessionState.Disconnected,
         };
 
+        public TargetServerInfo TargetServerInfo { get; private set; } = new();
+
         private UdpClient udpClient = null!;
         private IPEndPoint serverEndPoint = null!;
 
@@ -68,8 +66,7 @@ namespace ClientCore
 
         private void MakeSessionInfo(byte[] sessionInfoStream)
         {
-            // sessionInfoStream to session info
-            // If session info is invalid, throw exception
+            ParseSessionBrokerResponse(sessionInfoStream);
         }
 
         public SessionIdType GetSessionId()
@@ -77,34 +74,27 @@ namespace ClientCore
             return SessionInfo.sessionId;
         }
         
-        private static SessionBrokerResponse ParseSessionBrokerResponse(byte[] data, int length)
+        private void ParseSessionBrokerResponse(byte[] data)
         {
             var buffer = new NetBuffer();
-
-            var encodedData = new byte[length];
-            Array.Copy(data, encodedData, length);
-
-            if (!buffer.Decode(encodedData))
+            if (!buffer.Decode(data))
             {
                 throw new Exception("Failed to decode session broker response");
             }
 
-            var response = new SessionBrokerResponse
+            var resultCode = (ConnectResultCode)buffer.ReadByte();
+            if (resultCode != ConnectResultCode.SUCCESS)
             {
-                resultCode = (ConnectResultCode)buffer.ReadByte()
-            };
-
-            if (response.resultCode != ConnectResultCode.SUCCESS)
-            {
-                return response;
+                throw new Exception($"Session broker response error: {resultCode}");
             }
 
-            response.serverIp = buffer.ReadString();
-            response.serverPort = buffer.ReadUShort();
-            response.sessionId = buffer.ReadUShort();
-            response.sessionKey = buffer.ReadString();
+            TargetServerInfo.serverIp = buffer.ReadString();
+            TargetServerInfo.serverPort = buffer.ReadUShort();
+            SessionInfo.sessionId = buffer.ReadUShort();
+            SessionInfo.sessionKey = buffer.ReadString();
+            SessionInfo.sessionSalt = buffer.ReadString();
 
-            return response;
+            SessionInfo.sessionState = SessionState.Connecting;
         }
 
         public void Disconnect()
