@@ -26,15 +26,15 @@ namespace ClientCore
     public class SessionInfo
     {
         public SessionIdType sessionId { get; set; }
-        public string sessionKey { get; set; }
-        public string sessionSalt { get; set; }
+        public string sessionKey { get; set; } = "";
+        public string sessionSalt { get; set; } = "";
         public SessionState sessionState { get; set; }
     }
 
     public class TargetServerInfo
     {
-        public string serverIp { get; set; }
-        public ushort serverPort { get; set; }
+        public string serverIp { get; set; } = "";
+        public ushort serverPort { get; set; } = 0;
     }
 
     public class RUDPSession
@@ -44,12 +44,12 @@ namespace ClientCore
             MakeSessionInfo(sessionInfoStream);
         }
 
-        public SessionInfo SessionInfo { get; private set; } = new()
+        public SessionInfo SessionInfo { get; } = new()
         {
             sessionState = SessionState.Disconnected,
         };
 
-        public TargetServerInfo TargetServerInfo { get; private set; } = new();
+        public TargetServerInfo TargetServerInfo { get; } = new();
 
         private UdpClient udpClient = null!;
         private IPEndPoint serverEndPoint = null!;
@@ -58,9 +58,9 @@ namespace ClientCore
         private PacketSequence expectedRecvSequence = 0;
 
         private HashSet<PacketSequence> holdingSequences = [];
-        private object holdingSequencesLock = new object();
-        private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new SortedDictionary<PacketSequence, NetBuffer>();
-        private object holdingPacketsLock = new object();
+        private object holdingSequencesLock = new();
+        private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new();
+        private object holdingPacketsLock = new();
 
         private bool isConnected = false;
 
@@ -72,6 +72,11 @@ namespace ClientCore
         public SessionIdType GetSessionId()
         {
             return SessionInfo.sessionId;
+
+        }
+        public bool IsConnected()
+        {
+            return isConnected;
         }
         
         private void ParseSessionBrokerResponse(byte[] data)
@@ -227,6 +232,20 @@ namespace ClientCore
 
         private void Cleanup()
         {
+            udpClient.Close();
+            udpClient = null!;
+            SessionInfo.sessionState = SessionState.Disconnected;
+            SessionInfo.sessionId = 0;
+            SessionInfo.sessionKey = string.Empty;
+            SessionInfo.sessionSalt = string.Empty;
+            TargetServerInfo.serverIp = string.Empty;
+            TargetServerInfo.serverPort = 0;
+            lastSendSequence = 0;
+            expectedRecvSequence = 0;
+            holdingSequences.Clear();
+            holdingPackets.Clear();
+
+            isConnected = false;
         }
     }
 }
