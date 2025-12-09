@@ -201,6 +201,7 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 	std::scoped_lock lock(releaseSessionIdListLock);
 	session.nowInReleaseThread = true;
 	releaseSessionIdList.emplace_back(session.GetSessionId());
+	SetEvent(sessionReleaseEventHandle);
 }
 
 bool MultiSocketRUDPCore::SetSessionFactory(SessionFactoryFunc&& factoryFunc)
@@ -450,6 +451,15 @@ RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId)
 	return sessionArray[sessionId];
 }
 
+RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessionId) const
+{
+	if (sessionArray.size() <= sessionId || not sessionArray[sessionId]->IsReleasing())
+	{
+		return nullptr;
+	}
+	return sessionArray[sessionId];
+}
+
 void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 {
 	RIORESULT rioResults[MAX_RIO_RESULT];
@@ -572,7 +582,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 			std::scoped_lock lock(releaseSessionIdListLock);
 			for (const auto& releaseSessionId : releaseSessionIdList)
 			{
-				if (const auto releaseSession = GetUsingSession(releaseSessionId))
+				if (const auto releaseSession = GetReleasingSession(releaseSessionId))
 				{
 					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING ||
 						releaseSession->nowInProcessingRecvPacket)

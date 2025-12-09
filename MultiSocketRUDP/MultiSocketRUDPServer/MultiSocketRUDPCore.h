@@ -136,6 +136,7 @@ private:
 	RUDPSession* AcquireSession();
 	[[nodiscard]]
 	inline RUDPSession* GetUsingSession(SessionIdType sessionId) const;
+	inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 
 private:
 	// This container's size must not be increased any further
