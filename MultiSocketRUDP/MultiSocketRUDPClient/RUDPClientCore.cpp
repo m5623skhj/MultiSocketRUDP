@@ -297,11 +297,11 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 		if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
-			SendReplyToServer(packetSequence, true, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
+			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
 		}
 		else
 		{
-			SendReplyToServer(packetSequence, true);
+			SendReplyToServer(packetSequence);
 		}
 		break;
 	}
@@ -351,7 +351,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	}
 }
 
-void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const bool isCorePacket, const PACKET_TYPE packetType)
+void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType)
 {
 	auto& buffer = *NetBuffer::Alloc();
 
@@ -363,7 +363,7 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 		sessionSalt,
 		SESSION_SALT_SIZE,
 		sessionKeyHandle,
-		isCorePacket
+		true
 	);
 
 	{
