@@ -133,6 +133,7 @@ void RUDPSession::DoDisconnect()
 		}
 	}
 
+	OnDisconnected();
 	core.PushToDisconnectTargetSession(*this);
 }
 
@@ -153,7 +154,7 @@ void RUDPSession::Disconnect()
 
 		sendPacketInfoMap.clear();
 	}
-	OnDisconnected();
+	OnReleased();
 
 	core.DisconnectSession(sessionId);
 }
@@ -410,11 +411,13 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 	auto const itor = packetFactoryMap.find(packetId);
 	if (itor == packetFactoryMap.end())
 	{
+		LOG_ERROR(std::format("Received unknown packet. packetId: {}", packetId));
 		return false;
 	}
 
 	if (not itor->second(this, &recvPacket)())
 	{
+		LOG_ERROR(std::format("Failed to process received packet. packetId: {}", packetId));
 		return false;
 	}
 

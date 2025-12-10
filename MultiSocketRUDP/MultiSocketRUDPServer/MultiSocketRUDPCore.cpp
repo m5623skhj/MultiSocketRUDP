@@ -991,9 +991,9 @@ SEND_PACKET_INFO_TO_STREAM_RETURN MultiSocketRUDPCore::StoredSendPacketInfoToStr
 	}
 
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
-	if (useSize > MAX_SEND_BUFFER_SIZE)
+	if (useSize > MAX_SEND_BUFFER_SIZE || useSize == 0)
 	{
-		LOG_ERROR(std::format("MakeSendStream() : useSize is over MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
+		LOG_ERROR(std::format("MakeSendStream() : useSize is invalid. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
 
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;

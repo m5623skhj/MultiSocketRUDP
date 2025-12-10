@@ -15,6 +15,7 @@ public:
 private:
 	void OnConnected() override;
 	void OnDisconnected() override;
+	void OnReleased() override;
 
 private:
 	void RegisterAllPacketHandler();

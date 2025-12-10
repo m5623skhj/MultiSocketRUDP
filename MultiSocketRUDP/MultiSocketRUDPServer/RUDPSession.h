@@ -79,6 +79,7 @@ private:
 	void OnConnected(SessionIdType inSessionId);
 	virtual void OnConnected() {}
 	virtual void OnDisconnected() {}
+	virtual void OnReleased() {}
 	[[nodiscard]]
 	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
 
