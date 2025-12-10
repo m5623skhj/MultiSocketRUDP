@@ -134,10 +134,13 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		sendPacketInfo->AddRefCount();
 	}
 
-	NetBuffer* buffer = sendPacketInfo->GetBuffer();
-	buffer->m_iWriteLast = buffer->m_iWrite;
-	buffer->m_iWrite = 0;
-	buffer->m_iRead = 0;
+	if (sendPacketInfo->retransmissionCount == 0)
+	{
+		NetBuffer* buffer = sendPacketInfo->GetBuffer();
+		buffer->m_iWriteLast = buffer->m_iWrite;
+		buffer->m_iWrite = 0;
+		buffer->m_iRead = 0;
+	}
 
 	{
 		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
