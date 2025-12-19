@@ -1,5 +1,6 @@
 #include "PreCompile.h"
 #include "Protocol.h"
+#include "PacketId.h"
 
 #pragma region packet function
 #pragma endregion packet function

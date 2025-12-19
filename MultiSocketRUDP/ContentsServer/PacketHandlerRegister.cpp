@@ -1,4 +1,5 @@
 #include "PreCompile.h"
+#include "PacketIdType.h"
 #include "Player.h"
 
 void Player::RegisterAllPacketHandler()

@@ -2,7 +2,6 @@
 
 #include <string>
 #include "NetServerSerializeBuffer.h"
-#include "PacketIdType.h"
 #include "../MultiSocketRUDPServer/PacketManager.h"
 
 ////////////////////////////////////////////////////////////////////////////////////

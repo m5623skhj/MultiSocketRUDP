@@ -1,5 +1,6 @@
 #include "PreCompile.h"
 #include "Protocol.h"
+#include "PacketIdType.h"
 
 #pragma region packet function
 PacketId Ping::GetPacketId() const
