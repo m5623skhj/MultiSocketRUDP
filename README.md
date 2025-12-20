@@ -125,6 +125,13 @@
       * 각 파일들의 diff를 확인해 보고, 패킷 제네레이트의 결과물 파일이 이전 각 파일들의 원본과 비교하여 수정 사항이 없을 경우, 파일을 수정하지 않습니다.
         * 필요 없는 빌드 횟수를 줄이기 위하여 위와 같은 동작을 채택함
    2. RunDebug
-      * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다. 
+      * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다.
+   3. 개발용 인증서
+      * 테스트용 인증서를 생성 및 삭제합니다.
+      * CreateDevTLSCert.bat
+        * 테스트용 TLS 인증서를 제작하는 배치파일입니다.
+        * `DevServerCert` 라는 이름의 인증서를 제작합니다.
+      * RemoveDevTLSCert.bat
+        * `DevServerCert` 라는 이름을 가진 인증서를 제거합니다.
 
 ---
