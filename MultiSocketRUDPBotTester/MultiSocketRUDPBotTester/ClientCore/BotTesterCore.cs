@@ -8,8 +8,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
     {
         public static BotTesterCore Instance = new();
 
-        private SessionGetter sessionGetter = new SessionGetter();
-        private Dictionary<SessionIdType, RUDPSession> sessionDictionary = new();
+        private readonly SessionGetter sessionGetter = new();
+        private readonly Dictionary<SessionIdType, RUDPSession> sessionDictionary = new();
         private readonly Lock sessionDictionaryLock = new();
 
         private string hostIp = "";

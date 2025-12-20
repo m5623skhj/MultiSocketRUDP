@@ -52,7 +52,7 @@ namespace ClientCore
         public TargetServerInfo TargetServerInfo { get; } = new();
 
         private UdpClient udpClient = null!;
-        private IPEndPoint serverEndPoint = null!;
+        private readonly IPEndPoint serverEndPoint = null!;
 
         private PacketSequence lastSendSequence = 0;
         private PacketSequence expectedRecvSequence = 0;

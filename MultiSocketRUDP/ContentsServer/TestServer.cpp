@@ -24,12 +24,12 @@ bool TestServer::Start(const std::wstring& coreOptionFilePath, const std::wstrin
 
 	if (not serverCore.StartServer(coreOptionFilePath, sessionBrokerOptionFilePath, std::move(playerFactoryFunc), true))
 	{
-		std::cout << "StartServer() failed" << std::endl;
+		std::cout << "StartServer() failed" << '\n';
 		Logger::GetInstance().StopLoggerThread();
 		return false;
 	}
 
-	std::cout << "Server is running" << std::endl;
+	std::cout << "Server is running" << '\n';
 	return true;
 }
 
@@ -37,7 +37,7 @@ void TestServer::Stop()
 {
 	serverCore.StopServer();
 
-	std::cout << "Server stopped" << std::endl;
+	std::cout << "Server stopped" << '\n';
 }
 
 bool TestServer::IsServerStopped() const
