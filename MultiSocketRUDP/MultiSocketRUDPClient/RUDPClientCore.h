@@ -1,12 +1,12 @@
 #pragma once
 #include "NetServerSerializeBuffer.h"
-#include "NetClient.h"
 #include "BuildConfig.h"
 #include "../Common/etc/CoreType.h"
 #include <thread>
 #include <mutex>
 #include <array>
 #include <map>
+#include "ServerAliveChecker.h"
 
 #include "Queue.h"
 #include <queue>
@@ -52,7 +52,7 @@ struct RecvPacketInfo
 class RUDPClientCore
 {
 public:
-	RUDPClientCore() = default;
+	RUDPClientCore();
 	virtual ~RUDPClientCore() = default;
 	RUDPClientCore& operator=(const RUDPClientCore&) = delete;
 	RUDPClientCore(RUDPClientCore&&) = delete;
@@ -139,6 +139,8 @@ private:
 	void DoSend();
 	static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
+	PacketSequence GetNextRecvPacketSequence() const { return nextRecvPacketSequence; }
+
 private:
 	SOCKET rudpSocket{};
 	sockaddr_in serverAddr{};
@@ -191,6 +193,10 @@ private:
 private:
 	PacketRetransmissionCount maxPacketRetransmissionCount{};
 	unsigned int retransmissionThreadSleepMs{};
+	unsigned int serverAliveCheckMs{};
+
+private:
+	ServerAliveChecker serverAliveChecker;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

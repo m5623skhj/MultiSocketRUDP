@@ -60,6 +60,9 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="ServerAliveChecker.cpp">
+      <Filter>소스 파일\MultiSocketClientCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RUDPClientCore.h">
@@ -72,6 +75,9 @@
       <Filter>소스 파일\MultiSocketClientCore\CoreType</Filter>
     </ClInclude>
     <ClInclude Include="PacketManager.h">
+      <Filter>소스 파일\MultiSocketClientCore</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerAliveChecker.h">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClInclude>
   </ItemGroup>

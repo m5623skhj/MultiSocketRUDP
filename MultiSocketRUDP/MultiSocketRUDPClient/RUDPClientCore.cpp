@@ -5,6 +5,12 @@
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
+RUDPClientCore::RUDPClientCore()
+	: serverAliveChecker(std::bind(&RUDPClientCore::Stop, this)
+	, std::bind(&RUDPClientCore::GetNextRecvPacketSequence, this))
+{
+}
+
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
@@ -56,6 +62,7 @@ void RUDPClientCore::Stop()
 
 void RUDPClientCore::JoinThreads()
 {
+	serverAliveChecker.StopServerAliveCheck();
 	if (retransmissionThread.joinable())
 	{
 		retransmissionThread.join();
@@ -343,6 +350,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	if (packetSequence == 0)
 	{
 		isConnected = true;
+		serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
 	}
 
 	{
@@ -582,9 +590,17 @@ bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath
 	WCHAR* pBuff = cBuffer;
 
 	if (!parser.GetValue_Short(pBuff, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", reinterpret_cast<short*>(&maxPacketRetransmissionCount)))
+	{
 		return false;
+	}
 	if (!parser.GetValue_Int(pBuff, L"CORE", L"RETRANSMISSION_MS", reinterpret_cast<int*>(&retransmissionThreadSleepMs)))
+	{
 		return false;
+	}
+	if (!parser.GetValue_Int(pBuff, L"CORE", L"SERVER_ALIVE_CHECK_MS", reinterpret_cast<int*>(&serverAliveCheckMs)))
+	{
+		return false;
+	}
 
 	return true;
 }
