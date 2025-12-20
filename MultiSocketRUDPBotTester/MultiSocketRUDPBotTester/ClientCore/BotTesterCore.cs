@@ -47,11 +47,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
-        public UInt16 GetActiveBotCount()
+        public int GetActiveBotCount()
         {
             lock (sessionDictionaryLock)
             {
-                return (UInt16)sessionDictionary.Count;
+                return sessionDictionary.Count;
             }
         }
 

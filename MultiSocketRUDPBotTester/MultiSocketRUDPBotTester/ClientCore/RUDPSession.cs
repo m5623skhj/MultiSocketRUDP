@@ -54,13 +54,14 @@ namespace ClientCore
         private UdpClient udpClient = null!;
         private readonly IPEndPoint serverEndPoint = null!;
 
-        private PacketSequence lastSendSequence = 0;
+        private PacketSequence lastSendSequence = 1;
         private PacketSequence expectedRecvSequence = 0;
 
         private HashSet<PacketSequence> holdingSequences = [];
         private object holdingSequencesLock = new();
         private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new();
         private object holdingPacketsLock = new();
+        public CancellationToken cancellationToken;
 
         private bool isConnected = false;
 
@@ -100,6 +101,12 @@ namespace ClientCore
             SessionInfo.sessionSalt = buffer.ReadString();
 
             SessionInfo.sessionState = SessionState.Connecting;
+            _ = ReceiveAsync();
+            var result =  SendConnectPacket();
+            if (!result.Result)
+            {
+                Log.Error("SendConnectPacket() failed. SessionId {}", SessionInfo.sessionId);
+            }
         }
 
         public void Disconnect()
@@ -107,7 +114,7 @@ namespace ClientCore
             Cleanup();
         }
 
-        public async Task<bool> SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)
+        public async Task SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)
         {
             packetBuffer.InsertPacketType(packetType);
             packetBuffer.InsertPacketSequence(++lastSendSequence);
@@ -115,14 +122,6 @@ namespace ClientCore
 
             packetBuffer.Encode();
             await SendPacket(new SendPacketInfo(packetBuffer));
-
-            return true;
-        }
-
-        private async Task<bool> SendConnectPacket(NetBuffer packetBuffer)
-        {
-            await SendPacket(new SendPacketInfo(MakeConnectPacket()));
-            return true;
         }
 
         private async Task<bool> SendPacket(SendPacketInfo sendPacketInfo)
@@ -132,15 +131,20 @@ namespace ClientCore
             return true;
         }
 
+        private async Task<bool> SendConnectPacket()
+        {
+            return await SendPacket(new SendPacketInfo(MakeConnectPacket()));
+        }
+
         private NetBuffer MakeConnectPacket()
         {
             var buffer = new NetBuffer();
-            buffer.BuildConnectPacket(SessionInfo.sessionId, SessionInfo.sessionKey);
+            buffer.BuildConnectPacket(SessionInfo.sessionId);
 
             return buffer;
         }
 
-        private async Task ReceiveAsync(CancellationToken cancellationToken)
+        private async Task ReceiveAsync()
         {
             try
             {
@@ -150,13 +154,16 @@ namespace ClientCore
                     ProcessReceivedPacket(result.Buffer);
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                Log.Warning("Cancel by cancellationToken");
+            }
             catch (ObjectDisposedException) { }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 if (cancellationToken.IsCancellationRequested == false)
                 {
-                    Log.Error("Cancellation request failed with {}", ex.ToString());
+                    Log.Error("Cancellation request failed with {}", exception.ToString());
                 }
             }
         }
@@ -203,6 +210,7 @@ namespace ClientCore
             if (packetSequence == 0)
             {
                 isConnected = true;
+                _ = StartServerAliveCheck();
             }
 
             // Erase send packet info container by packetSequence
@@ -228,6 +236,36 @@ namespace ClientCore
             netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
             netBuffer.WriteULong(0);
             return netBuffer;
+        }
+
+        private async Task StartServerAliveCheck()
+        {
+            PacketSequence beforeReceivedSequence = 0;
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(cancellationToken))
+                {
+                    if (!isConnected)
+                    {
+                        break;
+                    }
+
+                    if (beforeReceivedSequence != expectedRecvSequence)
+                    {
+                        beforeReceivedSequence = expectedRecvSequence;
+                        continue;
+                    }
+
+                    Log.Warning("No response from server, disconnecting...");
+                    await DisconnectAsync();
+                    break;
+                }
+            }
+            catch (OperationCanceledException exception)
+            {
+                Log.Error("Server alive check throw with {}", exception.ToString());
+            }
         }
 
         private void Cleanup()

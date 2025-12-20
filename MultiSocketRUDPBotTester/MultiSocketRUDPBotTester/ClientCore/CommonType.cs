@@ -1,6 +1,5 @@
-﻿global using PacketSequence = System.UInt64;
-global using PacketRetransmissionCount = System.UInt16;
-global using PacketId = System.UInt32;
+﻿global using PacketSequence = ulong;
+global using PacketRetransmissionCount = ushort;
 
 public enum PacketType : byte
 {
@@ -19,4 +18,9 @@ public static class CommonFunc
     {
         return (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
+}
+
+public enum PacketId : uint
+{
+
 }

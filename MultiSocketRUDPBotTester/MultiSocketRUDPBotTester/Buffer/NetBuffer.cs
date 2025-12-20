@@ -297,14 +297,15 @@ namespace MultiSocketRUDPBotTester.Buffer
         public void InsertPacketId(PacketId id)
         {
             var span = buffer.AsSpan(PACKET_ID_POS, 4);
-            BitConverter.TryWriteBytes(span, id);
+            BitConverter.TryWriteBytes(span, (uint)id);
         }
 
-        public void BuildConnectPacket(SessionIdType sessionId, string sessionKey)
+        public void BuildConnectPacket(SessionIdType sessionId)
         {
             writePos = PACKET_ID_POS;
+            WriteByte((byte)PacketType.CONNECT_TYPE);
+            WriteULong(0);
             WriteUShort(sessionId);
-            WriteString(sessionKey);
         }
     }
 }
