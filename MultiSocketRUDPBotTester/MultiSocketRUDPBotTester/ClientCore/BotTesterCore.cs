@@ -73,17 +73,17 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     }
 
                     totalBytes += receivedBytes;
-                    if (totalBytes < GlobalConstants.packetHeaderSize)
+                    if (totalBytes < GlobalConstants.PacketHeaderSize)
                     {
                         continue;
                     }
 
                     if (payloadLength == 0)
                     {
-                        payloadLength = BitConverter.ToUInt16(buffer, GlobalConstants.payloadPosition);
+                        payloadLength = BitConverter.ToUInt16(buffer, GlobalConstants.PayloadPosition);
                     }
 
-                    if (totalBytes >= payloadLength + GlobalConstants.packetHeaderSize)
+                    if (totalBytes >= payloadLength + GlobalConstants.PacketHeaderSize)
                     {
                         break;
                     }
@@ -94,7 +94,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 throw new Exception($"GetSessionInfoFromSessionBroker failed with {e.Message}");
             }
 
-            return new Client(buffer[GlobalConstants.packetHeaderSize..totalBytes]);
+            return new Client(buffer[GlobalConstants.PacketHeaderSize..totalBytes]);
         }
     }
 }

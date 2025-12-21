@@ -1,6 +1,8 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
 using Serilog;
 
 namespace ClientCore
@@ -25,10 +27,13 @@ namespace ClientCore
     
     public class SessionInfo
     {
+        public static readonly int SessionKeySize = 16;
+
         public SessionIdType sessionId { get; set; }
-        public string sessionKey { get; set; } = "";
+        public byte[] sessionKey { get; set; } = new byte[16];
         public string sessionSalt { get; set; } = "";
         public SessionState sessionState { get; set; }
+        public AesGcm? AesGcm { get; set; }
     }
 
     public class TargetServerInfo
@@ -86,7 +91,7 @@ namespace ClientCore
 
     public abstract class RUDPSession
     {
-        public RUDPSession(byte[] sessionInfoStream)
+        protected RUDPSession(byte[] sessionInfoStream)
         {
             MakeSessionInfo(sessionInfoStream);
         }
@@ -144,8 +149,9 @@ namespace ClientCore
             TargetServerInfo.serverIp = buffer.ReadString();
             TargetServerInfo.serverPort = buffer.ReadUShort();
             SessionInfo.sessionId = buffer.ReadUShort();
-            SessionInfo.sessionKey = buffer.ReadString();
+            SessionInfo.sessionKey = buffer.ReadBytes(SessionInfo.SessionKeySize);
             SessionInfo.sessionSalt = buffer.ReadString();
+            SessionInfo.AesGcm = new AesGcm(SessionInfo.sessionKey, SessionInfo.SessionKeySize);
 
             udpClient = new UdpClient();
             udpClient.Connect(new IPEndPoint(IPAddress.Parse(TargetServerInfo.serverIp), TargetServerInfo.serverPort));
@@ -223,38 +229,66 @@ namespace ClientCore
 
         private void ProcessReceivedPacket(byte[] data)
         {
-            var buffer = new NetBuffer();
-            if (buffer.Decode(data) == false)
+            if (SessionInfo.AesGcm == null)
             {
-                Log.Error("Buffer decode failed");
+                Log.Error("AesGcm is null, cannot decode packet");
                 return;
             }
 
+            var buffer = new NetBuffer();
+            buffer.WriteBytes(data);
             var packetType = (PacketType)buffer.ReadByte();
+            var isCorePacket = packetType == PacketType.SEND_TYPE;
+            PacketDirection direction;
+            switch (packetType)
+            {
+                case PacketType.HEARTBEAT_TYPE:
+                case PacketType.SEND_TYPE:
+                {
+                    direction = PacketDirection.SERVER_TO_CLIENT;
+                    break;
+                }
+                case PacketType.SEND_REPLY_TYPE:
+                {
+                    direction = PacketDirection.SERVER_TO_CLIENT_REPLY;
+                    break;
+                }
+                default:
+                {
+                    return;
+                }
+            }
+
+            if (!NetBuffer.DecodePacket(SessionInfo.AesGcm
+                    , buffer
+                    , isCorePacket
+                    , SessionInfo.sessionKey
+                    , SessionInfo.sessionSalt
+                    , direction))
+            {
+                Log.Error("Failed to decode received packet");
+                return;
+            }
+
             var packetSequence = buffer.ReadULong();
             switch (packetType)
             {
                 case PacketType.HEARTBEAT_TYPE:
                 {
                     SendReplyToServer(packetSequence);
-                } 
-                break;
+                    break;
+                }
                 case PacketType.SEND_TYPE:
                 {
                     SendReplyToServer(packetSequence);
                     OnRecvPacket(buffer);
+                    break;
                 }
-                break;
                 case PacketType.SEND_REPLY_TYPE:
                 {
                     OnSendReply(packetSequence);
+                    break;
                 }
-                break;
-                default:
-                {
-                    Log.Error("Invalid packet type {}", packetType);
-                }
-                break;
             }
         }
 
@@ -375,8 +409,13 @@ namespace ClientCore
             udpClient = null!;
             SessionInfo.sessionState = SessionState.Disconnected;
             SessionInfo.sessionId = 0;
-            SessionInfo.sessionKey = string.Empty;
+            SessionInfo.sessionKey = [];
             SessionInfo.sessionSalt = string.Empty;
+            if (SessionInfo.AesGcm != null)
+            {
+                SessionInfo.AesGcm.Dispose();
+                SessionInfo.AesGcm = null;
+            }
             TargetServerInfo.serverIp = string.Empty;
             TargetServerInfo.serverPort = 0;
             lastSendSequence = 0;

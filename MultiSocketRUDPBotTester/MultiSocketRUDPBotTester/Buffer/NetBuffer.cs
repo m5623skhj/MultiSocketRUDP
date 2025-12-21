@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Security.Cryptography;
+using System.Text;
+using MultiSocketRUDPBotTester.ClientCore;
 
 namespace MultiSocketRUDPBotTester.Buffer
 {
@@ -259,6 +261,45 @@ namespace MultiSocketRUDPBotTester.Buffer
             readPos = HEADER_SIZE;
             writePos = data.Length;
             return true;
+        }
+
+        public static bool DecodePacket(AesGcm aesGcm, NetBuffer packet, bool isCorePacket, byte[] sessionKey, string sessionSalt, PacketDirection direction)
+        {
+            const int minimumPacketSize = sizeof(PacketSequence) + sizeof(PacketId) + CryptoHelper.AuthTagSize;
+            const int minimumCorePacketSize = sizeof(PacketSequence) + CryptoHelper.AuthTagSize;
+            const int sizeOfHeaderWithPacketType = HEADER_SIZE + sizeof(PacketType);
+
+            var packetUseSize = packet.GetLength();
+            var minimumRecvPacketSize = isCorePacket ? minimumCorePacketSize : minimumPacketSize;
+            if (packetUseSize < minimumRecvPacketSize)
+            {
+                return false;
+            }
+
+            var packetSequence = packet.ReadULong();
+            var bodyOffset = isCorePacket 
+                ? (sizeOfHeaderWithPacketType + sizeof(PacketSequence)) 
+                : (sizeOfHeaderWithPacketType + sizeof(PacketSequence) + sizeof(PacketId));
+            var authTagOffset = packet.writePos - CryptoHelper.AuthTagSize;
+            var bodySize = packetUseSize + sizeOfHeaderWithPacketType - bodyOffset - CryptoHelper.AuthTagSize;
+
+            var nonce = CryptoHelper.GenerateNonce(Encoding.UTF8.GetBytes(sessionSalt), packetSequence, direction);
+            if (nonce.Length == 0)
+            {
+                return false;
+            }
+
+            var bodySpan = packet.buffer.AsSpan(bodyOffset, bodySize);
+            var aadSpan = packet.buffer.AsSpan(0, sizeOfHeaderWithPacketType);
+            var authTagSpan = packet.buffer.AsSpan(authTagOffset, CryptoHelper.AuthTagSize);
+
+            return CryptoHelper.Decrypt(
+                aesGcm,
+                sessionKey,
+                nonce,
+                bodySpan,
+                aadSpan,
+                authTagSpan);
         }
 
         public byte[] GetPayload()

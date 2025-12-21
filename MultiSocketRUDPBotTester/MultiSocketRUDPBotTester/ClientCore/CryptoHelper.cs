@@ -4,7 +4,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 {
     public static class CryptoHelper
     {
-        public static void Encrypt(byte[] key
+        public const int AuthTagSize = 16;
+        public const int SessionSaltSize = 16;
+        public const int NonceSize = 12;
+
+        public static void Encrypt(AesGcm aesGcm
+            , byte[] key
             , byte[] nonce
             , byte[] plaintext
             , byte[] add
@@ -14,28 +19,53 @@ namespace MultiSocketRUDPBotTester.ClientCore
             ciphertext = new byte[plaintext.Length];
             tag = new byte[16];
 
-            using var aesGcm = new AesGcm(key, tag.Length);
             aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, add);
         }
 
-        public static byte[]? Decrypt(byte[] key
-            , byte[] nonce
-            , byte[] ciphertext
-            , byte[] add
-            , byte[] tag)
+        public static bool Decrypt(
+            AesGcm aesGcm,
+            byte[] key,
+            byte[] nonce,
+            Span<byte> cipherText,
+            ReadOnlySpan<byte> aad,
+            ReadOnlySpan<byte> authTag)
         {
-            var plaintext = new byte[ciphertext.Length];
-
             try
             {
-                using var aesGcm = new AesGcm(key, tag.Length);
-                aesGcm.Decrypt(nonce, ciphertext, tag, plaintext, add);
-                return plaintext;
+                aesGcm.Decrypt(
+                    nonce,
+                    cipherText,
+                    authTag,
+                    cipherText,
+                    aad);
             }
-            catch (CryptographicException)
+            catch (System.Security.Cryptography.CryptographicException)
             {
-                return null;
+                return false;
             }
+
+            return true;
+        }
+
+        public static byte[] GenerateNonce(byte[] sessionSalt, PacketSequence packetSequence, PacketDirection direction)
+        {
+            if (sessionSalt.Length != SessionSaltSize)
+            {
+                return [];
+            }
+
+            var nonce = new byte[NonceSize];
+            Array.Copy(sessionSalt, 0, nonce, 0, SessionSaltSize);
+
+            nonce[8] = (byte)((packetSequence >> 24) & 0x3F);
+            nonce[9] = (byte)((packetSequence >> 16) & 0xFF);
+            nonce[10] = (byte)((packetSequence >> 8) & 0xFF);
+            nonce[11] = (byte)(packetSequence & 0xFF);
+
+            var directionBits = (byte)((byte)direction << 6);
+            nonce[8] |= directionBits;
+
+            return nonce;
         }
     }
 }

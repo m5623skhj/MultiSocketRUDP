@@ -30,3 +30,12 @@ public enum PacketId : uint
     , TEST_PACKET_REQ = 5
     , TEST_PACKET_RES = 6
 }
+
+public enum PacketDirection : byte
+{
+    CLIENT_TO_SERVER = 0,
+    CLIENT_TO_SERVER_REPLY = 1,
+    SERVER_TO_CLIENT = 2,
+    SERVER_TO_CLIENT_REPLY = 3,
+    INVALID = 255
+}
