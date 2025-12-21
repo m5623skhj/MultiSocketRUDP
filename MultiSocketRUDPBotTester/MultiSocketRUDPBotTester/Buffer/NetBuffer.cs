@@ -9,20 +9,14 @@ namespace MultiSocketRUDPBotTester.Buffer
         private const int PACKET_TYPE_POS = 5;
         private const int PACKET_SEQUENCE_POS = 6;
         private const int PACKET_ID_POS = 14;
-        private byte[] buffer;
-        private int readPos;
-        private int writePos;
-        private bool isEndoded = false;
+
+        private readonly byte[] buffer = new byte[BUFFER_SIZE];
+        private int readPos = HEADER_SIZE;
+        private int writePos = HEADER_SIZE;
+        private bool IsEncoded = false;
 
         public static byte HeaderCode { get; set; } = 0x89;
         public static byte XORKey { get; set; } = 0x32;
-
-        public NetBuffer()
-        {
-            buffer = new byte[BUFFER_SIZE];
-            readPos = HEADER_SIZE;
-            writePos = HEADER_SIZE;
-        }
 
         public void WriteByte(byte value)
         {
@@ -183,9 +177,10 @@ namespace MultiSocketRUDPBotTester.Buffer
             return result;
         }
 
+        // TODO : Use CryptoHelper
         public void Encode()
         {
-            if (isEndoded)
+            if (IsEncoded)
             {
                 return;
             }
@@ -224,6 +219,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             Array.Copy(buffer, result, writePos);
         }
 
+        // TODO : Use CryptoHelper
         public bool Decode(byte[] data)
         {
             if (data.Length < HEADER_SIZE) return false;

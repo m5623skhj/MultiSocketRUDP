@@ -37,7 +37,54 @@ namespace ClientCore
         public ushort serverPort { get; set; } = 0;
     }
 
-    public class RUDPSession
+    public class HoldingPacketStore
+    {
+        private readonly HashSet<PacketSequence> holdingSequences = [];
+        private readonly Lock holdingSequencesLock = new();
+        private readonly SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new();
+        private readonly Lock holdingPacketsLock = new();
+
+        public void AddHoldingPacket(PacketSequence sequence, NetBuffer buffer)
+        {
+            lock (holdingPacketsLock)
+            {
+                holdingPackets.Add(sequence, buffer);
+            }
+
+            lock (holdingSequencesLock)
+            {
+                holdingSequences.Add(sequence);
+            }
+        }
+
+        public void RemoveHoldingPacket(PacketSequence sequence)
+        {
+            lock (holdingSequencesLock)
+            {
+                holdingSequences.Remove(sequence);
+            }
+
+            lock (holdingPacketsLock)
+            {
+                holdingPackets.Remove(sequence);
+            }
+        }
+
+        public void Clear()
+        {
+            lock (holdingSequencesLock)
+            {
+                holdingSequences.Clear();
+            }
+
+            lock (holdingPacketsLock)
+            {
+                holdingPackets.Clear();
+            }
+        }
+    }
+
+    public abstract class RUDPSession
     {
         public RUDPSession(byte[] sessionInfoStream)
         {
@@ -52,18 +99,18 @@ namespace ClientCore
         public TargetServerInfo TargetServerInfo { get; } = new();
 
         private UdpClient udpClient = null!;
-        private readonly IPEndPoint serverEndPoint = null!;
 
         private PacketSequence lastSendSequence = 1;
         private PacketSequence expectedRecvSequence = 0;
+        private const int RetransmissionWakeUpMs = 30;
 
-        private HashSet<PacketSequence> holdingSequences = [];
-        private object holdingSequencesLock = new();
-        private SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new();
-        private object holdingPacketsLock = new();
-        public CancellationToken cancellationToken;
+        private readonly HoldingPacketStore holdingPacketStore = new();
+        public CancellationTokenSource CancellationToken = new();
+        private readonly BufferStore bufferStore = new();
 
-        private bool isConnected = false;
+        private volatile bool isConnected;
+
+        protected abstract void OnRecvPacket(NetBuffer buffer);
 
         private void MakeSessionInfo(byte[] sessionInfoStream)
         {
@@ -100,8 +147,12 @@ namespace ClientCore
             SessionInfo.sessionKey = buffer.ReadString();
             SessionInfo.sessionSalt = buffer.ReadString();
 
+            udpClient = new UdpClient();
+            udpClient.Connect(new IPEndPoint(IPAddress.Parse(TargetServerInfo.serverIp), TargetServerInfo.serverPort));
+
             SessionInfo.sessionState = SessionState.Connecting;
             _ = ReceiveAsync();
+            _ = RetransmissionAsync();
             var result =  SendConnectPacket();
             if (!result.Result)
             {
@@ -127,7 +178,9 @@ namespace ClientCore
         private async Task<bool> SendPacket(SendPacketInfo sendPacketInfo)
         {
             sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
-            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketBuffer(), sendPacketInfo.SentBuffer.GetLength(), serverEndPoint);
+            bufferStore.EnqueueSendBuffer(sendPacketInfo);
+
+            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketBuffer(), sendPacketInfo.SentBuffer.GetLength());
             return true;
         }
 
@@ -148,20 +201,20 @@ namespace ClientCore
         {
             try
             {
-                while (!cancellationToken.IsCancellationRequested)
+                while (!CancellationToken.Token.IsCancellationRequested)
                 {
-                    var result = await udpClient.ReceiveAsync(cancellationToken);
+                    var result = await udpClient.ReceiveAsync(CancellationToken.Token);
                     ProcessReceivedPacket(result.Buffer);
                 }
             }
             catch (OperationCanceledException)
             {
-                Log.Warning("Cancel by cancellationToken");
+                Log.Information("Cancel by cancellationToken");
             }
             catch (ObjectDisposedException) { }
             catch (Exception exception)
             {
-                if (cancellationToken.IsCancellationRequested == false)
+                if (CancellationToken.Token.IsCancellationRequested == false)
                 {
                     Log.Error("Cancellation request failed with {}", exception.ToString());
                 }
@@ -181,26 +234,40 @@ namespace ClientCore
             var packetSequence = buffer.ReadULong();
             switch (packetType)
             {
-                case PacketType.SEND_TYPE:
                 case PacketType.HEARTBEAT_TYPE:
-                    {
-                        // SendReplyToServer(packetSequence);
-                    }
-                    break;
+                {
+                    SendReplyToServer(packetSequence);
+                } 
+                break;
+                case PacketType.SEND_TYPE:
+                {
+                    SendReplyToServer(packetSequence);
+                    OnRecvPacket(buffer);
+                }
+                break;
                 case PacketType.SEND_REPLY_TYPE:
-                    {
-                        OnSendReply(buffer, packetSequence);
-                    }
-                    break;
+                {
+                    OnSendReply(packetSequence);
+                }
+                break;
                 default:
-                    {
-                        Log.Error("Invalid packet type {}", packetType);
-                    }
-                    break;
+                {
+                    Log.Error("Invalid packet type {}", packetType);
+                }
+                break;
             }
         }
 
-        private void OnSendReply(NetBuffer recvPacket, PacketSequence packetSequence)
+        private void SendReplyToServer(PacketSequence packetSequence)
+        {
+            var replyBuffer = new NetBuffer();
+            replyBuffer.WriteByte((byte)PacketType.SEND_REPLY_TYPE);
+            replyBuffer.WriteULong(packetSequence);
+            replyBuffer.Encode();
+            _ = udpClient.SendAsync(replyBuffer.GetPacketBuffer(), replyBuffer.GetLength());
+        }
+
+        private void OnSendReply(PacketSequence packetSequence)
         {
             if (packetSequence < expectedRecvSequence)
             {
@@ -213,7 +280,37 @@ namespace ClientCore
                 _ = StartServerAliveCheck();
             }
 
-            // Erase send packet info container by packetSequence
+            holdingPacketStore.RemoveHoldingPacket(packetSequence);
+            bufferStore.RemoveSendBuffer(packetSequence);
+        }
+
+        private async Task RetransmissionAsync()
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(RetransmissionWakeUpMs));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(CancellationToken.Token))
+                {
+                    var nowMs = CommonFunc.GetNowMs();
+                    var sendPacketInfos = bufferStore.GetAllSendPacketInfos();
+                    foreach (var sendPacketInfo in sendPacketInfos.Where(sendPacketInfo => sendPacketInfo.IsRetransmissionTime(nowMs)))
+                    {
+                        if (sendPacketInfo.IsExceedMaxRetransmissionCount())
+                        {
+                            Log.Warning("Max retransmission count exceeded, disconnecting...");
+                            await DisconnectAsync();
+                            return;
+                        }
+
+                        sendPacketInfo.RefreshSendPacketInfo(nowMs);
+                        await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketBuffer(), sendPacketInfo.SentBuffer.GetLength());
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Information("Retransmission check cancelled");
+            }
         }
 
         private async Task DisconnectAsync()
@@ -222,7 +319,7 @@ namespace ClientCore
             SessionInfo.sessionState = SessionState.Disconnecting;
 
             var disconnectPacket = BuildDisconnectPacket();
-            await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength(), serverEndPoint);
+            await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength());
             udpClient.Close();
 
             Cleanup();
@@ -230,11 +327,12 @@ namespace ClientCore
             SessionInfo.sessionState = SessionState.Disconnected;
         }
 
-        private NetBuffer BuildDisconnectPacket()
+        private static NetBuffer BuildDisconnectPacket()
         {
             var netBuffer = new NetBuffer();
             netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
-            netBuffer.WriteULong(0);
+            netBuffer.Encode();
+
             return netBuffer;
         }
 
@@ -244,7 +342,7 @@ namespace ClientCore
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
             try
             {
-                while (await timer.WaitForNextTickAsync(cancellationToken))
+                while (await timer.WaitForNextTickAsync(CancellationToken.Token))
                 {
                     if (!isConnected)
                     {
@@ -262,15 +360,18 @@ namespace ClientCore
                     break;
                 }
             }
-            catch (OperationCanceledException exception)
+            catch (OperationCanceledException)
             {
-                Log.Error("Server alive check throw with {}", exception.ToString());
+                Log.Information("StartServerAliveCheck cancelled");
             }
         }
 
         private void Cleanup()
         {
             udpClient.Close();
+            CancellationToken.Cancel();
+            CancellationToken.Dispose();
+
             udpClient = null!;
             SessionInfo.sessionState = SessionState.Disconnected;
             SessionInfo.sessionId = 0;
@@ -280,8 +381,7 @@ namespace ClientCore
             TargetServerInfo.serverPort = 0;
             lastSendSequence = 0;
             expectedRecvSequence = 0;
-            holdingSequences.Clear();
-            holdingPackets.Clear();
+            holdingPacketStore.Clear();
 
             isConnected = false;
         }

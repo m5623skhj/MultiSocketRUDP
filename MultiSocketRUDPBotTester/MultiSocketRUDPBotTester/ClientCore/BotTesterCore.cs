@@ -1,6 +1,7 @@
 ﻿using ClientCore;
 using Serilog;
 using System;
+using MultiSocketRUDPBotTester.Contents.Client;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
@@ -9,13 +10,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public static BotTesterCore Instance = new();
 
         private readonly SessionGetter sessionGetter = new();
-        private readonly Dictionary<SessionIdType, RUDPSession> sessionDictionary = new();
+        private readonly Dictionary<SessionIdType, Client> sessionDictionary = new();
         private readonly Lock sessionDictionaryLock = new();
 
         private string hostIp = "";
-        private UInt16 hostPort = 0;
+        private ushort hostPort = 0;
 
-        public async Task StartBotTest(UInt16 numOfBot)
+        public async Task StartBotTest(ushort numOfBot)
         {
             for (var i = 0; i < numOfBot; ++i)
             {
@@ -55,7 +56,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
-        private async Task<RUDPSession?> GetSessionInfoFromSessionBroker()
+        private async Task<Client?> GetSessionInfoFromSessionBroker()
         {
             var buffer = new byte[1024];
             var totalBytes = 0;
@@ -93,7 +94,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 throw new Exception($"GetSessionInfoFromSessionBroker failed with {e.Message}");
             }
 
-            return new RUDPSession(buffer[GlobalConstants.packetHeaderSize..totalBytes]);
+            return new Client(buffer[GlobalConstants.packetHeaderSize..totalBytes]);
         }
     }
 }

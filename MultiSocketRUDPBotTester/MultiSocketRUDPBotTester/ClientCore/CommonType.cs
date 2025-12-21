@@ -22,5 +22,11 @@ public static class CommonFunc
 
 public enum PacketId : uint
 {
-
+    INVALID_PACKET_ID = 0
+    , PING = 1
+    , PONG = 2
+    , TEST_STRING_PACKET_REQ = 3
+    , TEST_STRING_PACKET_RES = 4
+    , TEST_PACKET_REQ = 5
+    , TEST_PACKET_RES = 6
 }

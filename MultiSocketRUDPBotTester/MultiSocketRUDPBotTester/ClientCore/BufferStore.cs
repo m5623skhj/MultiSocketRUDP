@@ -1,4 +1,5 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
+using static ClientCore.BufferStore;
 
 namespace ClientCore
 {
@@ -11,52 +12,118 @@ namespace ClientCore
 
         public void RefreshSendPacketInfo(UInt64 now)
         {
-            sendTimeStamp = now;
+            SendTimeStamp = now;
             ++retransmissionCount;
         }
 
         public bool IsRetransmissionTime(UInt64 now)
         {
-            return (now - sendTimeStamp) >= RETRANSMISSION_TIMEOUT_MS;
+            return (now - SendTimeStamp) >= RetransmissionTimeoutMs;
         }
 
         public bool IsExceedMaxRetransmissionCount()
         {
-            return retransmissionCount >= RETRANSMISSION_MAX_COUNT;
+            return retransmissionCount >= RetransmissionMaxCount;
         }
 
         public NetBuffer SentBuffer { get; }
-        public PacketSequence packetSequence { get; } = 0;
-        private UInt64 sendTimeStamp { get; set; } = 0;
+        public PacketSequence packetSequence => 0;
+        private ulong SendTimeStamp { get; set; } = 0;
         private PacketRetransmissionCount retransmissionCount = 0;
 
-        private static readonly UInt64 RETRANSMISSION_TIMEOUT_MS = 32;
-        private static readonly UInt64 RETRANSMISSION_MAX_COUNT = 16;
+        private const ulong RetransmissionTimeoutMs = 32;
+        private const ulong RetransmissionMaxCount = 16;
     }
 
     public class BufferStore
     {
-        private SendBufferStore sendBufferStore = new SendBufferStore();
+        private readonly SendBufferStore sendBufferStore = new();
+
+        public void EnqueueSendBuffer(SendPacketInfo sendPacketInfo)
+        {
+            sendBufferStore.EnqueueSendBuffer(sendPacketInfo);
+        }
+
+        public SendPacketInfo? PeekSendBuffer()
+        {
+            return sendBufferStore.PeekSendBuffer();
+        }
+
+        public SendPacketInfo? DequeueSendBuffer()
+        {
+            return sendBufferStore.DequeueSendBuffer();
+        }
+
+        public void RemoveSendBuffer(PacketSequence sequence)
+        {
+            sendBufferStore.RemoveSendBuffer(sequence);
+        }
+
+        public int GetSendBufferCount()
+        {
+            return sendBufferStore.GetSendBufferCount();
+        }
+
+        public List<SendPacketInfo> GetAllSendPacketInfos()
+        {
+            return sendBufferStore.GetAllSendPacketInfos();
+        }
 
         public class SendBufferStore
         {
-            PriorityQueue<SendPacketInfo, PacketSequence> sendBufferQueue = new PriorityQueue<SendPacketInfo, PacketSequence>(
-                Comparer<PacketSequence>.Create((x, y) => x.CompareTo(y))
-            );
+            private readonly SortedDictionary<PacketSequence, SendPacketInfo> sendBufferStore = new();
+            private readonly Lock sendBufferStoreLock = new();
 
             public void EnqueueSendBuffer(SendPacketInfo sendPacketInfo)
             {
-                sendBufferQueue.Enqueue(sendPacketInfo, sendPacketInfo.packetSequence);
+                lock (sendBufferStoreLock)
+                {
+                    sendBufferStore.Add(sendPacketInfo.packetSequence, sendPacketInfo);
+                }
             }
 
             public SendPacketInfo? PeekSendBuffer()
             {
-                return sendBufferQueue.Count == 0 ? null : sendBufferQueue.Peek();
+                lock (sendBufferStoreLock)
+                {
+                    return sendBufferStore.First().Value;
+                }
             }
 
             public SendPacketInfo? DequeueSendBuffer()
             {
-                return sendBufferQueue.Count == 0 ? null : sendBufferQueue.Dequeue();
+                lock (sendBufferStoreLock)
+                {
+                    var firstKey = sendBufferStore.First().Key;
+                    var firstValue = sendBufferStore[firstKey];
+                    sendBufferStore.Remove(firstKey);
+                    
+                    return firstValue;
+                }
+            }
+
+            public void RemoveSendBuffer(PacketSequence sequence)
+            {
+                lock (sendBufferStoreLock)
+                {
+                    sendBufferStore.Remove(sequence);
+                }
+            }
+
+            public int GetSendBufferCount()
+            {
+                lock (sendBufferStoreLock)
+                {
+                    return sendBufferStore.Count;
+                }
+            }
+
+            public List<SendPacketInfo> GetAllSendPacketInfos()
+            {
+                lock (sendBufferStoreLock)
+                {
+                    return sendBufferStore.Values.ToList();
+                }
             }
         }
     }
