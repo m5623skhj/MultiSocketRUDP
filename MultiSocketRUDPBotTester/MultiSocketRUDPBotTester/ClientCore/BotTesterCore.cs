@@ -1,6 +1,7 @@
 ﻿using ClientCore;
 using Serilog;
 using System;
+using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.Contents.Client;
 
 namespace MultiSocketRUDPBotTester.ClientCore
@@ -16,6 +17,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private string hostIp = "";
         private ushort hostPort = 0;
 
+        private ActionGraph botActionGraph = new();
+
+        public void SetBotActionGraph(ActionGraph graph)
+        {
+            botActionGraph = graph;
+        }
+
         public async Task StartBotTest(ushort numOfBot)
         {
             for (var i = 0; i < numOfBot; ++i)
@@ -26,6 +34,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     Log.Error("StartBotTest() failed to get session info from session broker");
                     return;
                 }
+
+                rudpSession.SetActionGraph(botActionGraph);
 
                 lock (sessionDictionaryLock)
                 {

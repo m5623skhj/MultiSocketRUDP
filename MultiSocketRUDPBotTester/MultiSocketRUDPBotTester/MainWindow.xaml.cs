@@ -29,7 +29,7 @@ namespace MultiSocketRUDPBotTester
             timer.Tick += (s, e) => UpdateUI();
             timer.Start();
         }
-
+        
         private async void StartBotTest_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -59,6 +59,8 @@ namespace MultiSocketRUDPBotTester
 
         private void UpdateUI()
         {
+            var activeBotCount = BotTesterCore.Instance.GetActiveBotCount();
+            Title = $"Multi-Socket RUDP Bot Tester - Active Bots: {activeBotCount}";
         }
     }
 }

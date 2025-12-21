@@ -117,6 +117,9 @@ namespace ClientCore
 
         protected abstract void OnRecvPacket(NetBuffer buffer);
 
+        protected virtual void OnConnected() {}
+        protected virtual void OnDisconnected() {}
+
         private void MakeSessionInfo(byte[] sessionInfoStream)
         {
             ParseSessionBrokerResponse(sessionInfoStream);
@@ -312,6 +315,7 @@ namespace ClientCore
             {
                 isConnected = true;
                 _ = StartServerAliveCheck();
+                OnConnected();
             }
 
             holdingPacketStore.RemoveHoldingPacket(packetSequence);
@@ -402,6 +406,8 @@ namespace ClientCore
 
         private void Cleanup()
         {
+            OnDisconnected();
+            
             udpClient.Close();
             CancellationToken.Cancel();
             CancellationToken.Dispose();
