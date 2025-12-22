@@ -12,6 +12,9 @@
         <StackPanel Grid.Column="0"
                     VerticalAlignment="Top"
                     Width="180">
+            <Button Content="Set Bot Action Graph"
+                    Height="35"
+                    Click="SetBotActionGraph_Click"/>
             <Button Content="Start Bot Test"
                     Height="35"
                     Click="StartBotTest_Click"/>
@@ -36,7 +39,8 @@
                 <TextBox x:Name="HostIpTextBox"
                          Grid.Column="2"
                          Height="25"
-                         Width="150"/>
+                         Width="150"
+                         Text="127.0.0.1"/>
             </Grid>
 
             <!-- Host Port -->
@@ -50,7 +54,8 @@
                 <TextBox x:Name="HostPortTextBox"
                          Grid.Column="2"
                          Height="25"
-                         Width="150"/>
+                         Width="150"
+                         Text="11011"/>
             </Grid>
 
             <!-- Bot Count -->
@@ -64,7 +69,8 @@
                 <TextBox x:Name="BotCountTextBox"
                          Grid.Column="2"
                          Height="25"
-                         Width="150"/>
+                         Width="150"
+                         Text="1"/>
             </Grid>
 
         </StackPanel>

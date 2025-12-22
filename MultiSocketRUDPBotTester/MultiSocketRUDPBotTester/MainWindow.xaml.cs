@@ -29,7 +29,15 @@ namespace MultiSocketRUDPBotTester
             timer.Tick += (s, e) => UpdateUI();
             timer.Start();
         }
-        
+        private void SetBotActionGraph_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new BotActionGraphWindow
+            {
+                Owner = this
+            };
+            window.Show();
+        }
+
         private async void StartBotTest_Click(object sender, RoutedEventArgs e)
         {
             try
