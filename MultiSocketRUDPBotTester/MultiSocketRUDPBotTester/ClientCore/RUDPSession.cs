@@ -1,8 +1,8 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
+﻿using System.Diagnostics;
+using MultiSocketRUDPBotTester.Buffer;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
-using System.Text;
 using Serilog;
 
 namespace ClientCore
@@ -138,10 +138,7 @@ namespace ClientCore
         private void ParseSessionBrokerResponse(byte[] data)
         {
             var buffer = new NetBuffer();
-            if (!buffer.Decode(data))
-            {
-                throw new Exception("Failed to decode session broker response");
-            }
+            buffer.WriteBytes(data);
 
             var resultCode = (ConnectResultCode)buffer.ReadByte();
             if (resultCode != ConnectResultCode.SUCCESS)
@@ -176,11 +173,14 @@ namespace ClientCore
 
         public async Task SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)
         {
+            var sequence = ++lastSendSequence;
             packetBuffer.InsertPacketType(packetType);
-            packetBuffer.InsertPacketSequence(++lastSendSequence);
+            packetBuffer.InsertPacketSequence(sequence);
             packetBuffer.InsertPacketId(packetId);
 
-            packetBuffer.Encode();
+            Debug.Assert(SessionInfo.AesGcm != null);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.sessionSalt, false);
+
             await SendPacket(new SendPacketInfo(packetBuffer));
         }
 
@@ -300,7 +300,11 @@ namespace ClientCore
             var replyBuffer = new NetBuffer();
             replyBuffer.WriteByte((byte)PacketType.SEND_REPLY_TYPE);
             replyBuffer.WriteULong(packetSequence);
-            replyBuffer.Encode();
+
+
+            Debug.Assert(SessionInfo.AesGcm != null);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, replyBuffer, packetSequence, PacketDirection.CLIENT_TO_SERVER_REPLY, SessionInfo.sessionSalt, true);
+
             _ = udpClient.SendAsync(replyBuffer.GetPacketBuffer(), replyBuffer.GetLength());
         }
 
@@ -365,11 +369,13 @@ namespace ClientCore
             SessionInfo.sessionState = SessionState.Disconnected;
         }
 
-        private static NetBuffer BuildDisconnectPacket()
+        private NetBuffer BuildDisconnectPacket()
         {
             var netBuffer = new NetBuffer();
             netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
-            netBuffer.Encode();
+
+            Debug.Assert(SessionInfo.AesGcm != null);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, netBuffer, ++lastSendSequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.sessionSalt, true);
 
             return netBuffer;
         }

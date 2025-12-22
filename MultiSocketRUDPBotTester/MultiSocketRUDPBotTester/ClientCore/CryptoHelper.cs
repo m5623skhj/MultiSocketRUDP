@@ -8,18 +8,22 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public const int SessionSaltSize = 16;
         public const int NonceSize = 12;
 
-        public static void Encrypt(AesGcm aesGcm
-            , byte[] key
-            , byte[] nonce
-            , byte[] plaintext
-            , byte[] add
-            , out byte[] ciphertext
-            , out byte[] tag)
+        public static void Encrypt(
+            AesGcm aesGcm,
+            byte[] buffer,
+            int bodyOffset,
+            int bodySize,
+            ReadOnlySpan<byte> nonce,
+            Span<byte> authTag)
         {
-            ciphertext = new byte[plaintext.Length];
-            tag = new byte[16];
+            var bodySpan = buffer.AsSpan(bodyOffset, bodySize);
 
-            aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, add);
+            aesGcm.Encrypt(
+                nonce,
+                bodySpan,
+                bodySpan,
+                authTag
+            );
         }
 
         public static bool Decrypt(
@@ -39,7 +43,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     cipherText,
                     aad);
             }
-            catch (System.Security.Cryptography.CryptographicException)
+            catch (CryptographicException)
             {
                 return false;
             }

@@ -179,88 +179,31 @@ namespace MultiSocketRUDPBotTester.Buffer
             return result;
         }
 
-        // TODO : Use CryptoHelper
-        public void Encode()
+        public static void EncodePacket(AesGcm aesGcm, NetBuffer buffer, PacketSequence packetSequence, PacketDirection direction, string sessionSalt, bool isCorePacket)
         {
-            if (IsEncoded)
+            if (buffer.IsEncoded)
             {
                 return;
             }
 
-            var payloadLength = writePos - HEADER_SIZE;
+            var nonce = CryptoHelper.GenerateNonce(Encoding.UTF8.GetBytes(sessionSalt), packetSequence, direction);
+            var bodySize = buffer.GetLength() - (isCorePacket ? (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence)) : (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId)));
+            var bodyOffset = isCorePacket
+                ? (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence))
+                : (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId));
+            Span<byte> authTag = stackalloc byte[CryptoHelper.AuthTagSize];
+            
+            CryptoHelper.Encrypt(
+                aesGcm,
+                buffer.buffer,
+                bodyOffset,
+                bodySize,
+                nonce,
+                authTag
+            );
 
-            buffer[0] = HeaderCode;
-            buffer[1] = (byte)(payloadLength & 0xFF);
-            buffer[2] = (byte)((payloadLength >> 8) & 0xFF);
-
-            var randCode = (byte)(new Random().Next(0, 256));
-            buffer[3] = randCode;
-
-            var payloadSum = 0;
-            for (var i = HEADER_SIZE; i < writePos; i++)
-            {
-                payloadSum += buffer[i];
-            }
-
-            buffer[4] = (byte)(payloadSum & 0xFF);
-
-            byte beforeRandomXOR = 0;
-            byte beforeFixedXOR = 0;
-            var numOfRoutine = 1;
-
-            for (var i = 4; i < writePos; i++)
-            {
-                var cur = buffer[i];
-                beforeRandomXOR = (byte)(cur ^ (beforeRandomXOR + randCode + numOfRoutine));
-                beforeFixedXOR = (byte)(beforeRandomXOR ^ (beforeFixedXOR + XORKey + numOfRoutine));
-                buffer[i] = beforeFixedXOR;
-                numOfRoutine++;
-            }
-
-            var result = new byte[writePos];
-            Array.Copy(buffer, result, writePos);
-        }
-
-        // TODO : Use CryptoHelper
-        public bool Decode(byte[] data)
-        {
-            if (data.Length < HEADER_SIZE) return false;
-
-            var randCode = data[3];
-            var xorCode = XORKey;
-            var numOfRoutine = 1;
-
-            var saveEncoded = data[4];
-            var saveRandom = (byte)(data[4] ^ (xorCode + numOfRoutine));
-            data[4] = (byte)(saveRandom ^ (randCode + numOfRoutine));
-
-            numOfRoutine++;
-            var beforeEncoded = saveEncoded;
-            var beforeRandom = saveRandom;
-
-            var payloadSum = 0;
-
-            for (var i = HEADER_SIZE; i < data.Length; i++)
-            {
-                saveEncoded = data[i];
-                saveRandom = (byte)(data[i] ^ (beforeEncoded + xorCode + numOfRoutine));
-                data[i] = (byte)(saveRandom ^ (beforeRandom + randCode + numOfRoutine));
-                numOfRoutine++;
-
-                payloadSum += data[i];
-                beforeEncoded = saveEncoded;
-                beforeRandom = saveRandom;
-            }
-
-            if (data[4] != (byte)(payloadSum & 0xFF))
-            {
-                return false;
-            }
-
-            Array.Copy(data, buffer, data.Length);
-            readPos = HEADER_SIZE;
-            writePos = data.Length;
-            return true;
+            buffer.WriteBytes(authTag.ToArray());
+            buffer.IsEncoded = true;
         }
 
         public static bool DecodePacket(AesGcm aesGcm, NetBuffer packet, bool isCorePacket, byte[] sessionKey, string sessionSalt, PacketDirection direction)

@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ClientCore;
-using MultiSocketRUDPBotTester.Contents.Client.Action;
+﻿using MultiSocketRUDPBotTester.Contents.Client.Action;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
-    public partial class Client : RUDPSession
+    public partial class Client
     {
         private readonly Dictionary<PacketId, ActionBase> packetHandlerDictionary = new();
 
