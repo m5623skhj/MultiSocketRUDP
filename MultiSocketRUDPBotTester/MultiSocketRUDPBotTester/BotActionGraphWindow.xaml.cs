@@ -106,8 +106,8 @@ namespace MultiSocketRUDPBotTester
         {
             var port = new Ellipse
             {
-                Width = 20,
-                Height = 20,
+                Width = 25,
+                Height = 25,
                 Fill = Brushes.LightGreen,
                 Stroke = Brushes.White,
                 StrokeThickness = 4,
@@ -136,8 +136,8 @@ namespace MultiSocketRUDPBotTester
         {
             var port = new Ellipse
             {
-                Width = 20,
-                Height = 20,
+                Width = 25,
+                Height = 25,
                 Fill = GetPortColor(portType),
                 Stroke = Brushes.White,
                 StrokeThickness = 4,
@@ -161,6 +161,11 @@ namespace MultiSocketRUDPBotTester
             }
 
             var inputPort = sender as Ellipse;
+            if (inputPort?.Tag as string != "input")
+            {
+                return;
+            }
+
             var targetNode = allNodes.FirstOrDefault(n => n.InputPort == inputPort);
 
             if (targetNode != null && targetNode != selectedNode)
@@ -169,6 +174,9 @@ namespace MultiSocketRUDPBotTester
             }
 
             isConnecting = false;
+            selectedNode = null;
+            connectingPortType = null;
+            connectingFromPort = null;
             if (tempConnectionLine != null)
             {
                 GraphCanvas.Children.Remove(tempConnectionLine);
@@ -364,6 +372,10 @@ namespace MultiSocketRUDPBotTester
             }
 
             isConnecting = false;
+            selectedNode = null;
+            connectingPortType = null;
+            connectingFromPort = null;
+
             e.Handled = true;
         }
 
