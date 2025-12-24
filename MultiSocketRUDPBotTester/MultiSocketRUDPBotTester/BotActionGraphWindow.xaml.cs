@@ -62,6 +62,7 @@ namespace MultiSocketRUDPBotTester
             Canvas.SetLeft(b, 50);
             Canvas.SetTop(b, 200);
             AddNodeToCanvas(n);
+            Log("Root node created.");
         }
 
         private void LoadActionNodeTypes()
@@ -129,6 +130,7 @@ namespace MultiSocketRUDPBotTester
             tempConnectionLine.Y2 = start.Y;
 
             GraphCanvas.Children.Add(tempConnectionLine);
+            Log($"Start connect from {connectingFromNode.Border.Child}");
         }
 
         private void InputPort_MouseUp(object sender, MouseButtonEventArgs e)
@@ -152,6 +154,7 @@ namespace MultiSocketRUDPBotTester
             }
 
             Connect(connectingFromNode!, to, connectingPortType!);
+            Log($"Connected {connectingFromNode} -> {to}");
             CleanupConnection();
         }
 
@@ -369,7 +372,10 @@ namespace MultiSocketRUDPBotTester
 
         private void AddNode_Click(object sender, RoutedEventArgs e)
         {
-            if (ActionNodeListBox.SelectedItem is not Type t) return;
+            if (ActionNodeListBox.SelectedItem is not Type t)
+            {
+                return;
+            }
 
             var cat = t.Name.Contains("Condition") ? NodeCategory.Condition :
                       t.Name.Contains("Loop") ? NodeCategory.Loop : NodeCategory.Action;
@@ -390,6 +396,7 @@ namespace MultiSocketRUDPBotTester
             Canvas.SetLeft(b, 300);
             Canvas.SetTop(b, 200);
             AddNodeToCanvas(n);
+            Log($"Node added: {t.Name}");
         }
 
         private static Brush GetNodeColor(NodeCategory c) => c switch
@@ -436,5 +443,15 @@ namespace MultiSocketRUDPBotTester
             NodeRuntimeState.Fail => Brushes.IndianRed,
             _ => Brushes.White
         };
+        private void UpdateNodeVisualState(NodeVisual n)
+        {
+            n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
+        }
+
+        private void Log(string msg)
+        {
+            LogListBox.Items.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
+            LogListBox.ScrollIntoView(LogListBox.Items[^1]);
+        }
     }
 }

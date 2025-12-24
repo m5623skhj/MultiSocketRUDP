@@ -27,9 +27,26 @@
                     Click="AddNode_Click"/>
         </Grid>
 
-        <!-- Right Canvas -->
-        <Canvas x:Name="GraphCanvas"
-                Grid.Column="1"
-                Background="#222"/>
+        <!-- Right Panel -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="200"/>
+            </Grid.RowDefinitions>
+
+            <Canvas x:Name="GraphCanvas"
+                    Grid.Row="0"
+                    Background="#222"/>
+
+            <Border Grid.Row="1"
+                    Background="#111"
+                    BorderBrush="#444"
+                    BorderThickness="1,0,0,0"
+                    Padding="5">
+                <ListBox x:Name="LogListBox"
+                         Foreground="White"
+                         Background="#111"/>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
