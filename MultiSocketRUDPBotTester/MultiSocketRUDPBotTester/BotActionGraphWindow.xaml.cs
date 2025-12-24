@@ -399,6 +399,14 @@ namespace MultiSocketRUDPBotTester
             _ => Brushes.DimGray
         };
 
+        public enum NodeRuntimeState
+        {
+            Idle,
+            Running,
+            Success,
+            Fail
+        }
+
         public class NodeVisual
         {
             public Border Border = null!;
@@ -411,6 +419,8 @@ namespace MultiSocketRUDPBotTester
             public NodeVisual? TrueChild;
             public NodeVisual? FalseChild;
 
+            public NodeRuntimeState RuntimeState;
+
             public bool HasPort(FrameworkElement p) => p == OutputPort || p == OutputPortTrue || p == OutputPortFalse;
 
             public Point GetPortCenter(FrameworkElement p, Canvas canvas) =>
@@ -418,5 +428,13 @@ namespace MultiSocketRUDPBotTester
         }
 
         public enum NodeCategory { Action, Condition, Loop }
+
+        private static Brush GetRuntimeBrush(NodeRuntimeState s) => s switch
+        {
+            NodeRuntimeState.Running => Brushes.LimeGreen,
+            NodeRuntimeState.Success => Brushes.DodgerBlue,
+            NodeRuntimeState.Fail => Brushes.IndianRed,
+            _ => Brushes.White
+        };
     }
 }
