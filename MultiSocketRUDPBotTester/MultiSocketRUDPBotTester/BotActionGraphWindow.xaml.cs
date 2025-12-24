@@ -17,6 +17,8 @@ namespace MultiSocketRUDPBotTester
         private string? connectingPortType;
         private FrameworkElement? connectingFromPort;
         private Line? tempConnectionLine;
+        private bool isPanning;
+        private Point panStart;
 
         public BotActionGraphWindow()
         {
@@ -30,22 +32,42 @@ namespace MultiSocketRUDPBotTester
         {
             GraphCanvas.PreviewMouseMove += (_, e) =>
             {
-                if (!isConnecting || tempConnectionLine == null)
+                if (isConnecting && tempConnectionLine != null)
+                {
+                    var p = e.GetPosition(GraphCanvas);
+                    tempConnectionLine.X2 = p.X;
+                    tempConnectionLine.Y2 = p.Y;
+                }
+
+                if (isPanning)
+                {
+                    var p = e.GetPosition(GraphScroll);
+                    var dx = p.X - panStart.X;
+                    var dy = p.Y - panStart.Y;
+
+                    GraphScroll.ScrollToHorizontalOffset(GraphScroll.HorizontalOffset - dx);
+                    GraphScroll.ScrollToVerticalOffset(GraphScroll.VerticalOffset - dy);
+
+                    panStart = p;
+                }
+            };
+
+            GraphCanvas.PreviewMouseLeftButtonUp += (_, _) =>
+            {
+                isPanning = false;
+                GraphCanvas.ReleaseMouseCapture();
+            };
+
+            GraphCanvas.PreviewMouseLeftButtonDown += (_, e) =>
+            {
+                if (e.Source != GraphCanvas)
                 {
                     return;
                 }
 
-                var p = e.GetPosition(GraphCanvas);
-                tempConnectionLine.X2 = p.X;
-                tempConnectionLine.Y2 = p.Y;
-            };
-
-            GraphCanvas.MouseLeftButtonUp += (_, _) =>
-            {
-                if (isConnecting)
-                {
-                    CleanupConnection();
-                }
+                isPanning = true;
+                panStart = e.GetPosition(GraphScroll);
+                GraphCanvas.CaptureMouse();
             };
         }
 
@@ -393,8 +415,8 @@ namespace MultiSocketRUDPBotTester
                 n.OutputPortFalse = CreateOutputPort(cat == NodeCategory.Condition ? "false" : "exit");
             }
 
-            Canvas.SetLeft(b, 300);
-            Canvas.SetTop(b, 200);
+            Canvas.SetLeft(b, GraphScroll.HorizontalOffset + 400);
+            Canvas.SetTop(b, GraphScroll.VerticalOffset + 300);
             AddNodeToCanvas(n);
             Log($"Node added: {t.Name}");
         }

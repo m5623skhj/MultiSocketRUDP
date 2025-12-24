@@ -34,9 +34,17 @@
                 <RowDefinition Height="200"/>
             </Grid.RowDefinitions>
 
-            <Canvas x:Name="GraphCanvas"
-                    Grid.Row="0"
-                    Background="#222"/>
+            <ScrollViewer x:Name="GraphScroll"
+                          Grid.Column="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          Background="#222">
+
+                <Canvas x:Name="GraphCanvas"
+                        Width="5000"
+                        Height="5000"
+                        Background="#222"/>
+            </ScrollViewer>
 
             <Border Grid.Row="1"
                     Background="#111"
