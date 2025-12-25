@@ -1,10 +1,8 @@
-﻿using System.Drawing;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Xml.Linq;
 using MultiSocketRUDPBotTester.Bot;
 
 namespace MultiSocketRUDPBotTester
@@ -12,7 +10,7 @@ namespace MultiSocketRUDPBotTester
     public partial class BotActionGraphWindow : Window
     {
         private readonly List<NodeVisual> allNodes = [];
-        private System.Windows.Point dragStart;
+        private Point dragStart;
         private bool isDragging;
         private bool isConnecting;
         private NodeVisual? connectingFromNode;
@@ -20,7 +18,7 @@ namespace MultiSocketRUDPBotTester
         private FrameworkElement? connectingFromPort;
         private Line? tempConnectionLine;
         private bool isPanning;
-        private System.Windows.Point panStart;
+        private Point panStart;
         private NodeVisual? selectedNode;
 
         public BotActionGraphWindow()
@@ -44,7 +42,11 @@ namespace MultiSocketRUDPBotTester
                     tempConnectionLine.Y2 = p.Y;
                 }
 
-                if (isPanning)
+                if (!isPanning)
+                {
+                    return;
+                }
+
                 {
                     var p = e.GetPosition(GraphScroll);
                     var dx = p.X - panStart.X;
@@ -559,6 +561,7 @@ namespace MultiSocketRUDPBotTester
             NodeRuntimeState.Fail => Brushes.IndianRed,
             _ => Brushes.White
         };
+
         private void UpdateNodeVisualState(NodeVisual n)
         {
             n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
