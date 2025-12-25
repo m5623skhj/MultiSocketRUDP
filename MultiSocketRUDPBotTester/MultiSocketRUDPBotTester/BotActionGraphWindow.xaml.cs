@@ -1,8 +1,10 @@
-﻿using System.Windows;
+﻿using System.Drawing;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Xml.Linq;
 using MultiSocketRUDPBotTester.Bot;
 
 namespace MultiSocketRUDPBotTester
@@ -10,7 +12,7 @@ namespace MultiSocketRUDPBotTester
     public partial class BotActionGraphWindow : Window
     {
         private readonly List<NodeVisual> allNodes = [];
-        private Point dragStart;
+        private System.Windows.Point dragStart;
         private bool isDragging;
         private bool isConnecting;
         private NodeVisual? connectingFromNode;
@@ -18,7 +20,8 @@ namespace MultiSocketRUDPBotTester
         private FrameworkElement? connectingFromPort;
         private Line? tempConnectionLine;
         private bool isPanning;
-        private Point panStart;
+        private System.Windows.Point panStart;
+        private NodeVisual? selectedNode;
 
         public BotActionGraphWindow()
         {
@@ -26,6 +29,8 @@ namespace MultiSocketRUDPBotTester
             LoadActionNodeTypes();
             CreateRootNode();
             SetupCanvasEvents();
+
+            PreviewKeyDown += BotActionGraphWindow_PreviewKeyDown;
         }
 
         private void SetupCanvasEvents()
@@ -60,7 +65,7 @@ namespace MultiSocketRUDPBotTester
 
             GraphCanvas.PreviewMouseLeftButtonDown += (_, e) =>
             {
-                if (e.Source != GraphCanvas)
+                if (!Equals(e.Source, GraphCanvas))
                 {
                     return;
                 }
@@ -74,13 +79,15 @@ namespace MultiSocketRUDPBotTester
         private void CreateRootNode()
         {
             var b = CreateNodeVisual("OnConnected", Brushes.DarkGreen);
-            var n = new NodeVisual
+            var n = new NodeVisual()
             {
                 Border = b,
                 Category = NodeCategory.Action,
                 InputPort = CreateInputPort(),
-                OutputPort = CreateOutputPort("default")
+                OutputPort = CreateOutputPort("default"),
+                IsRoot = true
             };
+
             Canvas.SetLeft(b, 50);
             Canvas.SetTop(b, 200);
             AddNodeToCanvas(n);
@@ -97,11 +104,62 @@ namespace MultiSocketRUDPBotTester
 
         private Border CreateNodeVisual(string title, Brush color)
         {
-            var t = new TextBlock { Text = title, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            var b = new Border { Width = 140, Height = 60, Background = color, BorderBrush = Brushes.White, BorderThickness = new Thickness(2), Child = t };
-            EnableDrag(b);
+            var t = new TextBlock
+            {
+                Text = title, 
+                Foreground = Brushes.White, 
+                HorizontalAlignment = HorizontalAlignment.Center, 
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var b = new Border
+            {
+                Width = 140, 
+                Height = 60, 
+                Background = color, 
+                BorderBrush = Brushes.White, 
+                BorderThickness = new Thickness(2), 
+                Child = t
+            };
 
+            EnableDrag(b);
             return b;
+        }
+
+        private void AttachNodeContextMenu(NodeVisual node)
+        {
+            var menu = new ContextMenu();
+            var deleteItem = new MenuItem
+            {
+                Header = "삭제",
+                IsEnabled = !node.IsRoot
+            };
+
+            deleteItem.Click += (_, _) =>
+            {
+                if (!node.IsRoot)
+                {
+                    DeleteNode(node);
+                }
+            };
+
+            menu.Items.Add(deleteItem);
+            node.Border.ContextMenu = menu;
+        }
+
+        private NodeVisual? FindNode(Border b)
+        {
+            return allNodes.FirstOrDefault(n => n.Border == b);
+        }
+
+        private void DeleteNodeByBorder(Border b)
+        {
+            var node = FindNode(b);
+            if (node == null)
+            {
+                return;
+            }
+
+            DeleteNode(node);
         }
 
         private FrameworkElement CreateInputPort()
@@ -273,10 +331,10 @@ namespace MultiSocketRUDPBotTester
 
         private void AddNodeToCanvas(NodeVisual node)
         {
+            AttachNodeContextMenu(node);
+
             GraphCanvas.Children.Add(node.Border);
-            Panel.SetZIndex(node.Border, 0);
             GraphCanvas.Children.Add(node.InputPort);
-            Panel.SetZIndex(node.InputPort, 1000);
 
             if (node.OutputPort != null)
             {
@@ -325,6 +383,17 @@ namespace MultiSocketRUDPBotTester
             }
 
             RedrawConnections();
+        }
+
+        private void SelectNodeByBorder(Border b)
+        {
+            selectedNode = allNodes.FirstOrDefault(n => n.Border == b);
+
+            foreach (var n in allNodes)
+                n.Border.BorderBrush = Brushes.White;
+
+            if (selectedNode != null)
+                selectedNode.Border.BorderBrush = Brushes.Yellow;
         }
 
         private void RedrawConnections()
@@ -436,24 +505,49 @@ namespace MultiSocketRUDPBotTester
             Fail
         }
 
-        public class NodeVisual
+        private void DeleteNode(NodeVisual node)
         {
-            public Border Border = null!;
-            public NodeCategory Category;
-            public FrameworkElement InputPort = null!;
-            public FrameworkElement? OutputPort;
-            public FrameworkElement? OutputPortTrue;
-            public FrameworkElement? OutputPortFalse;
-            public NodeVisual? Next;
-            public NodeVisual? TrueChild;
-            public NodeVisual? FalseChild;
+            if (node.IsRoot)
+            {
+                Log("Root node cannot be deleted.");
+                return;
+            }
 
-            public NodeRuntimeState RuntimeState;
+            DisconnectIncoming(node);
 
-            public bool HasPort(FrameworkElement p) => p == OutputPort || p == OutputPortTrue || p == OutputPortFalse;
+            GraphCanvas.Children.Remove(node.Border);
+            GraphCanvas.Children.Remove(node.InputPort);
 
-            public Point GetPortCenter(FrameworkElement p, Canvas canvas) =>
-                p.TranslatePoint(new Point(p.ActualWidth / 2, p.ActualHeight / 2), canvas);
+            if (node.OutputPort != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPort);
+            }
+
+            if (node.OutputPortTrue != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPortTrue);
+            }
+
+            if (node.OutputPortFalse != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPortFalse);
+            }
+
+            allNodes.Remove(node);
+
+            RedrawConnections();
+            Log($"Node deleted: {((TextBlock)node.Border.Child).Text}");
+        }
+
+        private void BotActionGraphWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete || selectedNode == null)
+            {
+                return;
+            }
+
+            DeleteNode(selectedNode);
+            selectedNode = null;
         }
 
         public enum NodeCategory { Action, Condition, Loop }
