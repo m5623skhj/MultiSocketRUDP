@@ -17,7 +17,6 @@ namespace MultiSocketRUDPBotTester.Bot
         public TriggerCondition? Trigger { get; set; }
         public List<ActionNodeBase> NextNodes { get; set; } = [];
 
-
         public abstract void Execute(Client client, NetBuffer? receivedPacket = null);
 
         public ActionNodeBase AddNext(ActionNodeBase nextNode)

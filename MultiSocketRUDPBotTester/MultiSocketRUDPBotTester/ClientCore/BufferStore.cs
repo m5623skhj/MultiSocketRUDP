@@ -1,22 +1,16 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
-using static ClientCore.BufferStore;
 
 namespace ClientCore
 {
-    public class SendPacketInfo
+    public class SendPacketInfo(NetBuffer inSentBuffer)
     {
-        public SendPacketInfo(NetBuffer inSentBuffer)
-        {
-            SentBuffer = inSentBuffer;
-        }
-
-        public void RefreshSendPacketInfo(UInt64 now)
+        public void RefreshSendPacketInfo(ulong now)
         {
             SendTimeStamp = now;
             ++retransmissionCount;
         }
 
-        public bool IsRetransmissionTime(UInt64 now)
+        public bool IsRetransmissionTime(ulong now)
         {
             return (now - SendTimeStamp) >= RetransmissionTimeoutMs;
         }
@@ -26,7 +20,7 @@ namespace ClientCore
             return retransmissionCount >= RetransmissionMaxCount;
         }
 
-        public NetBuffer SentBuffer { get; }
+        public NetBuffer SentBuffer { get; } = inSentBuffer;
         public PacketSequence packetSequence => 0;
         private ulong SendTimeStamp { get; set; } = 0;
         private PacketRetransmissionCount retransmissionCount = 0;

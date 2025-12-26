@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MultiSocketRUDPBotTester.Buffer;
+﻿using MultiSocketRUDPBotTester.Buffer;
 
 namespace MultiSocketRUDPBotTester.Contents.Client.Action
 {

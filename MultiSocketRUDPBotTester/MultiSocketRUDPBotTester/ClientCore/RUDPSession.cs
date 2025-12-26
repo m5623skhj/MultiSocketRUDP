@@ -29,36 +29,36 @@ namespace ClientCore
     {
         public static readonly int SessionKeySize = 16;
 
-        public SessionIdType sessionId { get; set; }
-        public byte[] sessionKey { get; set; } = new byte[16];
-        public string sessionSalt { get; set; } = "";
-        public SessionState sessionState { get; set; }
+        public SessionIdType SessionId { get; set; }
+        public byte[] SessionKey { get; set; } = new byte[16];
+        public string SessionSalt { get; set; } = "";
+        public SessionState SessionState { get; set; }
         public AesGcm? AesGcm { get; set; }
     }
 
     public class TargetServerInfo
     {
-        public string serverIp { get; set; } = "";
-        public ushort serverPort { get; set; } = 0;
+        public string ServerIp { get; set; } = "";
+        public ushort ServerPort { get; set; } = 0;
     }
 
     public class HoldingPacketStore
     {
-        private readonly HashSet<PacketSequence> holdingSequences = [];
+        public readonly HashSet<PacketSequence> HoldingSequences = [];
         private readonly Lock holdingSequencesLock = new();
-        private readonly SortedDictionary<PacketSequence, NetBuffer> holdingPackets = new();
+        public readonly SortedDictionary<PacketSequence, NetBuffer> HoldingPackets = new();
         private readonly Lock holdingPacketsLock = new();
 
         public void AddHoldingPacket(PacketSequence sequence, NetBuffer buffer)
         {
             lock (holdingPacketsLock)
             {
-                holdingPackets.Add(sequence, buffer);
+                HoldingPackets.Add(sequence, buffer);
             }
 
             lock (holdingSequencesLock)
             {
-                holdingSequences.Add(sequence);
+                HoldingSequences.Add(sequence);
             }
         }
 
@@ -66,12 +66,12 @@ namespace ClientCore
         {
             lock (holdingSequencesLock)
             {
-                holdingSequences.Remove(sequence);
+                HoldingSequences.Remove(sequence);
             }
 
             lock (holdingPacketsLock)
             {
-                holdingPackets.Remove(sequence);
+                HoldingPackets.Remove(sequence);
             }
         }
 
@@ -79,12 +79,12 @@ namespace ClientCore
         {
             lock (holdingSequencesLock)
             {
-                holdingSequences.Clear();
+                HoldingSequences.Clear();
             }
 
             lock (holdingPacketsLock)
             {
-                holdingPackets.Clear();
+                HoldingPackets.Clear();
             }
         }
     }
@@ -98,7 +98,7 @@ namespace ClientCore
 
         public SessionInfo SessionInfo { get; } = new()
         {
-            sessionState = SessionState.Disconnected,
+            SessionState = SessionState.Disconnected,
         };
 
         public TargetServerInfo TargetServerInfo { get; } = new();
@@ -127,7 +127,7 @@ namespace ClientCore
 
         public SessionIdType GetSessionId()
         {
-            return SessionInfo.sessionId;
+            return SessionInfo.SessionId;
 
         }
         public bool IsConnected()
@@ -146,23 +146,23 @@ namespace ClientCore
                 throw new Exception($"Session broker response error: {resultCode}");
             }
 
-            TargetServerInfo.serverIp = buffer.ReadString();
-            TargetServerInfo.serverPort = buffer.ReadUShort();
-            SessionInfo.sessionId = buffer.ReadUShort();
-            SessionInfo.sessionKey = buffer.ReadBytes(SessionInfo.SessionKeySize);
-            SessionInfo.sessionSalt = buffer.ReadString();
-            SessionInfo.AesGcm = new AesGcm(SessionInfo.sessionKey, SessionInfo.SessionKeySize);
+            TargetServerInfo.ServerIp = buffer.ReadString();
+            TargetServerInfo.ServerPort = buffer.ReadUShort();
+            SessionInfo.SessionId = buffer.ReadUShort();
+            SessionInfo.SessionKey = buffer.ReadBytes(SessionInfo.SessionKeySize);
+            SessionInfo.SessionSalt = buffer.ReadString();
+            SessionInfo.AesGcm = new AesGcm(SessionInfo.SessionKey, SessionInfo.SessionKeySize);
 
             udpClient = new UdpClient();
-            udpClient.Connect(new IPEndPoint(IPAddress.Parse(TargetServerInfo.serverIp), TargetServerInfo.serverPort));
+            udpClient.Connect(new IPEndPoint(IPAddress.Parse(TargetServerInfo.ServerIp), TargetServerInfo.ServerPort));
 
-            SessionInfo.sessionState = SessionState.Connecting;
+            SessionInfo.SessionState = SessionState.Connecting;
             _ = ReceiveAsync();
             _ = RetransmissionAsync();
             var result =  SendConnectPacket();
             if (!result.Result)
             {
-                Log.Error("SendConnectPacket() failed. SessionId {}", SessionInfo.sessionId);
+                Log.Error("SendConnectPacket() failed. SessionId {}", SessionInfo.SessionId);
             }
         }
 
@@ -179,7 +179,7 @@ namespace ClientCore
             packetBuffer.InsertPacketId(packetId);
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.sessionSalt, false);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.SessionSalt, false);
 
             await SendPacket(new SendPacketInfo(packetBuffer));
         }
@@ -201,7 +201,7 @@ namespace ClientCore
         private NetBuffer MakeConnectPacket()
         {
             var buffer = new NetBuffer();
-            buffer.BuildConnectPacket(SessionInfo.sessionId);
+            buffer.BuildConnectPacket(SessionInfo.SessionId);
 
             return buffer;
         }
@@ -265,8 +265,8 @@ namespace ClientCore
             if (!NetBuffer.DecodePacket(SessionInfo.AesGcm
                     , buffer
                     , isCorePacket
-                    , SessionInfo.sessionKey
-                    , SessionInfo.sessionSalt
+                    , SessionInfo.SessionKey
+                    , SessionInfo.SessionSalt
                     , direction))
             {
                 Log.Error("Failed to decode received packet");
@@ -303,7 +303,7 @@ namespace ClientCore
 
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, replyBuffer, packetSequence, PacketDirection.CLIENT_TO_SERVER_REPLY, SessionInfo.sessionSalt, true);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, replyBuffer, packetSequence, PacketDirection.CLIENT_TO_SERVER_REPLY, SessionInfo.SessionSalt, true);
 
             _ = udpClient.SendAsync(replyBuffer.GetPacketBuffer(), replyBuffer.GetLength());
         }
@@ -358,7 +358,7 @@ namespace ClientCore
         private async Task DisconnectAsync()
         {
             isConnected = false;
-            SessionInfo.sessionState = SessionState.Disconnecting;
+            SessionInfo.SessionState = SessionState.Disconnecting;
 
             var disconnectPacket = BuildDisconnectPacket();
             await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength());
@@ -366,7 +366,7 @@ namespace ClientCore
 
             Cleanup();
 
-            SessionInfo.sessionState = SessionState.Disconnected;
+            SessionInfo.SessionState = SessionState.Disconnected;
         }
 
         private NetBuffer BuildDisconnectPacket()
@@ -375,7 +375,7 @@ namespace ClientCore
             netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, netBuffer, ++lastSendSequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.sessionSalt, true);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, netBuffer, ++lastSendSequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.SessionSalt, true);
 
             return netBuffer;
         }
@@ -419,17 +419,17 @@ namespace ClientCore
             CancellationToken.Dispose();
 
             udpClient = null!;
-            SessionInfo.sessionState = SessionState.Disconnected;
-            SessionInfo.sessionId = 0;
-            SessionInfo.sessionKey = [];
-            SessionInfo.sessionSalt = string.Empty;
+            SessionInfo.SessionState = SessionState.Disconnected;
+            SessionInfo.SessionId = 0;
+            SessionInfo.SessionKey = [];
+            SessionInfo.SessionSalt = string.Empty;
             if (SessionInfo.AesGcm != null)
             {
                 SessionInfo.AesGcm.Dispose();
                 SessionInfo.AesGcm = null;
             }
-            TargetServerInfo.serverIp = string.Empty;
-            TargetServerInfo.serverPort = 0;
+            TargetServerInfo.ServerIp = string.Empty;
+            TargetServerInfo.ServerPort = 0;
             lastSendSequence = 0;
             expectedRecvSequence = 0;
             holdingPacketStore.Clear();

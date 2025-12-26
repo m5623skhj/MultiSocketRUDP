@@ -6,19 +6,19 @@ namespace MultiSocketRUDPBotTester.Buffer
 {
     public class NetBuffer
     {
-        private const int BUFFER_SIZE = 1024;
-        private const int HEADER_SIZE = 18;
-        private const int PACKET_TYPE_POS = 5;
-        private const int PACKET_SEQUENCE_POS = 6;
-        private const int PACKET_ID_POS = 14;
+        private const int BufferSize = 1024;
+        private const int HeaderSize = 18;
+        private const int PacketTypePos = 5;
+        private const int PacketSequencePos = 6;
+        private const int PacketIdPos = 14;
 
-        private readonly byte[] buffer = new byte[BUFFER_SIZE];
-        private int readPos = HEADER_SIZE;
-        private int writePos = HEADER_SIZE;
-        private bool IsEncoded = false;
+        private readonly byte[] buffer = new byte[BufferSize];
+        private int readPos = HeaderSize;
+        private int writePos = HeaderSize;
+        private bool isEncoded;
 
         public static byte HeaderCode { get; set; } = 0x89;
-        public static byte XORKey { get; set; } = 0x32;
+        public static byte XorKey { get; set; } = 0x32;
 
         public void WriteByte(byte value)
         {
@@ -57,7 +57,9 @@ namespace MultiSocketRUDPBotTester.Buffer
         public void WriteULong(ulong value)
         {
             for (var i = 0; i < 8; i++)
+            {
                 buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+            }
         }
 
         public void WriteLong(long value)
@@ -108,6 +110,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             var value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
             readPos += 2;
+
             return value;
         }
 
@@ -124,6 +127,7 @@ namespace MultiSocketRUDPBotTester.Buffer
                 (buffer[readPos + 2] << 16) |
                 (buffer[readPos + 3] << 24));
             readPos += 4;
+
             return value;
         }
 
@@ -136,8 +140,12 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             ulong value = 0;
             for (var i = 0; i < 8; i++)
+            {
                 value |= ((ulong)buffer[readPos + i]) << (8 * i);
+            }
+
             readPos += 8;
+
             return value;
         }
 
@@ -163,6 +171,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             var length = ReadUInt();
             var value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
             readPos += (int)length;
+
             return value;
         }
 
@@ -176,21 +185,22 @@ namespace MultiSocketRUDPBotTester.Buffer
             var result = new byte[length];
             Array.Copy(buffer, readPos, result, 0, length);
             readPos += length;
+
             return result;
         }
 
         public static void EncodePacket(AesGcm aesGcm, NetBuffer buffer, PacketSequence packetSequence, PacketDirection direction, string sessionSalt, bool isCorePacket)
         {
-            if (buffer.IsEncoded)
+            if (buffer.isEncoded)
             {
                 return;
             }
 
             var nonce = CryptoHelper.GenerateNonce(Encoding.UTF8.GetBytes(sessionSalt), packetSequence, direction);
-            var bodySize = buffer.GetLength() - (isCorePacket ? (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence)) : (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId)));
+            var bodySize = buffer.GetLength() - (isCorePacket ? (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence)) : (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId)));
             var bodyOffset = isCorePacket
-                ? (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence))
-                : (HEADER_SIZE + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId));
+                ? (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence))
+                : (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId));
             Span<byte> authTag = stackalloc byte[CryptoHelper.AuthTagSize];
             
             CryptoHelper.Encrypt(
@@ -203,14 +213,14 @@ namespace MultiSocketRUDPBotTester.Buffer
             );
 
             buffer.WriteBytes(authTag.ToArray());
-            buffer.IsEncoded = true;
+            buffer.isEncoded = true;
         }
 
         public static bool DecodePacket(AesGcm aesGcm, NetBuffer packet, bool isCorePacket, byte[] sessionKey, string sessionSalt, PacketDirection direction)
         {
             const int minimumPacketSize = sizeof(PacketSequence) + sizeof(PacketId) + CryptoHelper.AuthTagSize;
             const int minimumCorePacketSize = sizeof(PacketSequence) + CryptoHelper.AuthTagSize;
-            const int sizeOfHeaderWithPacketType = HEADER_SIZE + sizeof(PacketType);
+            const int sizeOfHeaderWithPacketType = HeaderSize + sizeof(PacketType);
 
             var packetUseSize = packet.GetLength();
             var minimumRecvPacketSize = isCorePacket ? minimumCorePacketSize : minimumPacketSize;
@@ -247,9 +257,10 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public byte[] GetPayload()
         {
-            var payloadSize = writePos - HEADER_SIZE;
+            var payloadSize = writePos - HeaderSize;
             var payload = new byte[payloadSize];
-            Array.Copy(buffer, HEADER_SIZE, payload, 0, payloadSize);
+            Array.Copy(buffer, HeaderSize, payload, 0, payloadSize);
+
             return payload;
         }
 
@@ -265,24 +276,24 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void InsertPacketType(PacketType type)
         {
-            buffer[PACKET_TYPE_POS] = (byte)type;
+            buffer[PacketTypePos] = (byte)type;
         }
 
         public void InsertPacketSequence(PacketSequence seq)
         {
-            var span = buffer.AsSpan(PACKET_SEQUENCE_POS, 8);
+            var span = buffer.AsSpan(PacketSequencePos, 8);
             BitConverter.TryWriteBytes(span, seq);
         }
 
         public void InsertPacketId(PacketId id)
         {
-            var span = buffer.AsSpan(PACKET_ID_POS, 4);
+            var span = buffer.AsSpan(PacketIdPos, 4);
             BitConverter.TryWriteBytes(span, (uint)id);
         }
 
         public void BuildConnectPacket(SessionIdType sessionId)
         {
-            writePos = PACKET_ID_POS;
+            writePos = PacketIdPos;
             WriteByte((byte)PacketType.CONNECT_TYPE);
             WriteULong(0);
             WriteUShort(sessionId);

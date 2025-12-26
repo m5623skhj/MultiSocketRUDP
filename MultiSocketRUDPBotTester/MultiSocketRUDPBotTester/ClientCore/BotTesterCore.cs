@@ -12,8 +12,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly Dictionary<SessionIdType, Client> sessionDictionary = new();
         private readonly Lock sessionDictionaryLock = new();
 
-        private string hostIp = "";
-        private ushort hostPort = 0;
+        private readonly string hostIp = "";
+        private readonly ushort hostPort = 0;
 
         private ActionGraph botActionGraph = new();
 

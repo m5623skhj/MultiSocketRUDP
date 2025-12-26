@@ -11,14 +11,12 @@ namespace MultiSocketRUDPBotTester
     /// </summary>
     public partial class MainWindow : Window
     {
-        private MultiSocketRUDPBotCore core;
         public ObservableCollection<string> Logs { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
 
-            core = new MultiSocketRUDPBotCore();
             Logs = [];
             DataContext = this;
 
@@ -26,7 +24,7 @@ namespace MultiSocketRUDPBotTester
             {
                 Interval = TimeSpan.FromSeconds(1)
             };
-            timer.Tick += (s, e) => UpdateUI();
+            timer.Tick += (s, e) => UpdateUi();
             timer.Start();
         }
         private void SetBotActionGraph_Click(object sender, RoutedEventArgs e)
@@ -65,7 +63,7 @@ namespace MultiSocketRUDPBotTester
             BotCountTextBox.IsEnabled = true;
         }
 
-        private void UpdateUI()
+        private void UpdateUi()
         {
             var activeBotCount = BotTesterCore.Instance.GetActiveBotCount();
             Title = $"Multi-Socket RUDP Bot Tester - Active Bots: {activeBotCount}";

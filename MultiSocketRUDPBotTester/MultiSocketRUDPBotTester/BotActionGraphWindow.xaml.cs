@@ -186,7 +186,6 @@ namespace MultiSocketRUDPBotTester
             return hit;
         }
 
-
         private static Brush GetPortColor(string type) => type switch
         {
             "true" or "continue" => Brushes.LightGreen,
@@ -392,16 +391,22 @@ namespace MultiSocketRUDPBotTester
             selectedNode = allNodes.FirstOrDefault(n => n.Border == b);
 
             foreach (var n in allNodes)
+            {
                 n.Border.BorderBrush = Brushes.White;
+            }
 
             if (selectedNode != null)
+            {
                 selectedNode.Border.BorderBrush = Brushes.Yellow;
+            }
         }
 
         private void RedrawConnections()
         {
             foreach (var l in GraphCanvas.Children.OfType<Line>().Where(l => l != tempConnectionLine).ToList())
+            {
                 GraphCanvas.Children.Remove(l);
+            }
 
             foreach (var n in allNodes)
             {
@@ -435,7 +440,11 @@ namespace MultiSocketRUDPBotTester
         {
             e.MouseLeftButtonDown += (_, ev) =>
             {
-                if (isConnecting) return;
+                if (isConnecting)
+                {
+                    return;
+                }
+
                 isDragging = true;
                 dragStart = ev.GetPosition(GraphCanvas);
                 e.CaptureMouse();
@@ -443,7 +452,11 @@ namespace MultiSocketRUDPBotTester
 
             e.MouseMove += (_, ev) =>
             {
-                if (!isDragging) return;
+                if (!isDragging)
+                {
+                    return;
+                }
+
                 var p = ev.GetPosition(GraphCanvas);
                 Canvas.SetLeft(e, Canvas.GetLeft(e) + p.X - dragStart.X);
                 Canvas.SetTop(e, Canvas.GetTop(e) + p.Y - dragStart.Y);
@@ -562,7 +575,7 @@ namespace MultiSocketRUDPBotTester
             _ => Brushes.White
         };
 
-        private void UpdateNodeVisualState(NodeVisual n)
+        private static void UpdateNodeVisualState(NodeVisual n)
         {
             n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
         }
