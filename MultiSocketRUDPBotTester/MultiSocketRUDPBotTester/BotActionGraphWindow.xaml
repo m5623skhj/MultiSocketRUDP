@@ -14,17 +14,43 @@
         <Grid Grid.Column="0" Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="40"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <ListBox x:Name="ActionNodeListBox"
                      DisplayMemberPath="Name"/>
 
-            <Button Grid.Row="1"
-                    Content="Add"
-                    Height="30"
-                    Margin="0,5,0,0"
-                    Click="AddNode_Click"/>
+            <!-- Button Panel -->
+            <StackPanel Grid.Row="1" Margin="0,10,0,0">
+                <Button Content="Add Node"
+                        Height="35"
+                        Margin="0,0,0,5"
+                        Click="AddNode_Click"/>
+
+                <Separator Margin="0,5"/>
+
+                <Button Content="Build Graph"
+                        Height="35"
+                        Margin="0,5,0,5"
+                        Background="#FF4CAF50"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="BuildGraph_Click"/>
+
+                <Button Content="Apply to BotTester"
+                        Height="35"
+                        Margin="0,0,0,5"
+                        Background="#FF2196F3"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="ApplyGraph_Click"/>
+
+                <TextBlock x:Name="StatusText"
+                          Text="Ready"
+                          Foreground="Gray"
+                          HorizontalAlignment="Center"
+                          Margin="0,10,0,0"/>
+            </StackPanel>
         </Grid>
 
         <!-- Right Panel -->

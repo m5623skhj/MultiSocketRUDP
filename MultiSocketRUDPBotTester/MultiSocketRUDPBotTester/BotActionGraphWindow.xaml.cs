@@ -4,6 +4,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.ClientCore;
+using MultiSocketRUDPBotTester.Buffer;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -20,6 +22,8 @@ namespace MultiSocketRUDPBotTester
         private bool isPanning;
         private Point panStart;
         private NodeVisual? selectedNode;
+
+        public ActionGraph? BuiltGraph { get; private set; }
 
         public BotActionGraphWindow()
         {
@@ -87,7 +91,12 @@ namespace MultiSocketRUDPBotTester
                 Category = NodeCategory.Action,
                 InputPort = CreateInputPort(),
                 OutputPort = CreateOutputPort("default"),
-                IsRoot = true
+                IsRoot = true,
+                ActionNode = new CustomActionNode
+                {
+                    Name = "OnConnected",
+                    Trigger = new TriggerCondition { Type = TriggerType.OnConnected }
+                }
             };
 
             Canvas.SetLeft(b, 50);
@@ -108,34 +117,153 @@ namespace MultiSocketRUDPBotTester
         {
             var t = new TextBlock
             {
-                Text = title, 
-                Foreground = Brushes.White, 
-                HorizontalAlignment = HorizontalAlignment.Center, 
+                Text = title,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
             var b = new Border
             {
-                Width = 140, 
-                Height = 60, 
-                Background = color, 
-                BorderBrush = Brushes.White, 
-                BorderThickness = new Thickness(2), 
+                Width = 140,
+                Height = 60,
+                Background = color,
+                BorderBrush = Brushes.White,
+                BorderThickness = new Thickness(2),
                 Child = t
             };
 
             EnableDrag(b);
+            b.PreviewMouseLeftButtonDown += Border_PreviewMouseLeftButtonDown;
             return b;
+        }
+
+        private void Border_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            Border_MouseDoubleClick(sender, e);
+        }
+
+        private void Border_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not Border border)
+            {
+                return;
+            }
+
+            var node = FindNode(border);
+            if (node == null || node.IsRoot)
+            {
+                return;
+            }
+
+            ShowNodeConfigurationDialog(node);
+        }
+
+        private void ShowNodeConfigurationDialog(NodeVisual node)
+        {
+            var dialog = new Window
+            {
+                Title = $"Configure {node.NodeType?.Name}",
+                Width = 400,
+                Height = 300,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(10) };
+
+            if (node.NodeType == typeof(SendPacketNode))
+            {
+                stack.Children.Add(new TextBlock { Text = "Packet ID:", FontWeight = FontWeights.Bold });
+                var packetIdCombo = new ComboBox
+                {
+                    ItemsSource = Enum.GetValues(typeof(PacketId)),
+                    SelectedItem = node.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID
+                };
+                stack.Children.Add(packetIdCombo);
+
+                stack.Children.Add(new TextBlock { Text = "Packet Builder (Custom Code):", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 10, 0, 0) });
+                var codeBox = new TextBox
+                {
+                    Height = 100,
+                    AcceptsReturn = true,
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = node.Configuration?.StringValue ?? "// Write packet builder code"
+                };
+                stack.Children.Add(codeBox);
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.PacketId = (PacketId)packetIdCombo.SelectedItem;
+                    node.Configuration.StringValue = codeBox.Text;
+                    Log($"Configuration saved for {node.NodeType.Name}");
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(DelayNode))
+            {
+                stack.Children.Add(new TextBlock { Text = "Delay (ms):", FontWeight = FontWeights.Bold });
+                var delayBox = new TextBox
+                {
+                    Text = node.Configuration?.IntValue.ToString() ?? "1000"
+                };
+                stack.Children.Add(delayBox);
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(delayBox.Text, out var delay))
+                    {
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.IntValue = delay;
+                        Log($"Delay set to {delay}ms");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid delay value", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "This node type doesn't have configurable properties yet.",
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+
+            dialog.Content = stack;
+            dialog.ShowDialog();
         }
 
         private void AttachNodeContextMenu(NodeVisual node)
         {
             var menu = new ContextMenu();
-            var deleteItem = new MenuItem
+            
+            var configItem = new MenuItem
             {
-                Header = "삭제",
+                Header = "Configure",
                 IsEnabled = !node.IsRoot
             };
+            configItem.Click += (_, _) => ShowNodeConfigurationDialog(node);
+            menu.Items.Add(configItem);
 
+            var deleteItem = new MenuItem
+            {
+                Header = "Delete",
+                IsEnabled = !node.IsRoot
+            };
             deleteItem.Click += (_, _) =>
             {
                 if (!node.IsRoot)
@@ -143,8 +271,8 @@ namespace MultiSocketRUDPBotTester
                     DeleteNode(node);
                 }
             };
-
             menu.Items.Add(deleteItem);
+
             node.Border.ContextMenu = menu;
         }
 
@@ -487,7 +615,14 @@ namespace MultiSocketRUDPBotTester
                       t.Name.Contains("Loop") ? NodeCategory.Loop : NodeCategory.Action;
 
             var b = CreateNodeVisual(t.Name, GetNodeColor(cat));
-            var n = new NodeVisual { Border = b, Category = cat, InputPort = CreateInputPort() };
+            var n = new NodeVisual 
+            { 
+                Border = b, 
+                Category = cat, 
+                InputPort = CreateInputPort(),
+                NodeType = t,
+                Configuration = new NodeConfiguration()
+            };
 
             if (cat == NodeCategory.Action)
             {
@@ -578,6 +713,272 @@ namespace MultiSocketRUDPBotTester
         private static void UpdateNodeVisualState(NodeVisual n)
         {
             n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
+        }
+
+        private void BuildGraph_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                BuiltGraph = BuildActionGraph();
+                Log($"Graph built successfully with {BuiltGraph.GetAllNodes().Count} nodes");
+                
+                if (FindName("StatusText") is TextBlock statusText)
+                {
+                    statusText.Text = $"✓ Graph Built ({BuiltGraph.GetAllNodes().Count} nodes)";
+                    statusText.Foreground = Brushes.LightGreen;
+                }
+                
+                MessageBox.Show($"Graph built successfully!\n{BuiltGraph.GetAllNodes().Count} nodes created.", 
+                    "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Log($"Error building graph: {ex.Message}");
+                
+                if (FindName("StatusText") is TextBlock statusText)
+                {
+                    statusText.Text = "✗ Build Failed";
+                    statusText.Foreground = Brushes.IndianRed;
+                }
+                
+                MessageBox.Show($"Error building graph: {ex.Message}", 
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private ActionGraph BuildActionGraph()
+        {
+            var graph = new ActionGraph { Name = "Bot Action Graph" };
+            var nodeMapping = new Dictionary<NodeVisual, ActionNodeBase>();
+
+            foreach (var visual in allNodes)
+            {
+                try
+                {
+                    ActionNodeBase? actionNode;
+                    if (visual.IsRoot)
+                    {
+                        actionNode = visual.ActionNode!;
+                    }
+                    else if (visual.NodeType == typeof(SendPacketNode))
+                    {
+                        actionNode = new SendPacketNode
+                        {
+                            Name = visual.NodeType.Name,
+                            PacketId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID,
+                            PacketBuilder = (_) =>
+                            {
+                                var buffer = new NetBuffer();
+                                return buffer;
+                            }
+                        };
+                    }
+                    else if (visual.NodeType == typeof(DelayNode))
+                    {
+                        actionNode = new DelayNode
+                        {
+                            Name = visual.NodeType.Name,
+                            DelayMilliseconds = visual.Configuration?.IntValue ?? 1000
+                        };
+                    }
+                    else if (visual.NodeType == typeof(CustomActionNode))
+                    {
+                        actionNode = new CustomActionNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ActionHandler = (_, _) =>
+                            {
+                                Serilog.Log.Information($"Custom action: {visual.NodeType.Name}");
+                            }
+                        };
+                    }
+                    else if (visual.NodeType == typeof(ConditionalNode))
+                    {
+                        actionNode = new ConditionalNode
+                        {
+                            Name = visual.NodeType.Name,
+                            Condition = (_, _) => true
+                        };
+                    }
+                    else if (visual.NodeType == typeof(LoopNode))
+                    {
+                        actionNode = new LoopNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ContinueCondition = (_, _) => false,
+                            MaxIterations = 10
+                        };
+                    }
+                    else if (visual.NodeType == typeof(RepeatTimerNode))
+                    {
+                        actionNode = new RepeatTimerNode
+                        {
+                            Name = visual.NodeType.Name,
+                            IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
+                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true 
+                                ? (int)visual.Configuration.Properties["RepeatCount"] 
+                                : 10
+                        };
+                    }
+                    else if (visual.NodeType == typeof(LogNode))
+                    {
+                        actionNode = new LogNode
+                        {
+                            Name = visual.NodeType.Name,
+                            MessageBuilder = (_, _) => $"Log from {visual.NodeType.Name}"
+                        };
+                    }
+                    else if (visual.NodeType != null)
+                    {
+                        actionNode = new CustomActionNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ActionHandler = (_, _) => 
+                            {
+                                Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
+                            }
+                        };
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("Node has no type information, skipping");
+                        continue;
+                    }
+
+                    nodeMapping[visual] = actionNode;
+                    visual.ActionNode = actionNode;
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error($"Error creating action node for {visual.NodeType?.Name}: {ex.Message}");
+                    throw new Exception($"Failed to create node '{visual.NodeType?.Name}': {ex.Message}");
+                }
+            }
+
+            foreach (var visual in allNodes)
+            {
+                if (!nodeMapping.TryGetValue(visual, out var actionNode))
+                {
+                    Serilog.Log.Warning("Visual node not in mapping, skipping connections");
+                    continue;
+                }
+
+                if (visual.Next != null)
+                {
+                    if (nodeMapping.TryGetValue(visual.Next, out var value))
+                    {
+                        actionNode.NextNodes.Add(value);
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning($"Next node not found in mapping for {actionNode.Name}");
+                    }
+                }
+
+                if (actionNode is ConditionalNode conditionalNode)
+                {
+                    if (visual.TrueChild != null)
+                    {
+                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        {
+                            conditionalNode.TrueNodes.Add(value);
+                        }
+                        else
+                        {
+                            Serilog.Log.Warning($"TrueChild not found in mapping for {actionNode.Name}");
+                        }
+                    }
+
+                    if (visual.FalseChild != null)
+                    {
+                        if (nodeMapping.TryGetValue(visual.FalseChild, out var value))
+                        {
+                            conditionalNode.FalseNodes.Add(value);
+                        }
+                        else
+                        {
+                            Serilog.Log.Warning($"FalseChild not found in mapping for {actionNode.Name}");
+                        }
+                    }
+                }
+
+                if (actionNode is LoopNode loopNode)
+                {
+                    if (visual.TrueChild != null)
+                    {
+                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        {
+                            loopNode.LoopBody.Add(value);
+                        }
+                        else
+                        {
+                            Serilog.Log.Warning($"LoopBody child not found in mapping for {actionNode.Name}");
+                        }
+                    }
+
+                    if (visual.FalseChild != null)
+                    {
+                        if (nodeMapping.TryGetValue(visual.FalseChild, out var value))
+                        {
+                            loopNode.ExitNodes.Add(value);
+                        }
+                        else
+                        {
+                            Serilog.Log.Warning($"ExitNode child not found in mapping for {actionNode.Name}");
+                        }
+                    }
+                }
+
+                if (actionNode is RepeatTimerNode repeatNode)
+                {
+                    if (visual.TrueChild != null)
+                    {
+                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        {
+                            repeatNode.RepeatBody.Add(value);
+                        }
+                        else
+                        {
+                            Serilog.Log.Warning($"RepeatBody child not found in mapping for {actionNode.Name}");
+                        }
+                    }
+                }
+
+                graph.AddNode(actionNode);
+            }
+
+            Serilog.Log.Information($"Graph built with {nodeMapping.Count} nodes");
+            return graph;
+        }
+
+        private void ApplyGraph_Click(object sender, RoutedEventArgs e)
+        {
+            if (BuiltGraph == null)
+            {
+                MessageBox.Show("Please build the graph first!", "Warning", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                if (FindName("StatusText") is not TextBlock statusText)
+                {
+                    return;
+                }
+
+                statusText.Text = "⚠ Build graph first";
+                statusText.Foreground = Brushes.Orange;
+                return;
+            }
+
+            BotTesterCore.Instance.SetBotActionGraph(BuiltGraph);
+            Log("Graph applied to BotTesterCore");
+            
+            if (FindName("StatusText") is TextBlock statusText2)
+            {
+                statusText2.Text = "✓ Applied to BotTester";
+                statusText2.Foreground = Brushes.LightBlue;
+            }
+            
+            MessageBox.Show("Graph has been applied successfully!\nYou can now start the bot test.", "Success", 
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void Log(string msg)
