@@ -29,10 +29,171 @@ namespace MultiSocketRUDPBotTester
         {
             InitializeComponent();
             LoadActionNodeTypes();
-            CreateRootNode();
+
+            var savedVisuals = BotTesterCore.Instance.GetSavedGraphVisuals();
+            if (savedVisuals is { Count: > 0 })
+            {
+                RestoreSavedGraph(savedVisuals);
+            }
+            else
+            {
+                CreateRootNode();
+            }
+
             SetupCanvasEvents();
 
             PreviewKeyDown += BotActionGraphWindow_PreviewKeyDown;
+        }
+
+        private void RestoreSavedGraph(List<NodeVisual> savedVisuals)
+        {
+            var nodeMapping = new Dictionary<NodeVisual, NodeVisual>();
+            var positionMapping = new Dictionary<NodeVisual, (double left, double top)>();
+
+            foreach (var savedNode in savedVisuals)
+            {
+                var left = Canvas.GetLeft(savedNode.Border);
+                var top = Canvas.GetTop(savedNode.Border);
+                positionMapping[savedNode] = (left, top);
+            }
+
+            foreach (var savedNode in savedVisuals)
+            {
+                var newNode = CloneNodeVisual(savedNode, positionMapping[savedNode]);
+                nodeMapping[savedNode] = newNode;
+
+                AttachNodeContextMenu(newNode);
+                GraphCanvas.Children.Add(newNode.Border);
+                GraphCanvas.Children.Add(newNode.InputPort);
+
+                if (newNode.OutputPort != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPort);
+                }
+
+                if (newNode.OutputPortTrue != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPortTrue);
+                }
+
+                if (newNode.OutputPortFalse != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPortFalse);
+                }
+
+                allNodes.Add(newNode);
+
+                var b = newNode.Border;
+                var l = Canvas.GetLeft(b);
+                var t = Canvas.GetTop(b);
+
+                Canvas.SetLeft(newNode.InputPort, l - 18);
+                Canvas.SetTop(newNode.InputPort, t + b.Height / 2 - 18);
+
+                if (newNode.OutputPort != null)
+                {
+                    Canvas.SetLeft(newNode.OutputPort, l + b.Width - 18);
+                    Canvas.SetTop(newNode.OutputPort, t + b.Height / 2 - 18);
+                }
+
+                if (newNode.OutputPortTrue != null)
+                {
+                    Canvas.SetLeft(newNode.OutputPortTrue, l + b.Width - 18);
+                    Canvas.SetTop(newNode.OutputPortTrue, t + b.Height / 3 - 18);
+                }
+
+                if (newNode.OutputPortFalse != null)
+                {
+                    Canvas.SetLeft(newNode.OutputPortFalse, l + b.Width - 18);
+                    Canvas.SetTop(newNode.OutputPortFalse, t + b.Height * 2 / 3 - 18);
+                }
+            }
+
+            foreach (var savedNode in savedVisuals)
+            {
+                if (!nodeMapping.TryGetValue(savedNode, out var newNode))
+                {
+                    continue;
+                }
+
+                if (savedNode.Next != null && nodeMapping.TryGetValue(savedNode.Next, out var nextNode))
+                {
+                    newNode.Next = nextNode;
+                    Log($"Restored connection: {((TextBlock)newNode.Border.Child).Text} -> {((TextBlock)nextNode.Border.Child).Text}");
+                }
+
+                if (savedNode.TrueChild != null && nodeMapping.TryGetValue(savedNode.TrueChild, out var trueNode))
+                {
+                    newNode.TrueChild = trueNode;
+                    Log($"Restored true branch: {((TextBlock)newNode.Border.Child).Text} -> {((TextBlock)trueNode.Border.Child).Text}");
+                }
+
+                if (savedNode.FalseChild != null && nodeMapping.TryGetValue(savedNode.FalseChild, out var falseNode))
+                {
+                    newNode.FalseChild = falseNode;
+                    Log($"Restored false branch: {((TextBlock)newNode.Border.Child).Text} -> {((TextBlock)falseNode.Border.Child).Text}");
+                }
+            }
+
+            RedrawConnections();
+            Log($"Graph restored with {allNodes.Count} nodes and connections.");
+        }
+
+        private NodeVisual CloneNodeVisual(NodeVisual original, (double left, double top) position)
+        {
+            var color = original.IsRoot ? Brushes.DarkGreen : GetNodeColor(original.Category);
+            var title = original.IsRoot ? "OnConnected" : (original.NodeType?.Name ?? "Unknown");
+            var border = CreateNodeVisual(title, color);
+
+            var newNode = new NodeVisual
+            {
+                Border = border,
+                Category = original.Category,
+                InputPort = CreateInputPort(),
+                IsRoot = original.IsRoot,
+                NodeType = original.NodeType,
+                Configuration = CloneConfiguration(original.Configuration)
+            };
+
+            if (original is { ActionNode: not null, IsRoot: true })
+            {
+                newNode.ActionNode = new CustomActionNode
+                {
+                    Name = "OnConnected",
+                    Trigger = new TriggerCondition { Type = TriggerType.OnConnected }
+                };
+            }
+
+            if (original.Category == NodeCategory.Action)
+            {
+                newNode.OutputPort = CreateOutputPort("default");
+            }
+            else
+            {
+                newNode.OutputPortTrue = CreateOutputPort(original.Category == NodeCategory.Condition ? "true" : "continue");
+                newNode.OutputPortFalse = CreateOutputPort(original.Category == NodeCategory.Condition ? "false" : "exit");
+            }
+
+            Canvas.SetLeft(border, position.left);
+            Canvas.SetTop(border, position.top);
+
+            return newNode;
+        }
+
+        private static NodeConfiguration? CloneConfiguration(NodeConfiguration? original)
+        {
+            if (original == null)
+            {
+                return null;
+            }
+
+            return new NodeConfiguration
+            {
+                PacketId = original.PacketId,
+                StringValue = original.StringValue,
+                IntValue = original.IntValue,
+                Properties = new Dictionary<string, object>(original.Properties)
+            };
         }
 
         private void SetupCanvasEvents()
@@ -148,7 +309,7 @@ namespace MultiSocketRUDPBotTester
             Border_MouseDoubleClick(sender, e);
         }
 
-        private void Border_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void Border_MouseDoubleClick(object sender, MouseButtonEventArgs _)
         {
             if (sender is not Border border)
             {
@@ -193,7 +354,7 @@ namespace MultiSocketRUDPBotTester
                     Height = 100,
                     AcceptsReturn = true,
                     TextWrapping = TextWrapping.Wrap,
-                    Text = node.Configuration?.StringValue ?? "// Write packet builder code"
+                    Text = node.Configuration?.StringValue ?? "Write packet builder code"
                 };
                 stack.Children.Add(codeBox);
 
@@ -250,7 +411,7 @@ namespace MultiSocketRUDPBotTester
         private void AttachNodeContextMenu(NodeVisual node)
         {
             var menu = new ContextMenu();
-            
+
             var configItem = new MenuItem
             {
                 Header = "Configure",
@@ -367,7 +528,7 @@ namespace MultiSocketRUDPBotTester
             CleanupConnection();
         }
 
-        private bool CreatesCycle(NodeVisual from, NodeVisual to)
+        private static bool CreatesCycle(NodeVisual from, NodeVisual to)
         {
             var stack = new Stack<NodeVisual>();
             var visited = new HashSet<NodeVisual>();
@@ -615,10 +776,10 @@ namespace MultiSocketRUDPBotTester
                       t.Name.Contains("Loop") ? NodeCategory.Loop : NodeCategory.Action;
 
             var b = CreateNodeVisual(t.Name, GetNodeColor(cat));
-            var n = new NodeVisual 
-            { 
-                Border = b, 
-                Category = cat, 
+            var n = new NodeVisual
+            {
+                Border = b,
+                Category = cat,
                 InputPort = CreateInputPort(),
                 NodeType = t,
                 Configuration = new NodeConfiguration()
@@ -721,27 +882,27 @@ namespace MultiSocketRUDPBotTester
             {
                 BuiltGraph = BuildActionGraph();
                 Log($"Graph built successfully with {BuiltGraph.GetAllNodes().Count} nodes");
-                
+
                 if (FindName("StatusText") is TextBlock statusText)
                 {
-                    statusText.Text = $"✓ Graph Built ({BuiltGraph.GetAllNodes().Count} nodes)";
+                    statusText.Text = $"Graph Built ({BuiltGraph.GetAllNodes().Count} nodes)";
                     statusText.Foreground = Brushes.LightGreen;
                 }
-                
-                MessageBox.Show($"Graph built successfully!\n{BuiltGraph.GetAllNodes().Count} nodes created.", 
+
+                MessageBox.Show($"Graph built successfully!\n{BuiltGraph.GetAllNodes().Count} nodes created.",
                     "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 Log($"Error building graph: {ex.Message}");
-                
+
                 if (FindName("StatusText") is TextBlock statusText)
                 {
-                    statusText.Text = "✗ Build Failed";
+                    statusText.Text = "Build Failed";
                     statusText.Foreground = Brushes.IndianRed;
                 }
-                
-                MessageBox.Show($"Error building graph: {ex.Message}", 
+
+                MessageBox.Show($"Error building graph: {ex.Message}",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -815,8 +976,8 @@ namespace MultiSocketRUDPBotTester
                         {
                             Name = visual.NodeType.Name,
                             IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
-                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true 
-                                ? (int)visual.Configuration.Properties["RepeatCount"] 
+                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true
+                                ? (int)visual.Configuration.Properties["RepeatCount"]
                                 : 10
                         };
                     }
@@ -833,7 +994,7 @@ namespace MultiSocketRUDPBotTester
                         actionNode = new CustomActionNode
                         {
                             Name = visual.NodeType.Name,
-                            ActionHandler = (_, _) => 
+                            ActionHandler = (_, _) =>
                             {
                                 Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
                             }
@@ -955,7 +1116,7 @@ namespace MultiSocketRUDPBotTester
         {
             if (BuiltGraph == null)
             {
-                MessageBox.Show("Please build the graph first!", "Warning", 
+                MessageBox.Show("Please build the graph first!", "Warning",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
 
                 if (FindName("StatusText") is not TextBlock statusText)
@@ -963,21 +1124,22 @@ namespace MultiSocketRUDPBotTester
                     return;
                 }
 
-                statusText.Text = "⚠ Build graph first";
+                statusText.Text = "Build graph first";
                 statusText.Foreground = Brushes.Orange;
                 return;
             }
 
             BotTesterCore.Instance.SetBotActionGraph(BuiltGraph);
-            Log("Graph applied to BotTesterCore");
-            
+            BotTesterCore.Instance.SaveGraphVisuals([..allNodes]);
+            Log("Graph applied to BotTesterCore and saved");
+
             if (FindName("StatusText") is TextBlock statusText2)
             {
-                statusText2.Text = "✓ Applied to BotTester";
+                statusText2.Text = "Applied to BotTester";
                 statusText2.Foreground = Brushes.LightBlue;
             }
-            
-            MessageBox.Show("Graph has been applied successfully!\nYou can now start the bot test.", "Success", 
+
+            MessageBox.Show("Graph has been applied successfully!\nYou can now start the bot test.", "Success",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

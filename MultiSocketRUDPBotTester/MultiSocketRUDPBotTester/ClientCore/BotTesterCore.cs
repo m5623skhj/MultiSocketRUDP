@@ -16,10 +16,21 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly ushort hostPort = 0;
 
         private ActionGraph botActionGraph = new();
+        private List<NodeVisual>? savedNodeVisuals;
 
         public void SetBotActionGraph(ActionGraph graph)
         {
             botActionGraph = graph;
+        }
+
+        public void SaveGraphVisuals(List<NodeVisual> nodeVisuals)
+        {
+            savedNodeVisuals = nodeVisuals;
+        }
+
+        public List<NodeVisual>? GetSavedGraphVisuals()
+        {
+            return savedNodeVisuals;
         }
 
         public async Task StartBotTest(ushort numOfBot)
