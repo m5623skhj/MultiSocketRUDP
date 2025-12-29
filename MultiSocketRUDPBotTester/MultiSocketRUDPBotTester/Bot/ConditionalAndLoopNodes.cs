@@ -4,13 +4,24 @@ using Serilog;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
-    public class ConditionalNode : ActionNodeBase
+    public abstract class ContextNodeBase : ActionNodeBase
     {
-        public Func<Client, NetBuffer?, bool>? Condition { get; set; }
+        public sealed override void Execute(Client client, NetBuffer? receivedPacket = null)
+        {
+            var context = new RuntimeContext(client, receivedPacket);
+            ExecuteImpl(context);
+        }
+
+        protected abstract void ExecuteImpl(RuntimeContext context);
+    }
+
+    public class ConditionalNode : ContextNodeBase
+    {
+        public Func<RuntimeContext, bool>? Condition { get; set; }
         public List<ActionNodeBase> TrueNodes { get; set; } = [];
         public List<ActionNodeBase> FalseNodes { get; set; } = [];
 
-        public override void Execute(Client client, NetBuffer? receivedPacket = null)
+        protected override void ExecuteImpl(RuntimeContext context)
         {
             if (Condition == null)
             {
@@ -20,13 +31,13 @@ namespace MultiSocketRUDPBotTester.Bot
 
             try
             {
-                var result = Condition(client, receivedPacket);
+                var result = Condition(context);
                 Log.Debug("Conditional check: {Result}", result);
 
                 var nodesToExecute = result ? TrueNodes : FalseNodes;
                 foreach (var node in nodesToExecute)
                 {
-                    ExecuteNodeChain(client, node, receivedPacket);
+                    ExecuteNodeChain(context, node);
                 }
             }
             catch (Exception ex)
@@ -35,25 +46,25 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
+        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node)
         {
-            node.Execute(client, buffer);
+            node.Execute(context.Client, context.Packet);
 
-            foreach (var nextNode in node.NextNodes)
+            foreach (var next in node.NextNodes)
             {
-                ExecuteNodeChain(client, nextNode, buffer);
+                ExecuteNodeChain(context, next);
             }
         }
     }
 
-    public class LoopNode : ActionNodeBase
+    public class LoopNode : ContextNodeBase
     {
-        public Func<Client, NetBuffer?, bool>? ContinueCondition { get; set; }
+        public Func<RuntimeContext, bool>? ContinueCondition { get; set; }
         public int MaxIterations { get; set; } = 100;
         public List<ActionNodeBase> LoopBody { get; set; } = [];
         public List<ActionNodeBase> ExitNodes { get; set; } = [];
 
-        public override void Execute(Client client, NetBuffer? receivedPacket = null)
+        protected override void ExecuteImpl(RuntimeContext context)
         {
             if (ContinueCondition == null)
             {
@@ -64,13 +75,12 @@ namespace MultiSocketRUDPBotTester.Bot
             try
             {
                 var iteration = 0;
-                while (iteration < MaxIterations && ContinueCondition(client, receivedPacket))
+                while (iteration < MaxIterations && ContinueCondition(context))
                 {
                     Log.Debug("Loop iteration: {Iteration}", iteration);
-
                     foreach (var node in LoopBody)
                     {
-                        ExecuteNodeChain(client, node, receivedPacket);
+                        ExecuteNodeChain(context, node);
                     }
 
                     iteration++;
@@ -83,7 +93,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                 foreach (var node in ExitNodes)
                 {
-                    ExecuteNodeChain(client, node, receivedPacket);
+                    ExecuteNodeChain(context, node);
                 }
             }
             catch (Exception ex)
@@ -92,33 +102,33 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
+        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node)
         {
-            node.Execute(client, buffer);
+            node.Execute(context.Client, context.Packet);
 
-            foreach (var nextNode in node.NextNodes)
+            foreach (var next in node.NextNodes)
             {
-                ExecuteNodeChain(client, nextNode, buffer);
+                ExecuteNodeChain(context, next);
             }
         }
     }
-    public class RepeatTimerNode : ActionNodeBase
+
+    public class RepeatTimerNode : ContextNodeBase
     {
         public int IntervalMilliseconds { get; set; } = 1000;
         public int RepeatCount { get; set; } = 10;
         public List<ActionNodeBase> RepeatBody { get; set; } = [];
 
-        public override void Execute(Client client, NetBuffer? receivedPacket = null)
+        protected override void ExecuteImpl(RuntimeContext context)
         {
             Task.Run(async () =>
             {
                 for (var i = 0; i < RepeatCount; i++)
                 {
                     Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
-
                     foreach (var node in RepeatBody)
                     {
-                        ExecuteNodeChain(client, node, receivedPacket);
+                        ExecuteNodeChain(context, node);
                     }
 
                     if (i < RepeatCount - 1)
@@ -127,20 +137,20 @@ namespace MultiSocketRUDPBotTester.Bot
                     }
                 }
 
-                foreach (var nextNode in NextNodes)
+                foreach (var next in NextNodes)
                 {
-                    ExecuteNodeChain(client, nextNode, receivedPacket);
+                    ExecuteNodeChain(context, next);
                 }
             });
         }
 
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
+        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node)
         {
-            node.Execute(client, buffer);
+            node.Execute(context.Client, context.Packet);
 
-            foreach (var nextNode in node.NextNodes)
+            foreach (var next in node.NextNodes)
             {
-                ExecuteNodeChain(client, nextNode, buffer);
+                ExecuteNodeChain(context, next);
             }
         }
     }

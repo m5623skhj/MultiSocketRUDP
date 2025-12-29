@@ -20,7 +20,7 @@ namespace MultiSocketRUDPBotTester.Bot
         public string? FalsePortType;
         public bool IsRoot;
 
-        public ActionNodeBase? ActionNode;
+        public ActionNodeBase? ActionNode { get; set; }
         public Type? NodeType;
         public NodeConfiguration? Configuration;
 

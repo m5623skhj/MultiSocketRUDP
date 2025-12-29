@@ -111,7 +111,7 @@ namespace MultiSocketRUDPBotTester.Bot
             return this;
         }
 
-        public ConditionalBranchBuilder ThenIf(string nodeName, Func<Client, NetBuffer?, bool> condition)
+        public ConditionalBranchBuilder ThenIf(string nodeName, Func<RuntimeContext, bool> condition)
         {
             var node = new ConditionalNode
             {
@@ -126,7 +126,7 @@ namespace MultiSocketRUDPBotTester.Bot
             return new ConditionalBranchBuilder(this, node);
         }
 
-        public LoopBranchBuilder ThenLoop(string nodeName, Func<Client, NetBuffer?, bool> continueCondition, int maxIterations = 100)
+        public LoopBranchBuilder ThenLoop(string nodeName, Func<RuntimeContext, bool> continueCondition, int maxIterations = 100)
         {
             var node = new LoopNode
             {

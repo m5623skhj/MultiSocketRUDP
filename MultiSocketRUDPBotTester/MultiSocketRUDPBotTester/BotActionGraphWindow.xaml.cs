@@ -398,6 +398,54 @@ namespace MultiSocketRUDPBotTester
                 };
                 stack.Children.Add(saveBtn);
             }
+            else if (node.NodeType == typeof(ConditionalNode))
+            {
+                stack.Children.Add(new TextBlock { Text = "Left Value:" });
+                var leftBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Left")?.ToString() ?? "value" };
+                stack.Children.Add(leftBox);
+
+                stack.Children.Add(new TextBlock { Text = "Operator (>, <, ==, >=, <=):" });
+                var opBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Op")?.ToString() ?? ">" };
+                stack.Children.Add(opBox);
+
+                stack.Children.Add(new TextBlock { Text = "Right Value:" });
+                var rightBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Right")?.ToString() ?? "10" };
+                stack.Children.Add(rightBox);
+
+                var saveBtn = new Button { Content = "Save" };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.Properties["Left"] = leftBox.Text;
+                    node.Configuration.Properties["Op"] = opBox.Text;
+                    node.Configuration.Properties["Right"] = rightBox.Text;
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(LoopNode))
+            {
+                stack.Children.Add(new TextBlock { Text = "Loop Count:" });
+                var countBox = new TextBox
+                {
+                    Text = node.Configuration?.Properties.GetValueOrDefault("LoopCount")?.ToString() ?? "5"
+                };
+                stack.Children.Add(countBox);
+
+                var saveBtn = new Button { Content = "Save" };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (!int.TryParse(countBox.Text, out var n))
+                    {
+                        return;
+                    }
+
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.Properties["LoopCount"] = n;
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
             else
             {
                 stack.Children.Add(new TextBlock
@@ -949,7 +997,7 @@ namespace MultiSocketRUDPBotTester
             {
                 try
                 {
-                    ActionNodeBase? actionNode;
+                    ActionNodeBase? actionNode = null;
                     if (visual.IsRoot)
                     {
                         actionNode = visual.ActionNode!;
@@ -988,19 +1036,50 @@ namespace MultiSocketRUDPBotTester
                     }
                     else if (visual.NodeType == typeof(ConditionalNode))
                     {
-                        actionNode = new ConditionalNode
+                        var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
+                        var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString();
+                        var rightStr = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
+
+                        if (int.TryParse(rightStr, out var right) == false)
                         {
-                            Name = visual.NodeType.Name,
-                            Condition = (_, _) => true
-                        };
+                            Serilog.Log.Error("Int parse failed in BuildActionGraph() with ConditionalNode");
+                        }
+
+                        if (left != null)
+                        {
+                            actionNode = new ConditionalNode
+                            {
+                                Name = visual.NodeType.Name,
+                                Condition = ctx =>
+                                {
+                                    var value = ctx.Get<int>(left);
+                                    return op switch
+                                    {
+                                        ">" => value > right,
+                                        "<" => value < right,
+                                        "==" => value == right,
+                                        ">=" => value >= right,
+                                        "<=" => value <= right,
+                                        _ => false
+                                    };
+                                }
+                            };
+                        }
                     }
                     else if (visual.NodeType == typeof(LoopNode))
                     {
+                        var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
+
                         actionNode = new LoopNode
                         {
                             Name = visual.NodeType.Name,
-                            ContinueCondition = (_, _) => false,
-                            MaxIterations = 10
+                            ContinueCondition = ctx =>
+                            {
+                                var i = ctx.GetOrDefault("LoopIndex", 0) + 1;
+                                ctx.Set("LoopIndex", i);
+                                return i < count;
+                            },
+                            MaxIterations = count
                         };
                     }
                     else if (visual.NodeType == typeof(RepeatTimerNode))
@@ -1036,6 +1115,12 @@ namespace MultiSocketRUDPBotTester
                     else
                     {
                         Serilog.Log.Warning("Node has no type information, skipping");
+                        continue;
+                    }
+
+                    if (actionNode == null)
+                    {
+                        Serilog.Log.Warning($"Node {visual.NodeType?.Name} could not be created, skipping");
                         continue;
                     }
 
