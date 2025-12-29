@@ -15,6 +15,9 @@ namespace MultiSocketRUDPBotTester.Bot
         public NodeVisual? Next;
         public NodeVisual? TrueChild;
         public NodeVisual? FalseChild;
+        public string? NextPortType;
+        public string? TruePortType;
+        public string? FalsePortType;
         public bool IsRoot;
 
         public ActionNodeBase? ActionNode;

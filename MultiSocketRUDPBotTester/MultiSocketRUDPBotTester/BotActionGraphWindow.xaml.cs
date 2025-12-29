@@ -135,7 +135,7 @@ namespace MultiSocketRUDPBotTester
                 }
             }
 
-            RedrawConnections();
+            Dispatcher.BeginInvoke(new Action(RedrawConnections), System.Windows.Threading.DispatcherPriority.Loaded);
             Log($"Graph restored with {allNodes.Count} nodes and connections.");
         }
 
@@ -152,7 +152,10 @@ namespace MultiSocketRUDPBotTester
                 InputPort = CreateInputPort(),
                 IsRoot = original.IsRoot,
                 NodeType = original.NodeType,
-                Configuration = CloneConfiguration(original.Configuration)
+                Configuration = CloneConfiguration(original.Configuration),
+                NextPortType = original.NextPortType,
+                TruePortType = original.TruePortType,
+                FalsePortType = original.FalsePortType
             };
 
             if (original is { ActionNode: not null, IsRoot: true })
@@ -571,14 +574,17 @@ namespace MultiSocketRUDPBotTester
             if (type is "true" or "continue")
             {
                 from.TrueChild = to;
+                from.TruePortType = type;
             }
             else if (type is "false" or "exit")
             {
                 from.FalseChild = to;
+                from.FalsePortType = type;
             }
             else
             {
                 from.Next = to;
+                from.NextPortType = type;
             }
 
             RedrawConnections();
@@ -701,19 +707,46 @@ namespace MultiSocketRUDPBotTester
             {
                 if (n.Next != null)
                 {
-                    DrawLine(n, n.Next, n.OutputPort!);
+                    var p = GetOutputPortByType(n, n.NextPortType);
+                    if (p != null)
+                    {
+                        DrawLine(n, n.Next, p);
+                    }
                 }
 
                 if (n.TrueChild != null)
                 {
-                    DrawLine(n, n.TrueChild, n.OutputPortTrue!);
+                    var p = GetOutputPortByType(n, n.TruePortType);
+                    if (p != null)
+                    {
+                        DrawLine(n, n.TrueChild, p);
+                    }
                 }
 
                 if (n.FalseChild != null)
                 {
-                    DrawLine(n, n.FalseChild, n.OutputPortFalse!);
+                    var p = GetOutputPortByType(n, n.FalsePortType);
+                    if (p != null)
+                    {
+                        DrawLine(n, n.FalseChild, p);
+                    }
                 }
             }
+        }
+
+        private FrameworkElement? GetOutputPortByType(NodeVisual n, string? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            return type switch
+            {
+                "true" or "continue" => n.OutputPortTrue,
+                "false" or "exit" => n.OutputPortFalse,
+                _ => n.OutputPort
+            };
         }
 
         private void DrawLine(NodeVisual from, NodeVisual to, FrameworkElement port)
