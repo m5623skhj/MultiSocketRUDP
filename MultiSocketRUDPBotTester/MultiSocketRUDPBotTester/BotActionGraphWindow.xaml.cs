@@ -6,6 +6,7 @@ using System.Windows.Shapes;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.ClientCore;
 using MultiSocketRUDPBotTester.Buffer;
+using System.Xml.Linq;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -244,6 +245,17 @@ namespace MultiSocketRUDPBotTester
                 panStart = e.GetPosition(GraphScroll);
                 GraphCanvas.CaptureMouse();
             };
+
+            GraphCanvas.MouseLeftButtonDown += (_, _) =>
+            {
+                if (selectedNode == null)
+                {
+                    return;
+                }
+
+                Unhighlight(selectedNode);
+                selectedNode = null;
+            };
         }
 
         private void CreateRootNode()
@@ -286,18 +298,26 @@ namespace MultiSocketRUDPBotTester
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
+
             var b = new Border
             {
                 Width = 140,
                 Height = 60,
                 Background = color,
-                BorderBrush = Brushes.White,
                 BorderThickness = new Thickness(2),
+                BorderBrush = Brushes.White,
                 Child = t
             };
 
             EnableDrag(b);
+
             b.PreviewMouseLeftButtonDown += Border_PreviewMouseLeftButtonDown;
+            b.MouseLeftButtonDown += (_, e) =>
+            {
+                SelectNodeByBorder(b);
+                e.Handled = true;
+            };
+
             return b;
         }
 
@@ -476,6 +496,7 @@ namespace MultiSocketRUDPBotTester
                 Header = "Delete",
                 IsEnabled = !node.IsRoot
             };
+
             deleteItem.Click += (_, _) =>
             {
                 if (!node.IsRoot)
@@ -483,8 +504,8 @@ namespace MultiSocketRUDPBotTester
                     DeleteNode(node);
                 }
             };
-            menu.Items.Add(deleteItem);
 
+            menu.Items.Add(deleteItem);
             node.Border.ContextMenu = menu;
         }
 
@@ -731,17 +752,40 @@ namespace MultiSocketRUDPBotTester
 
         private void SelectNodeByBorder(Border b)
         {
-            selectedNode = allNodes.FirstOrDefault(n => n.Border == b);
-
-            foreach (var n in allNodes)
+            var found = allNodes.FirstOrDefault(n => ReferenceEquals(n.Border, b));
+            if (found != null)
             {
-                n.Border.BorderBrush = Brushes.White;
+                SelectNode(found);
+            }
+        }
+
+        private void SelectNode(NodeVisual node)
+        {
+            var previous = selectedNode;
+            if (ReferenceEquals(previous, node))
+            {
+                return;
             }
 
-            if (selectedNode != null)
+            selectedNode = node;
+            if (previous != null)
             {
-                selectedNode.Border.BorderBrush = Brushes.Yellow;
+                Unhighlight(previous);
             }
+
+            Highlight(node);
+        }
+
+        private static void Highlight(NodeVisual node)
+        {
+            node.Border.SetValue(Border.BorderBrushProperty, Brushes.Yellow);
+            node.Border.BorderThickness = new Thickness(4);
+        }
+
+        private static void Unhighlight(NodeVisual node)
+        {
+            node.Border.BorderBrush = Brushes.White;
+            node.Border.BorderThickness = new Thickness(2);
         }
 
         private void RedrawConnections()
@@ -952,9 +996,12 @@ namespace MultiSocketRUDPBotTester
             _ => Brushes.White
         };
 
-        private static void UpdateNodeVisualState(NodeVisual n)
+        private void UpdateNodeVisualState(NodeVisual n)
         {
-            n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
+            if (n != selectedNode)
+            {
+                n.Border.BorderBrush = GetRuntimeBrush(n.RuntimeState);
+            }
         }
 
         private void BuildGraph_Click(object sender, RoutedEventArgs e)

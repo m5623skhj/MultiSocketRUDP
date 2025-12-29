@@ -17,9 +17,6 @@ namespace MultiSocketRUDPBotTester.Buffer
         private int writePos = HeaderSize;
         private bool isEncoded;
 
-        public static byte HeaderCode { get; set; } = 0x89;
-        public static byte XorKey { get; set; } = 0x32;
-
         public void WriteByte(byte value)
         {
             buffer[writePos++] = value;
