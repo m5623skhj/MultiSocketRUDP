@@ -53,7 +53,7 @@ virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersT
 ////////////////////////////////////////////////////////////////////////////////////
 
 #pragma pack(push, 1)
-class Ping : public IPacket
+class Ping final : public IPacket
 {
 public:
 	Ping() = default;
@@ -64,7 +64,7 @@ public:
 	PacketId GetPacketId() const override;
 };
 
-class Pong : public IPacket
+class Pong final : public IPacket
 {
 public:
 	Pong() = default;
@@ -75,7 +75,7 @@ public:
 	PacketId GetPacketId() const override;
 };
 
-class TestStringPacketReq : public IPacket
+class TestStringPacketReq final : public IPacket
 {
 public:
 	TestStringPacketReq() = default;
@@ -91,7 +91,7 @@ public:
 	std::string testString;
 };
 
-class TestStringPacketRes : public IPacket
+class TestStringPacketRes final : public IPacket
 {
 public:
 	TestStringPacketRes() = default;
@@ -107,7 +107,7 @@ public:
 	std::string echoString;
 };
 
-class TestPacketReq : public IPacket
+class TestPacketReq final : public IPacket
 {
 public:
 	TestPacketReq() = default;
@@ -123,7 +123,7 @@ public:
 	int order;
 };
 
-class TestPacketRes : public IPacket
+class TestPacketRes final : public IPacket
 {
 public:
 	TestPacketRes() = default;

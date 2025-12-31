@@ -158,7 +158,7 @@ def MakePacketClasss(packetList):
         packetName = packet['PacketName']
         items = packet.get('Items')
         
-        generatedCode += f"class {packetName} : public IPacket\n" + "{\npublic:\n"
+        generatedCode += f"class {packetName} final : public IPacket\n" + "{\npublic:\n"
         generatedCode += f"\t{packetName}() = default;\n"
         generatedCode += f"\t~{packetName}() override = default;\n\npublic:\n"
         generatedCode += "\t[[nodiscard]]\n\tPacketId GetPacketId() const override;\n"
