@@ -19,27 +19,52 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteByte(byte value)
         {
+            if (writePos + sizeof(byte) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             buffer[writePos++] = value;
         }
 
         public void WriteSByte(sbyte value)
         {
+            if (writePos + sizeof(sbyte) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             buffer[writePos++] = (byte)value;
         }
 
         public void WriteUShort(ushort value)
         {
+            if (writePos + sizeof(ushort) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             buffer[writePos++] = (byte)(value & 0xFF);
             buffer[writePos++] = (byte)((value >> 8) & 0xFF);
         }
 
         public void WriteShort(short value)
         {
+            if (writePos + sizeof(short) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             WriteUShort((ushort)value);
         }
 
         public void WriteUInt(uint value)
         {
+            if (writePos + sizeof(uint) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             for (var i = 0; i < 4; i++)
             {
                 buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
@@ -48,11 +73,21 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteInt(int value)
         {
+            if (writePos + sizeof(int) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             WriteUInt((uint)value);
         }
 
         public void WriteULong(ulong value)
         {
+            if (writePos + sizeof(ulong) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             for (var i = 0; i < 8; i++)
             {
                 buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
@@ -61,21 +96,41 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteLong(long value)
         {
+            if (writePos + sizeof(long) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             WriteULong((ulong)value);
         }
 
         public void WriteFloat(float value)
         {
+            if (writePos + sizeof(float) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             WriteBytes(BitConverter.GetBytes(value));
         }
 
         public void WriteDouble(double value)
         {
+            if (writePos + sizeof(double) > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             WriteBytes(BitConverter.GetBytes(value));
         }
 
         public void WriteString(string value)
         {
+            if (writePos + value.Length > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             var bytes = Encoding.UTF8.GetBytes(value);
             WriteUInt((uint)bytes.Length);
             WriteBytes(bytes);
@@ -83,12 +138,22 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteBytes(byte[] data)
         {
+            if (writePos + data.Length > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             Array.Copy(data, 0, buffer, writePos, data.Length);
             writePos += data.Length;
         }
 
         public void WriteBytes(byte[] data, int offset, int count)
         {
+            if (writePos + count > BufferSize)
+            {
+                throw new InvalidOperationException("Buffer overflow");
+            }
+
             Array.Copy(data, offset, buffer, writePos, count);
             writePos += count;
         }
