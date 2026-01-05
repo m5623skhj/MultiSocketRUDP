@@ -35,6 +35,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public async Task StartBotTest(ushort numOfBot)
         {
+            if (string.IsNullOrEmpty(hostIp) || hostPort == 0)
+            {
+                throw new InvalidOperationException("Connection info not set. Call SetConnectionInfo first.");
+            }
+
             for (var i = 0; i < numOfBot; ++i)
             {
                 var rudpSession = await GetSessionInfoFromSessionBroker();

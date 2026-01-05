@@ -1,6 +1,7 @@
-﻿using ClientCore;
-using MultiSocketRUDPBotTester.Bot;
+﻿using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.Buffer;
+using MultiSocketRUDPBotTester.ClientCore;
+using Serilog;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
@@ -19,15 +20,27 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             actionGraph = graph;
         }
 
-        protected override void OnRecvPacket(NetBuffer buffer)
+        protected override void OnConnected()
         {
-            const PacketId packetId = 0;
+            Log.Information("Client connected, triggering OnConnected event");
+            actionGraph.TriggerEvent(this, TriggerType.OnConnected);
+        }
+
+        protected override void OnDisconnected()
+        {
+            Log.Information("Client disconnected, triggering OnDisconnected event");
+            actionGraph.TriggerEvent(this, TriggerType.OnDisconnected);
+        }
+
+        protected override void OnRecvPacket(PacketId packetId, NetBuffer buffer)
+        {
+            Log.Debug("Received packet with ID: {PacketId}", packetId); 
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
                 action.Execute(buffer);
             }
 
-            actionGraph.TriggerEvent(this, TriggerType.OnPacketReceived, packetId);
+            actionGraph.TriggerEvent(this, TriggerType.OnPacketReceived, packetId, buffer);
         }
     }
 }

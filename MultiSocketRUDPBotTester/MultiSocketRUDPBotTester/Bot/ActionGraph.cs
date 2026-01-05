@@ -1,13 +1,14 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
+using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
     public class ActionGraph
     {
-        private readonly Dictionary<TriggerType, List<ActionNodeBase>> triggerNodes = new();
-        private readonly Dictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
+        private readonly ConcurrentDictionary<TriggerType, List<ActionNodeBase>> triggerNodes = new();
+        private readonly ConcurrentDictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
         private readonly List<ActionNodeBase> allNodes = [];
 
         public string Name { get; set; } = "Unnamed Graph";
@@ -43,31 +44,50 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public void TriggerEvent(Client client, TriggerType triggerType, PacketId? packetId = null, NetBuffer? buffer = null)
         {
+            Log.Debug("TriggerEvent called - Type: {Type}, PacketId: {PacketId}", triggerType, packetId);
+
             List<ActionNodeBase>? candidates;
             if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
             {
                 packetTriggerNodes.TryGetValue(packetId.Value, out candidates);
+                Log.Debug("Found {Count} nodes for PacketId {PacketId}", candidates?.Count ?? 0, packetId);
             }
             else
             {
                 triggerNodes.TryGetValue(triggerType, out candidates);
+                Log.Debug("Found {Count} nodes for TriggerType {Type}", candidates?.Count ?? 0, triggerType);
             }
 
             if (candidates == null || candidates.Count == 0)
             {
+                Log.Debug("No matching nodes found for trigger");
                 return;
             }
 
             foreach (var node in candidates.Where(node => node.Trigger?.Matches(triggerType, packetId, buffer) == true))
             {
-                Log.Debug("Triggering node: {NodeName}", node.Name);
-                ExecuteNodeChain(client, node, buffer);
+                Log.Information("Triggering node: {NodeName} (Type: {TriggerType})", node.Name, triggerType);
+                try
+                {
+                    ExecuteNodeChain(client, node, buffer);
+                    Log.Information("Node executed successfully: {NodeName}", node.Name);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Node execution failed: {NodeName} - {Error}", node.Name, ex.Message);
+                }
             }
         }
 
         private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
         {
+            Log.Debug("Executing node: {NodeName}", node.Name);
             node.Execute(client, buffer);
+
+            if (node.NextNodes.Count > 0)
+            {
+                Log.Debug("Node {NodeName} has {Count} next nodes", node.Name, node.NextNodes.Count);
+            }
 
             foreach (var nextNode in node.NextNodes)
             {

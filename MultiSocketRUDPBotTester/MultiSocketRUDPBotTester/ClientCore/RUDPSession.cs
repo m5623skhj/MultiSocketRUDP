@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using Serilog;
 
-namespace ClientCore
+namespace MultiSocketRUDPBotTester.ClientCore
 {
     public enum SessionState
     {
@@ -108,6 +108,7 @@ namespace ClientCore
         private PacketSequence lastSendSequence = 1;
         private PacketSequence expectedRecvSequence = 0;
         private const int RetransmissionWakeUpMs = 30;
+        private bool isDisposed;
 
         private readonly HoldingPacketStore holdingPacketStore = new();
         public CancellationTokenSource CancellationToken = new();
@@ -115,7 +116,7 @@ namespace ClientCore
 
         private volatile bool isConnected;
 
-        protected abstract void OnRecvPacket(NetBuffer buffer);
+        protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
 
         protected virtual void OnConnected() {}
         protected virtual void OnDisconnected() {}
@@ -241,8 +242,9 @@ namespace ClientCore
             var buffer = new NetBuffer();
             buffer.WriteBytes(data);
             var packetType = (PacketType)buffer.ReadByte();
-            var isCorePacket = packetType == PacketType.SEND_TYPE;
+            var isCorePacket = packetType != PacketType.SEND_TYPE;
             PacketDirection direction;
+
             switch (packetType)
             {
                 case PacketType.HEARTBEAT_TYPE:
@@ -274,6 +276,13 @@ namespace ClientCore
             }
 
             var packetSequence = buffer.ReadULong();
+
+            var packetId = PacketId.INVALID_PACKET_ID;
+            if (!isCorePacket)
+            {
+                packetId = (PacketId)buffer.ReadUInt();
+            }
+
             switch (packetType)
             {
                 case PacketType.HEARTBEAT_TYPE:
@@ -284,7 +293,7 @@ namespace ClientCore
                 case PacketType.SEND_TYPE:
                 {
                     SendReplyToServer(packetSequence);
-                    OnRecvPacket(buffer);
+                    OnRecvPacket(packetId, buffer);
                     break;
                 }
                 case PacketType.SEND_REPLY_TYPE:
@@ -364,7 +373,13 @@ namespace ClientCore
             await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength());
             udpClient.Close();
 
+            if (isDisposed)
+            {
+                return;
+            }
+
             Cleanup();
+            isDisposed = true;
 
             SessionInfo.SessionState = SessionState.Disconnected;
         }

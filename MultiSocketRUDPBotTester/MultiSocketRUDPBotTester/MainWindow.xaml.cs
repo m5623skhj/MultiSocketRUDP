@@ -1,5 +1,4 @@
-﻿using ClientCore;
-using MultiSocketRUDPBotTester.ClientCore;
+﻿using MultiSocketRUDPBotTester.ClientCore;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;

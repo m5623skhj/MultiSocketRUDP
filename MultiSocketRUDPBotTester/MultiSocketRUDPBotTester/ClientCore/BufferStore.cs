@@ -1,6 +1,6 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 
-namespace ClientCore
+namespace MultiSocketRUDPBotTester.ClientCore
 {
     public class SendPacketInfo(NetBuffer inSentBuffer)
     {

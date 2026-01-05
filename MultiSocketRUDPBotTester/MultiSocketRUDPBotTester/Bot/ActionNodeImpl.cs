@@ -20,7 +20,7 @@ namespace MultiSocketRUDPBotTester.Bot
             try
             {
                 var buffer = PacketBuilder(client);
-                _ = client.SendPacket(buffer, PacketId);
+                client.SendPacket(buffer, PacketId).Wait();
                 Log.Debug("Sent packet: {PacketId}", PacketId);
             }
             catch (Exception ex)
