@@ -123,23 +123,30 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             Task.Run(async () =>
             {
-                for (var i = 0; i < RepeatCount; i++)
+                try
                 {
-                    Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
-                    foreach (var node in RepeatBody)
+                    for (var i = 0; i < RepeatCount; i++)
                     {
-                        ExecuteNodeChain(context, node);
+                        Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
+                        foreach (var node in RepeatBody)
+                        {
+                            ExecuteNodeChain(context, node);
+                        }
+
+                        if (i < RepeatCount - 1)
+                        {
+                            await Task.Delay(IntervalMilliseconds);
+                        }
                     }
 
-                    if (i < RepeatCount - 1)
+                    foreach (var next in NextNodes)
                     {
-                        await Task.Delay(IntervalMilliseconds);
+                        ExecuteNodeChain(context, next);
                     }
                 }
-
-                foreach (var next in NextNodes)
+                catch (Exception e)
                 {
-                    ExecuteNodeChain(context, next);
+                    Log.Error("RepeatTimerNode failed: {Message}", e.Message);
                 }
             });
         }
