@@ -80,7 +80,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 lock (sendBufferStoreLock)
                 {
-                    return sendBufferStore.First().Value;
+                    return sendBufferStore.Count == 0 ? null : sendBufferStore.First().Value;
                 }
             }
 
@@ -88,10 +88,15 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 lock (sendBufferStoreLock)
                 {
+                    if (sendBufferStore.Count == 0)
+                    {
+                        return null;
+                    }
+
                     var firstKey = sendBufferStore.First().Key;
                     var firstValue = sendBufferStore[firstKey];
                     sendBufferStore.Remove(firstKey);
-                    
+
                     return firstValue;
                 }
             }

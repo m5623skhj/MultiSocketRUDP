@@ -342,6 +342,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 while (await timer.WaitForNextTickAsync(CancellationToken.Token))
                 {
+                    var count = bufferStore.GetSendBufferCount();
+                    if (count == 0)
+                    {
+                        continue;
+                    }
+
                     var nowMs = CommonFunc.GetNowMs();
                     var sendPacketInfos = bufferStore.GetAllSendPacketInfos();
                     foreach (var sendPacketInfo in sendPacketInfos.Where(sendPacketInfo => sendPacketInfo.IsRetransmissionTime(nowMs)))

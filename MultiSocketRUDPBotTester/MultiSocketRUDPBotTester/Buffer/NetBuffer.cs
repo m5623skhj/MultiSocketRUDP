@@ -231,6 +231,11 @@ namespace MultiSocketRUDPBotTester.Buffer
         public string ReadString()
         {
             var length = ReadUInt();
+            if (length > int.MaxValue || readPos + (int)length > writePos)
+            {
+                throw new InvalidOperationException($"Invalid string length: {length}");
+            }
+
             var value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
             readPos += (int)length;
 
