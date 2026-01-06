@@ -44,6 +44,10 @@ namespace MultiSocketRUDPBotTester
                 HostPortTextBox.IsEnabled = false;
                 BotCountTextBox.IsEnabled = false;
 
+                var hostIp = HostIpTextBox.Text.Trim();
+                var hostPort = ushort.Parse(HostPortTextBox.Text);
+                BotTesterCore.Instance.SetConnectionInfo(hostIp, hostPort);
+
                 await BotTesterCore.Instance.StartBotTest(numOfBot);
             }
             catch (Exception ex)
