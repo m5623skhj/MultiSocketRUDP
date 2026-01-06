@@ -126,12 +126,12 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteString(string value)
         {
-            if (writePos + value.Length > BufferSize)
+            var bytes = Encoding.UTF8.GetBytes(value);
+            if (writePos + sizeof(uint) + bytes.Length > BufferSize)
             {
                 throw new InvalidOperationException("Buffer overflow");
             }
 
-            var bytes = Encoding.UTF8.GetBytes(value);
             WriteUInt((uint)bytes.Length);
             WriteBytes(bytes);
         }
