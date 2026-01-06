@@ -373,14 +373,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             await udpClient.SendAsync(disconnectPacket.GetPacketBuffer(), disconnectPacket.GetLength());
             udpClient.Close();
 
-            if (isDisposed)
-            {
-                return;
-            }
-
             Cleanup();
-            isDisposed = true;
-
             SessionInfo.SessionState = SessionState.Disconnected;
         }
 
@@ -427,6 +420,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void Cleanup()
         {
+            if (isDisposed)
+            {
+                return;
+            }
+            isDisposed = true;
+            
             OnDisconnected();
             
             udpClient.Close();
