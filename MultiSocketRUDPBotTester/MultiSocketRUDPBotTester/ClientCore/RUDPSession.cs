@@ -182,7 +182,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             Debug.Assert(SessionInfo.AesGcm != null);
             NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.SessionSalt, false);
 
-            await SendPacket(new SendPacketInfo(packetBuffer));
+            await SendPacket(new SendPacketInfo(packetBuffer, sequence));
         }
 
         private async Task<bool> SendPacket(SendPacketInfo sendPacketInfo)
@@ -196,7 +196,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private async Task<bool> SendConnectPacket()
         {
-            return await SendPacket(new SendPacketInfo(MakeConnectPacket()));
+            return await SendPacket(new SendPacketInfo(MakeConnectPacket(), 0));
         }
 
         private NetBuffer MakeConnectPacket()
