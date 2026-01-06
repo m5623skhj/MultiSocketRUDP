@@ -2,7 +2,7 @@
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
-    public class SendPacketInfo(NetBuffer inSentBuffer)
+    public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSequence)
     {
         public void RefreshSendPacketInfo(ulong now)
         {
@@ -21,7 +21,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         }
 
         public NetBuffer SentBuffer { get; } = inSentBuffer;
-        public PacketSequence packetSequence => 0;
+        public PacketSequence packetSequence { get; } = inPacketSequence;
         private ulong SendTimeStamp { get; set; } = 0;
         private PacketRetransmissionCount retransmissionCount = 0;
 
