@@ -54,7 +54,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            Task.Delay(DelayMilliseconds).Wait();
+            Thread.Sleep(DelayMilliseconds);
             Log.Debug("Delayed for {Ms}ms", DelayMilliseconds);
         }
     }

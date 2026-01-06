@@ -12,25 +12,42 @@ namespace MultiSocketRUDPBotTester.Bot
         private readonly List<ActionNodeBase> allNodes = [];
 
         public string Name { get; set; } = "Unnamed Graph";
-        public List<ActionNodeBase> GetAllNodes() => [.. allNodes];
+
+        public List<ActionNodeBase> GetAllNodes()
+        {
+            lock (allNodes)
+            {
+                return [..allNodes];
+            }
+        }
 
         public void AddNode(ActionNodeBase node)
         {
-            allNodes.Add(node);
+            lock (allNodes)
+            {
+                allNodes.Add(node);
+            }
+
             if (node.Trigger == null)
             {
                 return;
             }
 
-            if (!triggerNodes.ContainsKey(node.Trigger.Type))
+            lock (triggerNodes)
             {
-                triggerNodes[node.Trigger.Type] = [];
+                if (!triggerNodes.ContainsKey(node.Trigger.Type))
+                {
+                    triggerNodes[node.Trigger.Type] = [];
+                }
+                triggerNodes[node.Trigger.Type].Add(node);
             }
-            triggerNodes[node.Trigger.Type].Add(node);
 
-            if (node.Trigger.Type != TriggerType.OnPacketReceived || !node.Trigger.PacketId.HasValue)
+            lock (packetTriggerNodes)
             {
-                return;
+                if (node.Trigger.Type != TriggerType.OnPacketReceived || !node.Trigger.PacketId.HasValue)
+                {
+                    return;
+                }
             }
 
             var packetId = node.Trigger.PacketId.Value;
@@ -54,7 +71,11 @@ namespace MultiSocketRUDPBotTester.Bot
             }
             else
             {
-                triggerNodes.TryGetValue(triggerType, out candidates);
+                lock (triggerNodes)
+                {
+                    triggerNodes.TryGetValue(triggerType, out candidates);
+                }
+
                 Log.Debug("Found {Count} nodes for TriggerType {Type}", candidates?.Count ?? 0, triggerType);
             }
 
