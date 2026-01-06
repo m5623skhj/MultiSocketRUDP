@@ -12,12 +12,28 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly Dictionary<SessionIdType, Client> sessionDictionary = new();
         private readonly Lock sessionDictionaryLock = new();
 
-        private readonly string hostIp = "";
-        private readonly ushort hostPort = 0;
+        private string hostIp = "";
+        private ushort hostPort = 0;
 
         private ActionGraph botActionGraph = new();
         private List<NodeVisual>? savedNodeVisuals;
 
+        public void SetConnectionInfo(string targetIp, ushort targetPort)
+        {
+            if (string.IsNullOrWhiteSpace(targetIp))
+            {
+                throw new ArgumentException("IP cannot be empty", nameof(targetIp));
+            }
+
+            if (targetPort == 0)
+            {
+                throw new ArgumentException("Port cannot be 0", nameof(targetPort));
+            }
+
+            hostIp = targetIp;
+            hostPort = targetPort;
+        }
+        
         public void SetBotActionGraph(ActionGraph graph)
         {
             botActionGraph = graph;
