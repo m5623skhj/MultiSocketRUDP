@@ -1,5 +1,6 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
+using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -8,7 +9,7 @@ namespace MultiSocketRUDPBotTester.Bot
         public Client Client { get; } = client;
         public NetBuffer? Packet { get; } = packet;
 
-        private readonly Dictionary<string, object> vars = new();
+        private readonly ConcurrentDictionary<string, object> vars = new();
 
         public void Set<T>(string key, T value) where T : notnull
         {
