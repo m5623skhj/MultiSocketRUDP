@@ -106,6 +106,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private UdpClient udpClient = null!;
 
         private PacketSequence lastSendSequence = 1;
+        private readonly Lock expectedRecvSequenceLock = new();
         private PacketSequence expectedRecvSequence = 0;
         private const int RetransmissionWakeUpMs = 30;
         private bool isDisposed;
@@ -293,9 +294,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 case PacketType.SEND_TYPE:
                 {
                     SendReplyToServer(packetSequence);
-                    if (packetSequence > expectedRecvSequence)
+                    lock (expectedRecvSequenceLock)
                     {
-                        expectedRecvSequence = packetSequence;
+                        if (packetSequence > expectedRecvSequence)
+                        {
+                            expectedRecvSequence = packetSequence;
+                        }
                     }
 
                     OnRecvPacket(packetId, buffer);
@@ -336,9 +340,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 OnConnected();
             }
 
-            if (packetSequence > expectedRecvSequence)
+            lock (expectedRecvSequenceLock)
             {
-                expectedRecvSequence = packetSequence;
+                if (packetSequence > expectedRecvSequence)
+                {
+                    expectedRecvSequence = packetSequence;
+                }
             }
 
             holdingPacketStore.RemoveHoldingPacket(packetSequence);

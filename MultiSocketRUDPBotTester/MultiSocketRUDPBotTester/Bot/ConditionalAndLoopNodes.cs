@@ -42,7 +42,8 @@ namespace MultiSocketRUDPBotTester.Bot
             }
             catch (Exception ex)
             {
-                Log.Error("Conditional evaluation failed: {Message}", ex.Message);
+                Log.Error(ex, "Conditional evaluation failed");
+                throw;
             }
         }
 

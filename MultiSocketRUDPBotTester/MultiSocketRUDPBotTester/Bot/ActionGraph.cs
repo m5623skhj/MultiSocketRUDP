@@ -65,7 +65,10 @@ namespace MultiSocketRUDPBotTester.Bot
             List<ActionNodeBase>? candidates;
             if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
             {
-                packetTriggerNodes.TryGetValue(packetId.Value, out candidates);
+                lock (packetTriggerNodes)
+                {
+                    packetTriggerNodes.TryGetValue(packetId.Value, out candidates);
+                }
                 Log.Debug("Found {Count} nodes for PacketId {PacketId}", candidates?.Count ?? 0, packetId);
             }
             else

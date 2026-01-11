@@ -131,7 +131,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
             catch (Exception e)
             {
-                throw new Exception($"GetSessionInfoFromSessionBroker failed with {e.Message}");
+                Log.Error(e, "Failed to get session info from session broker");
+                throw new InvalidOperationException("Failed to get session info from session broker. Check connection settings.", e);
             }
 
             return new Client(buffer[GlobalConstants.PacketHeaderSize..totalBytes]);
