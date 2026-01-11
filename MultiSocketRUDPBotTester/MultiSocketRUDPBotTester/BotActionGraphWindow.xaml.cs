@@ -90,25 +90,25 @@ namespace MultiSocketRUDPBotTester
                 var l = Canvas.GetLeft(b);
                 var t = Canvas.GetTop(b);
 
-                Canvas.SetLeft(newNode.InputPort, l - 18);
-                Canvas.SetTop(newNode.InputPort, t + b.Height / 2 - 18);
+                Canvas.SetLeft(newNode.InputPort, l - PortOffsetX);
+                Canvas.SetTop(newNode.InputPort, t + b.Height / 2 - HalfPortSize);
 
                 if (newNode.OutputPort != null)
                 {
-                    Canvas.SetLeft(newNode.OutputPort, l + b.Width - 18);
-                    Canvas.SetTop(newNode.OutputPort, t + b.Height / 2 - 18);
+                    Canvas.SetLeft(newNode.OutputPort, l + b.Width - PortOffsetX);
+                    Canvas.SetTop(newNode.OutputPort, t + b.Height / 2 - HalfPortSize);
                 }
 
                 if (newNode.OutputPortTrue != null)
                 {
-                    Canvas.SetLeft(newNode.OutputPortTrue, l + b.Width - 18);
-                    Canvas.SetTop(newNode.OutputPortTrue, t + b.Height / 3 - 18);
+                    Canvas.SetLeft(newNode.OutputPortTrue, l + b.Width - PortOffsetX);
+                    Canvas.SetTop(newNode.OutputPortTrue, t + b.Height / 3 - HalfPortSize);
                 }
 
                 if (newNode.OutputPortFalse != null)
                 {
-                    Canvas.SetLeft(newNode.OutputPortFalse, l + b.Width - 18);
-                    Canvas.SetTop(newNode.OutputPortFalse, t + b.Height * 2 / 3 - 18);
+                    Canvas.SetLeft(newNode.OutputPortFalse, l + b.Width - PortOffsetX);
+                    Canvas.SetTop(newNode.OutputPortFalse, t + b.Height * 2 / 3 - HalfPortSize);
                 }
             }
 
@@ -733,20 +733,20 @@ namespace MultiSocketRUDPBotTester
 
             if (n.OutputPort != null)
             {
-                Canvas.SetLeft(n.OutputPort, l + b.Width - 18);
-                Canvas.SetTop(n.OutputPort, t + b.Height / 2 - 18);
+                Canvas.SetLeft(n.OutputPort, l + b.Width - PortOffsetX);
+                Canvas.SetTop(n.OutputPort, t + b.Height / 2 - HalfPortSize);
             }
 
             if (n.OutputPortTrue != null)
             {
-                Canvas.SetLeft(n.OutputPortTrue, l + b.Width - 18);
-                Canvas.SetTop(n.OutputPortTrue, t + b.Height / 3 - 18);
+                Canvas.SetLeft(n.OutputPortTrue, l + b.Width - PortOffsetX);
+                Canvas.SetTop(n.OutputPortTrue, t + b.Height / 3 - HalfPortSize);
             }
 
             if (n.OutputPortFalse != null)
             {
-                Canvas.SetLeft(n.OutputPortFalse, l + b.Width - 18);
-                Canvas.SetTop(n.OutputPortFalse, t + b.Height * 2 / 3 - 18);
+                Canvas.SetLeft(n.OutputPortFalse, l + b.Width - PortOffsetX);
+                Canvas.SetTop(n.OutputPortFalse, t + b.Height * 2 / 3 - HalfPortSize);
             }
 
             RedrawConnections();
