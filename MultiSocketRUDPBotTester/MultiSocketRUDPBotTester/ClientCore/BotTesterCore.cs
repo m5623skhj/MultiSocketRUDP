@@ -92,7 +92,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             lock (sessionDictionaryLock)
             {
-                return sessionDictionary.Count;
+                return sessionDictionary.Values.Count(client => client.IsConnected());
             }
         }
 

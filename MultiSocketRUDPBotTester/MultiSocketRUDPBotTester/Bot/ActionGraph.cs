@@ -42,21 +42,20 @@ namespace MultiSocketRUDPBotTester.Bot
                 triggerNodes[node.Trigger.Type].Add(node);
             }
 
+            if (node.Trigger.Type != TriggerType.OnPacketReceived || !node.Trigger.PacketId.HasValue)
+            {
+                return;
+            }
+
             lock (packetTriggerNodes)
             {
-                if (node.Trigger.Type != TriggerType.OnPacketReceived || !node.Trigger.PacketId.HasValue)
+                var packetId = node.Trigger.PacketId.Value;
+                if (!packetTriggerNodes.ContainsKey(packetId))
                 {
-                    return;
+                    packetTriggerNodes[packetId] = [];
                 }
+                packetTriggerNodes[packetId].Add(node);
             }
-
-            var packetId = node.Trigger.PacketId.Value;
-            if (!packetTriggerNodes.ContainsKey(packetId))
-            {
-                packetTriggerNodes[packetId] = [];
-            }
-
-            packetTriggerNodes[packetId].Add(node);
         }
 
         public void TriggerEvent(Client client, TriggerType triggerType, PacketId? packetId = null, NetBuffer? buffer = null)

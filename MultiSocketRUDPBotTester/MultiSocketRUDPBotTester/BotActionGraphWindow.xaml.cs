@@ -1054,7 +1054,9 @@ namespace MultiSocketRUDPBotTester
                         var packetId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID;
                         if (packetId == PacketId.INVALID_PACKET_ID)
                         {
-                            throw new Exception("SendPacketNode requires a valid PacketId");
+                            throw new InvalidOperationException(
+                                $"SendPacketNode '{visual.NodeType.Name}' requires a valid PacketId. " +
+                                "Please double-click the node to configure it.");
                         }
 
                         actionNode = new SendPacketNode

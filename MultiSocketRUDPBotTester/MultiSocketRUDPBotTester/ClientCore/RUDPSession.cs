@@ -293,6 +293,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 case PacketType.SEND_TYPE:
                 {
                     SendReplyToServer(packetSequence);
+                    if (packetSequence > expectedRecvSequence)
+                    {
+                        expectedRecvSequence = packetSequence;
+                    }
+
                     OnRecvPacket(packetId, buffer);
                     break;
                 }
@@ -329,6 +334,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 isConnected = true;
                 _ = StartServerAliveCheck();
                 OnConnected();
+            }
+
+            if (packetSequence > expectedRecvSequence)
+            {
+                expectedRecvSequence = packetSequence;
             }
 
             holdingPacketStore.RemoveHoldingPacket(packetSequence);
