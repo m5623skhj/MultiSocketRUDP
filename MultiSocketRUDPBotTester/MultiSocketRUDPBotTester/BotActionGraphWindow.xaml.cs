@@ -23,6 +23,8 @@ namespace MultiSocketRUDPBotTester
         private bool isPanning;
         private Point panStart;
         private NodeVisual? selectedNode;
+        private const double PortOffsetX = 18.0;
+        private const double HalfPortSize = 18.0;
 
         public ActionGraph? BuiltGraph { get; private set; }
 
@@ -726,8 +728,8 @@ namespace MultiSocketRUDPBotTester
             var l = Canvas.GetLeft(b);
             var t = Canvas.GetTop(b);
 
-            Canvas.SetLeft(n.InputPort, l - 18);
-            Canvas.SetTop(n.InputPort, t + b.Height / 2 - 18);
+            Canvas.SetLeft(n.InputPort, l - PortOffsetX);
+            Canvas.SetTop(n.InputPort, t + b.Height / 2 - HalfPortSize);
 
             if (n.OutputPort != null)
             {

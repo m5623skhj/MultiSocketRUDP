@@ -294,17 +294,32 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 case PacketType.SEND_TYPE:
                 {
                     SendReplyToServer(packetSequence);
+
+                    bool shouldProcess;
                     lock (expectedRecvSequenceLock)
                     {
-                        if (packetSequence > expectedRecvSequence)
+                        if (packetSequence <= expectedRecvSequence)
                         {
+                            Log.Debug("Received duplicate or old packet: {Seq}, expected: {Expected}", packetSequence, expectedRecvSequence);
+                            shouldProcess = false;
+                        }
+                        else
+                        {
+                            if (packetSequence != expectedRecvSequence + 1)
+                            {
+                                Log.Warning("Received out-of-order packet: {Seq}, expected: {Expected}", packetSequence, expectedRecvSequence + 1);
+                            }
                             expectedRecvSequence = packetSequence;
+                            shouldProcess = true;
                         }
                     }
 
-                    OnRecvPacket(packetId, buffer);
+                    if (shouldProcess)
+                    {
+                        OnRecvPacket(packetId, buffer);
+                    }
                     break;
-                }
+                    }
                 case PacketType.SEND_REPLY_TYPE:
                 {
                     OnSendReply(packetSequence);
@@ -328,7 +343,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void OnSendReply(PacketSequence packetSequence)
         {
-            if (packetSequence < expectedRecvSequence)
+            if (lastSendSequence < packetSequence)
             {
                 return;
             }
@@ -338,14 +353,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 isConnected = true;
                 _ = StartServerAliveCheck();
                 OnConnected();
-            }
-
-            lock (expectedRecvSequenceLock)
-            {
-                if (packetSequence > expectedRecvSequence)
-                {
-                    expectedRecvSequence = packetSequence;
-                }
             }
 
             holdingPacketStore.RemoveHoldingPacket(packetSequence);
@@ -424,9 +431,15 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         break;
                     }
 
-                    if (beforeReceivedSequence != expectedRecvSequence)
+                    PacketSequence currentSequence;
+                    lock (expectedRecvSequenceLock)
                     {
-                        beforeReceivedSequence = expectedRecvSequence;
+                        currentSequence = expectedRecvSequence;
+                    }
+
+                    if (beforeReceivedSequence != currentSequence)
+                    {
+                        beforeReceivedSequence = currentSequence;
                         continue;
                     }
 
