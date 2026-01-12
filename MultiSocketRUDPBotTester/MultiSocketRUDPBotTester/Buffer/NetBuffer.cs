@@ -160,16 +160,31 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public byte ReadByte()
         {
+            if (readPos + sizeof(byte) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             return buffer[readPos++];
         }
 
         public sbyte ReadSByte()
         {
+            if (readPos + sizeof(sbyte) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             return (sbyte)buffer[readPos++];
         }
 
         public ushort ReadUShort()
         {
+            if (readPos + sizeof(ushort) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             var value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
             readPos += 2;
 
@@ -178,11 +193,21 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public short ReadShort()
         {
+            if (readPos + sizeof(short) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             return (short)ReadUShort();
         }
 
         public uint ReadUInt()
         {
+            if (readPos + sizeof(uint) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             var value = (uint)(
                 buffer[readPos] |
                 (buffer[readPos + 1] << 8) |
@@ -195,11 +220,21 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public int ReadInt()
         {
+            if (readPos + sizeof(int) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             return (int)ReadUInt();
         }
 
         public ulong ReadULong()
         {
+            if (readPos + sizeof(ulong) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             ulong value = 0;
             for (var i = 0; i < 8; i++)
             {
@@ -213,25 +248,45 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public long ReadLong()
         {
+            if (readPos + sizeof(long) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             return (long)ReadULong();
         }
 
         public float ReadFloat()
         {
+            if (readPos + sizeof(float) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             var bytes = ReadBytes(sizeof(float));
             return BitConverter.ToSingle(bytes, 0);
         }
 
         public double ReadDouble()
         {
+            if (readPos + sizeof(double) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             var bytes = ReadBytes(sizeof(double));
             return BitConverter.ToDouble(bytes, 0);
         }
 
         public string ReadString()
         {
+            if (readPos + sizeof(int) > writePos)
+            {
+                throw new InvalidOperationException("There is not enough data to read.");
+            }
+
             var length = ReadUInt();
-            if (length > int.MaxValue || readPos + (int)length > writePos)
+            if (readPos + (int)length > writePos)
             {
                 throw new InvalidOperationException($"Invalid string length: {length}");
             }
