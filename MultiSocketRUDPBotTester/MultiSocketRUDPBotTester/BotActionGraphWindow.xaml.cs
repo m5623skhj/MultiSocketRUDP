@@ -1323,5 +1323,23 @@ namespace MultiSocketRUDPBotTester
             LogListBox.Items.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
             LogListBox.ScrollIntoView(LogListBox.Items[^1]);
         }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            base.OnClosing(e);
+            PreviewKeyDown -= BotActionGraphWindow_PreviewKeyDown;
+            
+            foreach (var node in allNodes)
+            {
+                if (node.Border.ContextMenu != null)
+                {
+                    node.Border.ContextMenu.Items.Clear();
+                    node.Border.ContextMenu = null;
+                }
+            }
+            
+            allNodes.Clear();
+            GraphCanvas.Children.Clear();
+        }
     }
 }
