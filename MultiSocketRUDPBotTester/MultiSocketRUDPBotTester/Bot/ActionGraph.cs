@@ -10,20 +10,21 @@ namespace MultiSocketRUDPBotTester.Bot
         private readonly ConcurrentDictionary<TriggerType, List<ActionNodeBase>> triggerNodes = new();
         private readonly ConcurrentDictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
         private readonly List<ActionNodeBase> allNodes = [];
+        private readonly Lock allNodesLock = new();
 
         public string Name { get; set; } = "Unnamed Graph";
 
         public List<ActionNodeBase> GetAllNodes()
         {
-            lock (allNodes)
+            lock (allNodesLock)
             {
-                return [..allNodes];
+                return allNodes.ToList();
             }
         }
 
         public void AddNode(ActionNodeBase node)
         {
-            lock (allNodes)
+            lock (allNodesLock)
             {
                 allNodes.Add(node);
             }
