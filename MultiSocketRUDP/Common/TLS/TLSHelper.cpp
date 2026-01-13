@@ -129,7 +129,7 @@ namespace TLSHelper
 
         SecBufferDesc outBufferDesc;
         SecBuffer outBuffers[1];
-        outBuffers[0].pvBuffer = malloc(HANDSHAKE_BUFFER_SIZE);
+        outBuffers[0].pvBuffer = nullptr;
         outBuffers[0].cbBuffer = HANDSHAKE_BUFFER_SIZE;
         outBuffers[0].BufferType = SECBUFFER_TOKEN;
         outBufferDesc.cBuffers = 1;
@@ -163,7 +163,7 @@ namespace TLSHelper
 
             if (status != SEC_I_CONTINUE_NEEDED && status != SEC_E_OK)
             {
-                free(outBuffers[0].pvBuffer);
+                FreeContextBuffer(outBuffers[0].pvBuffer);
                 return false;
             }
 
@@ -179,7 +179,7 @@ namespace TLSHelper
                 const int received = recv(socket, recvBuffer.data() + totalReceived, static_cast<int>(recvBuffer.size()) - totalReceived, 0);
                 if (received <= 0)
                 {
-                    free(outBuffers[0].pvBuffer);
+                    FreeContextBuffer(outBuffers[0].pvBuffer);
                     return false;
                 }
                 totalReceived += received;
@@ -199,7 +199,6 @@ namespace TLSHelper
         handshakeCompleted = true;
         QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
 
-        free(outBuffers[0].pvBuffer);
         return true;
     }
 
@@ -273,7 +272,7 @@ namespace TLSHelper
         DWORD contextAttr;
         SECURITY_STATUS status;
 
-        outBuffers[0].pvBuffer = malloc(HANDSHAKE_BUFFER_SIZE);
+        outBuffers[0].pvBuffer = nullptr;
         outBuffers[0].cbBuffer = HANDSHAKE_BUFFER_SIZE;
         outBuffers[0].BufferType = SECBUFFER_TOKEN;
 
@@ -292,7 +291,7 @@ namespace TLSHelper
                 const int received = recv(socket, recvBuffer, static_cast<int>(sizeof(recvBuffer)) - totalReceived, 0);
                 if (received <= 0)
                 {
-                    free(outBuffers[0].pvBuffer);
+                    FreeContextBuffer(outBuffers[0].pvBuffer);
                     return false;
                 }
                 totalReceived += received;
@@ -319,7 +318,8 @@ namespace TLSHelper
 
             if (status != SEC_I_CONTINUE_NEEDED && status != SEC_E_OK)
             {
-                return false;
+                FreeContextBuffer(outBuffers[0].pvBuffer);
+            	return false;
             }
 
             int totalSent = 0;
@@ -329,7 +329,8 @@ namespace TLSHelper
                 const int sent = send(socket, static_cast<const char*>(outBuffers[0].pvBuffer) + totalSent, sendSize - totalSent, 0);
                 if (sent == SOCKET_ERROR)
                 {
-                    return false;
+                    FreeContextBuffer(outBuffers[0].pvBuffer);
+                	return false;
                 }
                 totalSent += sent;
             }
@@ -338,7 +339,7 @@ namespace TLSHelper
 
         } while (status == SEC_I_CONTINUE_NEEDED);
 
-        handshakeCompleted = true;
+    	handshakeCompleted = true;
         QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
 
         return true;
