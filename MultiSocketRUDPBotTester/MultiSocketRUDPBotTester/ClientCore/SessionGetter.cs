@@ -36,7 +36,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             await sslStream.AuthenticateAsClientAsync(
                 targetHost: host,
                 clientCertificates: null,
-                enabledSslProtocols: SslProtocols.Tls12 | SslProtocols.Tls13,
+                enabledSslProtocols: SslProtocols.Tls12,
                 checkCertificateRevocation: true);
         }
 
