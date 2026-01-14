@@ -420,6 +420,61 @@ namespace MultiSocketRUDPBotTester
                 };
                 stack.Children.Add(saveBtn);
             }
+            else if (node.NodeType == typeof(LogNode))
+			{
+				stack.Children.Add(new TextBlock 
+				{ 
+					Text = "Log Message:", 
+					FontWeight = FontWeights.Bold,
+					Margin = new Thickness(0, 0, 0, 5)
+				});
+				
+				stack.Children.Add(new TextBlock 
+				{ 
+					Text = "Enter the message to log when this node executes:",
+					FontSize = 11,
+					Foreground = Brushes.Gray,
+					Margin = new Thickness(0, 0, 0, 5),
+					TextWrapping = TextWrapping.Wrap
+				});
+			
+				var logMessageBox = new TextBox
+				{
+					Height = 120,
+					AcceptsReturn = true,
+					TextWrapping = TextWrapping.Wrap,
+					VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+					Text = node.Configuration?.StringValue ?? "Enter your log message here...",
+					Margin = new Thickness(0, 0, 0, 10)
+				};
+				stack.Children.Add(logMessageBox);
+			
+				var saveBtn = new Button 
+				{ 
+					Content = "Save", 
+					Height = 30,
+					FontWeight = FontWeights.Bold
+				};
+                
+				saveBtn.Click += (_, _) =>
+				{
+					var message = logMessageBox.Text.Trim();
+					if (string.IsNullOrEmpty(message))
+					{
+						MessageBox.Show("Log message cannot be empty", "Warning", 
+							MessageBoxButton.OK, MessageBoxImage.Warning);
+						return;
+					}
+			
+					node.Configuration ??= new NodeConfiguration();
+					node.Configuration.StringValue = message;
+					Log($"Log message configured: {message}");
+                    
+					dialog.Close();
+				};
+                
+				stack.Children.Add(saveBtn);
+			}
             else if (node.NodeType == typeof(ConditionalNode))
             {
                 stack.Children.Add(new TextBlock { Text = "Left Value:" });
