@@ -74,13 +74,24 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            if (MessageBuilder == null)
+            try
             {
-                return;
-            }
+                if (MessageBuilder == null)
+                {
+                    Log.Warning("LogNode has no message builder configured");
+                    return;
+                }
 
-            var message = MessageBuilder(client, receivedPacket);
-            Log.Information("[Bot Action] {Message}", message);
+                var message = MessageBuilder(client, receivedPacket);
+                
+                Log.Information("╔══════════════════════════════════════════════════════════════");
+                Log.Information("║ [Bot Log] {Message}", message);
+                Log.Information("╚══════════════════════════════════════════════════════════════");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("LogNode execution failed: {Message}", ex.Message);
+            }
         }
     }
 }
