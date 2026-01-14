@@ -163,17 +163,21 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 {
 	auto& recvBuffer = *NetBuffer::Alloc();
 	recvBuffer.m_iRead = 0;
-	int totalReceivedBytes = 0;
+
+	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
+	std::vector<char> encryptedStream;
+
+	int totalPlainReceived = 0;
 	BYTE code{};
 	WORD payloadLength{};
 
 	while (true)
 	{
-		const int bytesReceived = recv(sessionBrokerSocket, recvBuffer.GetBufferPtr(), RECV_BUFFER_SIZE, 0);
+		char tlsRecvBuffer[maxTlsPacketSize];
+		const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 		if (bytesReceived <= 0)
 		{
 			int error = WSAGetLastError();
-
 			if (error == 0)
 			{
 				break;
@@ -181,12 +185,33 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 			LOG_ERROR(std::format("recv() failed in GetSessionFromServer() with error code {}", error));
 			closesocket(sessionBrokerSocket);
+			NetBuffer::Free(&recvBuffer);
+
 			return false;
 		}
 
-		totalReceivedBytes += bytesReceived;
-		recvBuffer.MoveWritePos(bytesReceived - df_HEADER_SIZE);
-		if (totalReceivedBytes < df_HEADER_SIZE)
+		encryptedStream.insert(encryptedStream.end(), tlsRecvBuffer, tlsRecvBuffer + bytesReceived);
+
+		char plainBuffer[maxTlsPacketSize];
+		size_t plainSize = 0;
+
+		if (not tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize))
+		{
+			LOG_ERROR("TLS DecryptDataStream failed");
+			closesocket(sessionBrokerSocket);
+			NetBuffer::Free(&recvBuffer);
+
+			return false;
+		}
+
+		if (plainSize > 0)
+		{
+			recvBuffer.m_iWrite = 0;
+			recvBuffer.WriteBuffer(plainBuffer, static_cast<int>(plainSize));
+			totalPlainReceived += static_cast<int>(plainSize);
+		}
+
+		if (totalPlainReceived < df_HEADER_SIZE)
 		{
 			continue;
 		}
@@ -196,11 +221,12 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 			recvBuffer >> code >> payloadLength;
 		}
 
-		if (totalReceivedBytes == payloadLength + df_HEADER_SIZE)
+		if (totalPlainReceived >= payloadLength + df_HEADER_SIZE)
 		{
 			break;
 		}
 	}
+
 	closesocket(sessionBrokerSocket);
 
 	recvBuffer.m_iRead = df_HEADER_SIZE;

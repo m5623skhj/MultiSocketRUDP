@@ -102,13 +102,93 @@ namespace TLSHelper
             }
         }
 
-        if (!dataBuf)
+        if (not dataBuf)
         {
             return false;
         }
 
         plainSize = dataBuf->cbBuffer;
         memcpy(plainBuffer, dataBuf->pvBuffer, plainSize);
+
+        return true;
+    }
+
+    bool TLSHelperBase::DecryptDataStream(
+        std::vector<char>& encryptedStream,
+        char* plainBuffer,
+        size_t& plainSize)
+    {
+        plainSize = 0;
+        if (not handshakeCompleted)
+        {
+            return false;
+        }
+
+        while (true)
+        {
+            SecBuffer buffers[4];
+            buffers[0].BufferType = SECBUFFER_DATA;
+            buffers[0].pvBuffer = encryptedStream.data();
+            buffers[0].cbBuffer = static_cast<unsigned long>(encryptedStream.size());
+
+            buffers[1].BufferType = SECBUFFER_EMPTY;
+            buffers[2].BufferType = SECBUFFER_EMPTY;
+            buffers[3].BufferType = SECBUFFER_EMPTY;
+
+            SecBufferDesc bufferDesc;
+            bufferDesc.cBuffers = 4;
+            bufferDesc.pBuffers = buffers;
+            bufferDesc.ulVersion = SECBUFFER_VERSION;
+
+            const SECURITY_STATUS status = DecryptMessage(&ctxtHandle, &bufferDesc, 0, nullptr);
+
+            if (status == SEC_E_INCOMPLETE_MESSAGE)
+            {
+                return true;
+            }
+
+            if (status != SEC_E_OK && status != SEC_I_RENEGOTIATE)
+            {
+                return false;
+            }
+
+            const SecBuffer* dataBuf = nullptr;
+            const SecBuffer* extraBuf = nullptr;
+
+            for (auto& buffer : buffers)
+            {
+                if (buffer.BufferType == SECBUFFER_DATA)
+                {
+                    dataBuf = &buffer;
+                }
+                else if (buffer.BufferType == SECBUFFER_EXTRA)
+                {
+                    extraBuf = &buffer;
+                }
+            }
+
+            if (not dataBuf)
+            {
+                return false;
+            }
+
+            memcpy(plainBuffer + plainSize, dataBuf->pvBuffer, dataBuf->cbBuffer);
+            plainSize += dataBuf->cbBuffer;
+
+            if (extraBuf)
+            {
+                std::vector newStream(
+                    static_cast<char*>(extraBuf->pvBuffer),
+                    static_cast<char*>(extraBuf->pvBuffer) + extraBuf->cbBuffer);
+
+                encryptedStream.swap(newStream);
+            }
+            else
+            {
+                encryptedStream.clear();
+                break;
+            }
+        }
 
         return true;
     }
@@ -173,7 +253,7 @@ namespace TLSHelper
                 &credHandle,
                 pContext,
                 nullptr,
-                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_ALLOCATE_MEMORY,
+                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY,
                 0,
                 SECURITY_NATIVE_DREP,
                 pContext ? &inBufferDesc : nullptr,
@@ -359,7 +439,7 @@ namespace TLSHelper
                 &credHandle,
                 pContext,
                 &inBufferDesc,
-                ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY | ASC_REQ_ALLOCATE_MEMORY,
+                ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY | ASC_REQ_STREAM | ASC_REQ_ALLOCATE_MEMORY,
                 SECURITY_NATIVE_DREP,
                 &ctxtHandle,
                 &outBufferDesc,

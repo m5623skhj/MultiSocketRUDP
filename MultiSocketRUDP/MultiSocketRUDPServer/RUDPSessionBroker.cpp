@@ -271,8 +271,21 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
 	PacketCryptoHelper::SetHeader(sendBuffer);
+	constexpr size_t MaxTlsPacketSize = 16 * 1024 + 512;
+	char encryptedBuffer[MaxTlsPacketSize];
+	size_t encryptedSize = 0;
 
-	if (const int result = send(clientSocket, sendBuffer.GetBufferPtr(), sendBuffer.GetAllUseSize(), 0); result == SOCKET_ERROR)
+	if (not tlsHelper.EncryptData(
+		sendBuffer.GetBufferPtr(),
+		sendBuffer.GetAllUseSize(),
+		encryptedBuffer,
+		encryptedSize))
+	{
+		LOG_ERROR("TLS EncryptData failed");
+		return false;
+	}
+
+	if (const int result = send(clientSocket, encryptedBuffer, static_cast<int>(encryptedSize), 0); result == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
 		return false;

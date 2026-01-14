@@ -36,6 +36,8 @@ namespace TLSHelper
 		bool EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize);
 		[[nodiscard]]
 		bool DecryptData(const char* encryptedData, size_t encryptedSize, char* plainBuffer, size_t& plainSize);
+		[[nodiscard]]
+		bool DecryptDataStream(std::vector<char>& encryptedStream, char* plainBuffer, size_t& plainSize);
 
 	protected:
 		CredHandle credHandle;
