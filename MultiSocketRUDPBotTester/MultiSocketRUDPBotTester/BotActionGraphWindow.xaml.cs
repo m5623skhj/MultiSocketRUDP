@@ -7,6 +7,7 @@ using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.ClientCore;
 using MultiSocketRUDPBotTester.Buffer;
 using System.Xml.Linq;
+using static MultiSocketRUDPBotTester.Bot.WaitForPacketNode;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -477,25 +478,180 @@ namespace MultiSocketRUDPBotTester
 			}
             else if (node.NodeType == typeof(ConditionalNode))
             {
-                stack.Children.Add(new TextBlock { Text = "Left Value:" });
-                var leftBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Left")?.ToString() ?? "value" };
-                stack.Children.Add(leftBox);
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Conditional Expression:",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 5)
+                });
 
-                stack.Children.Add(new TextBlock { Text = "Operator (>, <, ==, >=, <=):" });
-                var opBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Op")?.ToString() ?? ">" };
-                stack.Children.Add(opBox);
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Select a getter function or enter a constant value",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 0, 0, 10),
+                    TextWrapping = TextWrapping.Wrap
+                });
 
-                stack.Children.Add(new TextBlock { Text = "Right Value:" });
-                var rightBox = new TextBox { Text = node.Configuration?.Properties.GetValueOrDefault("Right")?.ToString() ?? "10" };
-                stack.Children.Add(rightBox);
+                // Left Value
+                var leftPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                leftPanel.Children.Add(new TextBlock { Text = "Left Value:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 5) });
 
-                var saveBtn = new Button { Content = "Save" };
+                var leftTypePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                leftTypePanel.Children.Add(new TextBlock { Text = "Type:", Width = 80 });
+                var leftTypeCombo = new ComboBox
+                {
+                    Width = 220,
+                    ItemsSource = new[] { "Getter Function", "Constant" },
+                    SelectedItem = node.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString() ?? "Constant"
+                };
+                leftTypePanel.Children.Add(leftTypeCombo);
+                leftPanel.Children.Add(leftTypePanel);
+
+                var leftGetterCombo = new ComboBox
+                {
+                    Width = 300,
+                    DisplayMemberPath = "DisplayName",
+                    SelectedValuePath = "Method.Name",
+                    ItemsSource = VariableAccessorRegistry.GetAllGetters(),
+                    Visibility = Visibility.Collapsed
+                };
+
+                var leftConstantBox = new TextBox
+                {
+                    Width = 300,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("Left")?.ToString() ?? "0"
+                };
+
+                leftTypeCombo.SelectionChanged += (_, _) =>
+                {
+                    if (leftTypeCombo.SelectedItem?.ToString() == "Getter Function")
+                    {
+                        leftGetterCombo.Visibility = Visibility.Visible;
+                        leftConstantBox.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        leftGetterCombo.Visibility = Visibility.Collapsed;
+                        leftConstantBox.Visibility = Visibility.Visible;
+                    }
+                };
+
+                leftPanel.Children.Add(leftGetterCombo);
+                leftPanel.Children.Add(leftConstantBox);
+                stack.Children.Add(leftPanel);
+
+                // Operator
+                var opPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                opPanel.Children.Add(new TextBlock { Text = "Operator:", Width = 80, VerticalAlignment = VerticalAlignment.Center });
+                var opCombo = new ComboBox
+                {
+                    Width = 220,
+                    ItemsSource = new[] { ">", "<", "==", ">=", "<=", "!=" },
+                    SelectedItem = node.Configuration?.Properties.GetValueOrDefault("Op")?.ToString() ?? ">"
+                };
+                opPanel.Children.Add(opCombo);
+                stack.Children.Add(opPanel);
+
+                // Right Value
+                var rightPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                rightPanel.Children.Add(new TextBlock { Text = "Right Value:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 5) });
+
+                var rightTypePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                rightTypePanel.Children.Add(new TextBlock { Text = "Type:", Width = 80 });
+                var rightTypeCombo = new ComboBox
+                {
+                    Width = 220,
+                    ItemsSource = new[] { "Getter Function", "Constant" },
+                    SelectedItem = node.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString() ?? "Constant"
+                };
+                rightTypePanel.Children.Add(rightTypeCombo);
+                rightPanel.Children.Add(rightTypePanel);
+
+                var rightGetterCombo = new ComboBox
+                {
+                    Width = 300,
+                    DisplayMemberPath = "DisplayName",
+                    SelectedValuePath = "Method.Name",
+                    ItemsSource = VariableAccessorRegistry.GetAllGetters(),
+                    Visibility = Visibility.Collapsed
+                };
+
+                var rightConstantBox = new TextBox
+                {
+                    Width = 300,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("Right")?.ToString() ?? "0"
+                };
+
+                rightTypeCombo.SelectionChanged += (_, _) =>
+                {
+                    if (rightTypeCombo.SelectedItem?.ToString() == "Getter Function")
+                    {
+                        rightGetterCombo.Visibility = Visibility.Visible;
+                        rightConstantBox.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        rightGetterCombo.Visibility = Visibility.Collapsed;
+                        rightConstantBox.Visibility = Visibility.Visible;
+                    }
+                };
+
+                rightPanel.Children.Add(rightGetterCombo);
+                rightPanel.Children.Add(rightConstantBox);
+                stack.Children.Add(rightPanel);
+
+                // 초기 상태 설정
+                if (node.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString() == "Getter Function")
+                {
+                    leftGetterCombo.Visibility = Visibility.Visible;
+                    leftConstantBox.Visibility = Visibility.Collapsed;
+                    var savedGetter = node.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
+                    if (savedGetter != null)
+                    {
+                        leftGetterCombo.SelectedValue = savedGetter;
+                    }
+                }
+
+                if (node.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString() == "Getter Function")
+                {
+                    rightGetterCombo.Visibility = Visibility.Visible;
+                    rightConstantBox.Visibility = Visibility.Collapsed;
+                    var savedGetter = node.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
+                    if (savedGetter != null)
+                    {
+                        rightGetterCombo.SelectedValue = savedGetter;
+                    }
+                }
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
                 saveBtn.Click += (_, _) =>
                 {
                     node.Configuration ??= new NodeConfiguration();
-                    node.Configuration.Properties["Left"] = leftBox.Text;
-                    node.Configuration.Properties["Op"] = opBox.Text;
-                    node.Configuration.Properties["Right"] = rightBox.Text;
+
+                    node.Configuration.Properties["LeftType"] = leftTypeCombo.SelectedItem?.ToString() ?? "Constant";
+                    if (leftTypeCombo.SelectedItem?.ToString() == "Getter Function")
+                    {
+                        node.Configuration.Properties["Left"] = leftGetterCombo.SelectedValue?.ToString() ?? "";
+                    }
+                    else
+                    {
+                        node.Configuration.Properties["Left"] = leftConstantBox.Text;
+                    }
+
+                    node.Configuration.Properties["Op"] = opCombo.SelectedItem?.ToString() ?? ">";
+
+                    node.Configuration.Properties["RightType"] = rightTypeCombo.SelectedItem?.ToString() ?? "Constant";
+                    if (rightTypeCombo.SelectedItem?.ToString() == "Getter Function")
+                    {
+                        node.Configuration.Properties["Right"] = rightGetterCombo.SelectedValue?.ToString() ?? "";
+                    }
+                    else
+                    {
+                        node.Configuration.Properties["Right"] = rightConstantBox.Text;
+                    }
+
                     dialog.Close();
                 };
                 stack.Children.Add(saveBtn);
@@ -519,6 +675,303 @@ namespace MultiSocketRUDPBotTester
 
                     node.Configuration ??= new NodeConfiguration();
                     node.Configuration.Properties["LoopCount"] = n;
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(PacketParserNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Parse data from packet using setter function",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                var setterCombo = new ComboBox
+                {
+                    Width = 350,
+                    DisplayMemberPath = "DisplayName",
+                    SelectedValuePath = "Method.Name",
+                    ItemsSource = VariableAccessorRegistry.GetAllSetters()
+                };
+
+                var savedSetter = node.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
+                if (savedSetter != null)
+                {
+                    setterCombo.SelectedValue = savedSetter;
+                }
+
+                stack.Children.Add(new TextBlock { Text = "Select Setter:", Margin = new Thickness(0, 0, 0, 5) });
+                stack.Children.Add(setterCombo);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "This will read data from the packet and store it using the selected setter function.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.Properties["SetterMethod"] = setterCombo.SelectedValue?.ToString() ?? "";
+                    Log($"PacketParserNode configured with setter: {setterCombo.Text}");
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(DisconnectNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Disconnect Client",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                stack.Children.Add(new TextBlock { Text = "Disconnect Reason:", Margin = new Thickness(0, 0, 0, 5) });
+                var reasonBox = new TextBox
+                {
+                    Width = 300,
+                    Height = 60,
+                    AcceptsReturn = true,
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = node.Configuration?.StringValue ?? "User requested disconnect"
+                };
+                stack.Children.Add(reasonBox);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "This node will gracefully disconnect the client.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.StringValue = reasonBox.Text;
+                    Log($"DisconnectNode configured: {reasonBox.Text}");
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(RandomDelayNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Random Delay Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                var minPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                minPanel.Children.Add(new TextBlock { Text = "Min Delay (ms):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var minBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("MinDelay")?.ToString() ?? "500"
+                };
+                minPanel.Children.Add(minBox);
+                stack.Children.Add(minPanel);
+
+                var maxPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                maxPanel.Children.Add(new TextBlock { Text = "Max Delay (ms):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var maxBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("MaxDelay")?.ToString() ?? "2000"
+                };
+                maxPanel.Children.Add(maxBox);
+                stack.Children.Add(maxPanel);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Delays randomly between min and max milliseconds.\nUseful for simulating human-like behavior.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(minBox.Text, out var min) && int.TryParse(maxBox.Text, out var max))
+                    {
+                        if (min > max)
+                        {
+                            MessageBox.Show("Min delay cannot be greater than max delay", "Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.Properties["MinDelay"] = min;
+                        node.Configuration.Properties["MaxDelay"] = max;
+                        Log($"RandomDelayNode configured: {min}-{max}ms");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid delay values", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(WaitForPacketNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Wait For Packet Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                stack.Children.Add(new TextBlock { Text = "Expected Packet ID:", Margin = new Thickness(0, 0, 0, 5) });
+                var packetIdCombo = new ComboBox
+                {
+                    Width = 300,
+                    ItemsSource = Enum.GetValues(typeof(PacketId)),
+                    SelectedItem = node.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID
+                };
+                stack.Children.Add(packetIdCombo);
+
+                var timeoutPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 5) };
+                timeoutPanel.Children.Add(new TextBlock { Text = "Timeout (ms):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var timeoutBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.IntValue.ToString() ?? "5000"
+                };
+                timeoutPanel.Children.Add(timeoutBox);
+                stack.Children.Add(timeoutPanel);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Waits until the specified packet is received or timeout occurs.\n" +
+                           "Use 'continue' output for success path.\n" +
+                           "Use 'exit' output for timeout path.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(timeoutBox.Text, out var timeout))
+                    {
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.PacketId = (PacketId)packetIdCombo.SelectedItem;
+                        node.Configuration.IntValue = timeout;
+                        Log($"WaitForPacketNode configured: {packetIdCombo.SelectedItem}, timeout={timeout}ms");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid timeout value", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(SetVariableNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Set a constant value to a variable",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                // Variable Name
+                var varPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                varPanel.Children.Add(new TextBlock { Text = "Variable name:", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var varNameBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("VariableName")?.ToString() ?? "myVar"
+                };
+                varPanel.Children.Add(varNameBox);
+                stack.Children.Add(varPanel);
+
+                // Value Type
+                var typePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                typePanel.Children.Add(new TextBlock { Text = "Value type:", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var valueTypeCombo = new ComboBox
+                {
+                    Width = 180,
+                    ItemsSource = new[] { "int", "long", "float", "double", "bool", "string" },
+                    SelectedItem = node.Configuration?.Properties.GetValueOrDefault("ValueType")?.ToString() ?? "int"
+                };
+                typePanel.Children.Add(valueTypeCombo);
+                stack.Children.Add(typePanel);
+
+                // Value
+                var valuePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                valuePanel.Children.Add(new TextBlock { Text = "Value:", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var valueBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("Value")?.ToString() ?? "0"
+                };
+                valuePanel.Children.Add(valueBox);
+                stack.Children.Add(valuePanel);
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.Properties["VariableName"] = varNameBox.Text;
+                    node.Configuration.Properties["ValueType"] = valueTypeCombo.SelectedItem?.ToString() ?? "int";
+                    node.Configuration.Properties["Value"] = valueBox.Text;
+                    Log($"SetVariableNode configured: {varNameBox.Text} = {valueBox.Text}");
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(GetVariableNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Get and log a variable value",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                stack.Children.Add(new TextBlock { Text = "Variable name:", Margin = new Thickness(0, 0, 0, 5) });
+                var varNameBox = new TextBox
+                {
+                    Width = 300,
+                    Text = node.Configuration?.StringValue ?? "myVar"
+                };
+                stack.Children.Add(varNameBox);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "This node will read the variable and log its value.\nUseful for debugging.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.StringValue = varNameBox.Text;
+                    Log($"GetVariableNode configured: {varNameBox.Text}");
                     dialog.Close();
                 };
                 stack.Children.Add(saveBtn);
@@ -954,27 +1407,38 @@ namespace MultiSocketRUDPBotTester
                 return;
             }
 
-            var cat = t.Name.Contains("Condition") ? NodeCategory.Condition :
-                      t.Name.Contains("Loop") ? NodeCategory.Loop : NodeCategory.Action;
+            NodeCategory category;
+            if (t.Name.Contains("Condition"))
+            {
+                category = NodeCategory.Condition;
+            }
+            else if (t.Name.Contains("Loop") || t.Name.Contains("Repeat") || t == typeof(WaitForPacketNode))
+            {
+                category = NodeCategory.Loop;
+            }
+            else
+            {
+                category = NodeCategory.Action;
+            }
 
-            var b = CreateNodeVisual(t.Name, GetNodeColor(cat));
+            var b = CreateNodeVisual(t.Name, GetNodeColor(category));
             var n = new NodeVisual
             {
                 Border = b,
-                Category = cat,
+                Category = category,
                 InputPort = CreateInputPort(),
                 NodeType = t,
                 Configuration = new NodeConfiguration()
             };
 
-            if (cat == NodeCategory.Action)
+            if (category == NodeCategory.Action)
             {
                 n.OutputPort = CreateOutputPort("default");
             }
             else
             {
-                n.OutputPortTrue = CreateOutputPort(cat == NodeCategory.Condition ? "true" : "continue");
-                n.OutputPortFalse = CreateOutputPort(cat == NodeCategory.Condition ? "false" : "exit");
+                n.OutputPortTrue = CreateOutputPort(category == NodeCategory.Condition ? "true" : "continue");
+                n.OutputPortFalse = CreateOutputPort(category == NodeCategory.Condition ? "false" : "exit");
             }
 
             Canvas.SetLeft(b, GraphScroll.HorizontalOffset + 400);
@@ -1148,33 +1612,31 @@ namespace MultiSocketRUDPBotTester
                     }
                     else if (visual.NodeType == typeof(ConditionalNode))
                     {
+                        var leftType = visual.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString();
                         var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
                         var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString();
-                        var rightStr = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
+                        var rightType = visual.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString();
+                        var right = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
 
-                        if (int.TryParse(rightStr, out var right) == false)
-                        {
-                            Serilog.Log.Error("Int parse failed in BuildActionGraph() with ConditionalNode");
-                        }
-
-                        if (left != null)
+                        if (left != null && op != null && right != null)
                         {
                             actionNode = new ConditionalNode
                             {
                                 Name = visual.NodeType.Name,
-                                Condition = ctx =>
-                                {
-                                    var value = ctx.Get<int>(left);
-                                    return op switch
-                                    {
-                                        ">" => value > right,
-                                        "<" => value < right,
-                                        "==" => value == right,
-                                        ">=" => value >= right,
-                                        "<=" => value <= right,
-                                        _ => false
-                                    };
-                                }
+                                Condition = ctx => EvaluateConditionWithAccessors(ctx, leftType, left, op, rightType, right)
+                            };
+                        }
+                    }
+                    else if (visual.NodeType == typeof(PacketParserNode))
+                    {
+                        var setterMethod = visual.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
+
+                        if (!string.IsNullOrEmpty(setterMethod))
+                        {
+                            actionNode = new PacketParserNode
+                            {
+                                Name = visual.NodeType.Name,
+                                SetterMethodName = setterMethod
                             };
                         }
                     }
@@ -1223,6 +1685,96 @@ namespace MultiSocketRUDPBotTester
                                 Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
                             }
                         };
+                    }
+                    else if (visual.NodeType == typeof(DisconnectNode))
+                    {
+                        actionNode = new DisconnectNode
+                        {
+                            Name = visual.NodeType.Name,
+                            Reason = visual.Configuration?.StringValue ?? "User requested disconnect"
+                        };
+                    }
+                    else if (visual.NodeType == typeof(RandomDelayNode))
+                    {
+                        var minDelay = visual.Configuration?.Properties.GetValueOrDefault("MinDelay") as int? ?? 500;
+                        var maxDelay = visual.Configuration?.Properties.GetValueOrDefault("MaxDelay") as int? ?? 2000;
+
+                        actionNode = new RandomDelayNode
+                        {
+                            Name = visual.NodeType.Name,
+                            MinDelayMilliseconds = minDelay,
+                            MaxDelayMilliseconds = maxDelay
+                        };
+                    }
+                    else if (visual.NodeType == typeof(WaitForPacketNode))
+                    {
+                        var packetId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID;
+                        var timeout = visual.Configuration?.IntValue ?? 5000;
+
+                        if (packetId == PacketId.INVALID_PACKET_ID)
+                        {
+                            throw new InvalidOperationException(
+                                "WaitForPacketNode requires a valid PacketId. " +
+                                "Please double-click the node to configure it.");
+                        }
+
+                        actionNode = new WaitForPacketNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ExpectedPacketId = packetId,
+                            TimeoutMilliseconds = timeout
+                        };
+                    }
+                    else if (visual.NodeType == typeof(SetVariableNode))
+                    {
+                        var variableName = visual.Configuration?.Properties.GetValueOrDefault("VariableName")?.ToString() ?? "value";
+                        var valueType = visual.Configuration?.Properties.GetValueOrDefault("ValueType")?.ToString() ?? "int";
+                        var value = visual.Configuration?.Properties.GetValueOrDefault("Value")?.ToString() ?? "0";
+
+                        actionNode = new SetVariableNode
+                        {
+                            Name = visual.NodeType.Name,
+                            VariableName = variableName,
+                            ValueType = valueType,
+                            StringValue = value
+                        };
+                    }
+                    else if (visual.NodeType == typeof(GetVariableNode))
+                    {
+                        var variableName = visual.Configuration?.StringValue ?? "value";
+
+                        actionNode = new GetVariableNode
+                        {
+                            Name = visual.NodeType.Name,
+                            VariableName = variableName
+                        };
+                    }
+
+                    if (actionNode is WaitForPacketNode waitNode)
+                    {
+                        if (visual.FalseChild != null)
+                        {
+                            if (nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
+                            {
+                                waitNode.TimeoutNodes.Add(timeoutNode);
+                            }
+                            else
+                            {
+                                Serilog.Log.Warning($"Timeout node not found in mapping for {actionNode.Name}");
+                            }
+                        }
+
+                        if (visual.TrueChild != null)
+                        {
+                            if (nodeMapping.TryGetValue(visual.TrueChild, out var successNode))
+                            {
+                                actionNode.NextNodes.Add(successNode);
+                            }
+                            else
+                            {
+                                Serilog.Log.Warning($"Success node not found in mapping for {actionNode.Name}");
+                            }
+                        }
                     }
                     else
                     {
@@ -1386,15 +1938,144 @@ namespace MultiSocketRUDPBotTester
             
             foreach (var node in allNodes)
             {
-                if (node.Border.ContextMenu != null)
+                if (node.Border.ContextMenu == null)
                 {
-                    node.Border.ContextMenu.Items.Clear();
-                    node.Border.ContextMenu = null;
+                    continue;
                 }
+
+                node.Border.ContextMenu.Items.Clear();
+                node.Border.ContextMenu = null;
             }
             
             allNodes.Clear();
             GraphCanvas.Children.Clear();
+        }
+
+        private static bool EvaluateConditionWithAccessors(RuntimeContext ctx, string? leftType, string left, string op, string? rightType, string right)
+        {
+            try
+            {
+                object leftValue;
+                if (leftType == "Getter Function")
+                {
+                    leftValue = VariableAccessorRegistry.InvokeGetter(left, ctx) ?? 0;
+                }
+                else
+                {
+                    leftValue = ParseConstant(left);
+                }
+
+                object rightValue;
+                if (rightType == "Getter Function")
+                {
+                    rightValue = VariableAccessorRegistry.InvokeGetter(right, ctx) ?? 0;
+                }
+                else
+                {
+                    rightValue = ParseConstant(right);
+                }
+
+                if (TryConvertToNumber(leftValue, out var lNum) && TryConvertToNumber(rightValue, out var rNum))
+                {
+                    return op switch
+                    {
+                        ">" => lNum > rNum,
+                        "<" => lNum < rNum,
+                        "==" => Math.Abs(lNum - rNum) < 0.0001,
+                        ">=" => lNum >= rNum,
+                        "<=" => lNum <= rNum,
+                        "!=" => Math.Abs(lNum - rNum) >= 0.0001,
+                        _ => false
+                    };
+                }
+
+                return op switch
+                {
+                    "==" => Equals(leftValue, rightValue),
+                    "!=" => !Equals(leftValue, rightValue),
+                    _ => false
+                };
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error($"Condition evaluation failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static object ParseConstant(string value)
+        {
+            if (int.TryParse(value, out var intVal))
+            {
+                return intVal;
+            }
+
+            if (double.TryParse(value, out var doubleVal))
+            {
+                return doubleVal;
+            }
+
+            if (bool.TryParse(value, out var boolVal))
+            {
+                return boolVal;
+            }
+
+            return value;
+        }
+
+        private static bool TryConvertToNumber(object value, out double result)
+        {
+            result = 0;
+
+            if (value is int i)
+            {
+                result = i;
+                return true;
+            }
+
+            if (value is double d)
+            {
+                result = d;
+                return true;
+            }
+
+            if (value is float f)
+            {
+                result = f;
+                return true;
+            }
+
+            if (value is long l)
+            {
+                result = l;
+                return true;
+            }
+
+            if (value is uint ui)
+            {
+                result = ui;
+                return true;
+            }
+
+            if (value is short s)
+            {
+                result = s;
+                return true;
+            }
+
+            if (value is byte b)
+            {
+                result = b;
+                return true;
+            }
+
+            if (value is string str && double.TryParse(str, out var parsed))
+            {
+                result = parsed;
+                return true;
+            }
+
+            return false;
         }
     }
 }
