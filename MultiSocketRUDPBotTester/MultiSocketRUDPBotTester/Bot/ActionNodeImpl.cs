@@ -222,60 +222,60 @@ namespace MultiSocketRUDPBotTester.Bot
                 Log.Information($"WaitForPacketNode: Received expected packet {ExpectedPacketId}");
             }
         }
+    }
 
-        public class SetVariableNode : ContextNodeBase
+    public class SetVariableNode : ContextNodeBase
+    {
+        public string VariableName { get; set; } = "";
+        public string ValueType { get; set; } = "int";
+        public string StringValue { get; set; } = "";
+
+        protected override void ExecuteImpl(RuntimeContext context)
         {
-            public string VariableName { get; set; } = "";
-            public string ValueType { get; set; } = "int";
-            public string StringValue { get; set; } = "";
-
-            protected override void ExecuteImpl(RuntimeContext context)
+            try
             {
-                try
+                object value = ValueType.ToLower() switch
                 {
-                    object value = ValueType.ToLower() switch
-                    {
-                        "int" => int.Parse(StringValue),
-                        "long" => long.Parse(StringValue),
-                        "float" => float.Parse(StringValue),
-                        "double" => double.Parse(StringValue),
-                        "bool" => bool.Parse(StringValue),
-                        "string" => StringValue,
-                        _ => StringValue
-                    };
+                    "int" => int.Parse(StringValue),
+                    "long" => long.Parse(StringValue),
+                    "float" => float.Parse(StringValue),
+                    "double" => double.Parse(StringValue),
+                    "bool" => bool.Parse(StringValue),
+                    "string" => StringValue,
+                    _ => StringValue
+                };
 
-                    context.Set(VariableName, value);
-                    Log.Information($"SetVariableNode: Set '{VariableName}' = {value} ({ValueType})");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error($"SetVariableNode failed: {ex.Message}");
-                }
+                context.Set(VariableName, value);
+                Log.Information($"SetVariableNode: Set '{VariableName}' = {value} ({ValueType})");
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"SetVariableNode failed: {ex.Message}");
             }
         }
+    }
 
-        public class GetVariableNode : ContextNodeBase
+    public class GetVariableNode : ContextNodeBase
+    {
+        public string VariableName { get; set; } = "";
+
+        protected override void ExecuteImpl(RuntimeContext context)
         {
-            public string VariableName { get; set; } = "";
-
-            protected override void ExecuteImpl(RuntimeContext context)
+            try
             {
-                try
+                if (context.Has(VariableName))
                 {
-                    if (context.Has(VariableName))
-                    {
-                        var value = context.Get<object>(VariableName);
-                        Log.Information($"GetVariableNode: '{VariableName}' = {value}");
-                    }
-                    else
-                    {
-                        Log.Warning($"GetVariableNode: Variable '{VariableName}' not found");
-                    }
+                    var value = context.Get<object>(VariableName);
+                    Log.Information($"GetVariableNode: '{VariableName}' = {value}");
                 }
-                catch (Exception ex)
+                else
                 {
-                    Log.Error($"GetVariableNode failed: {ex.Message}");
+                    Log.Warning($"GetVariableNode: Variable '{VariableName}' not found");
                 }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"GetVariableNode failed: {ex.Message}");
             }
         }
     }

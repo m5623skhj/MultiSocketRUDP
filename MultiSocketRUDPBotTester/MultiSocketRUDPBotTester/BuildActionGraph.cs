@@ -175,13 +175,13 @@ namespace MultiSocketRUDPBotTester
                             TimeoutMilliseconds = timeout
                         };
                     }
-                    else if (visual.NodeType == typeof(WaitForPacketNode.SetVariableNode))
+                    else if (visual.NodeType == typeof(SetVariableNode))
                     {
                         var variableName = visual.Configuration?.Properties.GetValueOrDefault("VariableName")?.ToString() ?? "value";
                         var valueType = visual.Configuration?.Properties.GetValueOrDefault("ValueType")?.ToString() ?? "int";
                         var value = visual.Configuration?.Properties.GetValueOrDefault("Value")?.ToString() ?? "0";
 
-                        actionNode = new WaitForPacketNode.SetVariableNode
+                        actionNode = new SetVariableNode
                         {
                             Name = visual.NodeType.Name,
                             VariableName = variableName,
@@ -189,11 +189,11 @@ namespace MultiSocketRUDPBotTester
                             StringValue = value
                         };
                     }
-                    else if (visual.NodeType == typeof(WaitForPacketNode.GetVariableNode))
+                    else if (visual.NodeType == typeof(GetVariableNode))
                     {
                         var variableName = visual.Configuration?.StringValue ?? "value";
 
-                        actionNode = new WaitForPacketNode.GetVariableNode
+                        actionNode = new GetVariableNode
                         {
                             Name = visual.NodeType.Name,
                             VariableName = variableName
