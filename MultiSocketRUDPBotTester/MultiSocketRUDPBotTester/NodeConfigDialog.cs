@@ -1,5 +1,4 @@
 ﻿using MultiSocketRUDPBotTester.Bot;
-using static MultiSocketRUDPBotTester.Bot.WaitForPacketNode;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows;

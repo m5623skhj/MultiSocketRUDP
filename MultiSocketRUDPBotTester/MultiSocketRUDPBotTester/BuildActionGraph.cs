@@ -16,6 +16,7 @@ namespace MultiSocketRUDPBotTester
                 try
                 {
                     ActionNodeBase? actionNode = null;
+
                     if (visual.IsRoot)
                     {
                         actionNode = visual.ActionNode!;
@@ -33,12 +34,8 @@ namespace MultiSocketRUDPBotTester
                         actionNode = new SendPacketNode
                         {
                             Name = visual.NodeType.Name,
-                            PacketId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID,
-                            PacketBuilder = (_) =>
-                            {
-                                var buffer = new NetBuffer();
-                                return buffer;
-                            }
+                            PacketId = packetId,
+                            PacketBuilder = (_) => new NetBuffer()
                         };
                     }
                     else if (visual.NodeType == typeof(DelayNode))
@@ -47,101 +44,6 @@ namespace MultiSocketRUDPBotTester
                         {
                             Name = visual.NodeType.Name,
                             DelayMilliseconds = visual.Configuration?.IntValue ?? 1000
-                        };
-                    }
-                    else if (visual.NodeType == typeof(CustomActionNode))
-                    {
-                        actionNode = new CustomActionNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ActionHandler = (_, _) =>
-                            {
-                                Serilog.Log.Information($"Custom action: {visual.NodeType.Name}");
-                            }
-                        };
-                    }
-                    else if (visual.NodeType == typeof(ConditionalNode))
-                    {
-                        var leftType = visual.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString();
-                        var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
-                        var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString();
-                        var rightType = visual.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString();
-                        var right = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
-
-                        if (left != null && op != null && right != null)
-                        {
-                            actionNode = new ConditionalNode
-                            {
-                                Name = visual.NodeType.Name,
-                                Condition = ctx => EvaluateConditionWithAccessors(ctx, leftType, left, op, rightType, right)
-                            };
-                        }
-                    }
-                    else if (visual.NodeType == typeof(PacketParserNode))
-                    {
-                        var setterMethod = visual.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
-
-                        if (!string.IsNullOrEmpty(setterMethod))
-                        {
-                            actionNode = new PacketParserNode
-                            {
-                                Name = visual.NodeType.Name,
-                                SetterMethodName = setterMethod
-                            };
-                        }
-                    }
-                    else if (visual.NodeType == typeof(LoopNode))
-                    {
-                        var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
-
-                        actionNode = new LoopNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ContinueCondition = ctx =>
-                            {
-                                var i = ctx.GetOrDefault("LoopIndex", 0) + 1;
-                                ctx.Set("LoopIndex", i);
-                                return i < count;
-                            },
-                            MaxIterations = count
-                        };
-                    }
-                    else if (visual.NodeType == typeof(RepeatTimerNode))
-                    {
-                        actionNode = new RepeatTimerNode
-                        {
-                            Name = visual.NodeType.Name,
-                            IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
-                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true
-                                ? (int)visual.Configuration.Properties["RepeatCount"]
-                                : 10
-                        };
-                    }
-                    else if (visual.NodeType == typeof(LogNode))
-                    {
-                        actionNode = new LogNode
-                        {
-                            Name = visual.NodeType.Name,
-                            MessageBuilder = (_, _) => $"Log from {visual.NodeType.Name}"
-                        };
-                    }
-                    else if (visual.NodeType != null)
-                    {
-                        actionNode = new CustomActionNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ActionHandler = (_, _) =>
-                            {
-                                Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
-                            }
-                        };
-                    }
-                    else if (visual.NodeType == typeof(DisconnectNode))
-                    {
-                        actionNode = new DisconnectNode
-                        {
-                            Name = visual.NodeType.Name,
-                            Reason = visual.Configuration?.StringValue ?? "User requested disconnect"
                         };
                     }
                     else if (visual.NodeType == typeof(RandomDelayNode))
@@ -154,6 +56,14 @@ namespace MultiSocketRUDPBotTester
                             Name = visual.NodeType.Name,
                             MinDelayMilliseconds = minDelay,
                             MaxDelayMilliseconds = maxDelay
+                        };
+                    }
+                    else if (visual.NodeType == typeof(DisconnectNode))
+                    {
+                        actionNode = new DisconnectNode
+                        {
+                            Name = visual.NodeType.Name,
+                            Reason = visual.Configuration?.StringValue ?? "User requested disconnect"
                         };
                     }
                     else if (visual.NodeType == typeof(WaitForPacketNode))
@@ -199,36 +109,98 @@ namespace MultiSocketRUDPBotTester
                             VariableName = variableName
                         };
                     }
-
-                    if (actionNode is WaitForPacketNode waitNode)
+                    else if (visual.NodeType == typeof(LogNode))
                     {
-                        if (visual.FalseChild != null)
+                        var logMessage = visual.Configuration?.StringValue ?? "No log message configured";
+                        actionNode = new LogNode
                         {
-                            if (nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
+                            Name = visual.NodeType.Name,
+                            MessageBuilder = (_, _) => logMessage
+                        };
+                    }
+                    else if (visual.NodeType == typeof(CustomActionNode))
+                    {
+                        actionNode = new CustomActionNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ActionHandler = (_, _) =>
                             {
-                                waitNode.TimeoutNodes.Add(timeoutNode);
+                                Serilog.Log.Information($"Custom action: {visual.NodeType.Name}");
                             }
-                            else
-                            {
-                                Serilog.Log.Warning($"Timeout node not found in mapping for {actionNode.Name}");
-                            }
-                        }
+                        };
+                    }
+                    else if (visual.NodeType == typeof(ConditionalNode))
+                    {
+                        var leftType = visual.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString();
+                        var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
+                        var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString();
+                        var rightType = visual.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString();
+                        var right = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
 
-                        if (visual.TrueChild != null)
+                        if (left != null && op != null && right != null)
                         {
-                            if (nodeMapping.TryGetValue(visual.TrueChild, out var successNode))
+                            actionNode = new ConditionalNode
                             {
-                                actionNode.NextNodes.Add(successNode);
-                            }
-                            else
-                            {
-                                Serilog.Log.Warning($"Success node not found in mapping for {actionNode.Name}");
-                            }
+                                Name = visual.NodeType.Name,
+                                Condition = ctx => EvaluateConditionWithAccessors(ctx, leftType, left, op, rightType, right)
+                            };
                         }
                     }
-                    else
+                    else if (visual.NodeType == typeof(LoopNode))
                     {
-                        Serilog.Log.Warning("Node has no type information, skipping");
+                        var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
+
+                        actionNode = new LoopNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ContinueCondition = ctx =>
+                            {
+                                var i = ctx.GetOrDefault("LoopIndex", 0) + 1;
+                                ctx.Set("LoopIndex", i);
+                                return i < count;
+                            },
+                            MaxIterations = count
+                        };
+                    }
+                    else if (visual.NodeType == typeof(RepeatTimerNode))
+                    {
+                        actionNode = new RepeatTimerNode
+                        {
+                            Name = visual.NodeType.Name,
+                            IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
+                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true
+                                ? (int)visual.Configuration.Properties["RepeatCount"]
+                                : 10
+                        };
+                    }
+                    else if (visual.NodeType == typeof(PacketParserNode))
+                    {
+                        var setterMethod = visual.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
+
+                        if (!string.IsNullOrEmpty(setterMethod))
+                        {
+                            actionNode = new PacketParserNode
+                            {
+                                Name = visual.NodeType.Name,
+                                SetterMethodName = setterMethod
+                            };
+                        }
+                    }
+                    else if (visual.NodeType != null)
+                    {
+                        actionNode = new CustomActionNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ActionHandler = (_, _) =>
+                            {
+                                Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
+                            }
+                        };
+                    }
+
+                    if (actionNode == null)
+                    {
+                        Serilog.Log.Warning($"Node {visual.NodeType?.Name} could not be created, skipping");
                         continue;
                     }
 
@@ -252,9 +224,9 @@ namespace MultiSocketRUDPBotTester
 
                 if (visual.Next != null)
                 {
-                    if (nodeMapping.TryGetValue(visual.Next, out var value))
+                    if (nodeMapping.TryGetValue(visual.Next, out var nextNode))
                     {
-                        actionNode.NextNodes.Add(value);
+                        actionNode.NextNodes.Add(nextNode);
                     }
                     else
                     {
@@ -262,72 +234,53 @@ namespace MultiSocketRUDPBotTester
                     }
                 }
 
-                if (actionNode is ConditionalNode conditionalNode)
+                switch (actionNode)
                 {
-                    if (visual.TrueChild != null)
+                    case WaitForPacketNode waitNode:
                     {
-                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
                         {
-                            conditionalNode.TrueNodes.Add(value);
+                            waitNode.TimeoutNodes.Add(timeoutNode);
                         }
-                        else
-                        {
-                            Serilog.Log.Warning($"TrueChild not found in mapping for {actionNode.Name}");
-                        }
-                    }
 
-                    if (visual.FalseChild != null)
-                    {
-                        if (nodeMapping.TryGetValue(visual.FalseChild, out var value))
-                        {
-                            conditionalNode.FalseNodes.Add(value);
-                        }
-                        else
-                        {
-                            Serilog.Log.Warning($"FalseChild not found in mapping for {actionNode.Name}");
-                        }
+                        break;
                     }
-                }
-
-                if (actionNode is LoopNode loopNode)
-                {
-                    if (visual.TrueChild != null)
+                    case ConditionalNode conditionalNode:
                     {
-                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var trueNode))
                         {
-                            loopNode.LoopBody.Add(value);
+                            conditionalNode.TrueNodes.Add(trueNode);
                         }
-                        else
+
+                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var falseNode))
                         {
-                            Serilog.Log.Warning($"LoopBody child not found in mapping for {actionNode.Name}");
+                            conditionalNode.FalseNodes.Add(falseNode);
                         }
+
+                        break;
                     }
-
-                    if (visual.FalseChild != null)
+                    case LoopNode loopNode:
                     {
-                        if (nodeMapping.TryGetValue(visual.FalseChild, out var value))
+                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
                         {
-                            loopNode.ExitNodes.Add(value);
+                            loopNode.LoopBody.Add(bodyNode);
                         }
-                        else
+
+                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var exitNode))
                         {
-                            Serilog.Log.Warning($"ExitNode child not found in mapping for {actionNode.Name}");
+                            loopNode.ExitNodes.Add(exitNode);
                         }
+
+                        break;
                     }
-                }
-
-                if (actionNode is RepeatTimerNode repeatNode)
-                {
-                    if (visual.TrueChild != null)
+                    case RepeatTimerNode repeatNode:
                     {
-                        if (nodeMapping.TryGetValue(visual.TrueChild, out var value))
+                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
                         {
-                            repeatNode.RepeatBody.Add(value);
+                            repeatNode.RepeatBody.Add(bodyNode);
                         }
-                        else
-                        {
-                            Serilog.Log.Warning($"RepeatBody child not found in mapping for {actionNode.Name}");
-                        }
+
+                        break;
                     }
                 }
 
