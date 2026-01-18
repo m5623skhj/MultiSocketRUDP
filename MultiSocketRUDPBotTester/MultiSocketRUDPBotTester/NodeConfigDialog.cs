@@ -627,6 +627,179 @@ namespace MultiSocketRUDPBotTester
                 };
                 stack.Children.Add(saveBtn);
             }
+            else if (node.NodeType == typeof(RandomChoiceNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Random Choice Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "This node randomly selects one of the connected branches based on weights.\n" +
+                           "Connect branches using output ports, then set weights here.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 0, 0, 10),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                stack.Children.Add(new TextBlock { Text = "Number of Choices:", Margin = new Thickness(0, 0, 0, 5) });
+                var choiceCountBox = new TextBox
+                {
+                    Width = 300,
+                    Text = node.Configuration?.IntValue.ToString() ?? "2"
+                };
+                stack.Children.Add(choiceCountBox);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Note: After building the graph, branches will be randomly selected based on equal weights.",
+                    FontSize = 10,
+                    Foreground = Brushes.Orange,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(choiceCountBox.Text, out var count) && count > 0)
+                    {
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.IntValue = count;
+                        Log($"RandomChoiceNode configured: {count} choices");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid choice count", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(AssertNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Assert Node Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                stack.Children.Add(new TextBlock { Text = "Error Message:", Margin = new Thickness(0, 0, 0, 5) });
+                var messageBox = new TextBox
+                {
+                    Width = 300,
+                    Height = 60,
+                    AcceptsReturn = true,
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = node.Configuration?.StringValue ?? "Assertion failed"
+                };
+                stack.Children.Add(messageBox);
+
+                var stopOnFailureCheck = new CheckBox
+                {
+                    Content = "Stop execution on failure",
+                    IsChecked = node.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true,
+                    Margin = new Thickness(0, 10, 0, 0)
+                };
+                stack.Children.Add(stopOnFailureCheck);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Configure the condition in the ConditionalNode style.\n" +
+                           "Use 'continue' output for success path.\n" +
+                           "Use 'exit' output for failure path.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    node.Configuration ??= new NodeConfiguration();
+                    node.Configuration.StringValue = messageBox.Text;
+                    node.Configuration.Properties["StopOnFailure"] = stopOnFailureCheck.IsChecked ?? true;
+                    Log($"AssertNode configured: {messageBox.Text}");
+                    dialog.Close();
+                };
+                stack.Children.Add(saveBtn);
+            }
+            else if (node.NodeType == typeof(RetryNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Retry Node Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                var maxRetriesPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                maxRetriesPanel.Children.Add(new TextBlock { Text = "Max Retries:", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var maxRetriesBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("MaxRetries")?.ToString() ?? "3"
+                };
+                maxRetriesPanel.Children.Add(maxRetriesBox);
+                stack.Children.Add(maxRetriesPanel);
+
+                var delayPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                delayPanel.Children.Add(new TextBlock { Text = "Retry Delay (ms):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+                var delayBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("RetryDelay")?.ToString() ?? "1000"
+                };
+                delayPanel.Children.Add(delayBox);
+                stack.Children.Add(delayPanel);
+
+                var exponentialCheck = new CheckBox
+                {
+                    Content = "Use Exponential Backoff",
+                    IsChecked = node.Configuration?.Properties.GetValueOrDefault("ExponentialBackoff") as bool? ?? false,
+                    Margin = new Thickness(0, 10, 0, 0)
+                };
+                stack.Children.Add(exponentialCheck);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Connect 'continue' port to the action to retry.\n" +
+                           "Connect 'exit' port to the action on final failure.\n" +
+                           "Success condition can be configured separately.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(maxRetriesBox.Text, out var maxRetries) &&
+                        int.TryParse(delayBox.Text, out var delay))
+                    {
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.Properties["MaxRetries"] = maxRetries;
+                        node.Configuration.Properties["RetryDelay"] = delay;
+                        node.Configuration.Properties["ExponentialBackoff"] = exponentialCheck.IsChecked ?? false;
+                        Log($"RetryNode configured: {maxRetries} retries, {delay}ms delay");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid retry configuration", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
             else
             {
                 stack.Children.Add(new TextBlock

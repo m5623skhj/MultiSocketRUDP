@@ -186,6 +186,41 @@ namespace MultiSocketRUDPBotTester
                             };
                         }
                     }
+                    else if (visual.NodeType == typeof(RandomChoiceNode))
+                    {
+                        actionNode = new RandomChoiceNode
+                        {
+                            Name = visual.NodeType.Name,
+                            Choices = []
+                        };
+                    }
+                    else if (visual.NodeType == typeof(AssertNode))
+                    {
+                        var errorMessage = visual.Configuration?.StringValue ?? "Assertion failed";
+                        var stopOnFailure = visual.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true;
+
+                        actionNode = new AssertNode
+                        {
+                            Name = visual.NodeType.Name,
+                            ErrorMessage = errorMessage,
+                            StopOnFailure = stopOnFailure,
+                            Condition = _ => true
+                        };
+                    }
+                    else if (visual.NodeType == typeof(RetryNode))
+                    {
+                        var maxRetries = visual.Configuration?.Properties.GetValueOrDefault("MaxRetries") as int? ?? 3;
+                        var retryDelay = visual.Configuration?.Properties.GetValueOrDefault("RetryDelay") as int? ?? 1000;
+                        var exponentialBackoff = visual.Configuration?.Properties.GetValueOrDefault("ExponentialBackoff") as bool? ?? false;
+
+                        actionNode = new RetryNode
+                        {
+                            Name = visual.NodeType.Name,
+                            MaxRetries = maxRetries,
+                            RetryDelayMilliseconds = retryDelay,
+                            UseExponentialBackoff = exponentialBackoff
+                        };
+                    }
                     else if (visual.NodeType != null)
                     {
                         actionNode = new CustomActionNode
@@ -237,51 +272,107 @@ namespace MultiSocketRUDPBotTester
                 switch (actionNode)
                 {
                     case WaitForPacketNode waitNode:
-                    {
-                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
                         {
-                            waitNode.TimeoutNodes.Add(timeoutNode);
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
+                            {
+                                waitNode.TimeoutNodes.Add(timeoutNode);
+                            }
+                            break;
                         }
 
-                        break;
-                    }
+                    case RandomChoiceNode randomChoiceNode:
+                        {
+                            if (visual.Next != null && nodeMapping.TryGetValue(visual.Next, out var choice1))
+                            {
+                                randomChoiceNode.Choices.Add(new ChoiceOption
+                                {
+                                    Name = "Choice 1",
+                                    Weight = 1,
+                                    Node = choice1
+                                });
+                            }
+
+                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var choice2))
+                            {
+                                randomChoiceNode.Choices.Add(new ChoiceOption
+                                {
+                                    Name = "Choice 2",
+                                    Weight = 1,
+                                    Node = choice2
+                                });
+                            }
+
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var choice3))
+                            {
+                                randomChoiceNode.Choices.Add(new ChoiceOption
+                                {
+                                    Name = "Choice 3",
+                                    Weight = 1,
+                                    Node = choice3
+                                });
+                            }
+                            break;
+                        }
+
+                    case AssertNode assertNode:
+                        {
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var failureNode))
+                            {
+                                assertNode.FailureNodes.Add(failureNode);
+                            }
+                            break;
+                        }
+
+                    case RetryNode retryNode:
+                        {
+                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
+                            {
+                                retryNode.RetryBody.Add(bodyNode);
+                            }
+
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var failureNode))
+                            {
+                                retryNode.FailureNodes.Add(failureNode);
+                            }
+                            break;
+                        }
+
                     case ConditionalNode conditionalNode:
-                    {
-                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var trueNode))
                         {
-                            conditionalNode.TrueNodes.Add(trueNode);
+                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var trueNode))
+                            {
+                                conditionalNode.TrueNodes.Add(trueNode);
+                            }
+
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var falseNode))
+                            {
+                                conditionalNode.FalseNodes.Add(falseNode);
+                            }
+                            break;
                         }
 
-                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var falseNode))
-                        {
-                            conditionalNode.FalseNodes.Add(falseNode);
-                        }
-
-                        break;
-                    }
                     case LoopNode loopNode:
-                    {
-                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
                         {
-                            loopNode.LoopBody.Add(bodyNode);
+                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
+                            {
+                                loopNode.LoopBody.Add(bodyNode);
+                            }
+
+                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var exitNode))
+                            {
+                                loopNode.ExitNodes.Add(exitNode);
+                            }
+                            break;
                         }
 
-                        if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var exitNode))
-                        {
-                            loopNode.ExitNodes.Add(exitNode);
-                        }
-
-                        break;
-                    }
                     case RepeatTimerNode repeatNode:
-                    {
-                        if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
                         {
-                            repeatNode.RepeatBody.Add(bodyNode);
+                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
+                            {
+                                repeatNode.RepeatBody.Add(bodyNode);
+                            }
+                            break;
                         }
-
-                        break;
-                    }
                 }
 
                 graph.AddNode(actionNode);

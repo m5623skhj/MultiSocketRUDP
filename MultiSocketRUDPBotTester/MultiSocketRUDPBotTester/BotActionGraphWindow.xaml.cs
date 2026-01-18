@@ -772,7 +772,11 @@ namespace MultiSocketRUDPBotTester
             {
                 category = NodeCategory.Condition;
             }
-            else if (t.Name.Contains("Loop") || t.Name.Contains("Repeat") || t == typeof(WaitForPacketNode))
+            else if (t.Name.Contains("Loop") ||
+                     t.Name.Contains("Repeat") ||
+                     t == typeof(WaitForPacketNode) ||
+                     t == typeof(RetryNode) ||
+                     t == typeof(RandomChoiceNode))
             {
                 category = NodeCategory.Loop;
             }
