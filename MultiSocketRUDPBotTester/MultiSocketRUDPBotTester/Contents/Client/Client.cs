@@ -8,11 +8,13 @@ namespace MultiSocketRUDPBotTester.Contents.Client
     public partial class Client : RUDPSession
     {
         private ActionGraph actionGraph = new();
+        public RuntimeContext GlobalContext { get; }
 
         public Client(byte[] sessionInfoStream)
             : base(sessionInfoStream)
         {
             RegisterPacketHandlers();
+            GlobalContext = new RuntimeContext(this, null);
         }
 
         public void SetActionGraph(ActionGraph graph)
@@ -34,7 +36,9 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
         protected override void OnRecvPacket(PacketId packetId, NetBuffer buffer)
         {
-            Log.Debug("Received packet with ID: {PacketId}", packetId); 
+            Log.Debug("Received packet with ID: {PacketId}", packetId);
+            GlobalContext.Set($"__received_{packetId}", buffer);
+
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
                 action.Execute(buffer);

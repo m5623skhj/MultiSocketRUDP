@@ -7,7 +7,7 @@ namespace MultiSocketRUDPBotTester.Bot
     public class RuntimeContext(Client client, NetBuffer? packet)
     {
         public Client Client { get; } = client;
-        public NetBuffer? Packet { get; } = packet;
+        public NetBuffer? Packet { get; set; } = packet;
 
         private readonly ConcurrentDictionary<string, object> vars = new();
 

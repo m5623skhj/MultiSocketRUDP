@@ -159,6 +159,9 @@ namespace MultiSocketRUDPBotTester.Bot
             var client = context.Client;
             var startTime = CommonFunc.GetNowMs();
 
+            var waitKey = $"__wait_packet_{ExpectedPacketId}_{Guid.NewGuid()}";
+            context.Set(waitKey, false);
+
             Task.Run(async () =>
             {
                 try
