@@ -75,10 +75,15 @@ namespace MultiSocketRUDPBotTester.Bot
 
             try
             {
+                var loopInstanceKey = $"__loop_instance_{Guid.NewGuid()}";
+                context.Set(loopInstanceKey, 0);
+
                 var iteration = 0;
                 while (iteration < MaxIterations && ContinueCondition(context))
                 {
                     Log.Debug("Loop iteration: {Iteration}", iteration);
+                    context.Set(loopInstanceKey, iteration);
+
                     foreach (var node in LoopBody)
                     {
                         ExecuteNodeChain(context, node);
@@ -129,6 +134,8 @@ namespace MultiSocketRUDPBotTester.Bot
                     for (var i = 0; i < RepeatCount; i++)
                     {
                         Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
+                        context.Set("__repeat_iteration", i);
+
                         foreach (var node in RepeatBody)
                         {
                             ExecuteNodeChain(context, node);

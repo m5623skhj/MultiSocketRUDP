@@ -59,7 +59,6 @@ namespace MultiSocketRUDPBotTester.Bot
                 await Task.Delay(DelayMilliseconds);
                 Log.Debug("Delayed for {Ms}ms", DelayMilliseconds);
 
-                // 다음 노드 실행
                 foreach (var nextNode in NextNodes)
                 {
                     nextNode.Execute(client, receivedPacket);
@@ -427,7 +426,7 @@ namespace MultiSocketRUDPBotTester.Bot
                     {
                         foreach (var node in RetryBody)
                         {
-                            ExecuteNodeChain(context, node);
+                            ExecuteNodeChain(context.Client, node, context.Packet);
                         }
 
                         if (SuccessCondition != null)
@@ -446,7 +445,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                             foreach (var successNode in SuccessNodes)
                             {
-                                ExecuteNodeChain(context, successNode);
+                                ExecuteNodeChain(context.Client, successNode, context.Packet);
                             }
                             break;
                         }
@@ -475,25 +474,46 @@ namespace MultiSocketRUDPBotTester.Bot
                     Log.Error($"RetryNode: Failed after {MaxRetries} attempts");
                     foreach (var failureNode in FailureNodes)
                     {
-                        ExecuteNodeChain(context, failureNode);
+                        ExecuteNodeChain(context.Client, failureNode, context.Packet);
                     }
                 }
 
                 foreach (var nextNode in NextNodes)
                 {
-                    ExecuteNodeChain(context, nextNode);
+                    ExecuteNodeChain(context.Client, nextNode, context.Packet);
                 }
             });
         }
 
-        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node)
+        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
         {
-            node.Execute(context.Client, context.Packet);
+            Log.Debug("Executing node: {NodeName}", node.Name);
+            node.Execute(client, buffer);
 
-            foreach (var next in node.NextNodes)
+            if (IsAsyncNode(node))
             {
-                ExecuteNodeChain(context, next);
+                Log.Debug("Node {NodeName} is async, skipping automatic NextNodes execution", node.Name);
+                return;
             }
+
+            if (node.NextNodes.Count > 0)
+            {
+                Log.Debug("Node {NodeName} has {Count} next nodes", node.Name, node.NextNodes.Count);
+            }
+
+            foreach (var nextNode in node.NextNodes)
+            {
+                ExecuteNodeChain(client, nextNode, buffer);
+            }
+        }
+
+        private static bool IsAsyncNode(ActionNodeBase node)
+        {
+            return node is DelayNode
+                or RandomDelayNode
+                or RepeatTimerNode
+                or WaitForPacketNode
+                or RetryNode;
         }
     }
 }

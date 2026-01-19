@@ -800,6 +800,84 @@ namespace MultiSocketRUDPBotTester
                 };
                 stack.Children.Add(saveBtn);
             }
+            else if (node.NodeType == typeof(RepeatTimerNode))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Repeat Timer Configuration",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
+                var countPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                countPanel.Children.Add(new TextBlock
+                {
+                    Text = "Repeat Count:",
+                    Width = 120,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var countBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.Properties.GetValueOrDefault("RepeatCount")?.ToString() ?? "10"
+                };
+                countPanel.Children.Add(countBox);
+                stack.Children.Add(countPanel);
+
+                var intervalPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+                intervalPanel.Children.Add(new TextBlock
+                {
+                    Text = "Interval (ms):",
+                    Width = 120,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var intervalBox = new TextBox
+                {
+                    Width = 180,
+                    Text = node.Configuration?.IntValue.ToString() ?? "1000"
+                };
+                intervalPanel.Children.Add(intervalBox);
+                stack.Children.Add(intervalPanel);
+
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Executes the connected action repeatedly with specified interval.\n" +
+                           "Use 'continue' output to connect the action to repeat.\n" +
+                           "After all iterations complete, proceeds to next nodes.",
+                    FontSize = 11,
+                    Foreground = Brushes.Gray,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+                var saveBtn = new Button { Content = "Save", Margin = new Thickness(0, 10, 0, 0) };
+                saveBtn.Click += (_, _) =>
+                {
+                    if (int.TryParse(countBox.Text, out var count) &&
+                        int.TryParse(intervalBox.Text, out var interval))
+                    {
+                        if (count <= 0 || interval < 0)
+                        {
+                            MessageBox.Show("Count must be positive and interval cannot be negative",
+                                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+
+                        node.Configuration ??= new NodeConfiguration();
+                        node.Configuration.Properties["RepeatCount"] = count;
+                        node.Configuration.IntValue = interval;
+
+                        Log($"RepeatTimerNode configured: {count} times, {interval}ms interval");
+                        dialog.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid count or interval value", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                stack.Children.Add(saveBtn);
+            }
             else
             {
                 stack.Children.Add(new TextBlock

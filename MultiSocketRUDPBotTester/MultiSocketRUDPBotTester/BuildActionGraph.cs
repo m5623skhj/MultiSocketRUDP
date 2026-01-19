@@ -115,7 +115,19 @@ namespace MultiSocketRUDPBotTester
                         actionNode = new LogNode
                         {
                             Name = visual.NodeType.Name,
-                            MessageBuilder = (_, _) => logMessage
+                            MessageBuilder = (client, buffer) =>
+                            {
+                                var message = logMessage;
+                                message = message.Replace("{sessionId}", client.GetSessionId().ToString());
+                                message = message.Replace("{isConnected}", client.IsConnected().ToString());
+
+                                if (buffer != null)
+                                {
+                                    message = message.Replace("{packetSize}", buffer.GetLength().ToString());
+                                }
+
+                                return message;
+                            }
                         };
                     }
                     else if (visual.NodeType == typeof(CustomActionNode))
@@ -149,14 +161,16 @@ namespace MultiSocketRUDPBotTester
                     else if (visual.NodeType == typeof(LoopNode))
                     {
                         var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
+                        var loopId = Guid.NewGuid().ToString();
 
                         actionNode = new LoopNode
                         {
                             Name = visual.NodeType.Name,
                             ContinueCondition = ctx =>
                             {
-                                var i = ctx.GetOrDefault("LoopIndex", 0) + 1;
-                                ctx.Set("LoopIndex", i);
+                                var key = $"__loop_{loopId}_index";
+                                var i = ctx.GetOrDefault(key, 0);
+                                ctx.Set(key, i + 1);
                                 return i < count;
                             },
                             MaxIterations = count
@@ -164,13 +178,14 @@ namespace MultiSocketRUDPBotTester
                     }
                     else if (visual.NodeType == typeof(RepeatTimerNode))
                     {
+                        var interval = visual.Configuration?.IntValue ?? 1000;
+                        var repeatCount = visual.Configuration?.Properties.GetValueOrDefault("RepeatCount") as int? ?? 10;
+
                         actionNode = new RepeatTimerNode
                         {
                             Name = visual.NodeType.Name,
-                            IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
-                            RepeatCount = visual.Configuration?.Properties.ContainsKey("RepeatCount") == true
-                                ? (int)visual.Configuration.Properties["RepeatCount"]
-                                : 10
+                            IntervalMilliseconds = interval,
+                            RepeatCount = repeatCount
                         };
                     }
                     else if (visual.NodeType == typeof(PacketParserNode))
