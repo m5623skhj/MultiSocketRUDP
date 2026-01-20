@@ -481,7 +481,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
             TargetServerInfo.ServerIp = string.Empty;
             TargetServerInfo.ServerPort = 0;
             lastSendSequence = 0;
-            expectedRecvSequence = 0;
+            lock (expectedRecvSequenceLock)
+            {
+                expectedRecvSequence = 0;
+            }
             holdingPacketStore.Clear();
 
             isConnected = false;

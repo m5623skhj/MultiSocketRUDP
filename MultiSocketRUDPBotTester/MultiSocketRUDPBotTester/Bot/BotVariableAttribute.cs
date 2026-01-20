@@ -26,10 +26,10 @@ namespace MultiSocketRUDPBotTester.Bot
         ===========================================*/
 
 
-
         /*============================================
         // Setter
         ===========================================*/
+
     }
 
     public class VariableAccessor
@@ -84,12 +84,12 @@ namespace MultiSocketRUDPBotTester.Bot
                     ReturnType = method.ReturnType
                 };
 
-                if (attr.AccessType == VariableAccessType.Get || attr.AccessType == VariableAccessType.GetAndSet)
+                if (attr.AccessType is VariableAccessType.Get or VariableAccessType.GetAndSet)
                 {
                     Getters[method.Name] = accessor;
                 }
 
-                if (attr.AccessType == VariableAccessType.Set || attr.AccessType == VariableAccessType.GetAndSet)
+                if (attr.AccessType is VariableAccessType.Set or VariableAccessType.GetAndSet)
                 {
                     Setters[method.Name] = accessor;
                 }

@@ -13,7 +13,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly Lock sessionDictionaryLock = new();
 
         private string hostIp = "";
-        private ushort hostPort = 0;
+        private ushort hostPort;
 
         private ActionGraph botActionGraph = new();
         private List<NodeVisual>? savedNodeVisuals;

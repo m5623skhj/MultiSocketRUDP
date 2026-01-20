@@ -21,9 +21,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
         }
 
         public NetBuffer SentBuffer { get; } = inSentBuffer;
-        public PacketSequence packetSequence { get; } = inPacketSequence;
-        private ulong SendTimeStamp { get; set; } = 0;
-        private PacketRetransmissionCount retransmissionCount = 0;
+        public PacketSequence PacketSequence { get; } = inPacketSequence;
+        private ulong SendTimeStamp { get; set; }
+        private PacketRetransmissionCount retransmissionCount;
 
         private const ulong RetransmissionTimeoutMs = 32;
         private const ulong RetransmissionMaxCount = 16;
@@ -72,7 +72,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 lock (sendBufferStoreLock)
                 {
-                    sendBufferStore.Add(sendPacketInfo.packetSequence, sendPacketInfo);
+                    sendBufferStore.Add(sendPacketInfo.PacketSequence, sendPacketInfo);
                 }
             }
 
