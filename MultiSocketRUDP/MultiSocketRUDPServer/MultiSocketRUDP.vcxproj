@@ -34,6 +34,7 @@
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
+    <ClCompile Include="RUDPThreadManager.cpp" />
     <ClCompile Include="Ticker.cpp" />
     <ClCompile Include="TimerEvent.cpp" />
   </ItemGroup>
@@ -45,6 +46,7 @@
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RUDPSession.h" />
+    <ClInclude Include="RUDPThreadManager.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />
   </ItemGroup>

@@ -93,6 +93,9 @@
     <ClCompile Include="..\Common\FlowController\RUDPReceiveWindow.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPThreadManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MultiSocketRUDPCore.h">
@@ -121,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="MemoryTracer.h">
       <Filter>소스 파일\MemoryTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPThreadManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

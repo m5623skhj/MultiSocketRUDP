@@ -73,6 +73,15 @@ enum class SESSION_STATE : uint8_t
 	RELEASING = 3
 };
 
+enum class THREAD_GROUP : uint8_t
+{
+	IO_WORKER_THREAD = 0,
+	RECV_LOGIC_WORKER_THREAD = 1,
+	RETRANSMISSION_THREAD = 2,
+	SESSION_RELEASE_THREAD = 3,
+	HEARTBEAT_THREAD = 4,
+};
+
 struct TickSet
 {
 	UINT64 nowTick = 0;
