@@ -72,41 +72,22 @@ void MultiSocketRUDPCore::StopServer()
 	}
 #endif
 	CloseAllSessions();
-	delete[] rioCQList;
 
-	SetEvent(logicThreadEventStopHandle);
-	for (ThreadIdType i = 0; i < numOfWorkerThread; ++i)
+	SetEvent(recvLogicThreadEventStopHandle);
+	SetEvent(sessionReleaseStopEventHandle);
+	StopAllThreads();
+
+	for (ThreadIdType i = 0; i<numOfWorkerThread; ++i)
 	{
-		if (ioWorkerThreads[i].joinable())
-		{
-			ioWorkerThreads[i].join();
-		}
-		if (recvLogicWorkerThreads[i].joinable())
-		{
-			recvLogicWorkerThreads[i].join();
-		}
-		if (retransmissionThreads[i].joinable())
-		{
-			retransmissionThreads[i].join();
-		}
-
 		CloseHandle(recvLogicThreadEventHandles[i]);
 	}
+	CloseHandle(recvLogicThreadEventStopHandle);
+	CloseHandle(sessionReleaseEventHandle);
+	CloseHandle(sessionReleaseStopEventHandle);
 
-	SetEvent(sessionReleaseEventHandle);
-	if (sessionReleaseThread.joinable())
-	{
-		sessionReleaseThread.join();
-	}
-	if (heartbeatThread.joinable())
-	{
-		heartbeatThread.join();
-	}
 	Ticker::GetInstance().Stop();
 
-	CloseHandle(logicThreadEventStopHandle);
-	CloseHandle(sessionReleaseEventHandle);
-
+	delete[] rioCQList;
 	ClearAllSession();
 
 	Logger::GetInstance().StopLoggerThread();
@@ -299,18 +280,13 @@ bool MultiSocketRUDPCore::RunAllThreads()
 {
 	sendPacketInfoList.reserve(numOfWorkerThread);
 	sendPacketInfoListLock.reserve(numOfWorkerThread);
-	ioWorkerThreads.reserve(numOfWorkerThread);
-	recvLogicWorkerThreads.reserve(numOfWorkerThread);
-	retransmissionThreads.reserve(numOfWorkerThread);
 
-	logicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-	sessionReleaseEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-	recvLogicThreadEventHandles.reserve(numOfWorkerThread);
+	recvLogicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	sessionReleaseStopEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	sessionReleaseEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	ioCompletedContexts.reserve(numOfWorkerThread);
 
 	Ticker::GetInstance().Start(timerTickMs);
-	sessionReleaseThread = std::jthread([this]() { RunSessionReleaseThread(); });
-	heartbeatThread = std::jthread([this]() { RunHeartbeatThread(); });
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
 		ioCompletedContexts.emplace_back();
@@ -318,11 +294,14 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
 		sendPacketInfoList.emplace_back();
 		sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
-
-		ioWorkerThreads.emplace_back([this, id]() { this->RunIOWorkerThread(id); });
-		recvLogicWorkerThreads.emplace_back([this, id]() { this->RunRecvLogicWorkerThread(id); });
-		retransmissionThreads.emplace_back([this, id]() { this->RunRetransmissionThread(id); });
 	}
+
+	threadManager.StartThreads(THREAD_GROUP::SESSION_RELEASE_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunSessionReleaseThread(stopToken); }, 1);
+	threadManager.StartThreads(THREAD_GROUP::HEARTBEAT_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunHeartbeatThread(stopToken); }, 1);
+
+	threadManager.StartThreads(THREAD_GROUP::IO_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunIOWorkerThread(stopToken, id); }, numOfWorkerThread);
+	threadManager.StartThreads(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRecvLogicWorkerThread(stopToken, id); }, numOfWorkerThread);
+	threadManager.StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
 
 	Sleep(1000);
 	if (not RunSessionBroker())
@@ -391,7 +370,6 @@ void MultiSocketRUDPCore::CloseAllSessions()
 		{
 			session->CloseSocket();
 		}
-		delete session;
 	}
 
 	connectedUserCount = 0;
@@ -412,11 +390,33 @@ void MultiSocketRUDPCore::ClearAllSession()
 	{
 		for (const auto& session : sessionArray)
 		{
-			contextPool.Free(session->recvBuffer.recvContext.get());
+			if (session == nullptr)
+			{
+				continue;
+			}
+
+			if (const auto* context = session->recvBuffer.recvContext.get(); context != nullptr)
+			{
+				session->recvBuffer.recvContext.reset();
+			}
+
 			delete session;
 		}
 
 		sessionArray.clear();
+	}
+}
+
+void MultiSocketRUDPCore::ReleaseAllSession() const
+{
+	for (const auto& session : sessionArray)
+	{
+		if (session == nullptr)
+		{
+			continue;
+		}
+
+		delete session;
 	}
 }
 
@@ -459,14 +459,23 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 	return sessionArray[sessionId];
 }
 
-void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
+void MultiSocketRUDPCore::StopAllThreads()
+{
+	threadManager.StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
+	threadManager.StopThreadGroup(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD);
+	threadManager.StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
+	threadManager.StopThreadGroup(THREAD_GROUP::SESSION_RELEASE_THREAD);
+	threadManager.StopThreadGroup(THREAD_GROUP::HEARTBEAT_THREAD);
+}
+
+void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
 	RIORESULT rioResults[MAX_RIO_RESULT];
 
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 
-	while (not threadStopFlag)
+	while (not stopToken.stop_requested())
 	{
 		ZeroMemory(rioResults, sizeof(rioResults));
 
@@ -495,10 +504,10 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const ThreadIdType threadId)
 	Logger::GetInstance().WriteLog(log);
 }
 
-void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
+void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
-	const HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], logicThreadEventStopHandle };
-	while (not threadStopFlag)
+	const HANDLE eventHandles[2] = { recvLogicThreadEventHandles[threadId], recvLogicThreadEventStopHandle };
+	while (not stopToken.stop_requested())
 	{
 		switch (WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE))
 		{
@@ -511,10 +520,10 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 		{
 			Sleep(LOGIC_THREAD_STOP_SLEEP_TIME);
 			OnRecvPacket(threadId);
-			auto log = Logger::MakeLogObject<ServerLog>();
+			const auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format("Logic thread stop. ThreadId is {}", threadId);
 			Logger::GetInstance().WriteLog(log);
-			break;
+			return;
 		}
 		default:
 		{
@@ -525,7 +534,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
+void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
@@ -536,7 +545,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 	std::list<SendPacketInfo*> copyList;
 	unsigned short numOfTimeoutSession{};
 
-	while (not threadStopFlag)
+	while (not stopToken.stop_requested())
 	{
 		{
 			std::scoped_lock lock(thisThreadSendPacketInfoListLock);
@@ -564,11 +573,12 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const ThreadIdType threadId)
 	}
 }
 
-void MultiSocketRUDPCore::RunSessionReleaseThread()
+void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopToken)
 {
-	while (not threadStopFlag)
+	const HANDLE eventHandles[2] = { sessionReleaseEventHandle, sessionReleaseStopEventHandle };
+	while (not stopToken.stop_requested())
 	{
-		switch (WaitForSingleObject(sessionReleaseEventHandle, INFINITE))
+		switch (WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
 		{
@@ -590,6 +600,13 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 			releaseSessionIdList.clear();
 		}
 		break;
+		case WAIT_OBJECT_0 + 1:
+		{
+			const auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = "Session release thread stop.";
+			Logger::GetInstance().WriteLog(log);
+			return;
+		}
 		default:
 		{
 			LOG_ERROR(std::format("RunSessionReleaseThread() : Invalid session release thread wait result. Error is {}", WSAGetLastError()));
@@ -599,12 +616,12 @@ void MultiSocketRUDPCore::RunSessionReleaseThread()
 	}
 }
 
-void MultiSocketRUDPCore::RunHeartbeatThread() const
+void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) const
 {
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 
-	while (not threadStopFlag)
+	while (not stopToken.stop_requested())
 	{
 		const auto now = GetTickCount64();
 

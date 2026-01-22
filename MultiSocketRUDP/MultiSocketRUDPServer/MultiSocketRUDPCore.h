@@ -10,6 +10,7 @@
 #include "Queue.h"
 #include <vector>
 #include <set>
+#include "RUDPThreadManager.h"
 
 #include "../Common/TLS/TLSHelper.h"
 
@@ -123,6 +124,7 @@ private:
 private:
 	void CloseAllSessions();
 	void ClearAllSession();
+	void ReleaseAllSession() const;
 
 private:
 	bool threadStopFlag{};
@@ -207,11 +209,12 @@ private:
 	TLSHelper::TLSHelperServer tlsHelper;
 
 private:
-	void RunIOWorkerThread(ThreadIdType threadId);
-	void RunRecvLogicWorkerThread(ThreadIdType threadId);
-	void RunRetransmissionThread(ThreadIdType threadId);
-	void RunSessionReleaseThread();
-	void RunHeartbeatThread() const;
+	void StopAllThreads();
+	void RunIOWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
+	void RunRecvLogicWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
+	void RunRetransmissionThread(const std::stop_token& stopToken, ThreadIdType threadId);
+	void RunSessionReleaseThread(const std::stop_token& stopToken);
+	void RunHeartbeatThread(const std::stop_token& stopToken) const;
 	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
@@ -230,10 +233,12 @@ private:
 	std::vector<std::jthread> retransmissionThreads;
 	std::jthread heartbeatThread;
 	std::jthread sessionReleaseThread{};
+	RUDPThreadManager threadManager;
 
 	// event handles
-	HANDLE logicThreadEventStopHandle{};
+	HANDLE recvLogicThreadEventStopHandle{};
 	std::vector<HANDLE> recvLogicThreadEventHandles;
+	HANDLE sessionReleaseStopEventHandle{};
 	HANDLE sessionReleaseEventHandle{};
 
 	// objects
