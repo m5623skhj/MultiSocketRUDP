@@ -38,7 +38,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	{
 		StopServer();
 		LOG_ERROR("InitNetwork failed");
-		WSACleanup();
 		return false;
 	}
 
@@ -46,7 +45,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	{
 		StopServer();
 		LOG_ERROR("InitRIO failed");
-		WSACleanup();
 		return false;
 	}
 
@@ -54,7 +52,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	{
 		StopServer();
 		LOG_ERROR("RunAllThreads failed");
-		WSACleanup();
 		return false;
 	}
 
@@ -224,7 +221,6 @@ bool MultiSocketRUDPCore::InitNetwork()
 	if (int result = WSAStartup(MAKEWORD(2, 2), &wsaData); result != 0)
 	{
 		LOG_ERROR(std::format("WSAStartup failed with error code {}", result));
-		WSACleanup();
 		return false;
 	}
 
