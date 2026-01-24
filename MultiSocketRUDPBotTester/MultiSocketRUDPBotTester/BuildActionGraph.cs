@@ -390,7 +390,10 @@ namespace MultiSocketRUDPBotTester
                         }
                 }
 
-                graph.AddNode(actionNode);
+                if (actionNode.Trigger != null)
+                {
+                    graph.AddNode(actionNode);
+                }
             }
 
             Serilog.Log.Information($"Graph built with {nodeMapping.Count} nodes");

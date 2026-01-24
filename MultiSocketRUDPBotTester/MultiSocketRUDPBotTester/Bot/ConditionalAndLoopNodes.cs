@@ -8,7 +8,7 @@ namespace MultiSocketRUDPBotTester.Bot
     {
         public sealed override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            client.GlobalContext.Packet = receivedPacket;
+            client.GlobalContext.SetPacket(receivedPacket);
             ExecuteImpl(client.GlobalContext);
         }
 
@@ -65,7 +65,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            node.Execute(context.Client, context.Packet);
+            node.Execute(context.Client, context.GetPacket());
 
             if (IsAsyncNode(node))
             {
@@ -157,7 +157,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            node.Execute(context.Client, context.Packet);
+            node.Execute(context.Client, context.GetPacket());
 
             if (IsAsyncNode(node))
             {
@@ -190,6 +190,9 @@ namespace MultiSocketRUDPBotTester.Bot
 
         protected override void ExecuteImpl(RuntimeContext context)
         {
+            var instanceId = Guid.NewGuid().ToString();
+            var iterationKey = $"__repeat_iteration_{instanceId}";
+
             Task.Run(async () =>
             {
                 try
@@ -197,7 +200,7 @@ namespace MultiSocketRUDPBotTester.Bot
                     for (var i = 0; i < RepeatCount; i++)
                     {
                         Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
-                        context.Set("__repeat_iteration", i);
+                        context.Set(iterationKey, i);
 
                         var visited = new HashSet<ActionNodeBase>();
                         foreach (var node in RepeatBody)
@@ -232,7 +235,8 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            node.Execute(context.Client, context.Packet);
+            node.Execute(context.Client, context.GetPacket());
+
             if (IsAsyncNode(node))
             {
                 return;

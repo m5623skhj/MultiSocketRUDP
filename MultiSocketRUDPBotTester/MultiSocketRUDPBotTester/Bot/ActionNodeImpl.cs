@@ -150,6 +150,7 @@ namespace MultiSocketRUDPBotTester.Bot
             }
 
             var receivedKey = $"__received_{ExpectedPacketId}";
+
             if (context.Has(receivedKey))
             {
                 var buffer = context.Get<NetBuffer>(receivedKey);
@@ -344,7 +345,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                     foreach (var nextNode in NextNodes)
                     {
-                        nextNode.Execute(context.Client, context.Packet);
+                        nextNode.Execute(context.Client, context.GetPacket());
                     }
                 }
                 else
@@ -354,7 +355,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                     foreach (var failureNode in FailureNodes)
                     {
-                        failureNode.Execute(context.Client, context.Packet);
+                        failureNode.Execute(context.Client, context.GetPacket());
                     }
 
                     if (!StopOnFailure)
@@ -371,7 +372,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                 foreach (var failureNode in FailureNodes)
                 {
-                    failureNode.Execute(context.Client, context.Packet);
+                    failureNode.Execute(context.Client, context.GetPacket());
                 }
 
                 if (StopOnFailure)
@@ -408,7 +409,7 @@ namespace MultiSocketRUDPBotTester.Bot
                     {
                         foreach (var node in RetryBody)
                         {
-                            node.Execute(context.Client, context.Packet);
+                            node.Execute(context.Client, context.GetPacket());
                         }
 
                         if (SuccessCondition != null)
@@ -427,7 +428,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                             foreach (var successNode in SuccessNodes)
                             {
-                                successNode.Execute(context.Client, context.Packet);
+                                successNode.Execute(context.Client, context.GetPacket());
                             }
                             break;
                         }
@@ -456,13 +457,13 @@ namespace MultiSocketRUDPBotTester.Bot
                     Log.Error($"RetryNode: Failed after {MaxRetries} attempts");
                     foreach (var failureNode in FailureNodes)
                     {
-                        failureNode.Execute(context.Client, context.Packet);
+                        failureNode.Execute(context.Client, context.GetPacket());
                     }
                 }
 
                 foreach (var nextNode in NextNodes)
                 {
-                    nextNode.Execute(context.Client, context.Packet);
+                    nextNode.Execute(context.Client, context.GetPacket());
                 }
             });
         }
