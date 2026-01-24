@@ -17,298 +17,382 @@ namespace MultiSocketRUDPBotTester.Buffer
         private int writePos = HeaderSize;
         private bool isEncoded;
 
+        private readonly Lock readLock = new();
+        private readonly Lock writeLock = new();
+
         public void WriteByte(byte value)
         {
-            if (writePos + sizeof(byte) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(byte) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            buffer[writePos++] = value;
+                buffer[writePos++] = value;
+            }
         }
 
         public void WriteSByte(sbyte value)
         {
-            if (writePos + sizeof(sbyte) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(sbyte) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            buffer[writePos++] = (byte)value;
+                buffer[writePos++] = (byte)value;
+            }
         }
 
         public void WriteUShort(ushort value)
         {
-            if (writePos + sizeof(ushort) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(ushort) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            buffer[writePos++] = (byte)(value & 0xFF);
-            buffer[writePos++] = (byte)((value >> 8) & 0xFF);
+                buffer[writePos++] = (byte)(value & 0xFF);
+                buffer[writePos++] = (byte)((value >> 8) & 0xFF);
+            }
         }
 
         public void WriteShort(short value)
         {
-            if (writePos + sizeof(short) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(short) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            WriteUShort((ushort)value);
+                WriteUShort((ushort)value);
+            }
         }
 
         public void WriteUInt(uint value)
         {
-            if (writePos + sizeof(uint) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(uint) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            for (var i = 0; i < 4; i++)
-            {
-                buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+                for (var i = 0; i < 4; i++)
+                {
+                    buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+                }
             }
         }
 
         public void WriteInt(int value)
         {
-            if (writePos + sizeof(int) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(int) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            WriteUInt((uint)value);
+                WriteUInt((uint)value);
+            }
         }
 
         public void WriteULong(ulong value)
         {
-            if (writePos + sizeof(ulong) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(ulong) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            for (var i = 0; i < 8; i++)
-            {
-                buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+                for (var i = 0; i < 8; i++)
+                {
+                    buffer[writePos++] = (byte)((value >> (8 * i)) & 0xFF);
+                }
             }
         }
 
         public void WriteLong(long value)
         {
-            if (writePos + sizeof(long) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(long) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            WriteULong((ulong)value);
+                WriteULong((ulong)value);
+            }
         }
 
         public void WriteFloat(float value)
         {
-            if (writePos + sizeof(float) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(float) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            WriteBytes(BitConverter.GetBytes(value));
+                WriteBytes(BitConverter.GetBytes(value));
+            }
         }
 
         public void WriteDouble(double value)
         {
-            if (writePos + sizeof(double) > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + sizeof(double) > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            WriteBytes(BitConverter.GetBytes(value));
+                WriteBytes(BitConverter.GetBytes(value));
+            }
         }
 
         public void WriteString(string value)
         {
             var bytes = Encoding.UTF8.GetBytes(value);
-            if (writePos + sizeof(uint) + bytes.Length > BufferSize)
-            {
-                throw new InvalidOperationException("Buffer overflow");
-            }
 
-            WriteUInt((uint)bytes.Length);
-            WriteBytes(bytes);
+            lock (writeLock)
+            {
+                if (writePos + sizeof(uint) + bytes.Length > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
+
+                for (var i = 0; i < 4; i++)
+                {
+                    buffer[writePos++] = (byte)(((uint)bytes.Length >> (8 * i)) & 0xFF);
+                }
+
+                Array.Copy(bytes, 0, buffer, writePos, bytes.Length);
+                writePos += bytes.Length;
+            }
         }
 
         public void WriteBytes(byte[] data)
         {
-            if (writePos + data.Length > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + data.Length > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            Array.Copy(data, 0, buffer, writePos, data.Length);
-            writePos += data.Length;
+                Array.Copy(data, 0, buffer, writePos, data.Length);
+                writePos += data.Length;
+            }
         }
 
         public void WriteBytes(byte[] data, int offset, int count)
         {
-            if (writePos + count > BufferSize)
+            lock (writeLock)
             {
-                throw new InvalidOperationException("Buffer overflow");
-            }
+                if (writePos + count > BufferSize)
+                {
+                    throw new InvalidOperationException("Buffer overflow");
+                }
 
-            Array.Copy(data, offset, buffer, writePos, count);
-            writePos += count;
+                Array.Copy(data, offset, buffer, writePos, count);
+                writePos += count;
+            }
         }
 
         public byte ReadByte()
         {
-            if (readPos + sizeof(byte) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(byte) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            return buffer[readPos++];
+                return buffer[readPos++];
+            }
         }
 
         public sbyte ReadSByte()
         {
-            if (readPos + sizeof(sbyte) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(sbyte) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            return (sbyte)buffer[readPos++];
+                return (sbyte)buffer[readPos++];
+            }
         }
 
         public ushort ReadUShort()
         {
-            if (readPos + sizeof(ushort) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
+                if (readPos + sizeof(ushort) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
+
+                var value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
+                readPos += 2;
+
+                return value;
             }
-
-            var value = (ushort)(buffer[readPos] | (buffer[readPos + 1] << 8));
-            readPos += 2;
-
-            return value;
         }
 
         public short ReadShort()
         {
-            if (readPos + sizeof(short) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(short) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            return (short)ReadUShort();
+                return (short)ReadUShort();
+            }
         }
 
         public uint ReadUInt()
         {
-            if (readPos + sizeof(uint) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
+                if (readPos + sizeof(uint) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
+
+                var value = (uint)(
+                    buffer[readPos] |
+                    (buffer[readPos + 1] << 8) |
+                    (buffer[readPos + 2] << 16) |
+                    (buffer[readPos + 3] << 24));
+                readPos += 4;
+
+                return value;
             }
-
-            var value = (uint)(
-                buffer[readPos] |
-                (buffer[readPos + 1] << 8) |
-                (buffer[readPos + 2] << 16) |
-                (buffer[readPos + 3] << 24));
-            readPos += 4;
-
-            return value;
         }
 
         public int ReadInt()
         {
-            if (readPos + sizeof(int) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(int) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            return (int)ReadUInt();
+                return (int)ReadUInt();
+            }
         }
 
         public ulong ReadULong()
         {
-            if (readPos + sizeof(ulong) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
+                if (readPos + sizeof(ulong) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
+
+                ulong value = 0;
+                for (var i = 0; i < 8; i++)
+                {
+                    value |= ((ulong)buffer[readPos + i]) << (8 * i);
+                }
+
+                readPos += 8;
+
+                return value;
             }
-
-            ulong value = 0;
-            for (var i = 0; i < 8; i++)
-            {
-                value |= ((ulong)buffer[readPos + i]) << (8 * i);
-            }
-
-            readPos += 8;
-
-            return value;
         }
 
         public long ReadLong()
         {
-            if (readPos + sizeof(long) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(long) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            return (long)ReadULong();
+                return (long)ReadULong();
+            }
         }
 
         public float ReadFloat()
         {
-            if (readPos + sizeof(float) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(float) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            var bytes = ReadBytes(sizeof(float));
-            return BitConverter.ToSingle(bytes, 0);
+                var bytes = ReadBytes(sizeof(float));
+                return BitConverter.ToSingle(bytes, 0);
+            }
         }
 
         public double ReadDouble()
         {
-            if (readPos + sizeof(double) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
-            }
+                if (readPos + sizeof(double) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
 
-            var bytes = ReadBytes(sizeof(double));
-            return BitConverter.ToDouble(bytes, 0);
+                var bytes = ReadBytes(sizeof(double));
+                return BitConverter.ToDouble(bytes, 0);
+            }
         }
 
         public string ReadString()
         {
-            if (readPos + sizeof(int) > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
+                if (readPos + sizeof(int) > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
+
+                var length = ReadUInt();
+                if (readPos + (int)length > writePos)
+                {
+                    throw new InvalidOperationException($"Invalid string length: {length}");
+                }
+
+                var value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
+                readPos += (int)length;
+
+                return value;
             }
-
-            var length = ReadUInt();
-            if (readPos + (int)length > writePos)
-            {
-                throw new InvalidOperationException($"Invalid string length: {length}");
-            }
-
-            var value = Encoding.UTF8.GetString(buffer, readPos, (int)length);
-            readPos += (int)length;
-
-            return value;
         }
 
         public byte[] ReadBytes(int length)
         {
-            if (readPos + length > writePos)
+            lock (readLock)
             {
-                throw new InvalidOperationException("There is not enough data to read.");
+                if (readPos + length > writePos)
+                {
+                    throw new InvalidOperationException("There is not enough data to read.");
+                }
+
+                var result = new byte[length];
+                Array.Copy(buffer, readPos, result, 0, length);
+                readPos += length;
+
+                return result;
             }
-
-            var result = new byte[length];
-            Array.Copy(buffer, readPos, result, 0, length);
-            readPos += length;
-
-            return result;
         }
 
         public static void EncodePacket(AesGcm aesGcm, NetBuffer buffer, PacketSequence packetSequence, PacketDirection direction, string sessionSalt, bool isCorePacket)
@@ -324,7 +408,7 @@ namespace MultiSocketRUDPBotTester.Buffer
                 ? (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence))
                 : (HeaderSize + sizeof(PacketType) + sizeof(PacketSequence) + sizeof(PacketId));
             Span<byte> authTag = stackalloc byte[CryptoHelper.AuthTagSize];
-            
+
             CryptoHelper.Encrypt(
                 aesGcm,
                 buffer.buffer,
@@ -352,8 +436,8 @@ namespace MultiSocketRUDPBotTester.Buffer
             }
 
             var packetSequence = packet.ReadULong();
-            var bodyOffset = isCorePacket 
-                ? (sizeOfHeaderWithPacketType + sizeof(PacketSequence)) 
+            var bodyOffset = isCorePacket
+                ? (sizeOfHeaderWithPacketType + sizeof(PacketSequence))
                 : (sizeOfHeaderWithPacketType + sizeof(PacketSequence) + sizeof(PacketId));
             var authTagOffset = packet.writePos - CryptoHelper.AuthTagSize;
             var bodySize = packetUseSize + sizeOfHeaderWithPacketType - bodyOffset - CryptoHelper.AuthTagSize;
@@ -379,16 +463,23 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public byte[] GetPayload()
         {
-            var payloadSize = writePos - HeaderSize;
-            var payload = new byte[payloadSize];
-            Array.Copy(buffer, HeaderSize, payload, 0, payloadSize);
+            lock (readLock)
+                lock (writeLock)
+                {
+                    var payloadSize = writePos - HeaderSize;
+                    var payload = new byte[payloadSize];
+                    Array.Copy(buffer, HeaderSize, payload, 0, payloadSize);
 
-            return payload;
+                    return payload;
+                }
         }
 
         public int GetLength()
         {
-            return writePos;
+            lock (writeLock)
+            {
+                return writePos;
+            }
         }
 
         public byte[] GetPacketBuffer()
@@ -415,10 +506,13 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void BuildConnectPacket(SessionIdType sessionId)
         {
-            writePos = PacketIdPos;
-            WriteByte((byte)PacketType.CONNECT_TYPE);
-            WriteULong(0);
-            WriteUShort(sessionId);
+            lock (writeLock)
+            {
+                writePos = PacketIdPos;
+                WriteByte((byte)PacketType.CONNECT_TYPE);
+                WriteULong(0);
+                WriteUShort(sessionId);
+            }
         }
     }
 }

@@ -72,7 +72,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 lock (sendBufferStoreLock)
                 {
-                    sendBufferStore.Add(sendPacketInfo.PacketSequence, sendPacketInfo);
+                    if (sendBufferStore.TryAdd(sendPacketInfo.PacketSequence, sendPacketInfo))
+                    {
+                        return;
+                    }
+
+                    Serilog.Log.Debug("Updating existing packet sequence: {Seq}", sendPacketInfo.PacketSequence);
+                    sendBufferStore[sendPacketInfo.PacketSequence] = sendPacketInfo;
                 }
             }
 

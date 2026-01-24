@@ -22,6 +22,9 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
+        private readonly Lock triggerNodesLock = new();
+        private readonly Lock packetTriggerNodesLock = new();
+
         public void AddNode(ActionNodeBase node)
         {
             lock (allNodesLock)
@@ -34,13 +37,14 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            lock (triggerNodes)
+            lock (triggerNodesLock)
             {
-                if (!triggerNodes.ContainsKey(node.Trigger.Type))
+                if (!triggerNodes.TryGetValue(node.Trigger.Type, out var list))
                 {
-                    triggerNodes[node.Trigger.Type] = [];
+                    list = [];
+                    triggerNodes[node.Trigger.Type] = list;
                 }
-                triggerNodes[node.Trigger.Type].Add(node);
+                list.Add(node);
             }
 
             if (node.Trigger.Type != TriggerType.OnPacketReceived || !node.Trigger.PacketId.HasValue)
@@ -48,14 +52,15 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            lock (packetTriggerNodes)
+            var packetId = node.Trigger.PacketId.Value;
+            lock (packetTriggerNodesLock)
             {
-                var packetId = node.Trigger.PacketId.Value;
-                if (!packetTriggerNodes.ContainsKey(packetId))
+                if (!packetTriggerNodes.TryGetValue(packetId, out var list))
                 {
-                    packetTriggerNodes[packetId] = [];
+                    list = [];
+                    packetTriggerNodes[packetId] = list;
                 }
-                packetTriggerNodes[packetId].Add(node);
+                list.Add(node);
             }
         }
 
@@ -63,22 +68,28 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             Log.Debug("TriggerEvent called - Type: {Type}, PacketId: {PacketId}", triggerType, packetId);
 
-            List<ActionNodeBase>? candidates;
+            List<ActionNodeBase>? candidates = null;
+
             if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
             {
-                lock (packetTriggerNodes)
+                lock (packetTriggerNodesLock)
                 {
-                    packetTriggerNodes.TryGetValue(packetId.Value, out candidates);
+                    if (packetTriggerNodes.TryGetValue(packetId.Value, out var list))
+                    {
+                        candidates = list.ToList();
+                    }
                 }
                 Log.Debug("Found {Count} nodes for PacketId {PacketId}", candidates?.Count ?? 0, packetId);
             }
             else
             {
-                lock (triggerNodes)
+                lock (triggerNodesLock)
                 {
-                    triggerNodes.TryGetValue(triggerType, out candidates);
+                    if (triggerNodes.TryGetValue(triggerType, out var list))
+                    {
+                        candidates = list.ToList();
+                    }
                 }
-
                 Log.Debug("Found {Count} nodes for TriggerType {Type}", candidates?.Count ?? 0, triggerType);
             }
 
@@ -93,7 +104,8 @@ namespace MultiSocketRUDPBotTester.Bot
                 Log.Information("Triggering node: {NodeName} (Type: {TriggerType})", node.Name, triggerType);
                 try
                 {
-                    ExecuteNodeChain(client, node, buffer);
+                    var visited = new HashSet<ActionNodeBase>();
+                    ExecuteNodeChain(client, node, buffer, visited);
                     Log.Information("Node executed successfully: {NodeName}", node.Name);
                 }
                 catch (Exception ex)
@@ -103,8 +115,14 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
+        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer, HashSet<ActionNodeBase> visited)
         {
+            if (!visited.Add(node))
+            {
+                Log.Warning("Circular reference detected in execution chain: {NodeName}", node.Name);
+                return;
+            }
+
             Log.Debug("Executing node: {NodeName}", node.Name);
             node.Execute(client, buffer);
 
@@ -121,7 +139,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
             foreach (var nextNode in node.NextNodes)
             {
-                ExecuteNodeChain(client, nextNode, buffer);
+                ExecuteNodeChain(client, nextNode, buffer, visited);
             }
         }
 

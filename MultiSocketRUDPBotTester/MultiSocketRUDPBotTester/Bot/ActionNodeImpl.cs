@@ -82,7 +82,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 }
 
                 var message = MessageBuilder(client, receivedPacket);
-                
+
                 Log.Information("╔══════════════════════════════════════════════════════════════");
                 Log.Information("║ [Bot Log] {Message}", message);
                 Log.Information("╚══════════════════════════════════════════════════════════════");
@@ -149,11 +149,23 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
+            var receivedKey = $"__received_{ExpectedPacketId}";
+            if (context.Has(receivedKey))
+            {
+                var buffer = context.Get<NetBuffer>(receivedKey);
+                Log.Information($"WaitForPacketNode: Packet {ExpectedPacketId} already received");
+
+                foreach (var nextNode in NextNodes)
+                {
+                    nextNode.Execute(context.Client, buffer);
+                }
+                return;
+            }
+
             Log.Information($"WaitForPacketNode: Waiting for {ExpectedPacketId} (timeout: {TimeoutMilliseconds}ms)");
 
             var client = context.Client;
             var startTime = CommonFunc.GetNowMs();
-            var receivedKey = $"__received_{ExpectedPacketId}";
 
             Task.Run(async () =>
             {
@@ -453,37 +465,6 @@ namespace MultiSocketRUDPBotTester.Bot
                     nextNode.Execute(context.Client, context.Packet);
                 }
             });
-        }
-
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer)
-        {
-            Log.Debug("Executing node: {NodeName}", node.Name);
-            node.Execute(client, buffer);
-
-            if (IsAsyncNode(node))
-            {
-                Log.Debug("Node {NodeName} is async, skipping automatic NextNodes execution", node.Name);
-                return;
-            }
-
-            if (node.NextNodes.Count > 0)
-            {
-                Log.Debug("Node {NodeName} has {Count} next nodes", node.Name, node.NextNodes.Count);
-            }
-
-            foreach (var nextNode in node.NextNodes)
-            {
-                ExecuteNodeChain(client, nextNode, buffer);
-            }
-        }
-
-        private static bool IsAsyncNode(ActionNodeBase node)
-        {
-            return node is DelayNode
-                or RandomDelayNode
-                or RepeatTimerNode
-                or WaitForPacketNode
-                or RetryNode;
         }
     }
 }

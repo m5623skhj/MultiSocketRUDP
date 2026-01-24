@@ -37,7 +37,11 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         protected override void OnRecvPacket(PacketId packetId, NetBuffer buffer)
         {
             Log.Debug("Received packet with ID: {PacketId}", packetId);
-            GlobalContext.Set($"__received_{packetId}", buffer);
+
+            var bufferKey = $"__received_{packetId}";
+
+            GlobalContext.Set(bufferKey, buffer);
+            GlobalContext.Set($"{bufferKey}_timestamp", CommonFunc.GetNowMs());
 
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
