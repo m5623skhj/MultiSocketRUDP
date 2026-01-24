@@ -141,10 +141,6 @@ namespace MultiSocketRUDPBotTester.Bot
         public int TimeoutMilliseconds { get; set; } = 5000;
         public List<ActionNodeBase> TimeoutNodes { get; set; } = [];
 
-        private readonly Lock lockObj = new();
-        private bool packetReceived;
-        private NetBuffer? receivedBuffer;
-
         protected override void ExecuteImpl(RuntimeContext context)
         {
             if (ExpectedPacketId == PacketId.INVALID_PACKET_ID)
@@ -157,9 +153,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
             var client = context.Client;
             var startTime = CommonFunc.GetNowMs();
-
-            var waitKey = $"__wait_packet_{ExpectedPacketId}_{Guid.NewGuid()}";
-            context.Set(waitKey, false);
+            var receivedKey = $"__received_{ExpectedPacketId}";
 
             Task.Run(async () =>
             {
@@ -167,12 +161,16 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     while (true)
                     {
-                        lock (lockObj)
+                        if (context.Has(receivedKey))
                         {
-                            if (packetReceived)
+                            var buffer = context.Get<NetBuffer>(receivedKey);
+                            Log.Information($"WaitForPacketNode: Received expected packet {ExpectedPacketId}");
+
+                            foreach (var nextNode in NextNodes)
                             {
-                                break;
+                                nextNode.Execute(client, buffer);
                             }
+                            return;
                         }
 
                         var elapsed = CommonFunc.GetNowMs() - startTime;
@@ -184,16 +182,10 @@ namespace MultiSocketRUDPBotTester.Bot
                             {
                                 timeoutNode.Execute(client);
                             }
-
                             return;
                         }
 
                         await Task.Delay(50);
-                    }
-
-                    foreach (var nextNode in NextNodes)
-                    {
-                        nextNode.Execute(client, receivedBuffer);
                     }
                 }
                 catch (Exception ex)
@@ -201,28 +193,6 @@ namespace MultiSocketRUDPBotTester.Bot
                     Log.Error($"WaitForPacketNode error: {ex.Message}");
                 }
             });
-            return;
-
-            void OnPacketReceived(PacketId packetId, NetBuffer buffer)
-            {
-                if (packetId != ExpectedPacketId)
-                {
-                    return;
-                }
-
-                lock (lockObj)
-                {
-                    if (packetReceived)
-                    {
-                        return;
-                    }
-
-                    packetReceived = true;
-                    receivedBuffer = buffer;
-                }
-
-                Log.Information($"WaitForPacketNode: Received expected packet {ExpectedPacketId}");
-            }
         }
     }
 
@@ -426,7 +396,7 @@ namespace MultiSocketRUDPBotTester.Bot
                     {
                         foreach (var node in RetryBody)
                         {
-                            ExecuteNodeChain(context.Client, node, context.Packet);
+                            node.Execute(context.Client, context.Packet);
                         }
 
                         if (SuccessCondition != null)
@@ -445,7 +415,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                             foreach (var successNode in SuccessNodes)
                             {
-                                ExecuteNodeChain(context.Client, successNode, context.Packet);
+                                successNode.Execute(context.Client, context.Packet);
                             }
                             break;
                         }
@@ -474,13 +444,13 @@ namespace MultiSocketRUDPBotTester.Bot
                     Log.Error($"RetryNode: Failed after {MaxRetries} attempts");
                     foreach (var failureNode in FailureNodes)
                     {
-                        ExecuteNodeChain(context.Client, failureNode, context.Packet);
+                        failureNode.Execute(context.Client, context.Packet);
                     }
                 }
 
                 foreach (var nextNode in NextNodes)
                 {
-                    ExecuteNodeChain(context.Client, nextNode, context.Packet);
+                    nextNode.Execute(context.Client, context.Packet);
                 }
             });
         }

@@ -39,6 +39,12 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     ExecuteNodeChain(context, node);
                 }
+
+                Log.Debug("ConditionalNode: Executing {Count} next nodes after branch", NextNodes.Count);
+                foreach (var nextNode in NextNodes)
+                {
+                    ExecuteNodeChain(context, nextNode);
+                }
             }
             catch (Exception ex)
             {
@@ -51,10 +57,26 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             node.Execute(context.Client, context.Packet);
 
+            if (IsAsyncNode(node))
+            {
+                return;
+            }
+
             foreach (var next in node.NextNodes)
             {
                 ExecuteNodeChain(context, next);
             }
+        }
+
+        private static bool IsAsyncNode(ActionNodeBase node)
+        {
+            return node is DelayNode
+                or RandomDelayNode
+                or RepeatTimerNode
+                or WaitForPacketNode
+                or RetryNode
+                or ConditionalNode
+                or LoopNode;
         }
     }
 
@@ -101,6 +123,12 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     ExecuteNodeChain(context, node);
                 }
+
+                Log.Debug("LoopNode: Executing {Count} next nodes after loop", NextNodes.Count);
+                foreach (var nextNode in NextNodes)
+                {
+                    ExecuteNodeChain(context, nextNode);
+                }
             }
             catch (Exception ex)
             {
@@ -111,11 +139,26 @@ namespace MultiSocketRUDPBotTester.Bot
         private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node)
         {
             node.Execute(context.Client, context.Packet);
+            if (IsAsyncNode(node))
+            {
+                return;
+            }
 
             foreach (var next in node.NextNodes)
             {
                 ExecuteNodeChain(context, next);
             }
+        }
+
+        private static bool IsAsyncNode(ActionNodeBase node)
+        {
+            return node is DelayNode
+                or RandomDelayNode
+                or RepeatTimerNode
+                or WaitForPacketNode
+                or RetryNode
+                or ConditionalNode
+                or LoopNode;
         }
     }
 

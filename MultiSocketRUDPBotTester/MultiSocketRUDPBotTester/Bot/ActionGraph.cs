@@ -108,6 +108,12 @@ namespace MultiSocketRUDPBotTester.Bot
             Log.Debug("Executing node: {NodeName}", node.Name);
             node.Execute(client, buffer);
 
+            if (IsAsyncNode(node))
+            {
+                Log.Debug("Node {NodeName} is async, it will handle its own NextNodes", node.Name);
+                return;
+            }
+
             if (node.NextNodes.Count > 0)
             {
                 Log.Debug("Node {NodeName} has {Count} next nodes", node.Name, node.NextNodes.Count);
@@ -117,6 +123,17 @@ namespace MultiSocketRUDPBotTester.Bot
             {
                 ExecuteNodeChain(client, nextNode, buffer);
             }
+        }
+
+        private static bool IsAsyncNode(ActionNodeBase node)
+        {
+            return node is DelayNode
+                or RandomDelayNode
+                or RepeatTimerNode
+                or WaitForPacketNode
+                or RetryNode
+                or ConditionalNode
+                or LoopNode;
         }
     }
 }

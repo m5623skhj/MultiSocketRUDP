@@ -97,6 +97,15 @@ namespace MultiSocketRUDPBotTester
                     TextWrapping = TextWrapping.Wrap
                 });
 
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Available variables (use in your message):",
+                    FontWeight = FontWeights.Bold,
+                    FontSize = 10,
+                    Foreground = Brushes.LightBlue,
+                    Margin = new Thickness(0, 10, 0, 3)
+                });
+
                 var logMessageBox = new TextBox
                 {
                     Height = 120,
