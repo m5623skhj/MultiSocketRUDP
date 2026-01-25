@@ -89,6 +89,7 @@ private:
 	bool CheckReservedSessionTimeout(unsigned long long now) const;
 	void AbortReservedSession();
 	void CloseSocket();
+	void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
 	void UnregisterRIOBuffers();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
 

@@ -278,32 +278,26 @@ void RUDPSession::CloseSocket()
 	}
 }
 
+void RUDPSession::UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId)
+{
+	if (bufferId != RIO_INVALID_BUFFERID)
+	{
+		rioFunctionTable.RIODeregisterBuffer(bufferId);
+		bufferId = RIO_INVALID_BUFFERID;
+	}
+}
+
 void RUDPSession::UnregisterRIOBuffers()
 {
 	const auto& rioFunctionTable = core.GetRIOFunctionTable();
-	if (sendBuffer.sendBufferId != RIO_INVALID_BUFFERID)
-	{
-		rioFunctionTable.RIODeregisterBuffer(sendBuffer.sendBufferId);
-		sendBuffer.sendBufferId = RIO_INVALID_BUFFERID;
-	}
+	UnregisterRIOBuffer(rioFunctionTable, sendBuffer.sendBufferId);
+
 	if (recvBuffer.recvContext != nullptr)
 	{
 		const auto& context = recvBuffer.recvContext;
-		if (context->BufferId != RIO_INVALID_BUFFERID)
-		{
-			rioFunctionTable.RIODeregisterBuffer(context->BufferId);
-			context->BufferId = RIO_INVALID_BUFFERID;
-		}
-		if (context->clientAddrRIOBuffer.BufferId != RIO_INVALID_BUFFERID)
-		{
-			rioFunctionTable.RIODeregisterBuffer(context->clientAddrRIOBuffer.BufferId);
-			context->clientAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
-		}
-		if (context->localAddrRIOBuffer.BufferId != RIO_INVALID_BUFFERID)
-		{
-			rioFunctionTable.RIODeregisterBuffer(context->localAddrRIOBuffer.BufferId);
-			context->localAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
-		}
+		UnregisterRIOBuffer(rioFunctionTable, context->BufferId);
+		UnregisterRIOBuffer(rioFunctionTable, context->clientAddrRIOBuffer.BufferId);
+		UnregisterRIOBuffer(rioFunctionTable, context->localAddrRIOBuffer.BufferId);
 	}
 }
 
