@@ -203,7 +203,7 @@ private:
 		}
 	};
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
-	std::unordered_multiset<PacketSequence> recvHoldingPacketSequences;
+	std::unordered_set<PacketSequence> recvHoldingPacketSequences;
 	static BYTE maximumHoldingPacketQueueSize;
 	std::atomic_uchar sequenceViolationCounter{};
 
