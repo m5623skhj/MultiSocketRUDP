@@ -94,7 +94,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		{
 			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
 			{
-				session->DoDisconnect();
+				session->AbortReservedSession();
 			}
 		}
 	}
