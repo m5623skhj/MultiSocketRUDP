@@ -470,13 +470,12 @@ void MultiSocketRUDPCore::StopAllThreads()
 
 void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
-	RIORESULT rioResults[MAX_RIO_RESULT];
-
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 
 	while (not stopToken.stop_requested())
 	{
+		RIORESULT rioResults[MAX_RIO_RESULT];
 		ZeroMemory(rioResults, sizeof(rioResults));
 
 		const ULONG numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
@@ -554,7 +553,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 		
 		for (const auto& sendPacketInfo : copyList)
 		{
-			if (sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick || sendPacketInfo->owner->nowInReleaseThread || sendPacketInfo->isErasedPacketInfo)
+			if (sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick || sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread || sendPacketInfo->isErasedPacketInfo)
 			{
 				continue;
 			}
@@ -658,7 +657,7 @@ void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const un
 	tickSet.nowTick = GetTickCount64();
 }
 
-IOContext* MultiSocketRUDPCore::GetIOCompletedContext(RIORESULT& rioResult)
+IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult)
 {
 	const auto context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
 	if (context == nullptr)

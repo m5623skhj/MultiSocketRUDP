@@ -251,7 +251,7 @@ private:
 #pragma region RIO
 private:
 	[[nodiscard]]
-	IOContext* GetIOCompletedContext(RIORESULT& rioResult);
+	IOContext* GetIOCompletedContext(const RIORESULT& rioResult);
 	[[nodiscard]]
 	bool IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
 	[[nodiscard]]
