@@ -142,7 +142,7 @@ void RUDPClientCore::RunRecvThread()
 		{
 			const int error = WSAGetLastError();
 			
-			auto log = Logger::MakeLogObject<ClientLog>();
+			const auto log = Logger::MakeLogObject<ClientLog>();
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
 				log->logString = "Recv thread stopped";
