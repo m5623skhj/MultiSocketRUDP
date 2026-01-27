@@ -113,7 +113,7 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperBase::DecryptDataStream(
+    TlsDecryptResult TLSHelperBase::DecryptDataStream(
         std::vector<char>& encryptedStream,
         char* plainBuffer,
         size_t& plainSize)
@@ -121,10 +121,10 @@ namespace TLSHelper
         plainSize = 0;
         if (not handshakeCompleted)
         {
-            return false;
+            return TlsDecryptResult::Error;
         }
 
-        while (true)
+        while (not encryptedStream.empty())
         {
             SecBuffer buffers[4];
             buffers[0].BufferType = SECBUFFER_DATA;
@@ -141,23 +141,28 @@ namespace TLSHelper
             bufferDesc.ulVersion = SECBUFFER_VERSION;
 
             const SECURITY_STATUS status = DecryptMessage(&ctxtHandle, &bufferDesc, 0, nullptr);
-
             if (status == SEC_E_INCOMPLETE_MESSAGE)
             {
-                return true;
+                return TlsDecryptResult::None;
             }
 
-            if (status != SEC_E_OK && status != SEC_I_RENEGOTIATE)
+            if (status == SEC_I_CONTEXT_EXPIRED)
             {
-                return false;
+                encryptedStream.clear();
+                return TlsDecryptResult::CloseNotify;
+            }
+
+            if (status != SEC_E_OK)
+            {
+                return TlsDecryptResult::Error;
             }
 
             const SecBuffer* dataBuf = nullptr;
             const SecBuffer* extraBuf = nullptr;
 
-            for (auto& buffer : buffers)
+            for (const auto& buffer : buffers)
             {
-                if (buffer.BufferType == SECBUFFER_DATA)
+                if (buffer.BufferType == SECBUFFER_DATA && buffer.cbBuffer > 0)
                 {
                     dataBuf = &buffer;
                 }
@@ -167,13 +172,11 @@ namespace TLSHelper
                 }
             }
 
-            if (not dataBuf)
+            if (dataBuf)
             {
-                return false;
+                memcpy(plainBuffer + plainSize, dataBuf->pvBuffer, dataBuf->cbBuffer);
+                plainSize += dataBuf->cbBuffer;
             }
-
-            memcpy(plainBuffer + plainSize, dataBuf->pvBuffer, dataBuf->cbBuffer);
-            plainSize += dataBuf->cbBuffer;
 
             if (extraBuf)
             {
@@ -190,6 +193,46 @@ namespace TLSHelper
             }
         }
 
+        return plainSize > 0 ? TlsDecryptResult::PlainData : TlsDecryptResult::None;
+    }
+
+    bool TLSHelperBase::EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize)
+    {
+        encryptedSize = 0;
+
+        DWORD shutdownToken = SCHANNEL_SHUTDOWN;
+
+        SecBuffer controlBuffer;
+        controlBuffer.BufferType = SECBUFFER_TOKEN;
+        controlBuffer.cbBuffer = sizeof(shutdownToken);
+        controlBuffer.pvBuffer = &shutdownToken;
+
+        SecBufferDesc controlDesc;
+        controlDesc.ulVersion = SECBUFFER_VERSION;
+        controlDesc.cBuffers = 1;
+        controlDesc.pBuffers = &controlBuffer;
+
+        if (ApplyControlToken(&ctxtHandle, &controlDesc) != SEC_E_OK)
+        {
+            return false;
+        }
+
+        SecBuffer buffers[1];
+        buffers[0].BufferType = SECBUFFER_TOKEN;
+        buffers[0].cbBuffer = static_cast<ULONG>(bufferSize);
+        buffers[0].pvBuffer = buffer;
+
+        SecBufferDesc desc;
+        desc.ulVersion = SECBUFFER_VERSION;
+        desc.cBuffers = 1;
+        desc.pBuffers = buffers;
+
+        if (EncryptMessage(&ctxtHandle, 0, &desc, 0) != SEC_E_OK)
+        {
+            return false;
+        }
+
+        encryptedSize = buffers[0].cbBuffer;
         return true;
     }
 

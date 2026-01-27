@@ -271,8 +271,9 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
 	PacketCryptoHelper::SetHeader(sendBuffer);
-	constexpr size_t MaxTlsPacketSize = 16 * 1024 + 512;
-	char encryptedBuffer[MaxTlsPacketSize];
+	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
+	char encryptedBuffer[maxTlsPacketSize];
+	DWORD tlsShutdownTimeout = 300;
 	size_t encryptedSize = 0;
 
 	if (not tlsHelper.EncryptData(
@@ -285,14 +286,46 @@ bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OU
 		return false;
 	}
 
-	if (const int result = send(clientSocket, encryptedBuffer, static_cast<int>(encryptedSize), 0); result == SOCKET_ERROR)
+	if (not SendAll(clientSocket, encryptedBuffer, encryptedSize))
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
 		return false;
 	}
 
+	if (tlsHelper.EncryptCloseNotify(encryptedBuffer, sizeof(encryptedBuffer), encryptedSize))
+	{
+		SendAll(clientSocket, encryptedBuffer, encryptedSize);
+	}
+
+	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&tlsShutdownTimeout), sizeof(tlsShutdownTimeout));
+	shutdown(clientSocket, SD_SEND);
+	while (true)
+	{
+		if (char finRecv[256]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
+		{
+			break;
+		}
+	}
+
 	closesocket(clientSocket);
 	sendBuffer.Init();
+
+	return true;
+}
+
+bool MultiSocketRUDPCore::SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize)
+{
+	size_t sent = 0;
+	while (sent < sendSize)
+	{
+		const int ret = send(socket, sendBuffer + sent, static_cast<int>(sendSize - sent), 0);
+		if (ret == SOCKET_ERROR)
+		{
+			return false;
+		}
+
+		sent += ret;
+	}
 
 	return true;
 }

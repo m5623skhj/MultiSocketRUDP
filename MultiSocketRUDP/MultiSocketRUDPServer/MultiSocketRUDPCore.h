@@ -200,6 +200,7 @@ private:
 	CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const;
 	[[nodiscard]]
 	bool SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
+	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize);
 
 private:
 	std::jthread sessionBrokerThread{};

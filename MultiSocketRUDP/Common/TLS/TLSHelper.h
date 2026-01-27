@@ -13,6 +13,14 @@
 
 namespace TLSHelper
 {
+	enum class TlsDecryptResult : uint8_t
+	{
+		None = 0,
+		PlainData,
+		CloseNotify,
+		Error
+	};
+
 	namespace StoreNames
 	{
 		constexpr const wchar_t* MY = L"MY";
@@ -37,7 +45,9 @@ namespace TLSHelper
 		[[nodiscard]]
 		bool DecryptData(const char* encryptedData, size_t encryptedSize, char* plainBuffer, size_t& plainSize);
 		[[nodiscard]]
-		bool DecryptDataStream(std::vector<char>& encryptedStream, char* plainBuffer, size_t& plainSize);
+		TlsDecryptResult DecryptDataStream(std::vector<char>& encryptedStream, char* plainBuffer, size_t& plainSize);
+		[[nodiscard]]
+		bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
 
 	protected:
 		CredHandle credHandle;

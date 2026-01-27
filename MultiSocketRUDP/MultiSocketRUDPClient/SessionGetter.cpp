@@ -167,9 +167,11 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
 	std::vector<char> encryptedStream;
 
-	int totalPlainReceived = 0;
+	int totalPlainReceived{};
 	BYTE code{};
 	WORD payloadLength{};
+
+	bool payloadComplete{ false };
 
 	while (true)
 	{
@@ -177,13 +179,13 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 		const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 		if (bytesReceived <= 0)
 		{
-			int error = WSAGetLastError();
-			if (error == 0)
+			const int error = WSAGetLastError();
+			if (bytesReceived == 0 || error == WSAETIMEDOUT)
 			{
 				break;
 			}
 
-			LOG_ERROR(std::format("recv() failed in GetSessionFromServer() with error code {}", error));
+			LOG_ERROR(std::format("recv() failed in TrySetTargetSessionInfo() with error code {}", error));
 			closesocket(sessionBrokerSocket);
 			NetBuffer::Free(&recvBuffer);
 
@@ -191,11 +193,11 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 		}
 
 		encryptedStream.insert(encryptedStream.end(), tlsRecvBuffer, tlsRecvBuffer + bytesReceived);
-
 		char plainBuffer[maxTlsPacketSize];
 		size_t plainSize = 0;
 
-		if (not tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize))
+		const auto decryptResult = tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
+		if (decryptResult == TLSHelper::TlsDecryptResult::Error)
 		{
 			LOG_ERROR("TLS DecryptDataStream failed");
 			closesocket(sessionBrokerSocket);
@@ -223,11 +225,23 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 		if (totalPlainReceived >= payloadLength + df_HEADER_SIZE)
 		{
+			payloadComplete = true;
+		}
+
+		if (payloadComplete && decryptResult == TLSHelper::TlsDecryptResult::CloseNotify)
+		{
 			break;
 		}
 	}
 
+	shutdown(sessionBrokerSocket, SD_BOTH);
 	closesocket(sessionBrokerSocket);
+
+	if (not payloadComplete)
+	{
+		NetBuffer::Free(&recvBuffer);
+		return false;
+	}
 
 	recvBuffer.m_iRead = df_HEADER_SIZE;
 	const bool retval = SetTargetSessionInfo(recvBuffer);
