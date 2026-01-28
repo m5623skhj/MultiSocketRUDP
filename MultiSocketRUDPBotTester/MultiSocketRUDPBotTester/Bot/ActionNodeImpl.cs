@@ -1,4 +1,5 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
+using MultiSocketRUDPBotTester.ClientCore;
 using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
 
@@ -137,13 +138,13 @@ namespace MultiSocketRUDPBotTester.Bot
 
     public class WaitForPacketNode : ContextNodeBase
     {
-        public PacketId ExpectedPacketId { get; set; } = PacketId.INVALID_PACKET_ID;
+        public PacketId ExpectedPacketId { get; set; } = PacketId.InvalidPacketId;
         public int TimeoutMilliseconds { get; set; } = 5000;
         public List<ActionNodeBase> TimeoutNodes { get; set; } = [];
 
         protected override void ExecuteImpl(RuntimeContext context)
         {
-            if (ExpectedPacketId == PacketId.INVALID_PACKET_ID)
+            if (ExpectedPacketId == PacketId.InvalidPacketId)
             {
                 Log.Warning("WaitForPacketNode: No packet ID specified");
                 return;

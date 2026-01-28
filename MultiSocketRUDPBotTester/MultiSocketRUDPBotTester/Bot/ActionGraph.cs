@@ -2,6 +2,7 @@
 using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
 using System.Collections.Concurrent;
+using MultiSocketRUDPBotTester.ClientCore;
 
 namespace MultiSocketRUDPBotTester.Bot
 {

@@ -16,7 +16,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
             try
             {
-                VariableAccessorRegistry.InvokeSetter(SetterMethodName, context, context.Packet);
+                VariableAccessorRegistry.InvokeSetter(SetterMethodName, context, context.GetPacket());
                 Log.Information($"PacketParserNode: Invoked setter '{SetterMethodName}'");
             }
             catch (Exception ex)

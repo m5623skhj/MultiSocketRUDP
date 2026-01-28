@@ -1,6 +1,7 @@
 ﻿using static MultiSocketRUDPBotTester.BotActionGraphWindow;
 using System.Windows.Controls;
 using System.Windows;
+using MultiSocketRUDPBotTester.ClientCore;
 
 namespace MultiSocketRUDPBotTester.Bot
 {

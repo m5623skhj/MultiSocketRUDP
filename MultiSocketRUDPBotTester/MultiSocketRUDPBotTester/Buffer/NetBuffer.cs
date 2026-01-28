@@ -417,7 +417,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             lock (bufferLock)
             {
                 writePos = PacketIdPos;
-                WriteByteUnsafe((byte)PacketType.CONNECT_TYPE);
+                WriteByteUnsafe((byte)PacketType.ConnectType);
                 WriteULongUnsafe(0);
                 WriteUShortUnsafe(sessionId);
             }

@@ -5,7 +5,7 @@ using Serilog;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
-    public partial class Client : RUDPSession
+    public partial class Client : RudpSession
     {
         private ActionGraph actionGraph = new();
         public RuntimeContext GlobalContext { get; }

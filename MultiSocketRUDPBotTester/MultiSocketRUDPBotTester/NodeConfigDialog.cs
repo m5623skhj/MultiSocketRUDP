@@ -28,7 +28,7 @@ namespace MultiSocketRUDPBotTester
                 var packetIdCombo = new ComboBox
                 {
                     ItemsSource = GetValues(typeof(PacketId)),
-                    SelectedItem = node.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID
+                    SelectedItem = node.Configuration?.PacketId ?? PacketId.InvalidPacketId
                 };
                 stack.Children.Add(packetIdCombo);
 
@@ -504,7 +504,7 @@ namespace MultiSocketRUDPBotTester
                 {
                     Width = 300,
                     ItemsSource = GetValues(typeof(PacketId)),
-                    SelectedItem = node.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID
+                    SelectedItem = node.Configuration?.PacketId ?? PacketId.InvalidPacketId
                 };
                 stack.Children.Add(packetIdCombo);
 

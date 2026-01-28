@@ -201,7 +201,6 @@ namespace TLSHelper
         encryptedSize = 0;
 
         DWORD shutdownToken = SCHANNEL_SHUTDOWN;
-
         SecBuffer controlBuffer;
         controlBuffer.BufferType = SECBUFFER_TOKEN;
         controlBuffer.cbBuffer = sizeof(shutdownToken);

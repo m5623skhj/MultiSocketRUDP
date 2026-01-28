@@ -23,8 +23,8 @@ namespace MultiSocketRUDPBotTester
                     }
                     else if (visual.NodeType == typeof(SendPacketNode))
                     {
-                        var packetId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID;
-                        if (packetId == PacketId.INVALID_PACKET_ID)
+                        var packetId = visual.Configuration?.PacketId ?? PacketId.InvalidPacketId;
+                        if (packetId == PacketId.InvalidPacketId)
                         {
                             throw new InvalidOperationException(
                                 $"SendPacketNode '{visual.NodeType.Name}' requires a valid PacketId. " +
@@ -68,10 +68,10 @@ namespace MultiSocketRUDPBotTester
                     }
                     else if (visual.NodeType == typeof(WaitForPacketNode))
                     {
-                        var packetId = visual.Configuration?.PacketId ?? PacketId.INVALID_PACKET_ID;
+                        var packetId = visual.Configuration?.PacketId ?? PacketId.InvalidPacketId;
                         var timeout = visual.Configuration?.IntValue ?? 5000;
 
-                        if (packetId == PacketId.INVALID_PACKET_ID)
+                        if (packetId == PacketId.InvalidPacketId)
                         {
                             throw new InvalidOperationException(
                                 "WaitForPacketNode requires a valid PacketId. " +

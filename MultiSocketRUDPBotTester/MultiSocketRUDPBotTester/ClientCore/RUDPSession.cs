@@ -17,12 +17,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
     public enum ConnectResultCode : byte
     {
-        SUCCESS = 0,
-        SERVER_FULL = 1,
-        ALREADY_CONNECTED_SESSION = 2,
-        CREATE_SOCKET_FAILED = 3,
-        RIO_INIT_FAILED = 4,
-        DO_RECV_FAILED = 5
+        Success = 0,
+        ServerFull = 1,
+        AlreadyConnectedSession = 2,
+        CreateSocketFailed = 3,
+        RioInitFailed = 4,
+        DoRecvFailed = 5
     }
     
     public class SessionInfo
@@ -39,7 +39,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
     public class TargetServerInfo
     {
         public string ServerIp { get; set; } = "";
-        public ushort ServerPort { get; set; } = 0;
+        public ushort ServerPort { get; set; }
     }
 
     public class HoldingPacketStore
@@ -89,9 +89,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
         }
     }
 
-    public abstract class RUDPSession
+    public abstract class RudpSession
     {
-        protected RUDPSession(byte[] sessionInfoStream)
+        protected RudpSession(byte[] sessionInfoStream)
         {
             MakeSessionInfo(sessionInfoStream);
         }
@@ -107,7 +107,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private PacketSequence lastSendSequence = 1;
         private readonly Lock expectedRecvSequenceLock = new();
-        private PacketSequence expectedRecvSequence = 0;
+        private PacketSequence expectedRecvSequence;
         private const int RetransmissionWakeUpMs = 30;
         private bool isDisposed;
 
@@ -143,7 +143,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             buffer.WriteBytes(data);
 
             var resultCode = (ConnectResultCode)buffer.ReadByte();
-            if (resultCode != ConnectResultCode.SUCCESS)
+            if (resultCode != ConnectResultCode.Success)
             {
                 throw new Exception($"Session broker response error: {resultCode}");
             }
@@ -173,7 +173,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             Cleanup();
         }
 
-        public async Task SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SEND_TYPE)
+        public async Task SendPacket(NetBuffer packetBuffer, PacketId packetId, PacketType packetType = PacketType.SendType)
         {
             var sequence = ++lastSendSequence;
             packetBuffer.InsertPacketType(packetType);
@@ -181,7 +181,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             packetBuffer.InsertPacketId(packetId);
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.SessionSalt, false);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence, PacketDirection.ClientToServer, SessionInfo.SessionSalt, false);
 
             await SendPacket(new SendPacketInfo(packetBuffer, sequence));
         }
@@ -243,20 +243,20 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var buffer = new NetBuffer();
             buffer.WriteBytes(data);
             var packetType = (PacketType)buffer.ReadByte();
-            var isCorePacket = packetType != PacketType.SEND_TYPE;
+            var isCorePacket = packetType != PacketType.SendType;
             PacketDirection direction;
 
             switch (packetType)
             {
-                case PacketType.HEARTBEAT_TYPE:
-                case PacketType.SEND_TYPE:
+                case PacketType.HeartbeatType:
+                case PacketType.SendType:
                 {
-                    direction = PacketDirection.SERVER_TO_CLIENT;
+                    direction = PacketDirection.ServerToClient;
                     break;
                 }
-                case PacketType.SEND_REPLY_TYPE:
+                case PacketType.SendReplyType:
                 {
-                    direction = PacketDirection.SERVER_TO_CLIENT_REPLY;
+                    direction = PacketDirection.ServerToClientReply;
                     break;
                 }
                 default:
@@ -278,7 +278,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             var packetSequence = buffer.ReadULong();
 
-            var packetId = PacketId.INVALID_PACKET_ID;
+            var packetId = PacketId.InvalidPacketId;
             if (!isCorePacket)
             {
                 packetId = (PacketId)buffer.ReadUInt();
@@ -286,12 +286,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             switch (packetType)
             {
-                case PacketType.HEARTBEAT_TYPE:
+                case PacketType.HeartbeatType:
                 {
                     SendReplyToServer(packetSequence);
                     break;
                 }
-                case PacketType.SEND_TYPE:
+                case PacketType.SendType:
                 {
                     SendReplyToServer(packetSequence);
 
@@ -320,7 +320,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     }
                     break;
                     }
-                case PacketType.SEND_REPLY_TYPE:
+                case PacketType.SendReplyType:
                 {
                     OnSendReply(packetSequence);
                     break;
@@ -331,12 +331,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private void SendReplyToServer(PacketSequence packetSequence)
         {
             var replyBuffer = new NetBuffer();
-            replyBuffer.WriteByte((byte)PacketType.SEND_REPLY_TYPE);
+            replyBuffer.WriteByte((byte)PacketType.SendReplyType);
             replyBuffer.WriteULong(packetSequence);
 
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, replyBuffer, packetSequence, PacketDirection.CLIENT_TO_SERVER_REPLY, SessionInfo.SessionSalt, true);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, replyBuffer, packetSequence, PacketDirection.ClientToServerReply, SessionInfo.SessionSalt, true);
 
             _ = udpClient.SendAsync(replyBuffer.GetPacketBuffer(), replyBuffer.GetLength());
         }
@@ -410,10 +410,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private NetBuffer BuildDisconnectPacket()
         {
             var netBuffer = new NetBuffer();
-            netBuffer.WriteByte((byte)PacketType.DISCONNECT_TYPE);
+            netBuffer.WriteByte((byte)PacketType.DisconnectType);
 
             Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(SessionInfo.AesGcm, netBuffer, ++lastSendSequence, PacketDirection.CLIENT_TO_SERVER, SessionInfo.SessionSalt, true);
+            NetBuffer.EncodePacket(SessionInfo.AesGcm, netBuffer, ++lastSendSequence, PacketDirection.ClientToServer, SessionInfo.SessionSalt, true);
 
             return netBuffer;
         }
