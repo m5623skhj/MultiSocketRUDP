@@ -1,0 +1,6 @@
+{
+    "spreadsheet_id": "여기에_구글_시트_URL의_ID_입력",
+    "sheet_name": "PacketDefine",
+    "yaml_file": "..\\PacketDefine.yml",
+    "auth_file": "credentials.json"
+}
