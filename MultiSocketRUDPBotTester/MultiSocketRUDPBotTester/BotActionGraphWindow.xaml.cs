@@ -31,7 +31,7 @@ namespace MultiSocketRUDPBotTester
         private readonly NodeStatsTracker statsTracker = new();
         private Window? statsWindow;
 
-        private WithGeminiClient.GeminiClient geminiClient;
+        private WithGeminiClient.GeminiClient geminiClient = null!;
 
         public BotActionGraphWindow()
         {
@@ -52,12 +52,56 @@ namespace MultiSocketRUDPBotTester
             SetupCanvasEvents();
 
             PreviewKeyDown += BotActionGraphWindow_PreviewKeyDown;
-        
-            var geminiApiConfig = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("WithGeminiClient\\GeminiClientConfiguration.json")
-            .Build();
-            geminiClient = new WithGeminiClient.GeminiClient(geminiApiConfig);
+            InitializeGeminiClient();
+        }
+
+        private void InitializeGeminiClient()
+        {
+            try
+            {
+                var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                const string configFileName = "GeminiClientConfiguration.json";
+
+                var configPath = System.IO.Path.Combine(baseDirectory, configFileName);
+
+                if (!File.Exists(configPath))
+                {
+                    configPath = System.IO.Path.Combine(baseDirectory, "WithGeminiClient", configFileName);
+                }
+
+                if (!File.Exists(configPath))
+                {
+                    throw new FileNotFoundException(
+                        $"Configuration file not found in:\n" +
+                        $"1. {System.IO.Path.Combine(baseDirectory, configFileName)}\n" +
+                        $"2. {System.IO.Path.Combine(baseDirectory, "WithGeminiClient", configFileName)}"
+                    );
+                }
+
+                var geminiApiConfig = new ConfigurationBuilder()
+                    .SetBasePath(System.IO.Path.GetDirectoryName(configPath)!)
+                    .AddJsonFile(System.IO.Path.GetFileName(configPath), optional: false, reloadOnChange: false)
+                    .Build();
+
+                geminiClient = new WithGeminiClient.GeminiClient(geminiApiConfig);
+                Log("GeminiClient initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to initialize GeminiClient: {ex.Message}");
+
+                MessageBox.Show(
+                    $"Failed to initialize AI features:\n{ex.Message}\n\n" +
+                    $"AI Tree Generator will not be available.\n\n" +
+                    $"Current directory: {Directory.GetCurrentDirectory()}\n" +
+                    $"Base directory: {AppDomain.CurrentDomain.BaseDirectory}",
+                    "Warning",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning
+                );
+
+                geminiClient = null!;
+            }
         }
 
         private void RestoreSavedGraph(List<NodeVisual> savedVisuals)
@@ -1341,6 +1385,11 @@ namespace MultiSocketRUDPBotTester
 
             window.Content = stack;
             window.ShowDialog();
+        }
+
+        private void AITreeGenerator_Click(object sender, RoutedEventArgs e)
+        {
+            ShowAiTreeGenerator();
         }
     }
 }
