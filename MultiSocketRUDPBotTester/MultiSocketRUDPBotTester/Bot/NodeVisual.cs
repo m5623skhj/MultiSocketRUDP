@@ -1,7 +1,6 @@
 ﻿using static MultiSocketRUDPBotTester.BotActionGraphWindow;
 using System.Windows.Controls;
 using System.Windows;
-using MultiSocketRUDPBotTester.ClientCore;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -21,16 +20,29 @@ namespace MultiSocketRUDPBotTester.Bot
         public string? FalsePortType;
         public bool IsRoot;
 
+        public List<FrameworkElement> DynamicOutputPorts = [];
+        public List<string> DynamicPortTypes = [];
+        public List<NodeVisual?> DynamicChildren = [];
+
         public ActionNodeBase? ActionNode { get; set; }
         public Type? NodeType;
         public NodeConfiguration? Configuration;
 
         public NodeRuntimeState RuntimeState;
 
-        public bool HasPort(FrameworkElement p) => p == OutputPort || p == OutputPortTrue || p == OutputPortFalse;
+        public bool HasPort(FrameworkElement p)
+        {
+            return p == InputPort ||
+                   p == OutputPort ||
+                   p == OutputPortTrue ||
+                   p == OutputPortFalse ||
+                   DynamicOutputPorts.Contains(p);
+        }
 
-        public Point GetPortCenter(FrameworkElement p, Canvas canvas) =>
-            p.TranslatePoint(new Point(p.ActualWidth / 2, p.ActualHeight / 2), canvas);
+        public Point GetPortCenter(FrameworkElement p, Canvas canvas)
+        {
+            return p.TranslatePoint(new Point(p.ActualWidth / 2, p.ActualHeight / 2), canvas);
+        }
     }
 
     public class NodeConfiguration

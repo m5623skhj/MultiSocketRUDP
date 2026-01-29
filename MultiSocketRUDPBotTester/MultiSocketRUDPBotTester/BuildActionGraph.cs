@@ -208,6 +208,20 @@ namespace MultiSocketRUDPBotTester
                             Name = visual.NodeType.Name,
                             Choices = []
                         };
+
+                        for (var i = 0; i < visual.DynamicChildren.Count; i++)
+                        {
+                            var childVisual = visual.DynamicChildren[i];
+                            if (childVisual != null && nodeMapping.TryGetValue(childVisual, out var childNode))
+                            {
+                                ((RandomChoiceNode)actionNode).Choices.Add(new ChoiceOption
+                                {
+                                    Name = $"Choice {i + 1}",
+                                    Weight = 1,
+                                    Node = childNode
+                                });
+                            }
+                        }
                     }
                     else if (visual.NodeType == typeof(AssertNode))
                     {

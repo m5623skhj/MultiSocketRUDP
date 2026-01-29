@@ -125,7 +125,28 @@ namespace MultiSocketRUDPBotTester.Bot
             }
 
             Log.Debug("Executing node: {NodeName}", node.Name);
-            node.Execute(client, buffer);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var success = true;
+            string? error = null;
+
+            try
+            {
+                node.Execute(client, buffer);
+            }
+            catch (Exception ex)
+            {
+                success = false;
+                error = ex.Message;
+                Log.Error("Node execution failed: {NodeName} - {Error}", node.Name, ex.Message);
+                throw;
+            }
+            finally
+            {
+                sw.Stop();
+                ActionNodeBase.GetStatsTracker()?.RecordExecution(node.Name, sw.ElapsedMilliseconds, success, error);
+                client.GlobalContext.IncrementExecutionCount(node.Name);
+                client.GlobalContext.RecordMetric($"{node.Name}_time", sw.ElapsedMilliseconds);
+            }
 
             if (IsAsyncNode(node))
             {

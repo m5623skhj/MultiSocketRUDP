@@ -29,6 +29,14 @@
 
                 <Separator Margin="0,5"/>
 
+                <Button Content="Validate Graph"
+                        Height="35"
+                        Margin="0,5,0,5"
+                        Background="#FFFFA500"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="ValidateGraph_Click"/>
+
                 <Button Content="Build Graph"
                         Height="35"
                         Margin="0,5,0,5"
@@ -44,6 +52,16 @@
                         Foreground="White"
                         FontWeight="Bold"
                         Click="ApplyGraph_Click"/>
+
+                <Separator Margin="0,5"/>
+
+                <Button Content="View Statistics"
+                        Height="35"
+                        Margin="0,5,0,5"
+                        Background="#FF9C27B0"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="ShowStatsWindow_Click"/>
 
                 <TextBlock x:Name="StatusText"
                           Text="Ready"

@@ -24,5 +24,10 @@ namespace MultiSocketRUDPBotTester.Bot
             NextNodes.Add(nextNode);
             return nextNode;
         }
+
+        private static NodeStatsTracker? _statsTracker;
+        public static void SetStatsTracker(NodeStatsTracker? tracker) => _statsTracker = tracker;
+        internal static NodeStatsTracker? GetStatsTracker() => _statsTracker;
+
     }
 }

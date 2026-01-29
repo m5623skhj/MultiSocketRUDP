@@ -26,9 +26,13 @@ namespace MultiSocketRUDPBotTester
 
         public ActionGraph? BuiltGraph { get; private set; }
 
+        private readonly NodeStatsTracker statsTracker = new();
+        private Window? statsWindow;
+
         public BotActionGraphWindow()
         {
             InitializeComponent();
+            ActionNodeBase.SetStatsTracker(statsTracker);
             LoadActionNodeTypes();
 
             var savedVisuals = BotTesterCore.Instance.GetSavedGraphVisuals();
@@ -428,7 +432,14 @@ namespace MultiSocketRUDPBotTester
         {
             CleanupConnection();
 
-            connectingFromNode = allNodes.First(n => n.HasPort(port));
+            connectingFromNode = allNodes.FirstOrDefault(n => n.HasPort(port));
+            if (connectingFromNode == null)
+            {
+                Log($"Warning: Could not find node for port (type: {type})");
+                CleanupConnection();
+                return;
+            }
+
             connectingFromPort = port;
             connectingPortType = type;
             isConnecting = true;
@@ -519,6 +530,14 @@ namespace MultiSocketRUDPBotTester
             {
                 from.FalseChild = to;
                 from.FalsePortType = type;
+            }
+            else if (type.StartsWith("choice_"))
+            {
+                var index = from.DynamicPortTypes.IndexOf(type);
+                if (index >= 0 && index < from.DynamicChildren.Count)
+                {
+                    from.DynamicChildren[index] = to;
+                }
             }
             else
             {
@@ -617,6 +636,19 @@ namespace MultiSocketRUDPBotTester
                 Canvas.SetTop(n.OutputPortFalse, t + b.Height * 2 / 3 - HalfPortSize);
             }
 
+            if (n.DynamicOutputPorts.Count > 0)
+            {
+                var portCount = n.DynamicOutputPorts.Count;
+                var spacing = b.Height / (portCount + 1);
+
+                for (var i = 0; i < portCount; i++)
+                {
+                    var port = n.DynamicOutputPorts[i];
+                    Canvas.SetLeft(port, l + b.Width - PortOffsetX);
+                    Canvas.SetTop(port, t + spacing * (i + 1) - HalfPortSize);
+                }
+            }
+
             RedrawConnections();
         }
 
@@ -691,6 +723,15 @@ namespace MultiSocketRUDPBotTester
                     if (p != null)
                     {
                         DrawLine(n, n.FalseChild, p);
+                    }
+                }
+
+                for (var i = 0; i < n.DynamicChildren.Count; i++)
+                {
+                    var child = n.DynamicChildren[i];
+                    if (child != null && i < n.DynamicOutputPorts.Count)
+                    {
+                        DrawLine(n, child, n.DynamicOutputPorts[i]);
                     }
                 }
             }
@@ -795,7 +836,12 @@ namespace MultiSocketRUDPBotTester
                 Configuration = new NodeConfiguration()
             };
 
-            if (category == NodeCategory.Action)
+            if (t == typeof(RandomChoiceNode))
+            {
+                n.Configuration.IntValue = 2;
+                CreateDynamicPorts(n, 2);
+            }
+            else if (category == NodeCategory.Action)
             {
                 n.OutputPort = CreateOutputPort("default");
             }
@@ -809,6 +855,30 @@ namespace MultiSocketRUDPBotTester
             Canvas.SetTop(b, GraphScroll.VerticalOffset + 300);
             AddNodeToCanvas(n);
             Log($"Node added: {t.Name}");
+        }
+
+        private void CreateDynamicPorts(NodeVisual node, int count)
+        {
+            foreach (var port in node.DynamicOutputPorts)
+            {
+                GraphCanvas.Children.Remove(port);
+            }
+            node.DynamicOutputPorts.Clear();
+            node.DynamicPortTypes.Clear();
+            node.DynamicChildren.Clear();
+
+            for (var i = 0; i < count; i++)
+            {
+                var portType = $"choice_{i}";
+                var port = CreateOutputPort(portType);
+                node.DynamicOutputPorts.Add(port);
+                node.DynamicPortTypes.Add(portType);
+                node.DynamicChildren.Add(null);
+
+                GraphCanvas.Children.Add(port);
+            }
+
+            UpdatePortPositions(node);
         }
 
         private static Brush GetNodeColor(NodeCategory c) => c switch
@@ -894,6 +964,25 @@ namespace MultiSocketRUDPBotTester
             try
             {
                 BuiltGraph = BuildActionGraph();
+                var validation = GraphValidator.ValidateGraph(BuiltGraph);
+                if (!validation.IsValid)
+                {
+                    ShowValidationWindow(validation);
+                    MessageBox.Show($"{validation.ErrorCount} errors found. Please fix them.",
+                        "Validation Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                if (validation.WarningCount > 0)
+                {
+                    if (MessageBox.Show($"{validation.WarningCount} warnings. Continue?",
+                            "Warnings", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                    {
+                        ShowValidationWindow(validation);
+                        return;
+                    }
+                }
+
                 Log($"Graph built successfully with {BuiltGraph.GetAllNodes().Count} nodes");
 
                 if (FindName("StatusText") is TextBlock statusText)
@@ -1102,6 +1191,146 @@ namespace MultiSocketRUDPBotTester
             }
 
             return false;
+        }
+
+        private void ValidateGraph_Click(object sender, RoutedEventArgs e)
+        {
+            if (BuiltGraph == null)
+            {
+                MessageBox.Show("Please build the graph first!", "Warning",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = GraphValidator.ValidateGraph(BuiltGraph);
+            ShowValidationWindow(result);
+        }
+
+        private void ShowStatsWindow_Click(object sender, RoutedEventArgs e)
+        {
+            if (statsWindow?.IsVisible == true)
+            {
+                statsWindow.Activate();
+                return;
+            }
+
+            var window = new Window
+            {
+                Title = "Node Execution Statistics",
+                Width = 900,
+                Height = 600,
+                Owner = this
+            };
+            window.Closed += (_, _) => statsWindow = null;
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var dataGrid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                Margin = new Thickness(10)
+            };
+
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Node", Binding = new System.Windows.Data.Binding("NodeName"), Width = 150 });
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Exec", Binding = new System.Windows.Data.Binding("ExecutionCount"), Width = 60 });
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Success%", Binding = new System.Windows.Data.Binding("SuccessRate") { StringFormat = "F1" }, Width = 80 });
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Avg(ms)", Binding = new System.Windows.Data.Binding("AverageExecutionTimeMs") { StringFormat = "F2" }, Width = 80 });
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Min(ms)", Binding = new System.Windows.Data.Binding("MinExecutionTimeMs"), Width = 70 });
+            dataGrid.Columns.Add(new DataGridTextColumn { Header = "Max(ms)", Binding = new System.Windows.Data.Binding("MaxExecutionTimeMs"), Width = 70 });
+
+            dataGrid.ItemsSource = statsTracker.GetAllStats();
+
+            Grid.SetRow(dataGrid, 0);
+            grid.Children.Add(dataGrid);
+
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(10) };
+
+            var refreshBtn = new Button { Content = "Refresh", Width = 80 };
+            refreshBtn.Click += (_, _) =>
+            {
+                dataGrid.ItemsSource = null;
+                dataGrid.ItemsSource = statsTracker.GetAllStats();
+            };
+
+            var resetBtn = new Button { Content = "Reset", Width = 80, Margin = new Thickness(5, 0, 0, 0) };
+            resetBtn.Click += (_, _) =>
+            {
+                if (MessageBox.Show("Reset all?", "Confirm", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                statsTracker.Reset();
+                dataGrid.ItemsSource = null;
+            };
+
+            panel.Children.Add(refreshBtn);
+            panel.Children.Add(resetBtn);
+
+            Grid.SetRow(panel, 1);
+            grid.Children.Add(panel);
+
+            window.Content = grid;
+            statsWindow = window;
+            window.Show();
+        }
+
+        private void ShowValidationWindow(GraphValidationResult result)
+        {
+            var window = new Window
+            {
+                Title = "Validation Results",
+                Width = 700,
+                Height = 500,
+                Owner = this
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(10) };
+
+            var summary = new TextBlock
+            {
+                Text = result.IsValid ? "✓ Valid" : $"✗ {result.ErrorCount} Errors",
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = result.IsValid ? Brushes.Green : Brushes.Red,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            stack.Children.Add(summary);
+
+            var stats = new TextBlock
+            {
+                Text = $"Errors: {result.ErrorCount}, Warnings: {result.WarningCount}, Info: {result.InfoCount}",
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            stack.Children.Add(stats);
+
+            var scroll = new ScrollViewer { Height = 350 };
+            var issueStack = new StackPanel();
+
+            foreach (var tb in result.Issues.Select(issue => new TextBlock
+                     {
+                         Text = $"[{issue.Severity}] {issue.NodeName}: {issue.Message}",
+                         Foreground = issue.Severity == ValidationSeverity.Error ? Brushes.Red :
+                             issue.Severity == ValidationSeverity.Warning ? Brushes.Orange : Brushes.Blue,
+                         TextWrapping = TextWrapping.Wrap,
+                         Margin = new Thickness(0, 2, 0, 2)
+                     }))
+            {
+                issueStack.Children.Add(tb);
+            }
+
+            scroll.Content = issueStack;
+            stack.Children.Add(scroll);
+
+            var closeBtn = new Button { Content = "Close", Width = 80, HorizontalAlignment = HorizontalAlignment.Right };
+            closeBtn.Click += (_, _) => window.Close();
+            stack.Children.Add(closeBtn);
+
+            window.Content = stack;
+            window.ShowDialog();
         }
     }
 }

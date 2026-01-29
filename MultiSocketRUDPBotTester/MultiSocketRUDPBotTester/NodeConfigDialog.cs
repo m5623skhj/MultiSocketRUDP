@@ -679,13 +679,15 @@ namespace MultiSocketRUDPBotTester
                     {
                         node.Configuration ??= new NodeConfiguration();
                         node.Configuration.IntValue = count;
+
+                        CreateDynamicPorts(node, count);
+
                         Log($"RandomChoiceNode configured: {count} choices");
                         dialog.Close();
                     }
                     else
                     {
-                        MessageBox.Show("Invalid choice count", "Error",
-                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Invalid choice count", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 };
                 stack.Children.Add(saveBtn);
