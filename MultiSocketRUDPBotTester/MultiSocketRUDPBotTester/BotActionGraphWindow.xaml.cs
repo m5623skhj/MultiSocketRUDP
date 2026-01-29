@@ -1,10 +1,12 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.ClientCore;
+using Microsoft.Extensions.Configuration;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -29,6 +31,8 @@ namespace MultiSocketRUDPBotTester
         private readonly NodeStatsTracker statsTracker = new();
         private Window? statsWindow;
 
+        private WithGeminiClient.GeminiClient geminiClient;
+
         public BotActionGraphWindow()
         {
             InitializeComponent();
@@ -48,6 +52,12 @@ namespace MultiSocketRUDPBotTester
             SetupCanvasEvents();
 
             PreviewKeyDown += BotActionGraphWindow_PreviewKeyDown;
+        
+            var geminiApiConfig = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("WithGeminiClient\\GeminiClientConfiguration.json")
+            .Build();
+            geminiClient = new WithGeminiClient.GeminiClient(geminiApiConfig);
         }
 
         private void RestoreSavedGraph(List<NodeVisual> savedVisuals)
