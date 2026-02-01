@@ -1,4 +1,7 @@
 @echo off
 cd /d "%~dp0"
 python PacketGenerator/PacketGenerator.py
-pause
+
+if "%1"=="" (
+    pause
+)
