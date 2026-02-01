@@ -14,7 +14,7 @@
 1.1 메인 페이지 UI 구성  
 <img width="782" height="385" alt="image" src="https://github.com/user-attachments/assets/ea8d54ff-bbf4-4e84-aee3-83a8e97f5c8c" />  
 * Set Bot Action Graph : 사용자가 봇의 행동을 정의하도록 봇 액션 그래프를 그릴 수 있는 보드 및 노드를 제공
-* Start Bot Test : 액션 그래프가 작성되어 있다면, 해당 그래프에 따라 봇이 행동을 시작
+* Start Bot Test : 액션 그래프가 작성 및 적용되어 있다면, 해당 그래프에 따라 봇이 행동을 시작
 * Stop Bot Test : 봇 테스트 중지
 
 1.2 Start Bot Action Graph UI 구성
