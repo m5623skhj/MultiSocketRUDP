@@ -438,8 +438,11 @@ namespace MultiSocketRUDPBotTester
                 rootVisual.NextPortType = "default";
             }
 
-            RedrawConnections();
-            Log($"AI tree applied to canvas with {createdNodes.Count} nodes");
+            Dispatcher.InvokeAsync(() =>
+            {
+                RedrawConnections();
+                Log($"AI tree applied to canvas with {createdNodes.Count} nodes");
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private NodeVisual? CreateNodeVisualFromJson(
