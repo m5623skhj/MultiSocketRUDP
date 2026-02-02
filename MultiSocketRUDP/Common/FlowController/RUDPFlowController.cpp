@@ -2,6 +2,11 @@
 #include "RUDPFlowController.h"
 #include <algorithm>
 
+int32_t RUDPFlowController::SeqDiff(PacketSequence a, PacketSequence b) noexcept
+{
+	return static_cast<int32_t>(a - b);
+}
+
 RUDPFlowController::RUDPFlowController()
 	: cwnd(INITIAL_CWND)
 {
@@ -9,15 +14,17 @@ RUDPFlowController::RUDPFlowController()
 
 bool RUDPFlowController::CanSendPacket(const PacketSequence nextSendSequence, const PacketSequence lastAckedSequence) const noexcept
 {
-	const PacketSequence outstanding = nextSendSequence > lastAckedSequence ? nextSendSequence - lastAckedSequence : 0;
-	return outstanding < static_cast<PacketSequence>(cwnd);
+	const int32_t diff = SeqDiff(nextSendSequence, lastAckedSequence);
+	const uint16_t outstanding = diff > 1 ? static_cast<uint16_t>(diff - 1) : 0;
+	return outstanding < cwnd;
 }
 
 void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noexcept
 {
-	static constexpr PacketSequence GAP_THRESHOLD = 5;
+	static constexpr int32_t GAP_THRESHOLD = 5;
 
-	if (replySequence <= lastReplySequence)
+	const int32_t diff = SeqDiff(replySequence, lastReplySequence);
+	if (diff <= 0)
 	{
 #ifdef _DEBUG
 		++duplicateReplyCount;
@@ -25,16 +32,16 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 		return;
 	}
 
-	if (const PacketSequence sequenceGap = replySequence - lastReplySequence - 1; sequenceGap > GAP_THRESHOLD)
+	if (const int32_t sequenceGap = diff - 1; sequenceGap > GAP_THRESHOLD)
 	{
 		OnCongestionEvent();
-		inRecovery = true;
 	}
 
 	lastReplySequence = replySequence;
+
 	if (not inRecovery)
 	{
-		cwnd = min(cwnd + 1, MAX_CWND);
+		cwnd = std::min<uint16_t>(cwnd + 1, MAX_CWND);
 	}
 	else
 	{
@@ -44,7 +51,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 
 void RUDPFlowController::OnCongestionEvent() noexcept
 {
-	cwnd = max(cwnd / 2, 1u);
+	cwnd = std::max<uint16_t>(cwnd / 2, 1);
 	inRecovery = true;
 }
 
@@ -52,4 +59,14 @@ void RUDPFlowController::OnTimeout() noexcept
 {
 	cwnd = 1;
 	inRecovery = true;
+}
+
+void RUDPFlowController::Reset() noexcept
+{
+	cwnd = INITIAL_CWND;
+	lastReplySequence = 0;
+	inRecovery = false;
+#ifdef _DEBUG
+	duplicateReplyCount = 0;
+#endif
 }

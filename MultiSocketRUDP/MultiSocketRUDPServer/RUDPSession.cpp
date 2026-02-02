@@ -96,6 +96,8 @@ void RUDPSession::InitializeSession()
 	nowInReleaseThread = {};
 	sessionReservedTime = {};
 
+	flowManager.Reset(0);
+
 	if (sendBuffer.reservedSendPacketInfo != nullptr)
 	{
 		SendPacketInfo::Free(sendBuffer.reservedSendPacketInfo);
@@ -162,6 +164,11 @@ void RUDPSession::Disconnect()
 bool RUDPSession::SendPacket(IPacket& packet)
 {
 	if (not IsConnected())
+	{
+		return false;
+	}
+
+	if (const PacketSequence nextSequence = lastSendPacketSequence + 1; not flowManager.CanSend(nextSequence))
 	{
 		return false;
 	}
@@ -238,6 +245,11 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 void RUDPSession::SendHeartbeatPacket()
 {
+	if (const PacketSequence nextSequence = lastSendPacketSequence + 1; not flowManager.CanSend(nextSequence))
+	{
+		return;
+	}
+
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
@@ -326,6 +338,7 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	clientSockAddrInet.Ipv4 = inClientAddr;
 	++nextRecvPacketSequence;
 
+	flowManager.Reset(nextRecvPacketSequence);
 	OnConnected(sessionId);
 	SendReplyToClient(packetSequence);
 }
@@ -339,6 +352,11 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
+
+	if (not flowManager.CanAccept(packetSequence))
+	{
+		return true;
+	}
 
 	if (nextRecvPacketSequence != packetSequence)
 	{
@@ -415,6 +433,7 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 		return false;
 	}
 
+	flowManager.MarkReceived(recvPacketSequence);
 	SendReplyToClient(recvPacketSequence);
 	return true;
 }
@@ -454,6 +473,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		sendPacketInfoMap.erase(packetSequence);
 	}
 
+	flowManager.OnAckReceived(packetSequence);
 	core.EraseSendPacketInfo(sendPacketInfo, threadId);
 }
 

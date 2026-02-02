@@ -1,33 +1,47 @@
 #include "PreCompile.h"
 #include "RUDPReceiveWindow.h"
 
+int32_t RUDPReceiveWindow::SeqDiff(PacketSequence a, PacketSequence b) noexcept
+{
+	return static_cast<int32_t>(a - b);
+}
+
 RUDPReceiveWindow::RUDPReceiveWindow(const BYTE recvWindowSize)
 	: windowSize(recvWindowSize)
-	, receivedFlags(recvWindowSize, false)
+	, receivedFlags(recvWindowSize, 0)
 {
 }
 
 bool RUDPReceiveWindow::CanReceive(const PacketSequence inSequence) const noexcept
 {
-	return (inSequence - windowStart) < windowSize;
+	const int32_t diff = SeqDiff(inSequence, windowStart);
+	return diff >= 0 && diff < windowSize;
 }
 
 void RUDPReceiveWindow::MarkReceived(const PacketSequence inSequence) noexcept
 {
-	if (not CanReceive(inSequence))
+	if (!CanReceive(inSequence))
 	{
 		return;
 	}
 
-	const PacketSequence offset = inSequence - windowStart;
-	receivedFlags[offset] = true;
+	const int32_t offset = SeqDiff(inSequence, windowStart);
+	const size_t idx = (startIndex + static_cast<size_t>(offset)) % windowSize;
+	receivedFlags[idx] = 1;
 
-	while (not receivedFlags.empty() && receivedFlags.front())
+	while (receivedFlags[startIndex])
 	{
-		receivedFlags[startIndex] = false;
+		receivedFlags[startIndex] = 0;
 		startIndex = (startIndex + 1) % windowSize;
 		++windowStart;
 	}
+}
+
+void RUDPReceiveWindow::Reset(const PacketSequence startSequence) noexcept
+{
+	windowStart = startSequence;
+	startIndex = 0;
+	std::fill(receivedFlags.begin(), receivedFlags.end(), 0);
 }
 
 PacketSequence RUDPReceiveWindow::GetWindowEnd() const noexcept

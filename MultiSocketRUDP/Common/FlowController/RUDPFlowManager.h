@@ -13,9 +13,9 @@ public:
 
 public:
 	[[nodiscard]]
-	bool CanSend(PacketSequence nextSend, PacketSequence lastAck) noexcept
+	bool CanSend(PacketSequence nextSend) noexcept
 	{
-		return flowController.CanSendPacket(nextSend, lastAck);
+		return flowController.CanSendPacket(nextSend, flowController.GetLastAckedSequence());
 	}
 
 	void OnAckReceived(PacketSequence replySeq) noexcept
@@ -46,9 +46,15 @@ public:
 	}
 
 	[[nodiscard]]
-	BYTE GetCwnd() const noexcept
+	uint16_t GetCwnd() const noexcept
 	{
 		return flowController.GetCwnd();
+	}
+
+	void Reset(PacketSequence recvStartSequence) noexcept
+	{
+		flowController.Reset();
+		receiveWindow.Reset(recvStartSequence);
 	}
 
 private:

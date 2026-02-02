@@ -15,20 +15,25 @@ public:
 	void OnCongestionEvent() noexcept;
 	void OnTimeout() noexcept;
 
+	void Reset() noexcept;
+
 	[[nodiscard]]
-	BYTE GetCwnd() const noexcept { return cwnd; }
+	uint16_t GetCwnd() const noexcept { return cwnd; }
 	[[nodiscard]]
 	PacketSequence GetLastAckedSequence() const noexcept { return lastReplySequence; }
 
 private:
-	BYTE cwnd{};
+	static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
+
+private:
+	uint16_t cwnd{};
 	PacketSequence lastReplySequence{};
 	bool inRecovery{};
 
-	static constexpr BYTE INITIAL_CWND = 4;
-	static constexpr BYTE MAX_CWND = 255;
+	static constexpr uint16_t INITIAL_CWND = 4;
+	static constexpr uint16_t MAX_CWND = 1024;
 
 #ifdef _DEBUG
-	BYTE duplicateReplyCount{};
+	uint16_t duplicateReplyCount{};
 #endif
 };
