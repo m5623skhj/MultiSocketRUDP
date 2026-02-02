@@ -226,12 +226,6 @@ private:
 	unsigned int timerTickMs{};
 	BYTE maxHoldingPacketQueueSize{};
 
-	// threads
-	std::vector<std::jthread> ioWorkerThreads;
-	std::vector<std::jthread> recvLogicWorkerThreads;
-	std::vector<std::jthread> retransmissionThreads;
-	std::jthread heartbeatThread;
-	std::jthread sessionReleaseThread{};
 	RUDPThreadManager threadManager;
 
 	// event handles
