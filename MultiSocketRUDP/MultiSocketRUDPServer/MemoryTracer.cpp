@@ -3,7 +3,6 @@
 
 #include <fstream>
 #include <ranges>
-#include <vector>
 
 std::unordered_map<void*, MemoryTracer::AllocationInfo> MemoryTracer::allocations;
 std::mutex MemoryTracer::tracerMutex;
@@ -80,9 +79,7 @@ void MemoryTracer::TrackObject(void* ptr,
 	allocations[ptr] = std::move(info);
 }
 
-void MemoryTracer::UntrackObject(void* ptr,
-	const std::string& file,
-	const int line)
+void MemoryTracer::UntrackObject(void* ptr, const std::string& file, const int line)
 {
 	if (enabled.load() == false || ptr == nullptr)
 	{
@@ -90,12 +87,12 @@ void MemoryTracer::UntrackObject(void* ptr,
 	}
 
 	std::scoped_lock lock(tracerMutex);
-	if (const auto it = allocations.find(ptr); it != allocations.end())
+	if (const auto itor = allocations.find(ptr); itor != allocations.end())
 	{
-		it->second.isFreed = true;
-		it->second.freeLocation = file + ":" + std::to_string(line);
-		it->second.freeTime = std::chrono::steady_clock::now();
-		it->second.freeThread = std::this_thread::get_id();
+		itor->second.isFreed = true;
+		itor->second.freeLocation = file + ":" + std::to_string(line);
+		itor->second.freeTime = std::chrono::steady_clock::now();
+		itor->second.freeThread = std::this_thread::get_id();
 	}
 }
 
@@ -176,26 +173,26 @@ void MemoryTracer::GetObjectHistory(void* ptr)
 
 	if (const auto it = allocations.find(ptr); it != allocations.end())
 	{
-		const auto& info = it->second;
+		const auto& [objectName, allocLocation, stackTrace, allocTime, allocThread, isFreed, freeLocation, freeTime, freeThread, userNote] = it->second;
 		std::cout << "\n=== Object History ===" << '\n';
 		std::cout << "Address: " << ptr << '\n';
-		std::cout << "Object: " << info.objectName << '\n';
-		std::cout << "Tracked at: " << info.allocLocation << '\n';
-		std::cout << "Thread: " << info.allocThread << '\n';
+		std::cout << "Object: " << objectName << '\n';
+		std::cout << "Tracked at: " << allocLocation << '\n';
+		std::cout << "Thread: " << allocThread << '\n';
 
-		if (not info.userNote.empty())
+		if (not userNote.empty())
 		{
-			std::cout << "Note: " << info.userNote << '\n';
+			std::cout << "Note: " << userNote << '\n';
 		}
 
-		std::cout << "Stack trace:\n" << info.stackTrace << '\n';
+		std::cout << "Stack trace:\n" << stackTrace << '\n';
 
-		if (info.isFreed)
+		if (isFreed)
 		{
-			std::cout << "Untracked at: " << info.freeLocation << '\n';
-			std::cout << "Untrack thread: " << info.freeThread << '\n';
+			std::cout << "Untracked at: " << freeLocation << '\n';
+			std::cout << "Untrack thread: " << freeThread << '\n';
 
-			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(info.freeTime - info.allocTime).count();
+			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(freeTime - allocTime).count();
 			std::cout << "Lifetime: " << duration << " ms" << '\n';
 		}
 		else
@@ -215,11 +212,11 @@ void MemoryTracer::GetThreadStatistics()
 	std::unordered_map<std::thread::id, int> threadStats;
 
 	std::scoped_lock lock(tracerMutex);
-	for (const auto& pair : allocations)
+	for (const auto& allocation : allocations | std::views::values)
 	{
-		if (not pair.second.isFreed)
+		if (not allocation.isFreed)
 		{
-			threadStats[pair.second.allocThread]++;
+			threadStats[allocation.allocThread]++;
 		}
 	}
 
@@ -319,13 +316,13 @@ void MemoryTracer::GenerateReportToFile(const std::string& filename)
 	report << "Total tracked objects: " << allocations.size() << '\n';
 
 	int leakCount = 0;
-	for (const auto& pair : allocations)
+	for (const auto& [address, allocationInfo] : allocations)
 	{
-		if (const auto& info = pair.second; not info.isFreed)
+		if (const auto& info = allocationInfo; not info.isFreed)
 		{
 			leakCount++;
 			report << "\n[LEAK #" << leakCount << "]" << '\n';
-			report << "Address: " << pair.first << '\n';
+			report << "Address: " << address << '\n';
 			report << "Object: " << info.objectName << '\n';
 			report << "Tracked at: " << info.allocLocation << '\n';
 			report << "Thread: " << info.allocThread << '\n';
@@ -369,26 +366,26 @@ void MemoryTracer::GetObjectHistoryToFile(void* ptr, const std::string& filename
 	std::scoped_lock lock(tracerMutex);
 	if (const auto it = allocations.find(ptr); it != allocations.end())
 	{
-		const auto& info = it->second;
+		const auto& [objectName, allocLocation, stackTrace, allocTime, allocThread, isFreed, freeLocation, freeTime, freeThread, userNote] = it->second;
 		history << "\n=== Object History ===" << '\n';
 		history << "Timestamp: " << GetCurrentTimestamp() << '\n';
 		history << "Address: " << ptr << '\n';
-		history << "Object: " << info.objectName << '\n';
-		history << "Tracked at: " << info.allocLocation << '\n';
-		history << "Thread: " << info.allocThread << '\n';
+		history << "Object: " << objectName << '\n';
+		history << "Tracked at: " << allocLocation << '\n';
+		history << "Thread: " << allocThread << '\n';
 
-		if (not info.userNote.empty())
+		if (not userNote.empty())
 		{
-			history << "Note: " << info.userNote << '\n';
+			history << "Note: " << userNote << '\n';
 		}
-		history << "Stack trace:\n" << info.stackTrace << '\n';
+		history << "Stack trace:\n" << stackTrace << '\n';
 
-		if (info.isFreed)
+		if (isFreed)
 		{
-			history << "Untracked at: " << info.freeLocation << '\n';
-			history << "Untrack thread: " << info.freeThread << '\n';
+			history << "Untracked at: " << freeLocation << '\n';
+			history << "Untrack thread: " << freeThread << '\n';
 
-			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(info.freeTime - info.allocTime).count();
+			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(freeTime - allocTime).count();
 			history << "Lifetime: " << duration << " ms" << '\n';
 		}
 		else
@@ -424,36 +421,38 @@ void MemoryTracer::GetThreadStatisticsToFile(const std::string& filename)
 {
 	std::unordered_map<std::thread::id, int> threadStats;
 	std::scoped_lock lock(tracerMutex);
-	for (const auto& pair : allocations)
-	{
-		if (not pair.second.isFreed)
-		{
-			threadStats[pair.second.allocThread]++;
-		}
 
-		std::stringstream stats;
-		stats << "\n=== Thread Statistics ===" << '\n';
-		stats << "Generated at: " << GetCurrentTimestamp() << '\n';
-		for (const auto& stat : threadStats)
+	for (const auto& allocation : allocations | std::views::values)
+	{
+		if (not allocation.isFreed)
 		{
-			stats << "Thread " << stat.first << ": " << stat.second << " active objects" << '\n';
+			threadStats[allocation.allocThread]++;
 		}
-		stats << "========================\n" << '\n';
-		if (not filename.empty())
+	}
+
+	std::stringstream stats;
+	stats << "\n=== Thread Statistics ===" << '\n';
+	stats << "Generated at: " << GetCurrentTimestamp() << '\n';
+	for (const auto& [threadId, status] : threadStats)
+	{
+		stats << "Thread " << threadId << ": " << status << " active objects" << '\n';
+	}
+	stats << "========================\n" << '\n';
+
+	if (not filename.empty())
+	{
+		if (std::ofstream file(filename, std::ios::app); file.is_open())
 		{
-			if (std::ofstream file(filename, std::ios::app); file.is_open())
-			{
-				file << stats.str();
-				file.close();
-			}
-			else
-			{
-				std::cout << stats.str();
-			}
+			file << stats.str();
+			file.close();
 		}
 		else
 		{
-			WriteToOutput(stats.str());
+			std::cout << stats.str();
 		}
+	}
+	else
+	{
+		WriteToOutput(stats.str());
 	}
 }
