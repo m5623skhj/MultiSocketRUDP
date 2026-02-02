@@ -77,9 +77,9 @@ void MultiSocketRUDPCore::StopServer()
 	SetEvent(sessionReleaseStopEventHandle);
 	StopAllThreads();
 
-	for (ThreadIdType i = 0; i<numOfWorkerThread; ++i)
+	for (auto const handle : recvLogicThreadEventHandles)
 	{
-		CloseHandle(recvLogicThreadEventHandles[i]);
+		CloseHandle(handle);
 	}
 	CloseHandle(recvLogicThreadEventStopHandle);
 	CloseHandle(sessionReleaseEventHandle);
@@ -87,7 +87,6 @@ void MultiSocketRUDPCore::StopServer()
 
 	Ticker::GetInstance().Stop();
 
-	delete[] rioCQList;
 	ClearAllSession();
 
 	Logger::GetInstance().StopLoggerThread();
@@ -104,6 +103,11 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 	if (sendPacketInfo == nullptr || sendPacketInfo->owner == nullptr || sendPacketInfo->GetBuffer() == nullptr)
 	{
 		LOG_ERROR("SendPacketInfo or its owner or its buffer is nullptr in MultiSocketRUDPCore::SendPacket()");
+		return false;
+	}
+
+	if (sendPacketInfo->owner->nowInReleaseThread)
+	{
 		return false;
 	}
 
@@ -218,62 +222,24 @@ bool MultiSocketRUDPCore::InitNetwork()
 
 bool MultiSocketRUDPCore::InitRIO()
 {
-	GUID guid = WSAID_MULTIPLE_RIO;
-	DWORD bytes = 0;
-
-	const SOCKET tempSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	bool result = true;
 	do
 	{
-		// For the purpose of obtaining the function table, any of the created sessions selected
-		if (WSAIoctl(tempSocket, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID)
-			, &rioFunctionTable, sizeof(rioFunctionTable), &bytes, nullptr, nullptr))
+		if (rioManager.Initialize(numOfSockets, numOfWorkerThread) == false)
 		{
-			LOG_ERROR(std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER failed with error code {}", WSAGetLastError()));
+			LOG_ERROR("RIOManager initialization failed");
 			result = false;
 			break;
-		}
-
-		rioCQList = new RIO_CQ[numOfWorkerThread];
-		if (rioCQList == nullptr)
-		{
-			result = false;
-			break;
-		}
-		for (int rioCQIndex = 0; rioCQIndex < numOfWorkerThread; ++rioCQIndex)
-		{
-			rioCQList[rioCQIndex] = rioFunctionTable.RIOCreateCompletionQueue(numOfSockets / numOfWorkerThread * MAX_SEND_BUFFER_SIZE, nullptr);
 		}
 
 		for (const auto& session : sessionArray)
 		{
 			session->threadId = session->sessionId % numOfWorkerThread;
-			unusedSessionIdList.emplace_back(session->sessionId);
+			unusedSessionIdList.emplace_back(session->GetSessionId());
 		}
 	} while (false);
 	
-	if (tempSocket != INVALID_SOCKET)
-	{
-		closesocket(tempSocket);
-	}
-
 	return result;
-}
-
-RIO_BUFFERID MultiSocketRUDPCore::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBufferSize) const
-{
-	if (targetBuffer == nullptr)
-	{
-		return RIO_INVALID_BUFFERID;
-	}
-
-	const RIO_BUFFERID bufferId = rioFunctionTable.RIORegisterBuffer(targetBuffer, targetBufferSize);
-	if (bufferId == RIO_INVALID_BUFFERID)
-	{
-		LOG_ERROR(std::format("RIORegisterBuffer failed with error code {}", WSAGetLastError()));
-	}
-
-	return bufferId;
 }
 
 bool MultiSocketRUDPCore::RunAllThreads()
@@ -478,7 +444,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 		RIORESULT rioResults[MAX_RIO_RESULT];
 		ZeroMemory(rioResults, sizeof(rioResults));
 
-		const ULONG numOfResults = rioFunctionTable.RIODequeueCompletion(rioCQList[threadId], rioResults, MAX_RIO_RESULT);
+		const ULONG numOfResults = rioManager.DequeueCompletions(threadId, rioResults, MAX_RIO_RESULT);
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
 			const auto context = GetIOCompletedContext(rioResults[i]);
@@ -810,7 +776,7 @@ bool MultiSocketRUDPCore::DoRecv(const RUDPSession& session) const
 			return false;
 		}
 
-		if (rioFunctionTable.RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context.get()) == false)
+		if (rioManager.GetRIOFunctionTable().RIOReceiveEx(session.rioRQ, context.get(), 1, &context->localAddrRIOBuffer, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context.get()) == false)
 		{
 			LOG_ERROR(std::format("RIOReceiveEx() failed with error code {}", WSAGetLastError()));
 			return false;
@@ -870,7 +836,7 @@ IOContext* MultiSocketRUDPCore::MakeSendContext(OUT RUDPSession& session, const 
 
 	if (context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
 	{
-		if (context->clientAddrRIOBuffer.BufferId = RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET)); context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
+		if (context->clientAddrRIOBuffer.BufferId = rioManager.RegisterRIOBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET)); context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
 		{
 			LOG_ERROR("MakeSendContext() : clientAddrBufferId is RIO_INVALID_BUFFERID");
 			contextPool.Free(context);
@@ -900,7 +866,7 @@ bool MultiSocketRUDPCore::TryRIOSend(OUT RUDPSession& session, IOContext* contex
 			return false;
 		}
 
-		if (rioFunctionTable.RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context) == false)
+		if (rioManager.GetRIOFunctionTable().RIOSendEx(session.rioRQ, static_cast<PRIO_BUF>(context), 1, nullptr, &context->clientAddrRIOBuffer, nullptr, nullptr, 0, context) == false)
 		{
 			LOG_ERROR(std::format("RIOSendEx() failed with error code {}", WSAGetLastError()));
 			contextPool.Free(context);

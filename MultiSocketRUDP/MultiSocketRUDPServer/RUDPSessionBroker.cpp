@@ -252,7 +252,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
 	session.serverPort = ntohs(serverAddr.sin_port);
 
-	if (session.InitializeRIO(rioFunctionTable, rioCQList[session.threadId], rioCQList[session.threadId]) == false)
+	if (rioManager.InitializeSessionRIO(session, session.GetThreadId()) == false)
 	{
 		LOG_ERROR(std::format("RUDPSession::InitializeRIO failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::RIO_INIT_FAILED;

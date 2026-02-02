@@ -96,6 +96,12 @@
     <ClCompile Include="RUDPThreadManager.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
+    <ClCompile Include="RIOManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionFunctionDelegate.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MultiSocketRUDPCore.h">
@@ -127,6 +133,12 @@
     </ClInclude>
     <ClInclude Include="RUDPThreadManager.h">
       <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClInclude>
+    <ClInclude Include="RIOManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionFunctionDelegate.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

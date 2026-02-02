@@ -11,6 +11,7 @@
 #include <vector>
 #include <set>
 #include "RUDPThreadManager.h"
+#include "RIOManager.h"
 
 #include "../Common/TLS/TLSHelper.h"
 
@@ -86,8 +87,7 @@ public:
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
-	[[nodiscard]]
-	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioFunctionTable; }
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioManager.GetRIOFunctionTable(); }
 
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(SessionIdType disconnectTargetSessionId);
@@ -112,8 +112,6 @@ private:
 	bool InitNetwork();
 	[[nodiscard]]
 	bool InitRIO();
-	[[nodiscard]]
-	inline RIO_BUFFERID RegisterRIOBuffer(char* targetBuffer, unsigned int targetBufferSize) const;
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
@@ -272,11 +270,8 @@ private:
 	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, ThreadIdType threadId);
 
 private:
-	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
-	RIO_CQ* rioCQList = nullptr;
-
-private:
 	CTLSMemoryPool<IOContext> contextPool;
+	RIOManager rioManager;
 #pragma endregion RIO
 
 private:

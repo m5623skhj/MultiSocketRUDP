@@ -2,16 +2,17 @@
 #include <functional>
 #include <map>
 #include "../Common/etc/CoreType.h"
-#include <MSWSock.h>
 #include "NetServerSerializeBuffer.h"
 #include "Queue.h"
 #include <shared_mutex>
 #include <unordered_set>
 #include <queue>
 #include "PacketManager.h"
+#include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
 
 class MultiSocketRUDPCore;
+class RUDPSessionFunctionDelegate;
 class IPacket;
 
 struct SendPacketInfo;
@@ -55,13 +56,22 @@ struct SendBuffer
 class RUDPSession
 {
 	friend MultiSocketRUDPCore;
+	friend class RUDPSessionFunctionDelegate;
+
+public:
+	struct RUDPSessionFuncToken
+	{
+	private:
+		RUDPSessionFuncToken() = default;
+		friend RUDPSessionFunctionDelegate;
+	};
 
 protected:
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
 private:
 	[[nodiscard]]
-	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
+	bool InitializeRIO(RUDPSessionFuncToken _, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
 	[[nodiscard]]
 	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	[[nodiscard]]
@@ -74,6 +84,8 @@ public:
 public:
 	void DoDisconnect();
 	bool SendPacket(IPacket& packet);
+
+	ThreadIdType GetThreadId() const { return threadId; }
 
 private:
 	void OnConnected(SessionIdType inSessionId);
