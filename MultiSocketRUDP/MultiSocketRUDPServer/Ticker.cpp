@@ -19,7 +19,10 @@ void Ticker::Start(const unsigned int intervalMs)
 void Ticker::Stop()
 {
 	isRunning = false;
-	tickerThread.join();
+	if (tickerThread.joinable())
+	{
+		tickerThread.join();
+	}
 
 	{
 		std::unique_lock lock(unregisterListMutex);
