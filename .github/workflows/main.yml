@@ -2,14 +2,16 @@ name: Gemini PR Comment Bot
 
 on: 
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
   comment:
     runs-on: ubuntu-latest
+    
     permissions: 
       contents: read
       pull-requests: write
+      statuses: write
 
     steps:
       - name: Checkout
@@ -38,7 +40,7 @@ jobs:
       - name: Stop If Too Large
         if: steps.diffcheck.outputs.line_count > 1000
         run: |
-          echo "Diff too large. Skipping AI comment."
+          echo "Diff too large. Skipping AI comment and review."
           exit 0
           
       - name: RunCommentBot
@@ -47,6 +49,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
         run: python Scripts/GeminiComment.py
         
 
