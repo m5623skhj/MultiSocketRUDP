@@ -25,7 +25,7 @@ jobs:
           python-version: "3.11"
           
       - name: InstallDependencis
-        run: pip install google-generativeai requests
+        run: pip install google-genai requests
         
       - name: Fetch Base
         run: git fetch origin ${{ github.base_ref }}
