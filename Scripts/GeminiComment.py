@@ -47,6 +47,18 @@ def has_existing_comment(file_path, line):
 
     return False
 
+def approve_pr():
+    url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    data = {
+        "event": "APPROVE",
+        "body": "AI review passed."
+    }
+    requests.post(url, headers=headers, json=data)
+
 MAX_LINES = 1000
 
 api_key = os.environ["GEMINI_API_KEY"]
@@ -202,3 +214,4 @@ if critical_found:
     set_status("failure", "Critical issues detected by AI review")
 else:
     set_status("success", "No critical issues found")
+    approve_pr()
