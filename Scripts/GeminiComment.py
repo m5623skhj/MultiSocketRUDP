@@ -11,17 +11,6 @@ github_token = os.environ["GITHUB_TOKEN"]
 commit_sha = os.environ["GITHUB_SHA"]
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel(
-    model_name = "gemini-2.5-flash",
-    system_instruction = system_instruction
-)
-
-with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
-    diff = f.read()
-
-if not diff.strip():
-    exit(0)
-    
 system_instruction = """
 당신은 고도로 훈련된 시니어 코드 리뷰 전문가입니다.
 코드를 수정하지 말고 리뷰와 주석 제안만 작성하세요.
@@ -36,6 +25,17 @@ severity는 critical 또는 warning만 사용하세요.
 불필요한 서두, 인사말, 결론 문장을 작성하지 마세요.
 중복 표현을 사용하지 마세요.
 """
+
+model = genai.GenerativeModel(
+    model_name = "gemini-2.5-flash",
+    system_instruction = system_instruction
+)
+
+with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
+    diff = f.read()
+
+if not diff.strip():
+    exit(0)
 
 line_count = diff.count("\n")
 if line_count == 0:
