@@ -49,6 +49,6 @@ private:
 	std::vector<RIO_BUFFERID> registeredBuffers;
 	std::mutex registeredBufferMutex;
 
-	bool initialized{};
+	bool isInitialized{};
 	size_t numOfWorkerThreads{};
 };

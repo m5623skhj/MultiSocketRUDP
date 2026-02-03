@@ -13,13 +13,13 @@ RIOManager::~RIOManager()
 
 bool RIOManager::Initialize(const size_t numOfSockets, const size_t inNumOfWorkerThreads)
 {
-	if (initialized == true)
+	if (isInitialized == true)
 	{
 		return true;
 	}
 
 	numOfWorkerThreads = inNumOfWorkerThreads;
-	if (const auto result = LoadRIOFunctionTable(); result == false)
+	if (const auto result = LoadRIOFunctionTable(); not result)
 	{
 		LOG_ERROR("Failed to load RIO function table");
 		return false;
@@ -39,13 +39,13 @@ bool RIOManager::Initialize(const size_t numOfSockets, const size_t inNumOfWorke
 		rioCompletionQueues.emplace_back(rioCQ);
 	}
 
-	initialized = true;
+	isInitialized = true;
 	return true;
 }
 
 void RIOManager::Shutdown()
 {
-	if (initialized == false)
+	if (not isInitialized)
 	{
 		return;
 	}
@@ -53,12 +53,12 @@ void RIOManager::Shutdown()
 	rioCompletionQueues.clear();
 	registeredBuffers.clear();
 
-	initialized = false;
+	isInitialized = false;
 }
 
 RIO_BUFFERID RIOManager::RegisterRIOBuffer(char* targetBuffer, const unsigned int targetBufferSize)
 {
-	if (not initialized || targetBuffer == nullptr)
+	if (not isInitialized || targetBuffer == nullptr)
 	{
 		return RIO_INVALID_BUFFERID;
 	}
@@ -80,7 +80,7 @@ RIO_BUFFERID RIOManager::RegisterRIOBuffer(char* targetBuffer, const unsigned in
 
 void RIOManager::DeregisterBuffer(RIO_BUFFERID bufferId)
 {
-	if (not initialized)
+	if (not isInitialized)
 	{
 		return;
 	}
@@ -96,7 +96,7 @@ void RIOManager::DeregisterBuffer(RIO_BUFFERID bufferId)
 
 bool RIOManager::InitializeSessionRIO(RUDPSession& session, const ThreadIdType threadId) const
 {
-	if (not initialized)
+	if (not isInitialized)
 	{
 		return false;
 	}
@@ -109,7 +109,7 @@ bool RIOManager::InitializeSessionRIO(RUDPSession& session, const ThreadIdType t
 
 	const RIO_CQ recvCQ = rioCompletionQueues[threadId];
 	const RIO_CQ sendCQ = rioCompletionQueues[threadId];
-	if (RUDPSessionFunctionDelegate::InitializeSessionRIO(session, GetRIOFunctionTable(), recvCQ, sendCQ) == false)
+	if (not RUDPSessionFunctionDelegate::InitializeSessionRIO(session, GetRIOFunctionTable(), recvCQ, sendCQ))
 	{
 		LOG_ERROR("Failed to initialize RIO for session");
 		return false;
@@ -120,7 +120,7 @@ bool RIOManager::InitializeSessionRIO(RUDPSession& session, const ThreadIdType t
 
 RIO_CQ RIOManager::GetCompletionQueue(const ThreadIdType threadId) const
 {
-	if (not initialized || threadId >= rioCompletionQueues.size())
+	if (not isInitialized || threadId >= rioCompletionQueues.size())
 	{
 		return RIO_INVALID_CQ;
 	}
@@ -134,7 +134,7 @@ const RIO_EXTENSION_FUNCTION_TABLE& RIOManager::GetRIOFunctionTable() const
 }
 ULONG RIOManager::DequeueCompletions(const ThreadIdType threadId, RIORESULT* results, const ULONG maxResults) const
 {
-	if (not initialized || threadId >= rioCompletionQueues.size())
+	if (not isInitialized || threadId >= rioCompletionQueues.size())
 	{
 		return 0;
 	}
@@ -181,7 +181,7 @@ bool RIOManager::LoadRIOFunctionTable()
 
 RIO_CQ RIOManager::CreateCompletionQueue(const size_t queueSize) const
 {
-	if (initialized == true)
+	if (isInitialized == true)
 	{
 		return RIO_INVALID_CQ;
 	}
@@ -198,7 +198,7 @@ RIO_CQ RIOManager::CreateCompletionQueue(const size_t queueSize) const
 
 void RIOManager::CleanupCompletionQueues()
 {
-	if (not initialized)
+	if (not isInitialized)
 	{
 		return;
 	}
@@ -215,7 +215,7 @@ void RIOManager::CleanupCompletionQueues()
 
 void RIOManager::CleanupRegisteredBuffers()
 {
-	if (not initialized)
+	if (not isInitialized)
 	{
 		return;
 	}
