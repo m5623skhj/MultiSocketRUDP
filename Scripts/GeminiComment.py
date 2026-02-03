@@ -36,7 +36,7 @@ prompt = f"""
 """
 
 client = genai.Client(api_key=api_key)
-system_instruction = """
+system_instruction_prompt = """
 당신은 고도로 훈련된 시니어 코드 리뷰 전문가입니다.
 코드를 수정하지 말고 리뷰와 주석 제안만 작성하세요.
 치명적 버그만 critical로 분류하세요.
@@ -52,9 +52,9 @@ severity는 critical 또는 warning만 사용하세요.
 """
 
 response = client.models.generate_content(
-    model = "gemini-2.5-flash",
+    model = 'gemini-2.5-flash',
     contents = prompt,
-    system_instruction = system_instruction
+    system_instruction = system_instruction_prompt
 )
 client.close()
 comment_body = response.text[:60000]
