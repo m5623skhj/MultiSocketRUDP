@@ -46,7 +46,7 @@ jobs:
       - name: RunCommentBot
         env:
           GEMINI_API_KEY: ${{ secrets.COMMENT_BOT_API_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_SHA: ${{ github.sha }}
