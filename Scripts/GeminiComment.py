@@ -61,7 +61,7 @@ system_instruction_prompt = """
 severity는 critical 또는 warning만 사용하세요.
 한국어만 사용하세요.
 리뷰는 핵심만 간결하게 작성하세요.
-각 코멘트는 최대 두 문장을 넘기지 마세요.
+각 코멘트는 주석이 아닌 경우, 최대 두 문장을 넘기지 마세요.
 불필요한 서두, 인사말, 결론 문장을 작성하지 마세요.
 중복 표현을 사용하지 마세요.
 함수나 클래스에 대한 설명이 필요한 경우,
@@ -82,9 +82,8 @@ C++ / C# 함수 주석은 다음 형식을 사용하세요:
  * @brief 변수 역할 설명
  */
 
-모든 주석 출력은 반드시 코드 블록으로 감싸세요.
 comment 필드에는 오직 주석 코드만 작성하세요.
-일반 문장이나 리뷰 문구를 작성하지 마세요.
+설명 문장, 리뷰 문구, 마크다운 기호를 사용하지 마세요.
 """
 
 client = genai.Client(api_key=api_key)
@@ -129,6 +128,7 @@ critical_found = False
 for r in reviews[:20]:
     try:
         body = r["comment"]
+        body = f"```cpp\n{body}\n```"
         severity = r.get("severity", "warning")
         file_path = r["file"]
         line = r["line"]
