@@ -16,6 +16,8 @@ public:
     int GetItem() { return item; }
     void SetItem(int inItem) { item = inItem; }
 
+    void PrintString() { std::cout << "이건 컴파일 에러를 발생시키지롱!" << "std::endl; }
+
 private:
     int item{};
 };
