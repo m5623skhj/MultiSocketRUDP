@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 from google import genai
 from google.genai import types
@@ -11,19 +12,33 @@ repo = os.environ["REPO"]
 github_token = os.environ["GITHUB_TOKEN"]
 commit_sha = os.environ["GITHUB_SHA"]
 
+def set_status(state, description):
+    url = f"https://api.github.com/repos/{repo}/statuses/{commit_sha}"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    data = {
+        "state": state,
+        "context": "ai-review-check",
+        "description": description
+    }
+    requests.post(url, headers=headers, json=data)
+
 with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
     diff = f.read()
 
 if not diff.strip():
+    set_status("success", "No target file changes")
     exit(0)
 
 line_count = diff.count("\n")
 if line_count == 0:
-    print("No target file changes.")
+    set_status("success", "No target file changes")
     exit(0)
 
 if line_count > MAX_LINES:
-    print("Diff too large, skipping.")
+    set_status("success", "Diff too large - skipped")
     exit(0)
 
 if len(diff) > 20000:
@@ -36,7 +51,6 @@ prompt = f"""
 {diff}
 """
 
-client = genai.Client(api_key=api_key)
 system_instruction_prompt = """
 당신은 고도로 훈련된 시니어 코드 리뷰 전문가입니다.
 코드를 수정하지 말고 리뷰와 주석 제안만 작성하세요.
@@ -52,38 +66,36 @@ severity는 critical 또는 warning만 사용하세요.
 중복 표현을 사용하지 마세요.
 """
 
+client = genai.Client(api_key=api_key)
+
 response = client.models.generate_content(
-    model = 'gemini-2.5-flash',
-    contents = prompt,
-    config = types.GenerateContentConfig(
-        system_instruction = system_instruction_prompt
+    model="gemini-2.5-flash",
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        system_instruction=system_instruction_prompt
     )
 )
-client.close()
-comment_body = response.text[:60000]
 
-url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
-headers = {
-    "Authorization": f"Bearer {github_token}",
-    "Accept": "application/vnd.github+json"
-}
-data = {
-    "body": comment_body
-}
+client.close()
+
+if not response or not response.text:
+    set_status("failure", "AI response empty")
+    exit(1)
 
 text = response.text.strip()
-
 start = text.find("[")
 end = text.rfind("]") + 1
 json_text = text[start:end]
 
 try:
     reviews = json.loads(json_text)
-except:
-    reviews = []
+except Exception as e:
+    print("JSON parse error:", e)
+    set_status("failure", "AI JSON parse failed")
+    exit(1)
 
-if reviews is None or not response.text:
-    set_status_failure("AI response parse failed")
+if not isinstance(reviews, list):
+    set_status("failure", "AI JSON invalid format")
     exit(1)
 
 headers = {
@@ -93,9 +105,14 @@ headers = {
 
 critical_found = False
 
-for r in reviews[:10]:
-    body = r["comment"]
-    severity = r.get("severity", "warning")
+for r in reviews[:20]:
+    try:
+        body = r["comment"]
+        severity = r.get("severity", "warning")
+        file_path = r["file"]
+        line = r["line"]
+    except:
+        continue
 
     if severity == "critical":
         critical_found = True
@@ -106,26 +123,15 @@ for r in reviews[:10]:
     data = {
         "body": body,
         "commit_id": commit_sha,
-        "path": r["file"],
-        "line": r["line"],
+        "path": file_path,
+        "line": line,
         "side": "RIGHT"
     }
 
-    requests.post(url, headers=headers, json=data)
+    resp = requests.post(url, headers=headers, json=data)
+    print(resp.status_code, resp.text)
 
 if critical_found:
-    state = "failure"
-    description = "Critical issues detected by AI review"
+    set_status("failure", "Critical issues detected by AI review")
 else:
-    state = "success"
-    description = "No critical issues found"
-
-status_url = f"https://api.github.com/repos/{repo}/statuses/{commit_sha}"
-
-status_data = {
-    "state": state,
-    "context": "ai-review-check",
-    "description": description
-}
-
-requests.post(status_url, headers=headers, json=status_data)
+    set_status("success", "No critical issues found")
