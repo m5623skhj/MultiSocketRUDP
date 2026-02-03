@@ -70,15 +70,15 @@ severity는 critical 또는 warning만 사용하세요.
 C++ / C# 함수 주석은 다음 형식을 사용하세요:
 
 /**
-    @brief 함수의 역할 한 줄 요약
-    @param 매개변수 설명
-    @return 반환값 설명
+ \* @brief 함수의 역할 한 줄 요약
+ \* @param 매개변수 설명
+ \* @return 반환값 설명
  */
 
 변수 또는 멤버는 다음 형식을 사용하세요:
 
 /**
-    @brief 변수 역할 설명
+ \* @brief 변수 역할 설명
  */
 
 comment 필드에는 오직 주석 코드만 작성하세요.
@@ -135,7 +135,7 @@ for r in reviews[:20]:
 
     if severity == "critical":
         critical_found = True
-        body = "🚨 " + body
+        body = "🚨\n" + body
 
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
 
