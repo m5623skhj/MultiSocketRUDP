@@ -1,6 +1,7 @@
 import os
 import requests
 from google import genai
+from google.genai import types
 
 MAX_LINES = 1000
 
@@ -54,7 +55,7 @@ severity는 critical 또는 warning만 사용하세요.
 response = client.models.generate_content(
     model = 'gemini-2.5-flash',
     contents = prompt,
-    config=types.GenerateContentConfig(
+    config = types.GenerateContentConfig(
         system_instruction = system_instruction_prompt
     )
 )
