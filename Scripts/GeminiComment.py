@@ -80,6 +80,10 @@ try:
 except:
     reviews = []
 
+if reviews is None or not response.text:
+    set_status_failure("AI response parse failed")
+    exit(1)
+
 headers = {
     "Authorization": f"Bearer {github_token}",
     "Accept": "application/vnd.github+json"
