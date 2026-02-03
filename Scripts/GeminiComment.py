@@ -52,15 +52,6 @@ severity는 critical 또는 warning만 사용하세요.
 중복 표현을 사용하지 마세요.
 """
 
-response = client.models.generate_content(
-    model = 'gemini-2.5-flash',
-    contents = prompt,
-    config = types.GenerateContentConfig(
-        system_instruction = system_instruction_prompt
-    )
-)
-client.close()
-comment_body = response.text[:60000]
 
 url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
 headers = {
@@ -71,7 +62,15 @@ data = {
     "body": comment_body
 }
 
-response = model.generate_content(prompt)
+response = client.models.generate_content(
+    model = 'gemini-2.5-flash',
+    contents = prompt,
+    config = types.GenerateContentConfig(
+        system_instruction = system_instruction_prompt
+    )
+)
+client.close()
+comment_body = response.text[:60000]
 text = response.text.strip()
 
 start = text.find("[")
