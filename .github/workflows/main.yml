@@ -1,0 +1,52 @@
+name: Gemini PR Comment Bot
+
+on: 
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    permissions: 
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: SetupPython
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: InstallDependencis
+        run: pip install google-generativeai requests
+        
+      - name: Fetch Base
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Create Filtered Diff
+        id: diffcheck
+        run: |
+          git diff origin/${{ github.base_ref }} -- '*.h' '*.cpp' '*.cs' > diff.txt
+          LINE_COUNT=$(wc -l < diff.txt)
+          echo "line_count=$LINE_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Stop If Too Large
+        if: steps.diffcheck.outputs.line_count > 1000
+        run: |
+          echo "Diff too large. Skipping AI comment."
+          exit 0
+          
+      - name: RunCommentBot
+        env:
+          GEMINI_API_KEY: ${{ secrets.COMMENT_BOT_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/GeminiComment.py
+        
+
