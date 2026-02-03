@@ -54,7 +54,9 @@ severity는 critical 또는 warning만 사용하세요.
 response = client.models.generate_content(
     model = 'gemini-2.5-flash',
     contents = prompt,
-    system_instruction = system_instruction_prompt
+    config=types.GenerateContentConfig(
+        system_instruction = system_instruction_prompt
+    )
 )
 client.close()
 comment_body = response.text[:60000]
