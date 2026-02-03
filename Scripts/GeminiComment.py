@@ -10,7 +10,7 @@ repo = os.environ["REPO"]
 github_token = os.environ["GITHUB_TOKEN"]
 commit_sha = os.environ["GITHUB_SHA"]
 
-genai.configure(api_key=api_key)
+client = genai.Client(api_key=api_key)
 system_instruction = """
 당신은 고도로 훈련된 시니어 코드 리뷰 전문가입니다.
 코드를 수정하지 말고 리뷰와 주석 제안만 작성하세요.
@@ -26,7 +26,7 @@ severity는 critical 또는 warning만 사용하세요.
 중복 표현을 사용하지 마세요.
 """
 
-model = genai.GenerativeModel(
+model = client.GenerativeModel(
     model_name = "gemini-2.5-flash",
     system_instruction = system_instruction
 )
@@ -56,7 +56,11 @@ prompt = f"""
 {diff}
 """
 
-response = model.generate_content(prompt)
+response = client.model.generate_content(
+    model = "gemini-2.5-flash",
+    contents = prompt
+)
+client.close()
 comment_body = response.text[:60000]
 
 url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
