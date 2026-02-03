@@ -12,6 +12,14 @@ github_token = os.environ["GITHUB_TOKEN"]
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
+system_instruction = """
+당신은 고도로 훈련된 시니어 코드 리뷰 전문가입니다.
+코드를 수정하지 말고 리뷰와 주석 제안만 작성하세요.
+각 항목은 file, line, comment 필드를 가져야 합니다.
+한국어만 사용하세요.
+장황한 설명을 하지 마세요.
+"""
+
 with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
     diff = f.read()
 
@@ -28,7 +36,8 @@ if len(diff) > 20000:
     diff = diff[:20000]
 
 prompt = f"""
-다음 PR 변경 코드에 대해 한국어로 간단한 리뷰와 주석 제안을 작성하세요.
+다음 PR 변경 코드에서 어떤 기능들이 수정 되었는지 한국어로 간단한 리뷰를 작성하세요.
+추가적으로 각 클래스 및 추가된 함수들에 대해서 주석이 달려 있지 않다면, 해당 기능에 대한 주석을 작성하세요.
 코드는 수정하지 말고 설명과 개선 제안만 작성하세요.
 
 {diff}
