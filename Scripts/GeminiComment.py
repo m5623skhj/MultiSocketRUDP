@@ -4,6 +4,49 @@ import requests
 from google import genai
 from google.genai import types
 
+def get_file_content(path):
+    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={commit_sha}"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        return None
+
+    data = r.json()
+    if "content" not in data:
+        return None
+
+    import base64
+    return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
+
+def has_existing_comment(file_path, line):
+    content = get_file_content(file_path)
+    if not content:
+        return False
+
+    lines = content.splitlines()
+
+    start = max(0, line - 6)
+    end = min(len(lines), line + 1)
+
+    region = "\n".join(lines[start:end])
+
+    comment_patterns = [
+        "@brief",
+        "/**",
+        "///",
+        "// ----------------------------------------"
+    ]
+
+    for p in comment_patterns:
+        if p in region:
+            return True
+
+    return False
+
 MAX_LINES = 1000
 
 api_key = os.environ["GEMINI_API_KEY"]
@@ -132,6 +175,10 @@ for r in reviews[:20]:
         file_path = r["file"]
         line = r["line"]
     except:
+        continue
+
+    if has_existing_comment(file_path, line):
+        print(f"Skip existing comment: {file_path}:{line}")
         continue
 
     if severity == "critical":
