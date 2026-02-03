@@ -51,7 +51,7 @@ severity는 critical 또는 warning만 사용하세요.
 중복 표현을 사용하지 마세요.
 """
 
-response = client.model.generate_content(
+response = client.models.generate_content(
     model = "gemini-2.5-flash",
     contents = prompt,
     system_instruction = system_instruction
