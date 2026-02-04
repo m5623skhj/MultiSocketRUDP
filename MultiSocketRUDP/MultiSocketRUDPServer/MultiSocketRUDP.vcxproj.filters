@@ -40,25 +40,19 @@
     <Filter Include="소스 파일\MemoryTracer">
       <UniqueIdentifier>{5988ad38-7388-4406-8058-b5bb072ed9d4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\MultiSocketRUDPCore\Core">
+      <UniqueIdentifier>{1193a664-52e1-4837-b3d9-63d5883b43f2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
       <Filter>소스 파일\lib</Filter>
-    </ClCompile>
-    <ClCompile Include="MultiSocketRUDPCore.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\PacketManager</Filter>
-    </ClCompile>
-    <ClCompile Include="ProcessByPacketType.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPCoreReadOptionFile.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp">
       <Filter>소스 파일\lib</Filter>
@@ -73,9 +67,6 @@
       <Filter>소스 파일\Ticker</Filter>
     </ClCompile>
     <ClCompile Include="RUDPSession.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClCompile>
     <ClCompile Include="MemoryTracer.cpp">
@@ -93,20 +84,32 @@
     <ClCompile Include="..\Common\FlowController\RUDPReceiveWindow.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
-    <ClCompile Include="RUDPThreadManager.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClCompile>
-    <ClCompile Include="RIOManager.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClCompile>
     <ClCompile Include="RUDPSessionFunctionDelegate.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClCompile>
+    <ClCompile Include="MultiSocketRUDPCore.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RIOManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPCoreReadOptionFile.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPThreadManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionBroker.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ProcessByPacketType.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MultiSocketRUDPCore.h">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClInclude>
     <ClInclude Include="BuildConfig.h">
       <Filter>소스 파일\MultiSocketRUDPCore\CoreType</Filter>
     </ClInclude>
@@ -131,14 +134,20 @@
     <ClInclude Include="MemoryTracer.h">
       <Filter>소스 파일\MemoryTracer</Filter>
     </ClInclude>
-    <ClInclude Include="RUDPThreadManager.h">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClInclude>
-    <ClInclude Include="RIOManager.h">
-      <Filter>소스 파일\MultiSocketRUDPCore</Filter>
-    </ClInclude>
     <ClInclude Include="RUDPSessionFunctionDelegate.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiSocketRUDPCore.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RIOManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPThreadManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

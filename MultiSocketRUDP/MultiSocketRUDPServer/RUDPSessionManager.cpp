@@ -1,0 +1,218 @@
+#include "PreCompile.h"
+#include "RUDPSessionManager.h"
+#include "Logger.h"
+#include "LogExtension.h"
+#include "RUDPSessionFunctionDelegate.h"
+
+RUDPSessionManager::RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore)
+    : maxSessionSize(inMaxSessionSize)
+    , core(inCore)
+{
+}
+
+RUDPSessionManager::~RUDPSessionManager()
+{
+    ClearAllSessions();
+}
+
+bool RUDPSessionManager::Initialize(const BYTE inNumOfWorkerThreads, SessionFactoryFunc&& factory)
+{
+    if (isInitialized)
+    {
+		return true;
+    }
+
+	numOfWorkerThreads = inNumOfWorkerThreads;
+
+    if (sessionFactory == nullptr)
+    {
+		LOG_ERROR("Session factory function is not set");
+		return false;
+    }
+	sessionFactory = std::move(factory);
+
+    if (not CreateSessionPool())
+    {
+		LOG_ERROR("CreateSessionPool failed");
+		return false;
+    }
+
+	isInitialized = true;
+	return true;
+}
+
+RUDPSession* RUDPSessionManager::AcquireSession()
+{
+	if (not isInitialized)
+	{
+		LOG_ERROR("RUDPSessionManager is not initialized");
+		return nullptr;
+	}
+
+	{
+		std::scoped_lock lock(unusedSessionIdListLock);
+		if (unusedSessionIdList.empty() == true)
+		{
+			return nullptr;
+		}
+
+		const SessionIdType sessionId = unusedSessionIdList.front();
+		unusedSessionIdList.pop_front();
+
+		RUDPSession* session = sessionList[sessionId];
+		if (session == nullptr)
+		{
+			LOG_ERROR("Acquired session is nullptr");
+		}
+
+		return session;
+	}
+}
+
+void RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
+{
+	if (sessionId >= sessionList.size())
+	{
+		LOG_ERROR("Invalid sessionId in ReleaseSession");
+		return;
+	}
+
+	{
+		std::scoped_lock lock(unusedSessionIdListLock);
+		if (const auto itor = std::ranges::find(unusedSessionIdList, sessionId); itor != unusedSessionIdList.end())
+		{
+			LOG_ERROR("Session already released in ReleaseSession");
+			return;
+		}
+
+		unusedSessionIdList.emplace_back(sessionId);
+	}
+}
+
+RUDPSession* RUDPSessionManager::GetUsingSession(const SessionIdType sessionId)
+{
+	if (sessionId >= sessionList.size() ||
+		sessionList[sessionId] == nullptr ||
+		not sessionList[sessionId]->IsUsingSession())
+	{
+		return nullptr;
+	}
+
+	return sessionList[sessionId];
+}
+
+const RUDPSession* RUDPSessionManager::GetUsingSession(const SessionIdType sessionId) const
+{
+	if (sessionId >= sessionList.size() || 
+		sessionList[sessionId] == nullptr ||
+		not sessionList[sessionId]->IsUsingSession())
+	{
+		return nullptr;
+	}
+
+	return sessionList[sessionId];
+}
+
+RUDPSession* RUDPSessionManager::GetReleasingSession(const SessionIdType sessionId) const
+{
+	if (sessionId >= sessionList.size() ||
+		sessionList[sessionId] == nullptr ||
+		not sessionList[sessionId]->IsReleasing())
+	{
+		return nullptr;
+	}
+
+	return sessionList[sessionId];
+}
+
+unsigned short RUDPSessionManager::GetUnusedSessionCount() const
+{
+	std::scoped_lock lock(unusedSessionIdListLock);
+	return static_cast<unsigned short>(unusedSessionIdList.size());
+}
+
+void RUDPSessionManager::CloseAllSessions()
+{
+	for (auto* session : sessionList)
+	{
+		if (session == nullptr)
+		{
+			continue;
+		}
+
+		RUDPSessionFunctionDelegate::CloseSocket(*session);
+	}
+
+	connectedUserCount.store(0);
+
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = "All sessions closed";
+	Logger::GetInstance().WriteLog(log);
+}
+
+void RUDPSessionManager::ClearAllSessions()
+{
+	{
+		std::scoped_lock lock(unusedSessionIdListLock);
+		unusedSessionIdList.clear();
+	}
+
+	for (auto* session : sessionList)
+	{
+		if (session != nullptr)
+		{
+			//if (const auto* context = session->recvBuffer.recvContext.get(); context != nullptr)
+			//{
+			//	session->recvBuffer.recvContext.reset();
+			//}
+
+			delete session;
+		}
+	}
+
+	sessionList.clear();
+	connectedUserCount.store(0);
+	isInitialized = false;
+
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = "All sessions cleared";
+	Logger::GetInstance().WriteLog(log);
+}
+
+bool RUDPSessionManager::CreateSessionPool()
+{
+	try
+	{
+		sessionList.reserve(maxSessionSize);
+
+		for (size_t i = 0; i < maxSessionSize; ++i)
+		{
+			RUDPSession* session = sessionFactory(core);
+			if (session == nullptr)
+			{
+				LOG_ERROR(std::format("Failed to create session {}", i));
+				return false;
+			}
+
+			RUDPSessionFunctionDelegate::SetSessionId(*session, static_cast<SessionIdType>(i));
+			RUDPSessionFunctionDelegate::SetThreadId(*session, i % numOfWorkerThreads);
+			sessionList.emplace_back(session);
+			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(i));
+		}
+
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		LOG_ERROR(std::format("Exception during session pool creation: {}", e.what()));
+		return false;
+	}
+}
+
+bool RUDPSessionManager::IsUnusedSession(const SessionIdType sessionId) const
+{
+	std::scoped_lock lock(unusedSessionIdListLock);
+
+	const auto it = std::ranges::find(unusedSessionIdList, sessionId);
+	return it != unusedSessionIdList.end();
+}
