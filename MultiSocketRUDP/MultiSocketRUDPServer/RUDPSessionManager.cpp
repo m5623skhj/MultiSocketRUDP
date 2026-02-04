@@ -24,7 +24,7 @@ bool RUDPSessionManager::Initialize(const BYTE inNumOfWorkerThreads, SessionFact
 
 	numOfWorkerThreads = inNumOfWorkerThreads;
 
-    if (sessionFactory == nullptr)
+    if (factory == nullptr)
     {
 		LOG_ERROR("Session factory function is not set");
 		return false;
