@@ -29,5 +29,5 @@ void Player::OnDisconnected()
 
 void Player::OnReleased()
 {
-	LOG_DEBUG("Player released. Current player count");
+	LOG_DEBUG("Player released.");
 }
