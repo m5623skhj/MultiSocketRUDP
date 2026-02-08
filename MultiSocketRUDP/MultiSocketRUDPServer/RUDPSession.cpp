@@ -22,7 +22,7 @@ RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
-bool RUDPSession::InitializeRIO(RUDPSessionFuncToken _, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ)
+bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ)
 {
 	u_long nonBlocking = 1;
 	ioctlsocket(sock, FIONBIO, &nonBlocking);
@@ -318,7 +318,17 @@ void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
 	maximumHoldingPacketQueueSize = size;
 }
 
-void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
+void RUDPSession::RecvContextReset()
+{
+	if (recvBuffer.recvContext == nullptr)
+	{
+		return;
+	}
+
+	recvBuffer.recvContext.reset();
+}
+
+bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
 {
 	PacketSequence packetSequence;
 	SessionIdType recvSessionId;
@@ -326,13 +336,14 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	recvPacket >> packetSequence >> recvSessionId;
 	if (packetSequence != LOGIN_PACKET_SEQUENCE || sessionId != recvSessionId)
 	{
-		return;
+		return false;
 	}
 
 	if (auto connectState{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::CONNECTED))
 	{
-		return;
+		return false;
 	}
+
 	clientAddr = inClientAddr;
 	memset(&clientSockAddrInet, 0, sizeof(clientSockAddrInet));
 	clientSockAddrInet.Ipv4 = inClientAddr;
@@ -341,6 +352,8 @@ void RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	flowManager.Reset(nextRecvPacketSequence);
 	OnConnected(sessionId);
 	SendReplyToClient(packetSequence);
+
+	return true;
 }
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)

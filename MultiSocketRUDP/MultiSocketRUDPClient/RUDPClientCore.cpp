@@ -57,7 +57,11 @@ void RUDPClientCore::Stop()
 	WSACleanup();
 	isStopped = true;
 
-	delete[] keyObjectBuffer;
+	if (keyObjectBuffer != nullptr)
+	{
+		delete[] keyObjectBuffer;
+		keyObjectBuffer = nullptr;
+	}
 }
 
 void RUDPClientCore::JoinThreads()

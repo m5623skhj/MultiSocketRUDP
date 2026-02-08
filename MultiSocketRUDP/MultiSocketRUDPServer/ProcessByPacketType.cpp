@@ -9,7 +9,7 @@
 if (not PacketCryptoHelper::DecodePacket(recvPacket, session.sessionSalt, SESSION_SALT_SIZE, session.sessionKeyHandle, isCorePacket, direction)) \
 { break; }
 
-void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
+void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket) const
 {
 	PACKET_TYPE packetType;
 	recvPacket >> packetType;
@@ -23,7 +23,10 @@ void MultiSocketRUDPCore::ProcessByPacketType(RUDPSession& session, const sockad
 	{
 		DECODE_PACKET()
 
-		session.TryConnect(recvPacket, clientAddr);
+		if (session.TryConnect(recvPacket, clientAddr))
+		{
+			sessionManager->IncrementConnectedCount();
+		}
 		break;
 	}
 	case PACKET_TYPE::DISCONNECT_TYPE:

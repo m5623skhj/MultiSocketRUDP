@@ -58,25 +58,20 @@ class RUDPSession
 	friend MultiSocketRUDPCore;
 	friend class RUDPSessionFunctionDelegate;
 
-public:
-	struct RUDPSessionFuncToken
-	{
-	private:
-		RUDPSessionFuncToken() = default;
-		friend RUDPSessionFunctionDelegate;
-	};
-
 protected:
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
 
 private:
 	[[nodiscard]]
-	bool InitializeRIO(RUDPSessionFuncToken _, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
+	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
 	[[nodiscard]]
 	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	[[nodiscard]]
 	bool InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	void InitializeSession();
+
+	void SetSessionId( const SessionIdType inSessionId) { sessionId = inSessionId; }
+	void SetThreadId(const ThreadIdType inThreadId) { threadId = inThreadId; }
 
 public:
 	virtual ~RUDPSession();
@@ -101,12 +96,14 @@ private:
 	bool CheckReservedSessionTimeout(unsigned long long now) const;
 	void AbortReservedSession();
 	void CloseSocket();
-	void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
+	static void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
 	void UnregisterRIOBuffers();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
 
+	void RecvContextReset();
+
 private:
-	void TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
+	bool TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
 	void Disconnect();
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
@@ -124,8 +121,6 @@ private:
 	bool CanProcessPacket(const sockaddr_in& targetClientAddr) const;
 	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
-	[[nodiscard]]
-	bool IsReleasing() const;
 
 public:
 	[[nodiscard]]
@@ -140,6 +135,9 @@ public:
 	bool IsReserved() const { return sessionState == SESSION_STATE::RESERVED; }
 	[[nodiscard]]
 	bool IsUsingSession() const { return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED; }
+	SESSION_STATE GetSessionState() const { return sessionState.load(); }
+	[[nodiscard]]
+	bool IsReleasing() const;
 
 protected:
 	using PacketFactory = std::function<std::function<bool()>(RUDPSession*, NetBuffer*)>;
@@ -231,5 +229,3 @@ private:
 private:
 	MultiSocketRUDPCore& core;
 };
-
-using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;

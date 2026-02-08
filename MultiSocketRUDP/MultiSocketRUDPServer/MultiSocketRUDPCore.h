@@ -11,6 +11,7 @@
 #include <vector>
 #include <set>
 #include "RUDPThreadManager.h"
+#include "RUDPSessionManager.h"
 #include "RIOManager.h"
 
 #include "../Common/TLS/TLSHelper.h"
@@ -68,6 +69,9 @@ namespace MultiSocketRUDP
 	};
 }
 
+class RIOManager;
+class RUDPSessionManager;
+
 class MultiSocketRUDPCore
 {
 public:
@@ -82,15 +86,15 @@ public:
 	[[nodiscard]]
 	bool IsServerStopped() const { return isServerStopped; }
 	[[nodiscard]]
-	unsigned short GetConnectedUserCount() const { return connectedUserCount; }
+	unsigned short GetConnectedUserCount() const { return sessionManager->GetConnectedCount(); }
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
-	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioManager.GetRIOFunctionTable(); }
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioManager->GetRIOFunctionTable(); }
 
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
-	void DisconnectSession(SessionIdType disconnectTargetSessionId);
+	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
 	void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
@@ -107,9 +111,7 @@ private:
 	[[nodiscard]]
 	bool ReadOptionFile(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
 	[[nodiscard]]
-	bool SetSessionFactory(SessionFactoryFunc&& factoryFunc);
-	[[nodiscard]]
-	bool InitNetwork();
+	bool InitNetwork() const;
 	[[nodiscard]]
 	bool InitRIO();
 	[[nodiscard]]
@@ -120,7 +122,7 @@ private:
 	static SOCKET CreateRUDPSocket();
 
 private:
-	void CloseAllSessions();
+	void CloseAllSessions() const;
 	void ClearAllSession();
 	void ReleaseAllSession() const;
 
@@ -133,18 +135,13 @@ private:
 
 private:
 	[[nodiscard]]
-	RUDPSession* AcquireSession();
+	RUDPSession* AcquireSession() const;
 	[[nodiscard]]
 	inline RUDPSession* GetUsingSession(SessionIdType sessionId) const;
 	inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 
 private:
-	// This container's size must not be increased any further
-	std::vector<RUDPSession*> sessionArray;
-	std::list<SessionIdType> unusedSessionIdList;
-	std::recursive_mutex unusedSessionIdListLock;
-	std::atomic_uint16_t connectedUserCount{};
-	SessionFactoryFunc sessionFactory{};
+	std::unique_ptr<RUDPSessionManager> sessionManager;
 
 private:
 	std::vector<std::list<SendPacketInfo*>> sendPacketInfoList;
@@ -253,7 +250,7 @@ private:
 	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
-	static void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
+	void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket) const;
 	[[nodiscard]]
 	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
     [[nodiscard]]  
@@ -265,7 +262,7 @@ private:
 
 private:
 	CTLSMemoryPool<IOContext> contextPool;
-	RIOManager rioManager;
+	std::unique_ptr<RIOManager> rioManager;
 #pragma endregion RIO
 
 private:

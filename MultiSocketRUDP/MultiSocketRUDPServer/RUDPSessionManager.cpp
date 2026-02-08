@@ -69,12 +69,18 @@ RUDPSession* RUDPSessionManager::AcquireSession()
 	}
 }
 
-void RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
+bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 {
 	if (sessionId >= sessionList.size())
 	{
 		LOG_ERROR("Invalid sessionId in ReleaseSession");
-		return;
+		return false;
+	}
+
+	if (sessionList[sessionId]->GetSessionState() != SESSION_STATE::RELEASING)
+	{
+		LOG_ERROR("Session is not in RELEASING state in ReleaseSession");
+		return false;
 	}
 
 	{
@@ -82,11 +88,14 @@ void RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		if (const auto itor = std::ranges::find(unusedSessionIdList, sessionId); itor != unusedSessionIdList.end())
 		{
 			LOG_ERROR("Session already released in ReleaseSession");
-			return;
+			return false;
 		}
 
 		unusedSessionIdList.emplace_back(sessionId);
 	}
+
+	DecrementConnectedCount();
+	return true;
 }
 
 RUDPSession* RUDPSessionManager::GetUsingSession(const SessionIdType sessionId)
@@ -159,24 +168,48 @@ void RUDPSessionManager::ClearAllSessions()
 
 	for (auto* session : sessionList)
 	{
-		if (session != nullptr)
+		if (session == nullptr)
 		{
-			//if (const auto* context = session->recvBuffer.recvContext.get(); context != nullptr)
-			//{
-			//	session->recvBuffer.recvContext.reset();
-			//}
-
-			delete session;
+			continue;
 		}
+
+		RUDPSessionFunctionDelegate::RecvContextReset(*session);
+		delete session;
 	}
 
 	sessionList.clear();
 	connectedUserCount.store(0);
-	isInitialized = false;
+	isInitialized = {};
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "All sessions cleared";
 	Logger::GetInstance().WriteLog(log);
+}
+
+void RUDPSessionManager::HeartbeatCheck(const unsigned long long now)
+{
+	for (auto* session : sessionList)
+	{
+		if (session == nullptr || not session->IsConnected())
+		{
+			continue;
+		}
+
+		if (session->IsConnected() == true)
+		{
+			RUDPSessionFunctionDelegate::SendHeartbeatPacket(*session);
+		}
+
+		if (session->IsReserved() == true)
+		{
+			// Waiting 30 seconds
+			if (RUDPSessionFunctionDelegate::CheckReservedSessionTimeout(*session, now) == true)
+			{
+				// if not connected within the time, disconnect the session
+				RUDPSessionFunctionDelegate::AbortReservedSession(*session);
+			}
+		}
+	}
 }
 
 bool RUDPSessionManager::CreateSessionPool()
