@@ -29,6 +29,5 @@ void Player::OnDisconnected()
 
 void Player::OnReleased()
 {
-	const auto nowPlayerCount = Local::playerCount.fetch_sub(1, std::memory_order_relaxed) - 1;
-	LOG_DEBUG(std::format("Player released. Current player count {}", nowPlayerCount));
+	LOG_DEBUG("Player released. Current player count");
 }
