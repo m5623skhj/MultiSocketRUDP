@@ -4,15 +4,14 @@
 #include <thread>
 #include <MSWSock.h>
 #include "NetServer.h"
-#include "NetServerSerializeBuffer.h"
 #include <shared_mutex>
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
 #include <set>
-#include "RUDPThreadManager.h"
 #include "RUDPSessionManager.h"
-#include "RIOManager.h"
+#include "RUDPThreadManager.h"
+#include "RUDPPacketProcessor.h"
 
 #include "../Common/TLS/TLSHelper.h"
 
@@ -70,7 +69,6 @@ namespace MultiSocketRUDP
 }
 
 class RIOManager;
-class RUDPSessionManager;
 
 class MultiSocketRUDPCore
 {
@@ -86,7 +84,7 @@ public:
 	[[nodiscard]]
 	bool IsServerStopped() const { return isServerStopped; }
 	[[nodiscard]]
-	unsigned short GetConnectedUserCount() const { return sessionManager->GetConnectedCount(); }
+	unsigned short GetConnectedUserCount() const;
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
@@ -96,6 +94,13 @@ public:
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
 	void PushToDisconnectTargetSession(RUDPSession& session);
+
+	[[nodiscard]]
+	static WORD GetPayloadLength(OUT const NetBuffer& buffer)
+	{
+		static constexpr int PAYLOAD_LENGTH_POSITION = 1;
+		return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[PAYLOAD_LENGTH_POSITION]);
+	}
 
 private:
 	[[nodiscard]]
@@ -205,7 +210,7 @@ private:
 	TLSHelper::TLSHelperServer tlsHelper;
 
 private:
-	void StopAllThreads();
+	void StopAllThreads() const;
 	void RunIOWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void RunRetransmissionThread(const std::stop_token& stopToken, ThreadIdType threadId);
@@ -223,7 +228,7 @@ private:
 	unsigned int timerTickMs{};
 	BYTE maxHoldingPacketQueueSize{};
 
-	RUDPThreadManager threadManager;
+	std::unique_ptr<RUDPThreadManager> threadManager;
 
 	// event handles
 	HANDLE recvLogicThreadEventStopHandle{};
@@ -250,7 +255,6 @@ private:
 	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
-	void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket) const;
 	[[nodiscard]]
 	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
     [[nodiscard]]  
@@ -265,9 +269,7 @@ private:
 	std::unique_ptr<RIOManager> rioManager;
 #pragma endregion RIO
 
-private:
-	[[nodiscard]]
-	static inline WORD GetPayloadLength(OUT const NetBuffer& buffer);
+	std::unique_ptr<RUDPPacketProcessor> packetProcessor;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

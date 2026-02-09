@@ -102,10 +102,10 @@
     <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
-    <ClCompile Include="ProcessByPacketType.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
-    </ClCompile>
     <ClCompile Include="RUDPSessionManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPPacketProcessor.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
   </ItemGroup>
@@ -147,6 +147,9 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="RUDPSessionManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPPacketProcessor.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
   </ItemGroup>
