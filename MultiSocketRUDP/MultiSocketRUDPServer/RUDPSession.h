@@ -120,8 +120,16 @@ private:
 	bool CanProcessPacket(const sockaddr_in& targetClientAddr) const;
 	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
+	// ----------------------------------------
+	// @brief 세션의 암호화 키 핸들을 반환합니다.
+	// @return 세션 키 핸들
+	// ----------------------------------------
 	[[nodiscard]]
 	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const { return sessionKeyHandle; }
+	// ----------------------------------------
+	// @brief 세션의 암호화 솔트를 반환합니다.
+	// @return 세션 솔트 버퍼에 대한 포인터
+	// ----------------------------------------
 	[[nodiscard]]
 	const unsigned char* GetSessionSalt() const { return sessionSalt; }
 

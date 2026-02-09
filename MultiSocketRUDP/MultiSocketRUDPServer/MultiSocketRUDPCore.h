@@ -81,6 +81,10 @@ public:
 	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole = false);
 	void StopServer();
 
+	// ----------------------------------------
+	// @brief 현재 서버에 연결된 사용자 수를 반환합니다.
+	// @return 연결된 사용자 수
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsServerStopped() const { return isServerStopped; }
 	[[nodiscard]]
@@ -95,6 +99,11 @@ public:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
 	void PushToDisconnectTargetSession(RUDPSession& session);
 
+	// ----------------------------------------
+	// @brief NetBuffer에서 페이로드 길이를 추출합니다.
+	// @param buffer 페이로드 길이를 포함하는 NetBuffer 객체
+	// @return 페이로드 길이 (WORD 형식)
+	// ----------------------------------------
 	[[nodiscard]]
 	static WORD GetPayloadLength(OUT const NetBuffer& buffer)
 	{
@@ -255,6 +264,9 @@ private:
 	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
 
 	void OnRecvPacket(BYTE threadId);
+	// ----------------------------------------
+	// @brief 수신된 패킷을 타입에 따라 처리하는 객체입니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
     [[nodiscard]]  

@@ -7,6 +7,9 @@ class RIOManager;
 class RUDPSessionManager;
 class RUDPPacketProcessor;
 
+// ----------------------------------------
+// @brief RUDPSession 클래스의 특정 private/protected 메서드에 대한 접근을 위임하는 클래스입니다.
+// ----------------------------------------
 class RUDPSessionFunctionDelegate
 {
 	friend RIOManager;
