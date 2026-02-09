@@ -2,7 +2,6 @@
 #include "RUDPSessionFunctionDelegate.h"
 #include "RUDPSession.h"
 #include "RIOManager.h"
-#include "RUDPSessionManager.h"
 
 bool RUDPSessionFunctionDelegate::InitializeSessionRIO(RUDPSession& session, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& recvCQ, const RIO_CQ& sendCQ)
 {
@@ -42,4 +41,39 @@ bool RUDPSessionFunctionDelegate::CheckReservedSessionTimeout(const RUDPSession&
 void RUDPSessionFunctionDelegate::AbortReservedSession(RUDPSession& session)
 {
 	session.AbortReservedSession();
+}
+
+const unsigned char* RUDPSessionFunctionDelegate::GetSessionSalt(const RUDPSession& session)
+{
+	return session.GetSessionSalt();
+}
+
+const BCRYPT_KEY_HANDLE& RUDPSessionFunctionDelegate::GetSessionKeyHandle(const RUDPSession& session)
+{
+	return session.GetSessionKeyHandle();
+}
+
+bool RUDPSessionFunctionDelegate::TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr)
+{
+	return session.TryConnect(recvPacket, clientAddr);
+}
+
+bool RUDPSessionFunctionDelegate::CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr)
+{
+	return session.CanProcessPacket(clientAddr);
+}
+
+void RUDPSessionFunctionDelegate::OnSendReply(RUDPSession& session, NetBuffer& recvPacket)
+{
+	session.OnSendReply(recvPacket);
+}
+
+bool RUDPSessionFunctionDelegate::OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket)
+{
+	return session.OnRecvPacket(recvPacket);
+}
+
+void RUDPSessionFunctionDelegate::Disconnect(RUDPSession& session, NetBuffer& recvPacket)
+{
+	session.Disconnect(recvPacket);
 }

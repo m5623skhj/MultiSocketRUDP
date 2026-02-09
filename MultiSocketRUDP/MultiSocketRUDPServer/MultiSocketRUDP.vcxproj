@@ -30,9 +30,9 @@
     <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="PacketManager.cpp" />
-    <ClCompile Include="ProcessByPacketType.cpp" />
     <ClCompile Include="RIOManager.cpp" />
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
+    <ClCompile Include="RUDPPacketProcessor.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
     <ClCompile Include="RUDPSessionFunctionDelegate.cpp" />
@@ -49,6 +49,7 @@
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RIOManager.h" />
+    <ClInclude Include="RUDPPacketProcessor.h" />
     <ClInclude Include="RUDPSession.h" />
     <ClInclude Include="RUDPSessionFunctionDelegate.h" />
     <ClInclude Include="RUDPSessionManager.h" />

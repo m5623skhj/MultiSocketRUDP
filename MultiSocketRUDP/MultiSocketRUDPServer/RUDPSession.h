@@ -2,7 +2,6 @@
 #include <functional>
 #include <map>
 #include "../Common/etc/CoreType.h"
-#include "NetServerSerializeBuffer.h"
 #include "Queue.h"
 #include <shared_mutex>
 #include <unordered_set>
@@ -56,7 +55,7 @@ struct SendBuffer
 class RUDPSession
 {
 	friend MultiSocketRUDPCore;
-	friend class RUDPSessionFunctionDelegate;
+	friend RUDPSessionFunctionDelegate;
 
 protected:
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);
@@ -121,6 +120,10 @@ private:
 	bool CanProcessPacket(const sockaddr_in& targetClientAddr) const;
 	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
+	[[nodiscard]]
+	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const { return sessionKeyHandle; }
+	[[nodiscard]]
+	const unsigned char* GetSessionSalt() const { return sessionSalt; }
 
 public:
 	[[nodiscard]]

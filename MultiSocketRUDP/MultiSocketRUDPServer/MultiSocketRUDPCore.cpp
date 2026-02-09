@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "Ticker.h"
 #include "MemoryTracer.h"
+#include "RIOManager.h"
 
 void IOContext::InitContext(const SessionIdType inOwnerSessionId, const RIO_OPERATION_TYPE inIOType)
 {
@@ -36,6 +37,12 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	}
 
 	sessionManager = std::make_unique<RUDPSessionManager>(numOfSockets, *this);
+	if (sessionManager == nullptr)
+	{
+		LOG_ERROR("Session manager creation failed");
+		return false;
+	}
+
 	if (not sessionManager->Initialize(numOfWorkerThread, std::move(factoryFunc)))
 	{
 		LOG_ERROR("Session factory function is not set");
@@ -97,6 +104,11 @@ void MultiSocketRUDPCore::StopServer()
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Server stop";
 	Logger::GetInstance().WriteLog(log);
+}
+
+unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
+{
+	return sessionManager->GetConnectedCount();
 }
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool needAddRefCount)
@@ -203,6 +215,13 @@ bool MultiSocketRUDPCore::InitRIO()
 	do
 	{
 		rioManager = std::make_unique<RIOManager>();
+		if (rioManager == nullptr)
+		{
+			LOG_ERROR("RIOManager creation failed");
+			result = false;
+			break;
+		}
+
 		if (rioManager->Initialize(numOfSockets, numOfWorkerThread) == false)
 		{
 			LOG_ERROR("RIOManager initialization failed");
@@ -216,6 +235,14 @@ bool MultiSocketRUDPCore::InitRIO()
 
 bool MultiSocketRUDPCore::RunAllThreads()
 {
+	threadManager = std::make_unique<RUDPThreadManager>();
+	packetProcessor = std::make_unique<RUDPPacketProcessor>(*sessionManager);
+	if (threadManager == nullptr || packetProcessor == nullptr)
+	{
+		LOG_ERROR("ThreadManager or PacketProcessor creation failed");
+		return false;
+	}
+
 	sendPacketInfoList.reserve(numOfWorkerThread);
 	sendPacketInfoListLock.reserve(numOfWorkerThread);
 
@@ -234,12 +261,12 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
 	}
 
-	threadManager.StartThreads(THREAD_GROUP::SESSION_RELEASE_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunSessionReleaseThread(stopToken); }, 1);
-	threadManager.StartThreads(THREAD_GROUP::HEARTBEAT_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunHeartbeatThread(stopToken); }, 1);
+	threadManager->StartThreads(THREAD_GROUP::SESSION_RELEASE_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunSessionReleaseThread(stopToken); }, 1);
+	threadManager->StartThreads(THREAD_GROUP::HEARTBEAT_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunHeartbeatThread(stopToken); }, 1);
 
-	threadManager.StartThreads(THREAD_GROUP::IO_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunIOWorkerThread(stopToken, id); }, numOfWorkerThread);
-	threadManager.StartThreads(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRecvLogicWorkerThread(stopToken, id); }, numOfWorkerThread);
-	threadManager.StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
+	threadManager->StartThreads(THREAD_GROUP::IO_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunIOWorkerThread(stopToken, id); }, numOfWorkerThread);
+	threadManager->StartThreads(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRecvLogicWorkerThread(stopToken, id); }, numOfWorkerThread);
+	threadManager->StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
 
 	Sleep(1000);
 	if (not RunSessionBroker())
@@ -330,13 +357,13 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 	return sessionManager->GetReleasingSession(sessionId);
 }
 
-void MultiSocketRUDPCore::StopAllThreads()
+void MultiSocketRUDPCore::StopAllThreads() const
 {
-	threadManager.StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
-	threadManager.StopThreadGroup(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD);
-	threadManager.StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
-	threadManager.StopThreadGroup(THREAD_GROUP::SESSION_RELEASE_THREAD);
-	threadManager.StopThreadGroup(THREAD_GROUP::HEARTBEAT_THREAD);
+	threadManager->StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
+	threadManager->StopThreadGroup(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD);
+	threadManager->StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
+	threadManager->StopThreadGroup(THREAD_GROUP::SESSION_RELEASE_THREAD);
+	threadManager->StopThreadGroup(THREAD_GROUP::HEARTBEAT_THREAD);
 }
 
 void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, const ThreadIdType threadId)
@@ -623,15 +650,9 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 			{
 				break;
 			}
-
-			if (buffer->GetUseSize() != GetPayloadLength(*buffer))
-			{
-				break;
-			}
-
-			sockaddr_in clientAddr;
-			std::ignore = memcpy_s(&clientAddr, sizeof(clientAddr), context->clientAddrBuffer, sizeof(clientAddr));
-			ProcessByPacketType(*context->session, clientAddr, *buffer);
+			packetProcessor->OnRecvPacket(*context->session
+				, *buffer
+				, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer), sizeof(context->clientAddrBuffer)));
 		} while (false);
 
 		if (buffer != nullptr)
@@ -910,11 +931,4 @@ bool MultiSocketRUDPCore::RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo
 	}
 
 	return true;
-}
-
-WORD MultiSocketRUDPCore::GetPayloadLength(OUT const NetBuffer& buffer)
-{
-	static constexpr int PAYLOAD_LENGTH_POSITION = 1;
-
-	return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[PAYLOAD_LENGTH_POSITION]);
 }
