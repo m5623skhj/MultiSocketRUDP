@@ -53,7 +53,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public readonly SortedDictionary<PacketSequence, HeldPacket> HoldingPackets = [];
         private readonly Lock holdingPacketsLock = new();
 
-        public void AddHoldingPacket(PacketSequence sequence, HeldPacket buffer)
+        public void AddHoldingPacket(PacketSequence sequence, HeldPacket packet)
         {
             lock (holdingPacketsLock)
             {
@@ -89,11 +89,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public void Clear()
         {
-            lock (holdingSequencesLock)
-            {
-                HoldingSequences.Clear();
-            }
-
             lock (holdingPacketsLock)
             {
                 HoldingPackets.Clear();
@@ -378,7 +373,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 OnConnected();
             }
 
-            holdingPacketStore.RemoveHoldingPacket(packetSequence);
             bufferStore.RemoveSendBuffer(packetSequence);
         }
 
