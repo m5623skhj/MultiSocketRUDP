@@ -50,31 +50,19 @@ namespace MultiSocketRUDPBotTester.ClientCore
     
     public class HoldingPacketStore
     {
-        public readonly SortedDictionary<PacketSequence, HeldPacket> HoldingSequences = [];
-        private readonly Lock holdingSequencesLock = new();
-        public readonly SortedDictionary<PacketSequence, NetBuffer> HoldingPackets = new();
+        public readonly SortedDictionary<PacketSequence, HeldPacket> HoldingPackets = [];
         private readonly Lock holdingPacketsLock = new();
 
-        public void AddHoldingPacket(PacketSequence sequence, NetBuffer buffer)
+        public void AddHoldingPacket(PacketSequence sequence, HeldPacket buffer)
         {
             lock (holdingPacketsLock)
             {
-                HoldingPackets.Add(sequence, buffer);
-            }
-
-            lock (holdingSequencesLock)
-            {
-                HoldingSequences.Add(sequence);
+                HoldingPackets.Add(sequence, packet);
             }
         }
 
         public void RemoveHoldingPacket(PacketSequence sequence)
         {
-            lock (holdingSequencesLock)
-            {
-                HoldingSequences.Remove(sequence);
-            }
-
             lock (holdingPacketsLock)
             {
                 HoldingPackets.Remove(sequence);
@@ -338,6 +326,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                             holdingPacketStore.AddHoldingPacket(packetSequence, new HeldPacket { PacketId = packetId, Buffer = buffer});
                         }
                     }
+                    break;
+                }
                 case PacketType.SendReplyType:
                 {
                     OnSendReply(packetSequence);
