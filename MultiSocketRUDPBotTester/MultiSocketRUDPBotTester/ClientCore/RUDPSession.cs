@@ -42,9 +42,15 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public ushort ServerPort { get; set; }
     }
 
+    public class HeldPacket
+    {
+        public PacketId PacketId { get; set; }
+        public NetBuffer Buffer { get; set; }
+    }
+    
     public class HoldingPacketStore
     {
-        public readonly HashSet<PacketSequence> HoldingSequences = [];
+        public readonly SortedDictionary<PacketSequence, HeldPacket> HoldingSequences = [];
         private readonly Lock holdingSequencesLock = new();
         public readonly SortedDictionary<PacketSequence, NetBuffer> HoldingPackets = new();
         private readonly Lock holdingPacketsLock = new();
@@ -72,6 +78,24 @@ namespace MultiSocketRUDPBotTester.ClientCore
             lock (holdingPacketsLock)
             {
                 HoldingPackets.Remove(sequence);
+            }
+        }
+
+        public bool TryGetFirst(out PacketSequence sequence, out HeldPacket packet)
+        {
+            lock (holdingPacketsLock)
+            {
+                if (HoldingPackets.Count == 0)
+                {
+                    sequence = default;
+                    packet = null!;
+                    return false;
+                }
+
+                var first = HoldingPackets.First();
+                sequence = first.Key;
+                packet = first.Value;
+                return true;
             }
         }
 
@@ -295,36 +319,45 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 {
                     SendReplyToServer(packetSequence);
 
-                    bool shouldProcess;
                     lock (expectedRecvSequenceLock)
                     {
                         if (packetSequence <= expectedRecvSequence)
                         {
-                            Log.Debug("Received duplicate or old packet: {Seq}, expected: {Expected}", packetSequence, expectedRecvSequence);
-                            shouldProcess = false;
+                            return;
+                        }
+
+                        if (packetSequence == expectedRecvSequence + 1)
+                        {
+                            expectedRecvSequence = packetSequence;
+                            OnRecvPacket(packetId, buffer);
+
+                            ProcessHoldingPackets();
                         }
                         else
                         {
-                            if (packetSequence != expectedRecvSequence + 1)
-                            {
-                                Log.Warning("Received out-of-order packet: {Seq}, expected: {Expected}", packetSequence, expectedRecvSequence + 1);
-                            }
-                            expectedRecvSequence = packetSequence;
-                            shouldProcess = true;
+                            holdingPacketStore.AddHoldingPacket(packetSequence, new HeldPacket { PacketId = packetId, Buffer = buffer});
                         }
-                    }
-
-                    if (shouldProcess)
-                    {
-                        OnRecvPacket(packetId, buffer);
-                    }
-                    break;
                     }
                 case PacketType.SendReplyType:
                 {
                     OnSendReply(packetSequence);
                     break;
                 }
+            }
+        }
+
+        private void ProcessHoldingPackets()
+        {
+            while (holdingPacketStore.TryGetFirst(out var nextSequence, out var heldPacket))
+            {
+                if (nextSequence != expectedRecvSequence + 1)
+                {
+                    break;
+                }
+
+                expectedRecvSequence = nextSequence;
+                holdingPacketStore.RemoveHoldingPacket(nextSequence);
+                OnRecvPacket(heldPacket.PacketId, heldPacket.Buffer);
             }
         }
 
