@@ -73,7 +73,87 @@ bool RUDPSessionFunctionDelegate::OnRecvPacket(RUDPSession& session, NetBuffer& 
 	return session.OnRecvPacket(recvPacket);
 }
 
+std::shared_ptr<IOContext> RUDPSessionFunctionDelegate::GetRecvBufferContext(const RUDPSession& session)
+{
+	return session.GetRecvBufferContext();
+}
+
+RIO_BUFFERID RUDPSessionFunctionDelegate::GetSendBufferId(const RUDPSession& session)
+{
+	return session.GetSendBufferId();
+}
+
+IO_MODE& RUDPSessionFunctionDelegate::GetSendIOMode(RUDPSession& session)
+{
+	return session.GetSendIOMode();
+}
+
+bool RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(RUDPSession& session)
+{
+	return session.GetSendPacketInfoQueueSize() == 0;
+}
+
+SendPacketInfo* RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(const RUDPSession& session)
+{
+	return session.GetReservedSendPacketInfo();
+}
+
+void RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer)
+{
+	session.EnqueueToRecvBufferList(buffer);
+}
+
+size_t RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(const RUDPSession& session)
+{
+	return session.GetSendPacketInfoQueueSize();
+}
+
+char* RUDPSessionFunctionDelegate::GetRIOSendBuffer(RUDPSession& session)
+{
+	return session.GetRIOSendBuffer();
+}
+
+void RUDPSessionFunctionDelegate::SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo)
+{
+	return session.SetReservedSendPacketInfo(reserveSendPacketInfo);
+}
+
+SendPacketInfo* RUDPSessionFunctionDelegate::GetSendPacketInfoQueueFrontAndPop(RUDPSession& session)
+{
+	return session.GetSendPacketInfoQueueFrontAndPop();
+}
+
+RecvBuffer& RUDPSessionFunctionDelegate::GetRecvBuffer(RUDPSession& session)
+{
+	return session.GetRecvBuffer();
+}
+
 void RUDPSessionFunctionDelegate::Disconnect(RUDPSession& session, NetBuffer& recvPacket)
 {
 	session.Disconnect(recvPacket);
+}
+
+std::shared_mutex& RUDPSessionFunctionDelegate::GetSocketMutex(const RUDPSession& session)
+{
+	return session.GetSocketMutex();
+}
+
+std::mutex& RUDPSessionFunctionDelegate::AcquireSendPacketInfoQueueLock(RUDPSession& session)
+{
+	return session.GetSendPacketInfoQueueMutex();
+}
+
+SOCKET RUDPSessionFunctionDelegate::GetSocket(const RUDPSession& session)
+{
+	return session.GetSocket();
+}
+
+RIO_RQ RUDPSessionFunctionDelegate::GetRecvRIORQ(const RUDPSession& session)
+{
+	return session.GetRecvRIORQ();
+}
+
+RIO_RQ RUDPSessionFunctionDelegate::GetSendRIORQ(const RUDPSession& session)
+{
+	return session.GetSendRIORQ();
 }

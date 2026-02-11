@@ -8,39 +8,15 @@
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
-#include <set>
 #include "RUDPSessionManager.h"
 #include "RUDPThreadManager.h"
 #include "RUDPPacketProcessor.h"
+#include "RUDPIOHandler.h"
+#include "IOContext.h"
 
 #include "../Common/TLS/TLSHelper.h"
 
 #pragma comment(lib, "ws2_32.lib")
-
-enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
-{
-	SUCCESS = 0,
-	OCCURED_ERROR = -1,
-	IS_ERASED_PACKET = -2,
-	STREAM_IS_FULL = -3,
-	IS_SENT = -4,
-};
-
-struct IOContext : RIO_BUF
-{
-	IOContext() = default;
-	~IOContext() = default;
-
-	inline void InitContext(SessionIdType inOwnerSessionId, RIO_OPERATION_TYPE inIOType);
-
-	SessionIdType ownerSessionId = INVALID_SESSION_ID;
-	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
-	RUDPSession* session = nullptr;
-	RIO_BUF clientAddrRIOBuffer{ RIO_INVALID_BUFFERID };
-	RIO_BUF localAddrRIOBuffer{ RIO_INVALID_BUFFERID };
-	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
-	char localAddrBuffer[sizeof(SOCKADDR_INET)];
-};
 
 struct SendPacketInfo;
 
@@ -69,9 +45,12 @@ namespace MultiSocketRUDP
 }
 
 class RIOManager;
+class MultiSocketRUDPCoreFunctionDelegate;
 
 class MultiSocketRUDPCore
 {
+	friend MultiSocketRUDPCoreFunctionDelegate;
+
 public:
 	explicit MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName);
 	virtual ~MultiSocketRUDPCore() = default;
@@ -91,7 +70,7 @@ public:
 	unsigned short GetConnectedUserCount() const;
 
 public:
-	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true);
+	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true) const;
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioManager->GetRIOFunctionTable(); }
 
@@ -112,14 +91,7 @@ public:
 	}
 
 private:
-	[[nodiscard]]
-	bool DoRecv(const RUDPSession& session) const;
-	[[nodiscard]]
-	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId);
-	[[nodiscard]]
-	IOContext* MakeSendContext(OUT RUDPSession& session, ThreadIdType threadId);
-	[[nodiscard]]
-	bool TryRIOSend(OUT RUDPSession& session, IOContext* context);
+	void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
 
 private:
 	[[nodiscard]]
@@ -252,36 +224,16 @@ private:
 
 #pragma endregion thread
 
-#pragma region RIO
 private:
 	[[nodiscard]]
 	IOContext* GetIOCompletedContext(const RIORESULT& rioResult);
-	[[nodiscard]]
-	bool IOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
-	[[nodiscard]]
-	bool RecvIOCompleted(OUT IOContext* contextResult, ULONG transferred, BYTE threadId);
-	[[nodiscard]]
-	inline bool SendIOCompleted(OUT IOContext* ioContext, BYTE threadId);
-
 	void OnRecvPacket(BYTE threadId);
-	// ----------------------------------------
-	// @brief 수신된 패킷을 타입에 따라 처리하는 객체입니다.
-	// ----------------------------------------
-	[[nodiscard]]
-	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId);
-    [[nodiscard]]  
-	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, ThreadIdType threadId);
-	[[nodiscard]]
-	SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, ThreadIdType threadId);
-	[[nodiscard]]
-	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, ThreadIdType threadId);
 
 private:
 	CTLSMemoryPool<IOContext> contextPool;
 	std::unique_ptr<RIOManager> rioManager;
-#pragma endregion RIO
-
 	std::unique_ptr<RUDPPacketProcessor> packetProcessor;
+	std::unique_ptr<RUDPIOHandler> ioHandler;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

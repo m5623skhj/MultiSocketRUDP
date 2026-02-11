@@ -257,7 +257,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 		return CONNECT_RESULT_CODE::RIO_INIT_FAILED;
 	}
 
-	if (not DoRecv(session))
+	if (not ioHandler->DoRecv(session))
 	{
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::DO_RECV_FAILED;

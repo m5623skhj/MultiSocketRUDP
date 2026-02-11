@@ -142,6 +142,56 @@ ULONG RIOManager::DequeueCompletions(const ThreadIdType threadId, RIORESULT* res
 	return rioFunctionTable.RIODequeueCompletion(rioCompletionQueues[threadId], results, maxResults);
 }
 
+bool RIOManager::RIOReceiveEx(const RIO_RQ& rioRQ,
+	PRIO_BUF rioBuffer,
+	DWORD bufferCount,
+	PRIO_BUF localAddr,
+	PRIO_BUF remoteAddr,
+	PRIO_BUF controlContext,
+	PRIO_BUF flagsContext,
+	ULONG flags,
+	PVOID requestContext) const
+{
+	if (not isInitialized)
+	{
+		return false;
+	}
+
+	return rioFunctionTable.RIOReceiveEx(rioRQ
+		, rioBuffer
+		, bufferCount
+		, localAddr
+		, remoteAddr
+		, controlContext
+		, flagsContext
+		, flags
+		, requestContext);
+}
+
+bool RIOManager::RIOSendEx(const RIO_RQ& rioRQ,
+	PRIO_BUF rioBuffer,
+	DWORD bufferCount,
+	PRIO_BUF remoteAddr,
+	PRIO_BUF controlContext,
+	PRIO_BUF flagsContext,
+	ULONG flags,
+	PVOID requestContext) const
+{
+	if (not isInitialized)
+	{
+		return false;
+	}
+	return rioFunctionTable.RIOSendEx(rioRQ
+		, rioBuffer
+		, bufferCount
+		, remoteAddr
+		, controlContext
+		, flagsContext
+		, flagsContext
+		, flags
+		, requestContext);
+}
+
 bool RIOManager::LoadRIOFunctionTable()
 {
 	GUID guid = WSAID_MULTIPLE_RIO;

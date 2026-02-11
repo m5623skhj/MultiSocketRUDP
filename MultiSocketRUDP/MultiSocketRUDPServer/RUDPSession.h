@@ -98,8 +98,22 @@ private:
 	static void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
 	void UnregisterRIOBuffers();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
+	size_t GetSendPacketInfoQueueSize() const;
+	void EnqueueToRecvBufferList(NetBuffer* buffer);
+	char* GetRIOSendBuffer();
+	SendPacketInfo* GetReservedSendPacketInfo() const;
+	void SetReservedSendPacketInfo(SendPacketInfo* reserveSendPacketInfo);
+	SendPacketInfo* GetSendPacketInfoQueueFrontAndPop();
+	RecvBuffer& GetRecvBuffer();
 
 	void RecvContextReset();
+	RIO_BUFFERID GetSendBufferId() const;
+	IO_MODE& GetSendIOMode();
+	std::shared_ptr<IOContext> GetRecvBufferContext() const;
+	
+
+	RIO_RQ GetRecvRIORQ() const;
+	RIO_RQ GetSendRIORQ() const;
 
 private:
 	bool TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
@@ -133,13 +147,21 @@ private:
 	[[nodiscard]]
 	const unsigned char* GetSessionSalt() const { return sessionSalt; }
 
+private:
+	std::shared_mutex& GetSocketMutex() const { return socketLock; }
+	std::mutex& GetSendPacketInfoQueueMutex() { return sendBuffer.sendPacketInfoQueueLock; }
+
 public:
 	[[nodiscard]]
 	SessionIdType GetSessionId() const;
 	[[nodiscard]]
+	SOCKET GetSocket() const;
+	[[nodiscard]]
 	sockaddr_in GetSocketAddress() const;
 	[[nodiscard]]
 	SOCKADDR_INET GetSocketAddressInet() const;
+	[[nodiscard]]
+	SOCKADDR_INET& GetSocketAddressInetRef();
 	[[nodiscard]]
 	bool IsConnected() const { return sessionState == SESSION_STATE::CONNECTED; }
 	[[nodiscard]]

@@ -29,9 +29,11 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
     <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
+    <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RIOManager.cpp" />
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
+    <ClCompile Include="RUDPIOHandler.cpp" />
     <ClCompile Include="RUDPPacketProcessor.cpp" />
     <ClCompile Include="RUDPSession.cpp" />
     <ClCompile Include="RUDPSessionBroker.cpp" />
@@ -43,12 +45,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
+    <ClInclude Include="IOContext.h" />
     <ClInclude Include="LogExtension.h" />
     <ClInclude Include="MemoryTracer.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
+    <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RIOManager.h" />
+    <ClInclude Include="RUDPIOHandler.h" />
     <ClInclude Include="RUDPPacketProcessor.h" />
     <ClInclude Include="RUDPSession.h" />
     <ClInclude Include="RUDPSessionFunctionDelegate.h" />

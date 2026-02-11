@@ -5,6 +5,7 @@
 #include "LogExtension.h"
 #include "Logger.h"
 #include "MemoryTracer.h"
+#include "IOContext.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
@@ -318,6 +319,63 @@ void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
 	maximumHoldingPacketQueueSize = size;
 }
 
+size_t RUDPSession::GetSendPacketInfoQueueSize() const
+{
+	return sendBuffer.sendPacketInfoQueue.size();
+}
+
+void RUDPSession::EnqueueToRecvBufferList(NetBuffer* buffer)
+{
+	recvBuffer.recvBufferList.Enqueue(buffer);
+}
+
+char* RUDPSession::GetRIOSendBuffer()
+{
+	return sendBuffer.rioSendBuffer;
+}
+
+SendPacketInfo* RUDPSession::GetReservedSendPacketInfo() const
+{
+	return sendBuffer.reservedSendPacketInfo;
+}
+
+void RUDPSession::SetReservedSendPacketInfo(SendPacketInfo* reserveSendPacketInfo)
+{
+	sendBuffer.reservedSendPacketInfo = reserveSendPacketInfo;
+}
+
+SendPacketInfo* RUDPSession::GetSendPacketInfoQueueFrontAndPop()
+{
+	if (sendBuffer.sendPacketInfoQueue.empty())
+	{
+		return nullptr;
+	}
+
+	auto* frontItem = sendBuffer.sendPacketInfoQueue.front();
+	sendBuffer.sendPacketInfoQueue.pop();
+	return frontItem;
+}
+
+RecvBuffer& RUDPSession::GetRecvBuffer()
+{
+	return recvBuffer;
+}
+
+std::shared_ptr<IOContext> RUDPSession::GetRecvBufferContext() const
+{
+	return recvBuffer.recvContext;
+}
+
+RIO_BUFFERID RUDPSession::GetSendBufferId() const
+{
+	return sendBuffer.sendBufferId;
+}
+
+IO_MODE& RUDPSession::GetSendIOMode()
+{
+	return sendBuffer.ioMode;
+}
+
 void RUDPSession::RecvContextReset()
 {
 	if (recvBuffer.recvContext == nullptr)
@@ -326,6 +384,16 @@ void RUDPSession::RecvContextReset()
 	}
 
 	recvBuffer.recvContext.reset();
+}
+
+RIO_RQ RUDPSession::GetRecvRIORQ() const
+{
+	return rioRQ;
+}
+
+RIO_RQ RUDPSession::GetSendRIORQ() const
+{
+	return rioRQ;
 }
 
 bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr)
@@ -495,12 +563,22 @@ SessionIdType RUDPSession::GetSessionId() const
 	return sessionId;
 }
 
+SOCKET RUDPSession::GetSocket() const
+{
+	return sock;
+}
+
 sockaddr_in RUDPSession::GetSocketAddress() const
 {
 	return clientAddr;
 }
 
 SOCKADDR_INET RUDPSession::GetSocketAddressInet() const
+{
+	return clientSockAddrInet;
+}
+
+SOCKADDR_INET& RUDPSession::GetSocketAddressInetRef()
 {
 	return clientSockAddrInet;
 }
