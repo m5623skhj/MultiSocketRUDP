@@ -31,6 +31,25 @@ public:
 	const RIO_EXTENSION_FUNCTION_TABLE& GetRIOFunctionTable() const;
 	[[nodiscard]]
 	ULONG DequeueCompletions(ThreadIdType threadId, RIORESULT* results, ULONG maxResults) const;
+	[[nodiscard]]
+	bool RIOReceiveEx(const RIO_RQ& rioRQ,
+		PRIO_BUF rioBuffer,
+		DWORD bufferCount,
+		PRIO_BUF localAddr,
+		PRIO_BUF remoteAddr,
+		PRIO_BUF controlContext,
+		PRIO_BUF flagsContext,
+		ULONG flags,
+		PVOID requestContext) const;
+	[[nodiscard]]
+	bool RIOSendEx(const RIO_RQ& rioRQ,
+		PRIO_BUF rioBuffer,
+		DWORD bufferCount,
+		PRIO_BUF remoteAddr,
+		PRIO_BUF controlContext,
+		PRIO_BUF flagsContext,
+		ULONG flags,
+		PVOID requestContext) const;
 
 private:
 	[[nodiscard]]

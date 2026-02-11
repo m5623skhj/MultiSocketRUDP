@@ -1,11 +1,18 @@
 #pragma once
+#include <shared_mutex>
+
 #include "RIOManager.h"
 #include "NetServerSerializeBuffer.h"
 
+struct RecvBuffer;
+struct SendPacketInfo;
+enum class IO_MODE : LONG;
+struct IOContext;
 class RUDPSession;
 class RIOManager;
 class RUDPSessionManager;
 class RUDPPacketProcessor;
+class RUDPIOHandler;
 
 // ----------------------------------------
 // @brief RUDPSession 클래스의 특정 private/protected 메서드에 대한 접근을 위임하는 클래스입니다.
@@ -15,6 +22,7 @@ class RUDPSessionFunctionDelegate
 	friend RIOManager;
 	friend RUDPSessionManager;
 	friend RUDPPacketProcessor;
+	friend RUDPIOHandler;
 
 private:
 	RUDPSessionFunctionDelegate() = default;
@@ -45,7 +53,26 @@ private:
 	static bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket);
 #pragma endregion For RUDPPacketProcessor
 
+#pragma region For RUDPIOHandler
+	static std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session);
+	static RIO_BUFFERID GetSendBufferId(const RUDPSession& session);
+	static IO_MODE& GetSendIOMode(RUDPSession& session);
+	static bool IsSendPacketInfoQueueEmpty(RUDPSession& session);
+	static SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session);
+	static void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer);
+	static size_t GetSendPacketInfoQueueSize(const RUDPSession& session);
+	static char* GetRIOSendBuffer(RUDPSession& session);
+	static void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo);
+	static SendPacketInfo* GetSendPacketInfoQueueFrontAndPop(RUDPSession& session);
+	static RecvBuffer& GetRecvBuffer(RUDPSession& session);
+#pragma endregion For RUDPIOHandler
+
 #pragma region Util
 	static void Disconnect(RUDPSession& session, NetBuffer& recvPacket);
+	static std::shared_mutex& GetSocketMutex(const RUDPSession& session);
+	static std::mutex& AcquireSendPacketInfoQueueLock(RUDPSession& session);
+	static SOCKET GetSocket(const RUDPSession& session);
+	static RIO_RQ GetRecvRIORQ(const RUDPSession& session);
+	static RIO_RQ GetSendRIORQ(const RUDPSession& session);
 #pragma endregion Util
 };

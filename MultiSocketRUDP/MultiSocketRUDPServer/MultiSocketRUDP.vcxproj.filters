@@ -108,6 +108,12 @@
     <ClCompile Include="RUDPPacketProcessor.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPIOHandler.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h">
@@ -150,6 +156,15 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="RUDPPacketProcessor.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPIOHandler.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="IOContext.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
   </ItemGroup>
