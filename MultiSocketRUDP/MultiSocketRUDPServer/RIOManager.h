@@ -45,6 +45,7 @@ public:
 	bool RIOSendEx(const RIO_RQ& rioRQ,
 		PRIO_BUF rioBuffer,
 		DWORD bufferCount,
+		PRIO_BUF localAddr,
 		PRIO_BUF remoteAddr,
 		PRIO_BUF controlContext,
 		PRIO_BUF flagsContext,
