@@ -171,6 +171,7 @@ bool RIOManager::RIOReceiveEx(const RIO_RQ& rioRQ,
 bool RIOManager::RIOSendEx(const RIO_RQ& rioRQ,
 	PRIO_BUF rioBuffer,
 	DWORD bufferCount,
+	PRIO_BUF localAddr,
 	PRIO_BUF remoteAddr,
 	PRIO_BUF controlContext,
 	PRIO_BUF flagsContext,
@@ -181,12 +182,13 @@ bool RIOManager::RIOSendEx(const RIO_RQ& rioRQ,
 	{
 		return false;
 	}
+
 	return rioFunctionTable.RIOSendEx(rioRQ
 		, rioBuffer
 		, bufferCount
+		, localAddr
 		, remoteAddr
 		, controlContext
-		, flagsContext
 		, flagsContext
 		, flags
 		, requestContext);

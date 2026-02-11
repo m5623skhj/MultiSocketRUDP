@@ -181,15 +181,17 @@ bool RUDPIOHandler::TryRIOSend(RUDPSession& session, IOContext* context) const
 			return false;
 		}
 
-		if (not rioManager.RIOSendEx(RUDPSessionFunctionDelegate::GetRecvRIORQ(session)
+		if (not rioManager.RIOSendEx(RUDPSessionFunctionDelegate::GetSendRIORQ(session)
 			, context
 			, 1
 			, nullptr
 			, &context->clientAddrRIOBuffer
 			, nullptr
+			, nullptr
 			, 0
-			, context) != 0)
+			, context))
 		{
+			LOG_ERROR(std::format("RIOSendEx() failed with error code {}", WSAGetLastError()));
 			contextPool.Free(context);
 			return false;
 		}
@@ -283,7 +285,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 {
 	SendPacketInfo* sendPacketInfo = RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session);
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
-	if (useSize < MAX_SEND_BUFFER_SIZE)
+	if (useSize >= MAX_SEND_BUFFER_SIZE)
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
