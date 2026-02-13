@@ -1,8 +1,14 @@
 #pragma once
 #include <shared_mutex>
+#include <set>
 
 #include "RIOManager.h"
 #include "NetServerSerializeBuffer.h"
+
+namespace MultiSocketRUDP
+{
+	struct PacketSequenceSetKey;
+}
 
 struct RecvBuffer;
 struct SendPacketInfo;
@@ -60,6 +66,8 @@ private:
 	static bool IsSendPacketInfoQueueEmpty(RUDPSession& session);
 	static SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session);
 	static void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer);
+	static std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session);
+	static std::mutex& GetCachedSequenceSetMutex(RUDPSession& session);
 	static size_t GetSendPacketInfoQueueSize(const RUDPSession& session);
 	static char* GetRIOSendBuffer(RUDPSession& session);
 	static void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo);

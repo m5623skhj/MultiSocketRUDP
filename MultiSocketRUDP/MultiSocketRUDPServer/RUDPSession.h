@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <map>
+#include <set>
 #include "../Common/etc/CoreType.h"
 #include "Queue.h"
 #include <shared_mutex>
@@ -9,6 +10,11 @@
 #include "PacketManager.h"
 #include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
+
+namespace MultiSocketRUDP
+{
+	struct PacketSequenceSetKey;
+}
 
 class MultiSocketRUDPCore;
 class RUDPSessionFunctionDelegate;
@@ -110,7 +116,11 @@ private:
 	RIO_BUFFERID GetSendBufferId() const;
 	IO_MODE& GetSendIOMode();
 	std::shared_ptr<IOContext> GetRecvBufferContext() const;
-	
+
+	[[nodiscard]]
+	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet();
+	[[nodiscard]]
+	std::mutex& GetCachedSequenceSetMutex();
 
 	RIO_RQ GetRecvRIORQ() const;
 	RIO_RQ GetSendRIORQ() const;
@@ -255,6 +265,9 @@ private:
 	std::unordered_set<PacketSequence> recvHoldingPacketSequences;
 	static BYTE maximumHoldingPacketQueueSize;
 	std::atomic_uchar sequenceViolationCounter{};
+
+	std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
+	std::mutex cachedSequenceSetLock;
 
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;

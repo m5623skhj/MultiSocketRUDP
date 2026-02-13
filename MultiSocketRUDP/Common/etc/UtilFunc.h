@@ -22,6 +22,12 @@ namespace Util
 
         ScopeExit(const ScopeExit&) = delete;
         ScopeExit& operator=(const ScopeExit&) = delete;
+        ScopeExit& operator=(ScopeExit&&) = delete;
+
+        void Dismiss() noexcept
+        {
+            active = false;
+        }
 
     private:
         T call;

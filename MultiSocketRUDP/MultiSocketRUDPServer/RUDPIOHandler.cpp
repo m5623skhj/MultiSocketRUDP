@@ -244,8 +244,10 @@ IOContext* RUDPIOHandler::MakeSendContext(RUDPSession& session, const ThreadIdTy
 
 unsigned int RUDPIOHandler::MakeSendStream(RUDPSession& session, IOContext* context, const ThreadIdType threadId) const
 {
-	std::set<MultiSocketRUDP::PacketSequenceSetKey> packetSequenceSet;
-
+	std::scoped_lock lock(RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(session));
+	auto& packetSequenceSet = RUDPSessionFunctionDelegate::GetCachedSequenceSet(session);
+	packetSequenceSet.clear();
+	
 	unsigned int totalSendSize = 0;
 	size_t bufferCount;
 	{

@@ -381,6 +381,16 @@ std::shared_ptr<IOContext> RUDPSession::GetRecvBufferContext() const
 	return recvBuffer.recvContext;
 }
 
+std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSession::GetCachedSequenceSet()
+{
+	return cachedSequenceSet;
+}
+
+std::mutex& RUDPSession::GetCachedSequenceSetMutex()
+{
+	return cachedSequenceSetLock;
+}
+
 RIO_BUFFERID RUDPSession::GetSendBufferId() const
 {
 	return sendBuffer.sendBufferId;

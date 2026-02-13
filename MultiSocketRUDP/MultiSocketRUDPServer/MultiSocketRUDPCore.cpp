@@ -8,6 +8,7 @@
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "RIOManager.h"
 #include "RUDPSessionBroker.h"
+#include "../Common/etc/UtilFunc.h"
 
 MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName)
 	: sessionBrokerCertStoreName(inSessionBrokerCertStoreName)
@@ -347,6 +348,14 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
 
+	auto raii = Util::MakeScopeExit([&session]() {
+		if (session.GetSocket() != INVALID_SOCKET)
+		{
+			closesocket(session.GetSocket());
+			session.sock = INVALID_SOCKET;
+		}
+	});
+
 	sockaddr_in serverAddr;
 	socklen_t len = sizeof(serverAddr);
 	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
@@ -365,6 +374,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 	}
 	session.sessionState = SESSION_STATE::RESERVED;
 
+	raii.Dismiss();
 	return CONNECT_RESULT_CODE::SUCCESS;
 }
 

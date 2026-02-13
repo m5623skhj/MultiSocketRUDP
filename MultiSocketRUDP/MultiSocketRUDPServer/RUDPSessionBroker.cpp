@@ -79,9 +79,11 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 	sockaddr_in clientAddr;
 	int sockAddrSize = sizeof(clientAddr);
 
+	NetBuffer sendBuffer;
 	while (not stopToken.stop_requested())
 	{
-		NetBuffer sendBuffer;
+		sendBuffer.Init();
+
 		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -276,6 +278,8 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
 	char encryptedBuffer[maxTlsPacketSize];
 	size_t encryptedSize = 0;
+	constexpr DWORD tlsShutdownTimeout = 300;
+	constexpr size_t tlsFinBufferSize = 256;
 
 	if (not tlsHelper.EncryptData(
 		sendBuffer.GetBufferPtr(),
@@ -302,13 +306,12 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 		}
 	}
 
-	constexpr DWORD tlsShutdownTimeout = 300;
 	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tlsShutdownTimeout), sizeof(tlsShutdownTimeout));
 	shutdown(clientSocket, SD_SEND);
 
 	while (true)
 	{
-		if (char finRecv[256]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
+		if (char finRecv[tlsFinBufferSize]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
 		{
 			break;
 		}
