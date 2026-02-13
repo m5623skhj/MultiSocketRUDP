@@ -69,8 +69,8 @@ private:
 	bool InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	void InitializeSession();
 
-	void SetSessionId( const SessionIdType inSessionId) { sessionId = inSessionId; }
-	void SetThreadId(const ThreadIdType inThreadId) { threadId = inThreadId; }
+	void SetSessionId( const SessionIdType inSessionId);
+	void SetThreadId(const ThreadIdType inThreadId);
 
 public:
 	virtual ~RUDPSession();
@@ -79,7 +79,7 @@ public:
 	void DoDisconnect();
 	bool SendPacket(IPacket& packet);
 
-	ThreadIdType GetThreadId() const { return threadId; }
+	ThreadIdType GetThreadId() const;
 
 private:
 	void OnConnected(SessionIdType inSessionId);
@@ -139,19 +139,23 @@ private:
 	// @return 세션 키 핸들
 	// ----------------------------------------
 	[[nodiscard]]
-	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const { return sessionKeyHandle; }
-	void SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle) { sessionKeyHandle = inKeyHandle; }
+	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const;
+	void SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle);
 	// ----------------------------------------
 	// @brief 세션의 암호화 솔트를 반환합니다.
 	// @return 세션 솔트 버퍼에 대한 포인터
 	// ----------------------------------------
 	[[nodiscard]]
-	const unsigned char* GetSessionSalt() const { return sessionSalt; }
-	void SetSessionSalt(const unsigned char* inSessionSalt) { std::copy_n(inSessionSalt, SESSION_SALT_SIZE, sessionSalt); }
+	const unsigned char* GetSessionSalt() const;
+	void SetSessionSalt(const unsigned char* inSessionSalt);
+
+	[[nodiscard]]
+	const unsigned char* GetSessionKey() const;
+	void SetSessionKey(const unsigned char* inSessionKey);
 
 private:
-	std::shared_mutex& GetSocketMutex() const { return socketLock; }
-	std::mutex& GetSendPacketInfoQueueMutex() { return sendBuffer.sendPacketInfoQueueLock; }
+	std::shared_mutex& GetSocketMutex() const;
+	std::mutex& GetSendPacketInfoQueueMutex();
 
 public:
 	[[nodiscard]]
@@ -165,12 +169,12 @@ public:
 	[[nodiscard]]
 	SOCKADDR_INET& GetSocketAddressInetRef();
 	[[nodiscard]]
-	bool IsConnected() const { return sessionState == SESSION_STATE::CONNECTED; }
+	bool IsConnected() const;
 	[[nodiscard]]
-	bool IsReserved() const { return sessionState == SESSION_STATE::RESERVED; }
+	bool IsReserved() const;
 	[[nodiscard]]
-	bool IsUsingSession() const { return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED; }
-	SESSION_STATE GetSessionState() const { return sessionState.load(); }
+	bool IsUsingSession() const;
+	SESSION_STATE GetSessionState() const;
 	[[nodiscard]]
 	bool IsReleasing() const;
 

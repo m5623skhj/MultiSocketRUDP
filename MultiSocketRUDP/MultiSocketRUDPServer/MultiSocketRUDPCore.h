@@ -12,6 +12,7 @@
 #include "RUDPThreadManager.h"
 #include "RUDPPacketProcessor.h"
 #include "RUDPIOHandler.h"
+#include "RUDPSessionBroker.h"
 #include "IOContext.h"
 
 #include "../Common/TLS/TLSHelper.h"
@@ -52,7 +53,7 @@ class MultiSocketRUDPCore
 	friend MultiSocketRUDPCoreFunctionDelegate;
 
 public:
-	explicit MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName);
+	explicit MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName);
 	virtual ~MultiSocketRUDPCore() = default;
 
 public:
@@ -103,8 +104,6 @@ private:
 	[[nodiscard]]
 	bool RunAllThreads();
 	[[nodiscard]]
-	bool RunSessionBroker();
-	[[nodiscard]]
 	static SOCKET CreateRUDPSocket();
 
 private:
@@ -127,69 +126,18 @@ private:
 	inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 
 private:
-	std::unique_ptr<RUDPSessionManager> sessionManager;
-
-private:
 	std::vector<std::list<SendPacketInfo*>> sendPacketInfoList;
 	std::vector<std::unique_ptr<std::mutex>> sendPacketInfoListLock;
 
+private:
+	[[nodiscard]]
+	CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session) const;
+
+private:
+	std::wstring sessionBrokerCertStoreName{};
+	std::wstring sessionBrokerCertSubjectName{};
+
 #pragma region thread
-#if USE_IOCP_SESSION_BROKER
-private:
-	class RUDPSessionBroker : public CNetServer
-	{
-		friend MultiSocketRUDPCore;
-
-	private:
-		RUDPSessionBroker() = default;
-		~RUDPSessionBroker() = default;
-
-	private:
-		bool Start(const std::wstring& sessionBrokerOptionFilePath);
-		void Stop();
-
-	private:
-		void OnClientJoin(UINT64 sessionId) override;
-		void OnClientLeave(UINT64 sessionId) override;
-		bool OnConnectionRequest(const WCHAR* ip)  override { UNREFERENCED_PARAMETER(ip); return true; }
-		void OnRecv(UINT64 sessionId, NetBuffer* recvBuffer) override;
-		void OnSend(UINT64 sessionId, int sendSize) override { UNREFERENCED_PARAMETER(sessionId); UNREFERENCED_PARAMETER(sendSize); }
-		void OnWorkerThreadBegin() override {}
-		void OnWorkerThreadEnd() override {}
-		void OnError(st_Error* OutError) override;
-		void GQCSFailed(int lastError, UINT64 sessionId) override { UNREFERENCED_PARAMETER(lastError); UNREFERENCED_PARAMETER(sessionId); }
-
-	private:
-		bool isServerStopped{};
-	};
-	RUDPSessionBroker sessionBroker;
-#else
-private:
-	void RunSessionBrokerThread(PortType listenPort, const std::string& rudpSessionIP);
-	[[nodiscard]]
-	bool OpenSessionBrokerSocket(PortType listenPort);
-	[[nodiscard]]
-	static bool InitSessionCrypto(OUT RUDPSession& session);
-	[[nodiscard]]
-	static bool GenerateSessionKey(OUT RUDPSession& session);
-	[[nodiscard]]
-	static bool GenerateSaltKey(OUT RUDPSession& session);
-	static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer);
-	[[nodiscard]]
-	RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP);
-	[[nodiscard]]
-	CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const;
-	[[nodiscard]]
-	bool SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
-	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize);
-
-private:
-	std::jthread sessionBrokerThread{};
-	SOCKET sessionBrokerListenSocket{ INVALID_SOCKET };
-#endif
-
-	TLSHelper::TLSHelperServer tlsHelper;
-
 private:
 	void StopAllThreads() const;
 	void RunIOWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
@@ -234,6 +182,8 @@ private:
 	std::unique_ptr<RIOManager> rioManager;
 	std::unique_ptr<RUDPPacketProcessor> packetProcessor;
 	std::unique_ptr<RUDPIOHandler> ioHandler;
+	std::unique_ptr<RUDPSessionBroker> sessionBroker;
+	std::unique_ptr<RUDPSessionManager> sessionManager;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

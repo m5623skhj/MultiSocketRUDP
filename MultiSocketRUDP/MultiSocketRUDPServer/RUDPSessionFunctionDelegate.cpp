@@ -118,6 +118,26 @@ RecvBuffer& RUDPSessionFunctionDelegate::GetRecvBuffer(RUDPSession& session)
 	return session.GetRecvBuffer();
 }
 
+void RUDPSessionFunctionDelegate::SetAbortReservedSession(RUDPSession& session)
+{
+	session.AbortReservedSession();
+}
+
+void RUDPSessionFunctionDelegate::SetSessionReservedTime(RUDPSession& session, const unsigned long long now)
+{
+	session.sessionReservedTime = now;
+}
+
+unsigned char* RUDPSessionFunctionDelegate::GetSessionKeyObjectBuffer(const RUDPSession& session)
+{
+	return session.keyObjectBuffer;
+}
+
+void RUDPSessionFunctionDelegate::SetSessionKeyObjectBuffer(RUDPSession& session, unsigned char* inKeyObjectBuffer)
+{
+	session.keyObjectBuffer = inKeyObjectBuffer;
+}
+
 void RUDPSessionFunctionDelegate::Disconnect(RUDPSession& session, NetBuffer& recvPacket)
 {
 	session.Disconnect(recvPacket);
@@ -148,6 +168,16 @@ RIO_RQ RUDPSessionFunctionDelegate::GetSendRIORQ(const RUDPSession& session)
 	return session.GetSendRIORQ();
 }
 
+const unsigned char* RUDPSessionFunctionDelegate::GetSessionKey(const RUDPSession& session)
+{
+	return session.GetSessionKey();
+}
+
+void RUDPSessionFunctionDelegate::SetSessionKey(RUDPSession& session, const unsigned char* inSessionKey)
+{
+	session.SetSessionKey(inSessionKey);
+}
+
 const unsigned char* RUDPSessionFunctionDelegate::GetSessionSalt(const RUDPSession& session)
 {
 	return session.GetSessionSalt();
@@ -166,4 +196,10 @@ const BCRYPT_KEY_HANDLE& RUDPSessionFunctionDelegate::GetSessionKeyHandle(const 
 void RUDPSessionFunctionDelegate::SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle)
 {
 	session.SetSessionKeyHandle(inKeyHandle);
+}
+
+void RUDPSessionFunctionDelegate::GetServerPortAndSessionId(const RUDPSession& session, PortType& outServerPort, SessionIdType& outSessionId)
+{
+	outServerPort = session.serverPort;
+	outSessionId = session.sessionId;
 }

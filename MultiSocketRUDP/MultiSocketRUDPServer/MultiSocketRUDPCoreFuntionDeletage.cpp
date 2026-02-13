@@ -9,3 +9,19 @@ void MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(IOContext* contex
 
     inst.core->EnqueueContextResult(contextResult, threadId);
 }
+
+RUDPSession* MultiSocketRUDPCoreFunctionDelegate::AcquireSession()
+{
+	const auto& inst = Instance();
+
+	assert(inst.core != nullptr);
+	return inst.core->AcquireSession();
+}
+
+CONNECT_RESULT_CODE MultiSocketRUDPCoreFunctionDelegate::InitReserveSession(RUDPSession& session)
+{
+	const auto& inst = Instance();
+
+	assert(inst.core != nullptr);
+	return inst.core->InitReserveSession(session);
+}

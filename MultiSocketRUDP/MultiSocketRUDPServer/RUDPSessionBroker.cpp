@@ -1,75 +1,87 @@
 #include "PreCompile.h"
-#include <WinSock2.h>
-#include <random>
-#include <sstream>
-#include <iomanip>
-#include <array>
+#include "RUDPSessionBroker.h"
+#include "RUDPSession.h"
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
+#include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "RUDPSessionFunctionDelegate.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
-#if USE_IOCP_SESSION_BROKER
-bool MultiSocketRUDPCore::RUDPSessionBroker::Start(const std::wstring& sessionBrokerOptionFilePath)
+RUDPSessionBroker::RUDPSessionBroker(
+	MultiSocketRUDPCore& inCore,
+	const std::wstring& certStoreName,
+	const std::wstring& certSubjectName)
+	: core(inCore)
+	, tlsHelper(certStoreName, certSubjectName)
 {
-	if (not CNetServer::Start(sessionBrokerOptionFilePath.c_str()))
+}
+
+RUDPSessionBroker::~RUDPSessionBroker()
+{
+	Stop();
+}
+
+bool RUDPSessionBroker::Start(const PortType listenPort, const std::string& rudpSessionIP)
+{
+	if (isRunning)
 	{
-		auto log = Logger::MakeLogObject<ServerLog>();
-		log->logString = "RUDPSessionBroker Start failed";
-		Logger::GetInstance().WriteLog(log);
+		LOG_ERROR("RUDPSessionBroker already running");
 		return false;
 	}
+
+	if (not tlsHelper.Initialize())
+	{
+		LOG_ERROR("RUDPSessionBroker tlsHelper initialize failed");
+		return false;
+	}
+
+	if (not OpenSessionBrokerSocket(listenPort))
+	{
+		LOG_ERROR("RUDPSessionBroker OpenSessionBrokerSocket failed");
+		return false;
+	}
+
+	isRunning = true;
+	sessionBrokerThread = std::jthread([this, rudpSessionIP](const std::stop_token& stopToken)
+		{
+			this->RunSessionBrokerThread(stopToken, rudpSessionIP);
+		});
 
 	return true;
 }
 
-void MultiSocketRUDPCore::RUDPSessionBroker::Stop()
+void RUDPSessionBroker::Stop()
 {
-	CNetServer::Stop();
-	isServerStopped = true;
-}
-
-void MultiSocketRUDPCore::RUDPSessionBroker::OnClientJoin(UINT64 clientId)
-{
-
-}
-
-void MultiSocketRUDPCore::RUDPSessionBroker::OnClientLeave(UINT64 sessionId)
-{
-
-}
-
-void MultiSocketRUDPCore::RUDPSessionBroker::OnRecv(UINT64 sessionId, NetBuffer* recvBuffer)
-{
-
-}
-
-void MultiSocketRUDPCore::RUDPSessionBroker::OnError(st_Error* OutError)
-{
-
-}
-#else
-void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, const std::string& rudpSessionIP)
-{
-	if (tlsHelper.Initialize() == false)
+	if (not isRunning)
 	{
-		LOG_ERROR("RunSessionBrokerThread tlsHelper.Initialize failed");
 		return;
 	}
 
+	CloseListenSocket();
+
+	if (sessionBrokerThread.joinable())
+	{
+		sessionBrokerThread.request_stop();
+		sessionBrokerThread.join();
+	}
+	isRunning = false;
+
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = "RUDPSessionBroker stopped";
+	Logger::GetInstance().WriteLog(log);
+}
+
+void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP)
+{
 	SOCKET clientSocket = INVALID_SOCKET;
 	sockaddr_in clientAddr;
-	if (not OpenSessionBrokerSocket(listenPort))
-	{
-		LOG_ERROR("RunSessionBrokerThread OpenSessionBrokerSocket failed");
-		return;
-	}
+	int sockAddrSize = sizeof(clientAddr);
 
-	int sockAddrSize = sizeof(clientAddr); 
-	NetBuffer sendBuffer;
-	while (not threadStopFlag)
+	while (not stopToken.stop_requested())
 	{
+		NetBuffer sendBuffer;
 		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -94,7 +106,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 		{
 			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
 			{
-				session->AbortReservedSession();
+				RUDPSessionFunctionDelegate::AbortReservedSession(*session);
 			}
 		}
 	}
@@ -104,7 +116,7 @@ void MultiSocketRUDPCore::RunSessionBrokerThread(const PortType listenPort, cons
 	Logger::GetInstance().WriteLog(log);
 }
 
-bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
+bool RUDPSessionBroker::OpenSessionBrokerSocket(const PortType listenPort)
 {
 	sessionBrokerListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerListenSocket == INVALID_SOCKET)
@@ -121,7 +133,6 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	if (bind(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread bind failed with error {}", WSAGetLastError()));
-
 		closesocket(sessionBrokerListenSocket);
 		return false;
 	}
@@ -129,7 +140,6 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	if (listen(sessionBrokerListenSocket, SOMAXCONN) == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread listen failed with error {}", WSAGetLastError()));
-
 		closesocket(sessionBrokerListenSocket);
 		return false;
 	}
@@ -137,74 +147,31 @@ bool MultiSocketRUDPCore::OpenSessionBrokerSocket(const PortType listenPort)
 	return true;
 }
 
-bool MultiSocketRUDPCore::InitSessionCrypto(OUT RUDPSession& session)
+void RUDPSessionBroker::CloseListenSocket()
 {
-	if (not GenerateSessionKey(session) || not GenerateSaltKey(session))
+	if (sessionBrokerListenSocket != INVALID_SOCKET)
 	{
-		return false;
+		closesocket(sessionBrokerListenSocket);
+		sessionBrokerListenSocket = INVALID_SOCKET;
 	}
-
-	if (session.keyObjectBuffer == nullptr)
-	{
-		session.keyObjectBuffer = new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()];
-	}
-	session.sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(session.keyObjectBuffer, session.sessionKey);
-	if (session.sessionKeyHandle == nullptr)
-	{
-		LOG_ERROR("InitSessionCrypto failed : GetSymmetricKeyHandle failed");
-		return false;
-	}
-
-	return true;
 }
 
-bool MultiSocketRUDPCore::GenerateSessionKey(OUT RUDPSession& session)
-{
-	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); bytes.has_value())
-	{
-		std::copy_n(bytes->begin(), SESSION_KEY_SIZE, session.sessionKey);
-		return true;
-	}
-
-	return false;
-}
-
-bool MultiSocketRUDPCore::GenerateSaltKey(OUT RUDPSession& session)
-{
-	if (auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE); bytes.has_value())
-	{
-		std::copy_n(bytes->begin(), SESSION_SALT_SIZE, session.sessionSalt);
-		return true;
-	}
-
-	return false;
-}
-
-void MultiSocketRUDPCore::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpSessionIP, OUT NetBuffer& buffer)
-{
-	const PortType targetPort = session.serverPort;
-	const SessionIdType sessionId = session.sessionId;
-
-	//Send rudp session information packet to client
-	buffer << rudpSessionIP << targetPort << sessionId << session.sessionKey << session.sessionSalt;
-}
-
-RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpSessionIP)
+RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP)
 {
 	CONNECT_RESULT_CODE connectResultCode;
-	const auto session = AcquireSession();
+	const auto session = MultiSocketRUDPCoreFunctionDelegate::AcquireSession();
 	do
 	{
 		if (session == nullptr)
 		{
-			LOG_ERROR("ReserveSession failed : session is nullptr");
+			LOG_ERROR("ReserveSession failed: session is nullptr");
 			connectResultCode = CONNECT_RESULT_CODE::SERVER_FULL;
 			break;
 		}
 
 		connectResultCode = InitReserveSession(*session);
 	} while (false);
-	
+
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS)
 	{
 		if (not InitSessionCrypto(*session))
@@ -218,7 +185,7 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 	sendBuffer << connectResultCode;
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
-		SetSessionInfoToBuffer(*session, rudpSessionIP, sendBuffer);
+		SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);
 	}
 	else
 	{
@@ -228,11 +195,11 @@ RUDPSession* MultiSocketRUDPCore::ReserveSession(OUT NetBuffer& sendBuffer, cons
 		}
 	}
 
-	session->sessionReservedTime = GetTickCount64();
+	RUDPSessionFunctionDelegate::SetSessionReservedTime(*session, GetTickCount64());
 	return session;
 }
 
-CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session) const
+CONNECT_RESULT_CODE RUDPSessionBroker::InitReserveSession(OUT RUDPSession& session)
 {
 	if (session.IsConnected())
 	{
@@ -240,39 +207,74 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(RUDPSession& session
 		return CONNECT_RESULT_CODE::ALREADY_CONNECTED_SESSION;
 	}
 
-	if (session.sock = CreateRUDPSocket(); session.sock == INVALID_SOCKET)
-	{
-		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
-		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
-	}
-	
-	sockaddr_in serverAddr;
-	socklen_t len = sizeof(serverAddr);
-	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
-	session.serverPort = ntohs(serverAddr.sin_port);
-
-	if (rioManager->InitializeSessionRIO(session, session.GetThreadId()) == false)
-	{
-		LOG_ERROR(std::format("RUDPSession::InitializeRIO failed with error {}", WSAGetLastError()));
-		return CONNECT_RESULT_CODE::RIO_INIT_FAILED;
-	}
-
-	if (not ioHandler->DoRecv(session))
-	{
-		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
-		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
-	}
-	session.sessionState = SESSION_STATE::RESERVED;
-
-	return CONNECT_RESULT_CODE::SUCCESS;
+	return MultiSocketRUDPCoreFunctionDelegate::InitReserveSession(session);
 }
 
-bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
+bool RUDPSessionBroker::InitSessionCrypto(OUT RUDPSession& session)
+{
+	if (not GenerateSessionKey(session) || not GenerateSaltKey(session))
+	{
+		return false;
+	}
+
+	if (RUDPSessionFunctionDelegate::GetSessionKeyHandle(session) == nullptr)
+	{
+		RUDPSessionFunctionDelegate::SetSessionKeyObjectBuffer(session, new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()]);
+	}
+
+	RUDPSessionFunctionDelegate::SetSessionKeyHandle(session, 
+		CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(
+			RUDPSessionFunctionDelegate::GetSessionKeyObjectBuffer(session),
+			const_cast<unsigned char*>(RUDPSessionFunctionDelegate::GetSessionKey(session))));
+	if (RUDPSessionFunctionDelegate::GetSessionKeyHandle(session) == nullptr)
+	{
+		LOG_ERROR("InitSessionCrypto failed : GetSymmetricKeyHandle failed");
+		return false;
+	}
+
+	return true;
+}
+
+bool RUDPSessionBroker::GenerateSessionKey(OUT RUDPSession& session)
+{
+	if (const auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); bytes.has_value())
+	{
+		RUDPSessionFunctionDelegate::SetSessionKey(session, bytes->data());
+		return true;
+	}
+
+	return false;
+}
+
+bool RUDPSessionBroker::GenerateSaltKey(OUT RUDPSession& session)
+{
+	if (const auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE); bytes.has_value())
+	{
+		RUDPSessionFunctionDelegate::SetSessionSalt(session, bytes->data());
+		return true;
+	}
+
+	return false;
+}
+
+void RUDPSessionBroker::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer)
+{
+	PortType targetPort;
+	SessionIdType sessionId;
+	RUDPSessionFunctionDelegate::GetServerPortAndSessionId(session, targetPort, sessionId);
+
+	//Send rudp session information packet to client
+	buffer << rudpServerIP << targetPort << sessionId;
+	buffer.WriteBuffer(RUDPSessionFunctionDelegate::GetSessionKey(session), SESSION_KEY_SIZE);
+	buffer.WriteBuffer(RUDPSessionFunctionDelegate::GetSessionSalt(session), SESSION_SALT_SIZE);
+}
+
+bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
 {
 	PacketCryptoHelper::SetHeader(sendBuffer);
+
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
 	char encryptedBuffer[maxTlsPacketSize];
-	DWORD tlsShutdownTimeout = 300;
 	size_t encryptedSize = 0;
 
 	if (not tlsHelper.EncryptData(
@@ -293,11 +295,17 @@ bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OU
 
 	if (tlsHelper.EncryptCloseNotify(encryptedBuffer, sizeof(encryptedBuffer), encryptedSize))
 	{
-		SendAll(clientSocket, encryptedBuffer, encryptedSize);
+		if (not SendAll(clientSocket, encryptedBuffer, encryptedSize))
+		{
+			LOG_ERROR(std::format("RunSessionBrokerThread send close notify failed with error {}", WSAGetLastError()));
+			return false;
+		}
 	}
 
-	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&tlsShutdownTimeout), sizeof(tlsShutdownTimeout));
+	constexpr DWORD tlsShutdownTimeout = 300;
+	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tlsShutdownTimeout), sizeof(tlsShutdownTimeout));
 	shutdown(clientSocket, SD_SEND);
+
 	while (true)
 	{
 		if (char finRecv[256]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
@@ -312,7 +320,7 @@ bool MultiSocketRUDPCore::SendSessionInfoToClient(const SOCKET& clientSocket, OU
 	return true;
 }
 
-bool MultiSocketRUDPCore::SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize)
+bool RUDPSessionBroker::SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize)
 {
 	size_t sent = 0;
 	while (sent < sendSize)
@@ -328,5 +336,3 @@ bool MultiSocketRUDPCore::SendAll(const SOCKET& socket, const char* sendBuffer, 
 
 	return true;
 }
-
-#endif

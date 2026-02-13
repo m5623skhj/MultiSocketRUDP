@@ -7,9 +7,11 @@
 #include "MemoryTracer.h"
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "RIOManager.h"
+#include "RUDPSessionBroker.h"
 
-MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& sessionBrokerCertStoreName, const std::wstring& sessionBrokerCertSubjectName)
-	: tlsHelper(sessionBrokerCertStoreName, sessionBrokerCertSubjectName)
+MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName)
+	: sessionBrokerCertStoreName(inSessionBrokerCertStoreName)
+	, sessionBrokerCertSubjectName(inSessionBrokerCertSubjectName)
 	, contextPool(2, false)
 {
 }
@@ -66,15 +68,7 @@ void MultiSocketRUDPCore::StopServer()
 {
 	threadStopFlag = true;
 
-#if USE_IOCP_SESSION_BROKER
-	sessionBroker.Stop();
-#else
-	closesocket(sessionBrokerListenSocket);
-	if (sessionBrokerThread.joinable())
-	{
-		sessionBrokerThread.join();
-	}
-#endif
+	sessionBroker->Stop();
 	CloseAllSessions();
 
 	SetEvent(recvLogicThreadEventStopHandle);
@@ -272,27 +266,12 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	threadManager->StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
 
 	Sleep(1000);
-	if (not RunSessionBroker())
+	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionBrokerCertStoreName, sessionBrokerCertSubjectName);
+	if (not sessionBroker->Start(sessionBrokerPort, coreServerIp))
 	{
 		LOG_ERROR("RunSessionBroker failed");
 		return false;
 	}
-
-	return true;
-}
-
-bool MultiSocketRUDPCore::RunSessionBroker()
-{
-#if USE_IOCP_SESSION_BROKER
-	if (not sessionBroker.Start(sessionBrokerOptionFilePath))
-	{
-		CloseAllSockets();
-		LOG_ERROR("SessionBroker start failed");
-		return false;
-	}
-#else
-	sessionBrokerThread = std::jthread([this]() { this->RunSessionBrokerThread(sessionBrokerPort, coreServerIp); });
-#endif
 
 	return true;
 }
@@ -307,7 +286,6 @@ SOCKET MultiSocketRUDPCore::CreateRUDPSocket()
 	}
 
 	sockaddr_in serverAddr = {};
-
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 	serverAddr.sin_port = 0;
@@ -358,6 +336,36 @@ RUDPSession* MultiSocketRUDPCore::GetUsingSession(const SessionIdType sessionId)
 RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessionId) const
 {
 	return sessionManager->GetReleasingSession(sessionId);
+}
+
+CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
+{
+	session.sock = CreateRUDPSocket();
+	if (session.GetSocket() == INVALID_SOCKET)
+	{
+		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
+		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
+	}
+
+	sockaddr_in serverAddr;
+	socklen_t len = sizeof(serverAddr);
+	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
+	session.serverPort = ntohs(serverAddr.sin_port);
+
+	if (not rioManager->InitializeSessionRIO(session, session.GetThreadId()))
+	{
+		LOG_ERROR(std::format("RUDPSession::InitializeRIO failed with error {}", WSAGetLastError()));
+		return CONNECT_RESULT_CODE::RIO_INIT_FAILED;
+	}
+
+	if (not ioHandler->DoRecv(session))
+	{
+		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
+		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
+	}
+	session.sessionState = SESSION_STATE::RESERVED;
+
+	return CONNECT_RESULT_CODE::SUCCESS;
 }
 
 void MultiSocketRUDPCore::StopAllThreads() const

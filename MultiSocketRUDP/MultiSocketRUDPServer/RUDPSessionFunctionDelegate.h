@@ -67,6 +67,13 @@ private:
 	static RecvBuffer& GetRecvBuffer(RUDPSession& session);
 #pragma endregion For RUDPIOHandler
 
+#pragma region For RUDPSessionBroker
+	static void SetAbortReservedSession(RUDPSession& session);
+	static void SetSessionReservedTime(RUDPSession& session, unsigned long long now);
+	static unsigned char* GetSessionKeyObjectBuffer(const RUDPSession& session);
+	static void SetSessionKeyObjectBuffer(RUDPSession& session, unsigned char* inKeyObjectBuffer);
+#pragma endregion For RUDPSessionBroker
+
 #pragma region Util
 	static void Disconnect(RUDPSession& session, NetBuffer& recvPacket);
 	static std::shared_mutex& GetSocketMutex(const RUDPSession& session);
@@ -80,5 +87,6 @@ private:
 	static void SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt);
 	static const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession& session);
 	static void SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle);
+	static void GetServerPortAndSessionId(const RUDPSession& session, OUT PortType& outServerPort, OUT SessionIdType& outSessionId);
 #pragma endregion Util
 };
