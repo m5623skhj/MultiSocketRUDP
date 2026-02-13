@@ -99,9 +99,6 @@
     <ClCompile Include="RUDPThreadManager.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
-    <ClCompile Include="RUDPSessionBroker.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
     <ClCompile Include="RUDPSessionManager.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
@@ -112,6 +109,9 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
     <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
   </ItemGroup>
@@ -165,6 +165,9 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionBroker.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
   </ItemGroup>

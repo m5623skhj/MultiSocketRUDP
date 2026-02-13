@@ -56,6 +56,7 @@
     <ClInclude Include="RUDPIOHandler.h" />
     <ClInclude Include="RUDPPacketProcessor.h" />
     <ClInclude Include="RUDPSession.h" />
+    <ClInclude Include="RUDPSessionBroker.h" />
     <ClInclude Include="RUDPSessionFunctionDelegate.h" />
     <ClInclude Include="RUDPSessionManager.h" />
     <ClInclude Include="RUDPThreadManager.h" />

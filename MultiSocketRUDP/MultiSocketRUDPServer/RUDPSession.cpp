@@ -116,6 +116,16 @@ void RUDPSession::InitializeSession()
 	}
 }
 
+void RUDPSession::SetSessionId(const SessionIdType inSessionId)
+{
+	sessionId = inSessionId;
+}
+
+void RUDPSession::SetThreadId(const ThreadIdType inThreadId)
+{
+	threadId = inThreadId;
+}
+
 RUDPSession::~RUDPSession()
 {
 	if (sock != INVALID_SOCKET)
@@ -187,6 +197,11 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	packet.PacketToBuffer(*buffer);
 
 	return SendPacket(*buffer, packetSequence, false, false);
+}
+
+ThreadIdType RUDPSession::GetThreadId() const
+{
+	return threadId;
 }
 
 void RUDPSession::OnConnected(const SessionIdType inSessionId)
@@ -558,6 +573,21 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	core.EraseSendPacketInfo(sendPacketInfo, threadId);
 }
 
+void RUDPSession::SetSessionKey(const unsigned char* inSessionKey)
+{
+	std::copy_n(inSessionKey, SESSION_KEY_SIZE, sessionKey);
+}
+
+std::shared_mutex& RUDPSession::GetSocketMutex() const
+{
+	return socketLock;
+}
+
+std::mutex& RUDPSession::GetSendPacketInfoQueueMutex()
+{
+	return sendBuffer.sendPacketInfoQueueLock;
+}
+
 SessionIdType RUDPSession::GetSessionId() const
 {
 	return sessionId;
@@ -583,6 +613,11 @@ SOCKADDR_INET& RUDPSession::GetSocketAddressInetRef()
 	return clientSockAddrInet;
 }
 
+bool RUDPSession::IsConnected() const
+{
+	return sessionState == SESSION_STATE::CONNECTED;
+}
+
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
 {
 	return CheckMyClient(clientAddr) && not IsReleasing();
@@ -597,6 +632,46 @@ bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 	}
 
 	return true;
+}
+
+const BCRYPT_KEY_HANDLE& RUDPSession::GetSessionKeyHandle() const
+{
+	return sessionKeyHandle;
+}
+
+void RUDPSession::SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle)
+{
+	sessionKeyHandle = inKeyHandle;
+}
+
+const unsigned char* RUDPSession::GetSessionSalt() const
+{
+	return sessionSalt;
+}
+
+void RUDPSession::SetSessionSalt(const unsigned char* inSessionSalt)
+{
+	std::copy_n(inSessionSalt, SESSION_SALT_SIZE, sessionSalt);
+}
+
+const unsigned char* RUDPSession::GetSessionKey() const
+{
+	return sessionKey;
+}
+
+bool RUDPSession::IsReserved() const
+{
+	return sessionState == SESSION_STATE::RESERVED;
+}
+
+bool RUDPSession::IsUsingSession() const
+{
+	return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED;
+}
+
+SESSION_STATE RUDPSession::GetSessionState() const
+{
+	return sessionState.load();
 }
 
 bool RUDPSession::IsReleasing() const
