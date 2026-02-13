@@ -13,6 +13,7 @@ class RIOManager;
 class RUDPSessionManager;
 class RUDPPacketProcessor;
 class RUDPIOHandler;
+class RUDPSessionBroker;
 
 // ----------------------------------------
 // @brief RUDPSession 클래스의 특정 private/protected 메서드에 대한 접근을 위임하는 클래스입니다.
@@ -23,6 +24,7 @@ class RUDPSessionFunctionDelegate
 	friend RUDPSessionManager;
 	friend RUDPPacketProcessor;
 	friend RUDPIOHandler;
+	friend RUDPSessionBroker;
 
 private:
 	RUDPSessionFunctionDelegate() = default;
@@ -45,8 +47,6 @@ private:
 #pragma endregion For SessionManager
 
 #pragma region For RUDPPacketProcessor
-	static const unsigned char* GetSessionSalt(const RUDPSession& session);
-	static const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession& session);
 	static bool TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr);
 	static bool CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr);
 	static void OnSendReply(RUDPSession& session, NetBuffer& recvPacket);
@@ -74,5 +74,11 @@ private:
 	static SOCKET GetSocket(const RUDPSession& session);
 	static RIO_RQ GetRecvRIORQ(const RUDPSession& session);
 	static RIO_RQ GetSendRIORQ(const RUDPSession& session);
+	static const unsigned char* GetSessionKey(const RUDPSession& session);
+	static void SetSessionKey(RUDPSession& session, const unsigned char* inSessionKey);
+	static const unsigned char* GetSessionSalt(const RUDPSession& session);
+	static void SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt);
+	static const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession& session);
+	static void SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle);
 #pragma endregion Util
 };

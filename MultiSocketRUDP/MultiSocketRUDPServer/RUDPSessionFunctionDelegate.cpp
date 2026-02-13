@@ -43,16 +43,6 @@ void RUDPSessionFunctionDelegate::AbortReservedSession(RUDPSession& session)
 	session.AbortReservedSession();
 }
 
-const unsigned char* RUDPSessionFunctionDelegate::GetSessionSalt(const RUDPSession& session)
-{
-	return session.GetSessionSalt();
-}
-
-const BCRYPT_KEY_HANDLE& RUDPSessionFunctionDelegate::GetSessionKeyHandle(const RUDPSession& session)
-{
-	return session.GetSessionKeyHandle();
-}
-
 bool RUDPSessionFunctionDelegate::TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr)
 {
 	return session.TryConnect(recvPacket, clientAddr);
@@ -156,4 +146,24 @@ RIO_RQ RUDPSessionFunctionDelegate::GetRecvRIORQ(const RUDPSession& session)
 RIO_RQ RUDPSessionFunctionDelegate::GetSendRIORQ(const RUDPSession& session)
 {
 	return session.GetSendRIORQ();
+}
+
+const unsigned char* RUDPSessionFunctionDelegate::GetSessionSalt(const RUDPSession& session)
+{
+	return session.GetSessionSalt();
+}
+
+void RUDPSessionFunctionDelegate::SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt)
+{
+	session.SetSessionSalt(inSessionSalt);
+}
+
+const BCRYPT_KEY_HANDLE& RUDPSessionFunctionDelegate::GetSessionKeyHandle(const RUDPSession& session)
+{
+	return session.GetSessionKeyHandle();
+}
+
+void RUDPSessionFunctionDelegate::SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle)
+{
+	session.SetSessionKeyHandle(inKeyHandle);
 }

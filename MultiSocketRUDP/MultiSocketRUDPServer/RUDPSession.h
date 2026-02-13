@@ -140,12 +140,14 @@ private:
 	// ----------------------------------------
 	[[nodiscard]]
 	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const { return sessionKeyHandle; }
+	void SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle) { sessionKeyHandle = inKeyHandle; }
 	// ----------------------------------------
 	// @brief 세션의 암호화 솔트를 반환합니다.
 	// @return 세션 솔트 버퍼에 대한 포인터
 	// ----------------------------------------
 	[[nodiscard]]
 	const unsigned char* GetSessionSalt() const { return sessionSalt; }
+	void SetSessionSalt(const unsigned char* inSessionSalt) { std::copy_n(inSessionSalt, SESSION_SALT_SIZE, sessionSalt); }
 
 private:
 	std::shared_mutex& GetSocketMutex() const { return socketLock; }
