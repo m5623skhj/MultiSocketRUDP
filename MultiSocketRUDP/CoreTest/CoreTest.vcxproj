@@ -21,6 +21,11 @@
   <ItemGroup>
     <ClCompile Include="GoogleTest.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PacketManagerTest.cpp" />
+    <ClCompile Include="RUDPFlowControllerTest.cpp" />
+    <ClCompile Include="RUDPFlowManagerTest.cpp" />
+    <ClCompile Include="RUDPReceiveWindowTest.cpp" />
+    <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h" />
@@ -111,12 +116,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common\googletest-main\googletest\include;C:\Users\KimHyeongJin\Desktop\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common\googletest-main\googletest\include;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPServer;C:\Users\KimHyeongJin\Desktop\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>MultiSocketRUDPServer.lib;MultiSocketRUDPClient.lib;gtest.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MultiSocketRUDPServer.lib;gtest.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

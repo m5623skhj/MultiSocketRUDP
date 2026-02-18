@@ -1,3 +1,4 @@
+#include "PreCompile.h"
 #include "GoogleTest.h"
 #include <iostream>
 

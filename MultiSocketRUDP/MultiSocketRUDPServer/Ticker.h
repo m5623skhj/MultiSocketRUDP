@@ -51,7 +51,7 @@ private:
 private:
 	TickCounter tickCounter;
 
-	bool isRunning = false;
+	std::atomic<bool> isRunning = false;
 	unsigned int tickInterval;
 
 	std::jthread tickerThread;

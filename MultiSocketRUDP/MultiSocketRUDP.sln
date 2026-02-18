@@ -26,6 +26,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Logger", "Logger\Logger.vcxproj", "{D1D0CBC0-97D6-4B95-B06D-3B16DF2D3CEA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoreTest", "CoreTest\CoreTest.vcxproj", "{CF367513-4CEA-417B-81F5-EE7199CD09F9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{16F99C50-D24A-47B7-9402-2278BC3F0B0B} = {16F99C50-D24A-47B7-9402-2278BC3F0B0B}
+		{F3949482-754B-4097-AE29-AA14E700FEC3} = {F3949482-754B-4097-AE29-AA14E700FEC3}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

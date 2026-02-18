@@ -6,6 +6,7 @@ using Clock = std::chrono::steady_clock;
 
 void Ticker::Start(const unsigned int intervalMs)
 {
+	isRunning = true;
 	tickInterval = intervalMs;
 	if (unregisterTargetList.capacity() == 0)
 	{
@@ -37,9 +38,7 @@ void Ticker::Stop()
 
 void Ticker::UpdateTick()
 {
-	isRunning = true;
-
-	while (isRunning)
+	while (isRunning.load())
 	{
 		tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count();
 		UnregisterTimerEventImpl();
