@@ -10,6 +10,47 @@
 #include "RUDPSessionBroker.h"
 #include "../Common/etc/UtilFunc.h"
 
+namespace Local
+{
+	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
+	{
+		const UINT64 now = GetTickCount64();
+		if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
+		{
+			Sleep(static_cast<DWORD>(intervalMs - delta));
+		}
+
+		tickSet.nowTick = GetTickCount64();
+	}
+
+	static SOCKET CreateRUDPSocket()
+	{
+		const SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
+		if (sock == INVALID_SOCKET)
+		{
+			LOG_ERROR(std::format("WSASocket failed with error code {}", WSAGetLastError()));
+			return INVALID_SOCKET;
+		}
+
+		sockaddr_in serverAddr = {};
+		serverAddr.sin_family = AF_INET;
+		serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
+		serverAddr.sin_port = 0;
+
+		if (bind(sock, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
+		{
+			LOG_ERROR(std::format("Bind failed with error code {}", WSAGetLastError()));
+			closesocket(sock);
+			return INVALID_SOCKET;
+		}
+
+		socklen_t len = sizeof(serverAddr);
+		getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
+
+		return sock;
+	}
+}
+
 MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName)
 	: sessionBrokerCertStoreName(inSessionBrokerCertStoreName)
 	, sessionBrokerCertSubjectName(inSessionBrokerCertSubjectName)
@@ -277,33 +318,6 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	return true;
 }
 
-SOCKET MultiSocketRUDPCore::CreateRUDPSocket()
-{
-	const SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
-	if (sock == INVALID_SOCKET)
-	{
-		LOG_ERROR(std::format("WSASocket failed with error code {}", WSAGetLastError()));
-		return INVALID_SOCKET;
-	}
-
-	sockaddr_in serverAddr = {};
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-	serverAddr.sin_port = 0;
-
-	if (bind(sock, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
-	{
-		LOG_ERROR(std::format("Bind failed with error code {}", WSAGetLastError()));
-		closesocket(sock);
-		return INVALID_SOCKET;
-	}
-
-	socklen_t len = sizeof(serverAddr);
-	getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
-
-	return sock;
-}
-
 void MultiSocketRUDPCore::CloseAllSessions() const
 {
 	sessionManager->CloseAllSessions();
@@ -341,7 +355,7 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
 {
-	session.sock = CreateRUDPSocket();
+	session.sock = Local::CreateRUDPSocket();
 	if (session.GetSocket() == INVALID_SOCKET)
 	{
 		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
@@ -413,7 +427,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
-		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
+		Local::SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
 #endif
 	}
 
@@ -487,7 +501,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 			SendPacket(sendPacketInfo, false);
 		}
 
-		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+		Local::SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
 
@@ -542,19 +556,8 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) c
 	while (not stopToken.stop_requested())
 	{
 		sessionManager->HeartbeatCheck(GetTickCount64());
-		SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
+		Local::SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
 	}
-}
-
-void MultiSocketRUDPCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
-{
-	const UINT64 now = GetTickCount64();
-	if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
-	{
-		Sleep(static_cast<DWORD>(intervalMs - delta));
-	}
-
-	tickSet.nowTick = GetTickCount64();
 }
 
 IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult)

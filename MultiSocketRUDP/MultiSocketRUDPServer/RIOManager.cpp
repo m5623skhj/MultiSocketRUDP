@@ -207,7 +207,7 @@ bool RIOManager::LoadRIOFunctionTable()
 		return false;
 	}
 
-	auto _ = Util::ScopeExit([tempSocket]()
+	auto raii = Util::ScopeExit([tempSocket]()
 		{
 			closesocket(tempSocket);
 		});
@@ -223,11 +223,9 @@ bool RIOManager::LoadRIOFunctionTable()
 		, nullptr) != 0)
 	{
 		LOG_ERROR(std::format("WSAIoctl_SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER failed with error code {}", WSAGetLastError()));
-		closesocket(tempSocket);
 		return false;
 	}
 
-	closesocket(tempSocket);
 	return true;
 }
 

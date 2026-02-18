@@ -103,8 +103,6 @@ private:
 	bool InitRIO();
 	[[nodiscard]]
 	bool RunAllThreads();
-	[[nodiscard]]
-	static SOCKET CreateRUDPSocket();
 
 private:
 	void CloseAllSessions() const;
@@ -145,7 +143,6 @@ private:
 	void RunRetransmissionThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void RunSessionReleaseThread(const std::stop_token& stopToken);
 	void RunHeartbeatThread(const std::stop_token& stopToken) const;
-	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
 	unsigned char numOfWorkerThread{};
