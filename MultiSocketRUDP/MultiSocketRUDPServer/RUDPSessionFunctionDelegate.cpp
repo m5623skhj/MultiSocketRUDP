@@ -78,7 +78,7 @@ IO_MODE& RUDPSessionFunctionDelegate::GetSendIOMode(RUDPSession& session)
 	return session.GetSendIOMode();
 }
 
-bool RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(RUDPSession& session)
+bool RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(const RUDPSession& session)
 {
 	return session.GetSendPacketInfoQueueSize() == 0;
 }
@@ -140,12 +140,12 @@ void RUDPSessionFunctionDelegate::SetSessionReservedTime(RUDPSession& session, c
 
 unsigned char* RUDPSessionFunctionDelegate::GetSessionKeyObjectBuffer(const RUDPSession& session)
 {
-	return session.keyObjectBuffer;
+	return session.GetCryptoContext().GetKeyObjectBuffer();
 }
 
 void RUDPSessionFunctionDelegate::SetSessionKeyObjectBuffer(RUDPSession& session, unsigned char* inKeyObjectBuffer)
 {
-	session.keyObjectBuffer = inKeyObjectBuffer;
+	session.GetCryptoContext().SetKeyObjectBuffer(inKeyObjectBuffer);
 }
 
 void RUDPSessionFunctionDelegate::Disconnect(RUDPSession& session, NetBuffer& recvPacket)
@@ -180,32 +180,32 @@ RIO_RQ RUDPSessionFunctionDelegate::GetSendRIORQ(const RUDPSession& session)
 
 const unsigned char* RUDPSessionFunctionDelegate::GetSessionKey(const RUDPSession& session)
 {
-	return session.GetSessionKey();
+	return session.GetCryptoContext().GetSessionKey();
 }
 
 void RUDPSessionFunctionDelegate::SetSessionKey(RUDPSession& session, const unsigned char* inSessionKey)
 {
-	session.SetSessionKey(inSessionKey);
+	session.GetCryptoContext().SetSessionKey(inSessionKey);
 }
 
 const unsigned char* RUDPSessionFunctionDelegate::GetSessionSalt(const RUDPSession& session)
 {
-	return session.GetSessionSalt();
+	return session.GetCryptoContext().GetSessionSalt();
 }
 
 void RUDPSessionFunctionDelegate::SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt)
 {
-	session.SetSessionSalt(inSessionSalt);
+	session.GetCryptoContext().SetSessionSalt(inSessionSalt);
 }
 
 const BCRYPT_KEY_HANDLE& RUDPSessionFunctionDelegate::GetSessionKeyHandle(const RUDPSession& session)
 {
-	return session.GetSessionKeyHandle();
+	return session.GetCryptoContext().GetSessionKeyHandle();
 }
 
 void RUDPSessionFunctionDelegate::SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle)
 {
-	session.SetSessionKeyHandle(inKeyHandle);
+	session.GetCryptoContext().SetSessionKeyHandle(inKeyHandle);
 }
 
 void RUDPSessionFunctionDelegate::GetServerPortAndSessionId(const RUDPSession& session, PortType& outServerPort, SessionIdType& outSessionId)

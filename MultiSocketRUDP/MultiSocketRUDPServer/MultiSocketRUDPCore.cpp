@@ -10,9 +10,9 @@
 #include "RUDPSessionBroker.h"
 #include "../Common/etc/UtilFunc.h"
 
-namespace Local
+namespace
 {
-	FORCEINLINE static void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
+	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 	{
 		const UINT64 now = GetTickCount64();
 		if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
@@ -23,7 +23,7 @@ namespace Local
 		tickSet.nowTick = GetTickCount64();
 	}
 
-	static SOCKET CreateRUDPSocket()
+	SOCKET CreateRUDPSocket()
 	{
 		const SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
 		if (sock == INVALID_SOCKET)
@@ -51,9 +51,9 @@ namespace Local
 	}
 }
 
-MultiSocketRUDPCore::MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName)
-	: sessionBrokerCertStoreName(inSessionBrokerCertStoreName)
-	, sessionBrokerCertSubjectName(inSessionBrokerCertSubjectName)
+MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName)
+	: sessionBrokerCertStoreName(std::move(inSessionBrokerCertStoreName))
+	, sessionBrokerCertSubjectName(std::move(inSessionBrokerCertSubjectName))
 	, contextPool(2, false)
 {
 }
@@ -355,7 +355,7 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
 {
-	session.sock = Local::CreateRUDPSocket();
+	session.sock = CreateRUDPSocket();
 	if (session.GetSocket() == INVALID_SOCKET)
 	{
 		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
@@ -427,7 +427,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 		}
 
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
-		Local::SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
+		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
 #endif
 	}
 
@@ -501,7 +501,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 			SendPacket(sendPacketInfo, false);
 		}
 
-		Local::SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
 	}
 }
 
@@ -556,7 +556,7 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) c
 	while (not stopToken.stop_requested())
 	{
 		sessionManager->HeartbeatCheck(GetTickCount64());
-		Local::SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
+		SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
 	}
 }
 
