@@ -8,6 +8,7 @@
 #include "IOContext.h"
 #include "MultiSocketRUDPCore.h"
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "SendPacketInfo.h"
 
 RUDPIOHandler::RUDPIOHandler(RIOManager& rioManager
                              , CTLSMemoryPool<IOContext>& contextPool
@@ -108,18 +109,15 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 			break;
 		}
 
+		if (RUDPSessionFunctionDelegate::IsNothingToSend(session))
 		{
-			std::scoped_lock lock(RUDPSessionFunctionDelegate::AcquireSendPacketInfoQueueLock(session));
-			if (RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(session) &&
-				RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session) == nullptr)
+			InterlockedExchange(reinterpret_cast<UINT*>(&RUDPSessionFunctionDelegate::GetSendIOMode(session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+			if (not RUDPSessionFunctionDelegate::IsNothingToSend(session))
 			{
-				InterlockedExchange(reinterpret_cast<UINT*>(&RUDPSessionFunctionDelegate::GetSendIOMode(session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-				if (not RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(session))
-				{
-					continue;
-				}
-				break;
+				continue;
 			}
+
+			break;
 		}
 
 		IOContext* sendContext = MakeSendContext(session, threadId);
@@ -212,7 +210,7 @@ IOContext* RUDPIOHandler::MakeSendContext(RUDPSession& session, const ThreadIdTy
 	context->InitContext(session.GetSessionId(), RIO_OPERATION_TYPE::OP_SEND);
 	context->BufferId = RUDPSessionFunctionDelegate::GetSendBufferId(session);
 	context->Offset = 0;
-	context->Length = MakeSendStream(session, context, threadId);
+	context->Length = MakeSendStream(session, threadId);
 	if (context->Length == 0)
 	{
 		contextPool.Free(context);
@@ -242,19 +240,14 @@ IOContext* RUDPIOHandler::MakeSendContext(RUDPSession& session, const ThreadIdTy
 	return context;
 }
 
-unsigned int RUDPIOHandler::MakeSendStream(RUDPSession& session, IOContext* context, const ThreadIdType threadId) const
+unsigned int RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdType threadId) const
 {
-	std::scoped_lock lock(RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(session));
+	std::scoped_lock cachedSequenceLock(RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(session));
 	auto& packetSequenceSet = RUDPSessionFunctionDelegate::GetCachedSequenceSet(session);
 	packetSequenceSet.clear();
 	
 	unsigned int totalSendSize = 0;
-	size_t bufferCount;
-	{
-		std::scoped_lock lock(RUDPSessionFunctionDelegate::AcquireSendPacketInfoQueueLock(session));
-		bufferCount = RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(session);
-	}
-
+	const size_t bufferCount = RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(session);
 	if (RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session) != nullptr)
 	{
 		if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
@@ -316,15 +309,10 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 
 SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
-	SendPacketInfo* sendPacketInfo;
+	SendPacketInfo* sendPacketInfo = RUDPSessionFunctionDelegate::TryGetFrontAndPop(session);
+	if (sendPacketInfo == nullptr)
 	{
-		std::scoped_lock lock(RUDPSessionFunctionDelegate::AcquireSendPacketInfoQueueLock(session));
-		if (RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(session) == true)
-		{
-			return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
-		}
-
-		sendPacketInfo = RUDPSessionFunctionDelegate::GetSendPacketInfoQueueFrontAndPop(session);
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 	}
 
 	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };

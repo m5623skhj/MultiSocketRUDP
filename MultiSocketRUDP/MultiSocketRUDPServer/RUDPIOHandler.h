@@ -62,7 +62,7 @@ private:
 	[[nodiscard]]
 	IOContext* MakeSendContext(OUT RUDPSession& session, ThreadIdType threadId) const;
 	[[nodiscard]]
-	unsigned int MakeSendStream(OUT RUDPSession& session, OUT IOContext* context, ThreadIdType threadId) const;
+	unsigned int MakeSendStream(OUT RUDPSession& session, ThreadIdType threadId) const;
 
 	[[nodiscard]]
 	SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(OUT RUDPSession& session, OUT std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, OUT unsigned int& totalSendSize, ThreadIdType threadId) const;

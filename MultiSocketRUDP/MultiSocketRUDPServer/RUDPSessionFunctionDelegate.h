@@ -63,12 +63,14 @@ private:
 	static std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session);
 	static RIO_BUFFERID GetSendBufferId(const RUDPSession& session);
 	static IO_MODE& GetSendIOMode(RUDPSession& session);
-	static bool IsSendPacketInfoQueueEmpty(const RUDPSession& session);
+	static bool IsSendPacketInfoQueueEmpty(RUDPSession& session);
+	static SendPacketInfo* TryGetFrontAndPop(RUDPSession& session);
 	static SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session);
+	static bool IsNothingToSend(RUDPSession& session);
 	static void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer);
 	static std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session);
 	static std::mutex& GetCachedSequenceSetMutex(RUDPSession& session);
-	static size_t GetSendPacketInfoQueueSize(const RUDPSession& session);
+	static size_t GetSendPacketInfoQueueSize(RUDPSession& session);
 	static char* GetRIOSendBuffer(RUDPSession& session);
 	static void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo);
 	static SendPacketInfo* GetSendPacketInfoQueueFrontAndPop(RUDPSession& session);
@@ -85,7 +87,6 @@ private:
 #pragma region Util
 	static void Disconnect(RUDPSession& session, NetBuffer& recvPacket);
 	static std::shared_mutex& GetSocketMutex(const RUDPSession& session);
-	static std::mutex& AcquireSendPacketInfoQueueLock(RUDPSession& session);
 	static SOCKET GetSocket(const RUDPSession& session);
 	static RIO_RQ GetRecvRIORQ(const RUDPSession& session);
 	static RIO_RQ GetSendRIORQ(const RUDPSession& session);

@@ -70,22 +70,32 @@ std::shared_ptr<IOContext> RUDPSessionFunctionDelegate::GetRecvBufferContext(con
 
 RIO_BUFFERID RUDPSessionFunctionDelegate::GetSendBufferId(const RUDPSession& session)
 {
-	return session.GetSendBufferId();
+	return session.GetSendContext().GetSendBufferId();
 }
 
 IO_MODE& RUDPSessionFunctionDelegate::GetSendIOMode(RUDPSession& session)
 {
-	return session.GetSendIOMode();
+	return session.GetSendContext().GetIOMode();
 }
 
-bool RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(const RUDPSession& session)
+bool RUDPSessionFunctionDelegate::IsSendPacketInfoQueueEmpty(RUDPSession& session)
 {
-	return session.GetSendPacketInfoQueueSize() == 0;
+	return session.GetSendContext().IsSendPacketInfoQueueEmpty();
+}
+
+SendPacketInfo* RUDPSessionFunctionDelegate::TryGetFrontAndPop(RUDPSession& session)
+{
+	return session.GetSendContext().TryGetFrontAndPop();
 }
 
 SendPacketInfo* RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(const RUDPSession& session)
 {
-	return session.GetReservedSendPacketInfo();
+	return session.GetSendContext().GetReservedSendPacketInfo();
+}
+
+bool RUDPSessionFunctionDelegate::IsNothingToSend(RUDPSession& session)
+{
+	return session.GetSendContext().IsNothingToSend();
 }
 
 void RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer)
@@ -95,32 +105,32 @@ void RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(RUDPSession& session, 
 
 std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSessionFunctionDelegate::GetCachedSequenceSet(RUDPSession& session)
 {
-	return session.GetCachedSequenceSet();
+	return session.GetSendContext().GetCachedSequenceSet();
 }
 
 std::mutex& RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(RUDPSession& session)
 {
-	return session.GetCachedSequenceSetMutex();
+	return session.GetSendContext().GetCachedSequenceSetLock();
 }
 
-size_t RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(const RUDPSession& session)
+size_t RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(RUDPSession& session)
 {
-	return session.GetSendPacketInfoQueueSize();
+	return session.GetSendContext().GetSendPacketInfoQueueSize();
 }
 
 char* RUDPSessionFunctionDelegate::GetRIOSendBuffer(RUDPSession& session)
 {
-	return session.GetRIOSendBuffer();
+	return session.GetSendContext().GetRIOSendBuffer();
 }
 
 void RUDPSessionFunctionDelegate::SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo)
 {
-	return session.SetReservedSendPacketInfo(reserveSendPacketInfo);
+	return session.GetSendContext().SetReservedSendPacketInfo(reserveSendPacketInfo);
 }
 
 SendPacketInfo* RUDPSessionFunctionDelegate::GetSendPacketInfoQueueFrontAndPop(RUDPSession& session)
 {
-	return session.GetSendPacketInfoQueueFrontAndPop();
+	return session.GetSendContext().TryGetFrontAndPop();
 }
 
 RecvBuffer& RUDPSessionFunctionDelegate::GetRecvBuffer(RUDPSession& session)
@@ -156,11 +166,6 @@ void RUDPSessionFunctionDelegate::Disconnect(RUDPSession& session, NetBuffer& re
 std::shared_mutex& RUDPSessionFunctionDelegate::GetSocketMutex(const RUDPSession& session)
 {
 	return session.GetSocketMutex();
-}
-
-std::mutex& RUDPSessionFunctionDelegate::AcquireSendPacketInfoQueueLock(RUDPSession& session)
-{
-	return session.GetSendPacketInfoQueueMutex();
 }
 
 SOCKET RUDPSessionFunctionDelegate::GetSocket(const RUDPSession& session)

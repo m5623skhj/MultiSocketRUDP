@@ -43,6 +43,9 @@
     <Filter Include="소스 파일\MultiSocketRUDPCore\Core">
       <UniqueIdentifier>{1193a664-52e1-4837-b3d9-63d5883b43f2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\MultiSocketRUDPCore\Core\CoreComponent">
+      <UniqueIdentifier>{9aab2a3d-cb3d-446b-96f3-e81803f66cba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
@@ -90,32 +93,38 @@
     <ClCompile Include="MultiSocketRUDPCore.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
-    <ClCompile Include="RIOManager.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
     <ClCompile Include="RUDPCoreReadOptionFile.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPThreadManager.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPSessionManager.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPPacketProcessor.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="RUDPIOHandler.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
     <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
-    <ClCompile Include="RUDPSessionBroker.cpp">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClCompile>
     <ClCompile Include="SessionCryptoContext.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionSendContext.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="SendPacketInfo.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPIOHandler.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPPacketProcessor.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionBroker.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPThreadManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RIOManager.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -149,32 +158,41 @@
     <ClInclude Include="MultiSocketRUDPCore.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RIOManager.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="RUDPThreadManager.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="RUDPSessionManager.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="RUDPPacketProcessor.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="RUDPIOHandler.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
     <ClInclude Include="IOContext.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RUDPSessionBroker.h">
-      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
-    </ClInclude>
     <ClInclude Include="SessionCryptoContext.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionSendContext.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketSequenceSetKey.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SendPacketInfo.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPIOHandler.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPPacketProcessor.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionBroker.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPThreadManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RIOManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
