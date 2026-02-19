@@ -11,6 +11,7 @@
 #include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
 #include "SessionCryptoContext.h"
+#include "SessionSendContext.h"
 
 namespace MultiSocketRUDP
 {
@@ -36,27 +37,11 @@ struct RecvPacketInfo
 	PacketSequence packetSequence{};
 };
 
-enum class IO_MODE : LONG
-{
-	IO_NONE_SENDING = 0
-	, IO_SENDING
-};
-
 struct RecvBuffer
 {
 	std::shared_ptr<IOContext> recvContext{};
 	char buffer[RECV_BUFFER_SIZE];
 	CListBaseQueue<NetBuffer*> recvBufferList;
-};
-
-struct SendBuffer
-{
-	std::mutex sendPacketInfoQueueLock;
-	std::queue<SendPacketInfo*> sendPacketInfoQueue;
-	SendPacketInfo* reservedSendPacketInfo;
-	char rioSendBuffer[MAX_SEND_BUFFER_SIZE];
-	RIO_BUFFERID sendBufferId;
-	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
 };
 
 class RUDPSession
@@ -103,25 +88,13 @@ private:
 	void AbortReservedSession();
 	void CloseSocket();
 	static void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
-	void UnregisterRIOBuffers();
+	void UnregisterRIOBuffers() const;
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
-	size_t GetSendPacketInfoQueueSize() const;
 	void EnqueueToRecvBufferList(NetBuffer* buffer);
-	char* GetRIOSendBuffer();
-	SendPacketInfo* GetReservedSendPacketInfo() const;
-	void SetReservedSendPacketInfo(SendPacketInfo* reserveSendPacketInfo);
-	SendPacketInfo* GetSendPacketInfoQueueFrontAndPop();
 	RecvBuffer& GetRecvBuffer();
 
 	void RecvContextReset();
-	RIO_BUFFERID GetSendBufferId() const;
-	IO_MODE& GetSendIOMode();
 	std::shared_ptr<IOContext> GetRecvBufferContext() const;
-
-	[[nodiscard]]
-	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet();
-	[[nodiscard]]
-	std::mutex& GetCachedSequenceSetMutex();
 
 	RIO_RQ GetRecvRIORQ() const;
 	RIO_RQ GetSendRIORQ() const;
@@ -148,7 +121,6 @@ private:
 
 private:
 	std::shared_mutex& GetSocketMutex() const;
-	std::mutex& GetSendPacketInfoQueueMutex();
 
 public:
 	[[nodiscard]]
@@ -221,11 +193,6 @@ private:
 	bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
-	RUDPFlowManager flowManager;
-
-	std::atomic<PacketSequence> lastSendPacketSequence{};
-	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
-	std::shared_mutex sendPacketInfoMapLock;
 
 	std::atomic<PacketSequence> nextRecvPacketSequence{};
 	struct RecvPacketInfoPriority
@@ -248,7 +215,6 @@ private:
 
 private:
 	RecvBuffer recvBuffer;
-	SendBuffer sendBuffer;
 
 	RIO_RQ rioRQ = RIO_INVALID_RQ;
 
@@ -256,7 +222,12 @@ private:
 	SessionCryptoContext& GetCryptoContext();
 	const SessionCryptoContext& GetCryptoContext() const;
 
+	SessionSendContext& GetSendContext();
+	const SessionSendContext& GetSendContext() const;
+
 private:
+	RUDPFlowManager flowManager;
+	SessionSendContext sendContext;
 	SessionCryptoContext cryptoContext;
 
 private:

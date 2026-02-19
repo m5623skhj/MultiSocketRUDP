@@ -8,6 +8,8 @@
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "RIOManager.h"
 #include "RUDPSessionBroker.h"
+#include "RUDPSessionFunctionDelegate.h"
+#include "SendPacketInfo.h"
 #include "../Common/etc/UtilFunc.h"
 
 namespace
@@ -169,11 +171,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		buffer->m_iRead = 0;
 	}
 
-	{
-		std::scoped_lock lock(sendPacketInfo->owner->sendBuffer.sendPacketInfoQueueLock);
-		sendPacketInfo->owner->sendBuffer.sendPacketInfoQueue.push(sendPacketInfo);
-	}
-
+	sendPacketInfo->owner->sendContext.PushSendPacketInfo(sendPacketInfo);
 	if (not ioHandler->DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
 		SendPacketInfo::Free(sendPacketInfo, 2);
@@ -519,7 +517,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 			{
 				if (const auto releaseSession = GetReleasingSession(releaseSessionId))
 				{
-					if (releaseSession->sendBuffer.ioMode == IO_MODE::IO_SENDING ||
+					if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
 						releaseSession->nowInProcessingRecvPacket)
 					{
 						continue;

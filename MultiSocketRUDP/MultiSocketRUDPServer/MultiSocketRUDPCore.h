@@ -1,5 +1,4 @@
 #pragma once
-#include <optional>
 #include <list>
 #include <thread>
 #include <MSWSock.h>
@@ -20,30 +19,6 @@
 #pragma comment(lib, "ws2_32.lib")
 
 struct SendPacketInfo;
-
-namespace MultiSocketRUDP
-{
-	struct PacketSequenceSetKey
-	{
-		PacketSequenceSetKey(const bool inIsReplyType, const PacketSequence inPacketSequence)
-			: isReplyType(inIsReplyType), packetSequence(inPacketSequence)
-		{
-		}
-
-		bool operator<(const PacketSequenceSetKey& other) const
-		{
-			if (isReplyType != other.isReplyType)
-			{
-				return isReplyType < other.isReplyType;
-			}
-
-			return packetSequence < other.packetSequence;
-		}
-
-		bool isReplyType{};
-		PacketSequence packetSequence{};
-	};
-}
 
 class RIOManager;
 class MultiSocketRUDPCoreFunctionDelegate;
@@ -181,80 +156,4 @@ private:
 	std::unique_ptr<RUDPIOHandler> ioHandler;
 	std::unique_ptr<RUDPSessionBroker> sessionBroker;
 	std::unique_ptr<RUDPSessionManager> sessionManager;
-};
-
-static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);
-
-struct SendPacketInfo
-{
-	NetBuffer* buffer{};
-	RUDPSession* owner{};
-	PacketRetransmissionCount retransmissionCount{};
-	PacketSequence sendPacketSequence{};
-	unsigned long long retransmissionTimeStamp{};
-	bool isErasedPacketInfo{};
-	bool isReplyType{};
-	std::list<SendPacketInfo*>::iterator listItor;
-	std::atomic_int8_t refCount{};
-
-	~SendPacketInfo()
-	{
-		owner = {};
-		retransmissionCount = {};
-		sendPacketSequence = {};
-		retransmissionTimeStamp = {};
-		listItor = {};
-		isErasedPacketInfo = {};
-		isReplyType = {};
-	}
-
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, const PacketSequence inSendPacketSequence, const bool inIsReplyType)
-	{
-		owner = inOwner;
-		buffer = inBuffer;
-		sendPacketSequence = inSendPacketSequence;
-		isReplyType = inIsReplyType;
-
-		retransmissionCount = {};
-		retransmissionTimeStamp = {};
-		isErasedPacketInfo = {};
-
-		refCount = 1;
-	}
-
-	void AddRefCount()
-	{
-		refCount.fetch_add(1, std::memory_order_relaxed);
-	}
-
-	static void Free(SendPacketInfo* deleteTarget)
-	{
-		if (deleteTarget == nullptr)
-		{
-			return;
-		}
-
-		if (deleteTarget->refCount.fetch_sub(1, std::memory_order_relaxed) == 1)
-		{
-			NetBuffer::Free(deleteTarget->buffer);
-			sendPacketInfoPool->Free(deleteTarget);
-		}
-	}
-	
-	static void Free(SendPacketInfo* deleteTarget, const char subCount)
-	{
-		if (deleteTarget == nullptr)
-		{
-			return;
-		}
-
-		if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_relaxed) == 1)
-		{
-			NetBuffer::Free(deleteTarget->buffer);
-			sendPacketInfoPool->Free(deleteTarget);
-		}
-	}
-
-	[[nodiscard]]
-	NetBuffer* GetBuffer() const { return buffer; }
 };

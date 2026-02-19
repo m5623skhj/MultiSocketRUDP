@@ -6,6 +6,7 @@
 #include "Logger.h"
 #include "MemoryTracer.h"
 #include "IOContext.h"
+#include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
@@ -14,11 +15,9 @@ RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
 	, flowManager(maximumHoldingPacketQueueSize)
 	, recvBuffer()
-	, sendBuffer()
 	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
-	ZeroMemory(sendBuffer.rioSendBuffer, sizeof(sendBuffer.rioSendBuffer));
 }
 
 bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ)
@@ -43,12 +42,14 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 bool RUDPSession::InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
 {
-	sendBuffer.sendBufferId = rioFunctionTable.RIORegisterBuffer(sendBuffer.rioSendBuffer, MAX_SEND_BUFFER_SIZE);
-	if (sendBuffer.sendBufferId == RIO_INVALID_BUFFERID)
+	const auto bufferId = rioFunctionTable.RIORegisterBuffer(sendContext.GetRIOSendBuffer(), MAX_SEND_BUFFER_SIZE);
+	if (bufferId == RIO_INVALID_BUFFERID)
 	{
 		LOG_ERROR(std::format("RIORegisterBuffer failed with error {}", WSAGetLastError()));
 		return false;
 	}
+
+	sendContext.SetSendRIOBufferId(bufferId);
 
 	return true;
 }
@@ -91,27 +92,11 @@ void RUDPSession::InitializeSession()
 	cryptoContext.Initialize();
 	clientAddr = {};
 	clientSockAddrInet = {};
-	lastSendPacketSequence = {};
 	nowInReleaseThread = {};
 	sessionReservedTime = {};
 
 	flowManager.Reset(0);
-
-	if (sendBuffer.reservedSendPacketInfo != nullptr)
-	{
-		SendPacketInfo::Free(sendBuffer.reservedSendPacketInfo);
-		sendBuffer.reservedSendPacketInfo = {};
-	}
-
-	std::scoped_lock lock(sendBuffer.sendPacketInfoQueueLock);
-	const size_t sendPacketInfoQueueSize = sendBuffer.sendPacketInfoQueue.size();
-	for (size_t i = 0; i < sendPacketInfoQueueSize; ++i)
-	{
-		const auto restItem = sendBuffer.sendPacketInfoQueue.front();
-		SendPacketInfo::Free(restItem);
-
-		sendBuffer.sendPacketInfoQueue.pop();
-	}
+	sendContext.Reset();
 }
 
 void RUDPSession::SetSessionId(const SessionIdType inSessionId)
@@ -155,13 +140,10 @@ void RUDPSession::Disconnect()
 
 	CloseSocket();
 	{
-		std::unique_lock lock(sendPacketInfoMapLock);
-		for (const auto& item : sendPacketInfoMap | std::views::values)
+		sendContext.ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info)
 		{
-			core.EraseSendPacketInfo(item, threadId);
-		}
-
-		sendPacketInfoMap.clear();
+			core.EraseSendPacketInfo(info, threadId);
+		});
 	}
 	OnReleased();
 
@@ -175,7 +157,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 		return false;
 	}
 
-	if (const PacketSequence nextSequence = lastSendPacketSequence + 1; not flowManager.CanSend(nextSequence))
+	if (const PacketSequence nextSequence = sendContext.GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
 	{
 		return false;
 	}
@@ -188,7 +170,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
-	const PacketSequence packetSequence = ++lastSendPacketSequence;
+	const PacketSequence packetSequence = sendContext.IncrementLastSendPacketSequence();
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
@@ -221,8 +203,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
 	if (not isReplyType)
 	{
-		std::unique_lock lock(sendPacketInfoMapLock);
-		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
+		sendContext.InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
 	}
 
 	if (buffer.m_bIsEncoded == false)
@@ -244,8 +225,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		SendPacketInfo::Free(sendPacketInfo);
 		if (not isReplyType)
 		{
-			std::unique_lock lock(sendPacketInfoMapLock);
-			sendPacketInfoMap.erase(inSendPacketSequence);
+			sendContext.EraseSendPacketInfo(inSendPacketSequence);
 		}
 
 		return false;
@@ -257,7 +237,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 void RUDPSession::SendHeartbeatPacket()
 {
-	if (const PacketSequence nextSequence = lastSendPacketSequence + 1; not flowManager.CanSend(nextSequence))
+	if (const PacketSequence nextSequence = sendContext.GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
 	{
 		return;
 	}
@@ -265,7 +245,7 @@ void RUDPSession::SendHeartbeatPacket()
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
-	const PacketSequence packetSequence = ++lastSendPacketSequence;
+	const PacketSequence packetSequence = sendContext.IncrementLastSendPacketSequence();
 	buffer << packetType << packetSequence;
 
 	std::ignore = SendPacket(buffer, packetSequence, false, true);
@@ -311,10 +291,11 @@ void RUDPSession::UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFun
 	}
 }
 
-void RUDPSession::UnregisterRIOBuffers()
+void RUDPSession::UnregisterRIOBuffers() const
 {
 	const auto& rioFunctionTable = core.GetRIOFunctionTable();
-	UnregisterRIOBuffer(rioFunctionTable, sendBuffer.sendBufferId);
+	RIO_BUFFERID sendBufferId = sendContext.GetSendBufferId();
+	UnregisterRIOBuffer(rioFunctionTable, sendBufferId);
 
 	if (recvBuffer.recvContext != nullptr)
 	{
@@ -330,41 +311,9 @@ void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
 	maximumHoldingPacketQueueSize = size;
 }
 
-size_t RUDPSession::GetSendPacketInfoQueueSize() const
-{
-	return sendBuffer.sendPacketInfoQueue.size();
-}
-
 void RUDPSession::EnqueueToRecvBufferList(NetBuffer* buffer)
 {
 	recvBuffer.recvBufferList.Enqueue(buffer);
-}
-
-char* RUDPSession::GetRIOSendBuffer()
-{
-	return sendBuffer.rioSendBuffer;
-}
-
-SendPacketInfo* RUDPSession::GetReservedSendPacketInfo() const
-{
-	return sendBuffer.reservedSendPacketInfo;
-}
-
-void RUDPSession::SetReservedSendPacketInfo(SendPacketInfo* reserveSendPacketInfo)
-{
-	sendBuffer.reservedSendPacketInfo = reserveSendPacketInfo;
-}
-
-SendPacketInfo* RUDPSession::GetSendPacketInfoQueueFrontAndPop()
-{
-	if (sendBuffer.sendPacketInfoQueue.empty())
-	{
-		return nullptr;
-	}
-
-	auto* frontItem = sendBuffer.sendPacketInfoQueue.front();
-	sendBuffer.sendPacketInfoQueue.pop();
-	return frontItem;
 }
 
 RecvBuffer& RUDPSession::GetRecvBuffer()
@@ -375,26 +324,6 @@ RecvBuffer& RUDPSession::GetRecvBuffer()
 std::shared_ptr<IOContext> RUDPSession::GetRecvBufferContext() const
 {
 	return recvBuffer.recvContext;
-}
-
-std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSession::GetCachedSequenceSet()
-{
-	return cachedSequenceSet;
-}
-
-std::mutex& RUDPSession::GetCachedSequenceSetMutex()
-{
-	return cachedSequenceSetLock;
-}
-
-RIO_BUFFERID RUDPSession::GetSendBufferId() const
-{
-	return sendBuffer.sendBufferId;
-}
-
-IO_MODE& RUDPSession::GetSendIOMode()
-{
-	return sendBuffer.ioMode;
 }
 
 void RUDPSession::RecvContextReset()
@@ -555,24 +484,20 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
 
-	if (lastSendPacketSequence < packetSequence)
+	if (sendContext.GetLastSendPacketSequence() < packetSequence)
 	{
 		return;
 	}
 
 	SendPacketInfo* sendPacketInfo;
 	{
-		std::unique_lock lock(sendPacketInfoMapLock);
-		if (const auto itor = sendPacketInfoMap.find(packetSequence); itor != sendPacketInfoMap.end())
-		{
-			sendPacketInfo = itor->second;
-		}
-		else
+		sendPacketInfo = sendContext.FindAndEraseSendPacketInfo(packetSequence);
+		if (sendPacketInfo == nullptr)
 		{
 			return;
 		}
 
-		sendPacketInfoMap.erase(packetSequence);
+		sendContext.EraseSendPacketInfo(packetSequence);
 	}
 
 	flowManager.OnAckReceived(packetSequence);
@@ -582,11 +507,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 std::shared_mutex& RUDPSession::GetSocketMutex() const
 {
 	return socketLock;
-}
-
-std::mutex& RUDPSession::GetSendPacketInfoQueueMutex()
-{
-	return sendBuffer.sendPacketInfoQueueLock;
 }
 
 SessionIdType RUDPSession::GetSessionId() const
@@ -663,4 +583,14 @@ SessionCryptoContext& RUDPSession::GetCryptoContext()
 const SessionCryptoContext& RUDPSession::GetCryptoContext() const
 {
 	return cryptoContext;
+}
+
+SessionSendContext& RUDPSession::GetSendContext()
+{
+	return sendContext;
+}
+
+const SessionSendContext& RUDPSession::GetSendContext() const
+{
+	return sendContext;
 }
