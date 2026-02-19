@@ -53,7 +53,7 @@ class MultiSocketRUDPCore
 	friend MultiSocketRUDPCoreFunctionDelegate;
 
 public:
-	explicit MultiSocketRUDPCore(const std::wstring& inSessionBrokerCertStoreName, const std::wstring& inSessionBrokerCertSubjectName);
+	explicit MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName);
 	virtual ~MultiSocketRUDPCore() = default;
 
 public:

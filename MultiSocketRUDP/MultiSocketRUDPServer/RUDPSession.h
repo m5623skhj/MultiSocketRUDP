@@ -10,6 +10,7 @@
 #include "PacketManager.h"
 #include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
+#include "SessionCryptoContext.h"
 
 namespace MultiSocketRUDP
 {
@@ -144,24 +145,6 @@ private:
 	bool CanProcessPacket(const sockaddr_in& targetClientAddr) const;
 	[[nodiscard]]
 	bool CheckMyClient(const sockaddr_in& targetClientAddr) const;
-	// ----------------------------------------
-	// @brief 세션의 암호화 키 핸들을 반환합니다.
-	// @return 세션 키 핸들
-	// ----------------------------------------
-	[[nodiscard]]
-	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const;
-	void SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle);
-	// ----------------------------------------
-	// @brief 세션의 암호화 솔트를 반환합니다.
-	// @return 세션 솔트 버퍼에 대한 포인터
-	// ----------------------------------------
-	[[nodiscard]]
-	const unsigned char* GetSessionSalt() const;
-	void SetSessionSalt(const unsigned char* inSessionSalt);
-
-	[[nodiscard]]
-	const unsigned char* GetSessionKey() const;
-	void SetSessionKey(const unsigned char* inSessionKey);
 
 private:
 	std::shared_mutex& GetSocketMutex() const;
@@ -228,17 +211,8 @@ private:
 	std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
 
 private:
-	std::atomic<SESSION_STATE> sessionState{ SESSION_STATE::DISCONNECTED };
 	SessionIdType sessionId = INVALID_SESSION_ID;
-	// a connectKey seems to be necessary
-	// generate and store a key on the TCP connection side,
-	// then insert the generated key into the packet and send it
-	// if the connectKey matches, verifying it as a valid key,
-	// insert the client information into clientAddr below
-	unsigned char sessionKey[SESSION_KEY_SIZE];
-	unsigned char sessionSalt[SESSION_SALT_SIZE];
-	unsigned char* keyObjectBuffer{};
-	BCRYPT_KEY_HANDLE sessionKeyHandle{};
+	std::atomic<SESSION_STATE> sessionState{ SESSION_STATE::DISCONNECTED };
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
 	PortType serverPort{ INVALID_PORT_NUMBER };
@@ -277,6 +251,13 @@ private:
 	SendBuffer sendBuffer;
 
 	RIO_RQ rioRQ = RIO_INVALID_RQ;
+
+private:
+	SessionCryptoContext& GetCryptoContext();
+	const SessionCryptoContext& GetCryptoContext() const;
+
+private:
+	SessionCryptoContext cryptoContext;
 
 private:
 	MultiSocketRUDPCore& core;

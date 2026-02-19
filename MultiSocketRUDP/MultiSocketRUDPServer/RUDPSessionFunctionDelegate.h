@@ -63,7 +63,7 @@ private:
 	static std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session);
 	static RIO_BUFFERID GetSendBufferId(const RUDPSession& session);
 	static IO_MODE& GetSendIOMode(RUDPSession& session);
-	static bool IsSendPacketInfoQueueEmpty(RUDPSession& session);
+	static bool IsSendPacketInfoQueueEmpty(const RUDPSession& session);
 	static SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session);
 	static void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer);
 	static std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session);

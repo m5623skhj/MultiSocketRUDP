@@ -114,6 +114,9 @@
     <ClCompile Include="RUDPSessionBroker.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
+    <ClCompile Include="SessionCryptoContext.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h">
@@ -169,6 +172,9 @@
     </ClInclude>
     <ClInclude Include="RUDPSessionBroker.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionCryptoContext.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

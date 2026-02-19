@@ -11,9 +11,7 @@
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
-	: sessionKey{}
-	, sessionSalt{}
-	, sock(INVALID_SOCKET)
+	: sock(INVALID_SOCKET)
 	, flowManager(maximumHoldingPacketQueueSize)
 	, recvBuffer()
 	, sendBuffer()
@@ -90,7 +88,7 @@ bool RUDPSession::InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 void RUDPSession::InitializeSession()
 {
 	sessionId = INVALID_SESSION_ID;
-	ZeroMemory(sessionKey, SESSION_KEY_SIZE);
+	cryptoContext.Initialize();
 	clientAddr = {};
 	clientSockAddrInet = {};
 	lastSendPacketSequence = {};
@@ -132,8 +130,6 @@ RUDPSession::~RUDPSession()
 	{
 		closesocket(sock);
 	}
-
-	delete[] keyObjectBuffer;
 }
 
 void RUDPSession::DoDisconnect()
@@ -236,9 +232,9 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 			buffer,
 			inSendPacketSequence,
 			direction,
-			sessionSalt,
+			cryptoContext.GetSessionSalt(),
 			SESSION_SALT_SIZE,
-			sessionKeyHandle,
+			cryptoContext.GetSessionKeyHandle(),
 			isCorePacket
 		);
 	}
@@ -583,11 +579,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	core.EraseSendPacketInfo(sendPacketInfo, threadId);
 }
 
-void RUDPSession::SetSessionKey(const unsigned char* inSessionKey)
-{
-	std::copy_n(inSessionKey, SESSION_KEY_SIZE, sessionKey);
-}
-
 std::shared_mutex& RUDPSession::GetSocketMutex() const
 {
 	return socketLock;
@@ -644,31 +635,6 @@ bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 	return true;
 }
 
-const BCRYPT_KEY_HANDLE& RUDPSession::GetSessionKeyHandle() const
-{
-	return sessionKeyHandle;
-}
-
-void RUDPSession::SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& inKeyHandle)
-{
-	sessionKeyHandle = inKeyHandle;
-}
-
-const unsigned char* RUDPSession::GetSessionSalt() const
-{
-	return sessionSalt;
-}
-
-void RUDPSession::SetSessionSalt(const unsigned char* inSessionSalt)
-{
-	std::copy_n(inSessionSalt, SESSION_SALT_SIZE, sessionSalt);
-}
-
-const unsigned char* RUDPSession::GetSessionKey() const
-{
-	return sessionKey;
-}
-
 bool RUDPSession::IsReserved() const
 {
 	return sessionState == SESSION_STATE::RESERVED;
@@ -687,4 +653,14 @@ SESSION_STATE RUDPSession::GetSessionState() const
 bool RUDPSession::IsReleasing() const
 {
 	return nowInReleaseThread;
+}
+
+SessionCryptoContext& RUDPSession::GetCryptoContext()
+{
+	return cryptoContext;
+}
+
+const SessionCryptoContext& RUDPSession::GetCryptoContext() const
+{
+	return cryptoContext;
 }

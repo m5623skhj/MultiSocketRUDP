@@ -41,7 +41,8 @@ public:
 			sessionKeyHandle
 		))
 		{
-			LOG_ERROR("PacketCryptoHelper::EncodePacket() : EncryptAESGCM() failed.");
+			auto errorCode = GetLastError();
+			LOG_ERROR(std::format("PacketCryptoHelper::EncodePacket() : EncryptAESGCM() failed with {} error", errorCode));
 			return;
 		}
 

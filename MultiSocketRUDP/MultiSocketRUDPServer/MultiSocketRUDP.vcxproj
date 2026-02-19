@@ -40,6 +40,7 @@
     <ClCompile Include="RUDPSessionFunctionDelegate.cpp" />
     <ClCompile Include="RUDPSessionManager.cpp" />
     <ClCompile Include="RUDPThreadManager.cpp" />
+    <ClCompile Include="SessionCryptoContext.cpp" />
     <ClCompile Include="Ticker.cpp" />
     <ClCompile Include="TimerEvent.cpp" />
   </ItemGroup>
@@ -60,6 +61,7 @@
     <ClInclude Include="RUDPSessionFunctionDelegate.h" />
     <ClInclude Include="RUDPSessionManager.h" />
     <ClInclude Include="RUDPThreadManager.h" />
+    <ClInclude Include="SessionCryptoContext.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />
   </ItemGroup>
