@@ -47,6 +47,7 @@ void SessionSendContext::PushSendPacketInfo(SendPacketInfo* info)
 
 SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 {
+	std::scoped_lock lock(sendPacketInfoQueueLock);
 	if (sendPacketInfoQueue.empty())
 	{
 		return nullptr;
@@ -54,6 +55,7 @@ SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 
 	auto* front = sendPacketInfoQueue.front();
 	sendPacketInfoQueue.pop();
+
 	return front;
 }
 
