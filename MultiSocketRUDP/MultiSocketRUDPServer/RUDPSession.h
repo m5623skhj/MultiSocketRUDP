@@ -74,7 +74,7 @@ private:
 	void AbortReservedSession();
 	void CloseSocket();
 	static void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
-	void UnregisterRIOBuffers() const;
+	void UnregisterRIOBuffers();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
 	void EnqueueToRecvBufferList(NetBuffer* buffer);
 	RecvBuffer& GetRecvBuffer();

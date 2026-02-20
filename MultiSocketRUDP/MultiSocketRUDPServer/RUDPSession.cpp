@@ -293,11 +293,12 @@ void RUDPSession::UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFun
 	}
 }
 
-void RUDPSession::UnregisterRIOBuffers() const
+void RUDPSession::UnregisterRIOBuffers()
 {
 	const auto& rioFunctionTable = core.GetRIOFunctionTable();
 	RIO_BUFFERID sendBufferId = sendContext.GetSendBufferId();
 	UnregisterRIOBuffer(rioFunctionTable, sendBufferId);
+	sendContext.SetSendRIOBufferId(RIO_INVALID_BUFFERID);
 
 	if (recvBuffer.recvContext != nullptr)
 	{
@@ -305,6 +306,10 @@ void RUDPSession::UnregisterRIOBuffers() const
 		UnregisterRIOBuffer(rioFunctionTable, context->BufferId);
 		UnregisterRIOBuffer(rioFunctionTable, context->clientAddrRIOBuffer.BufferId);
 		UnregisterRIOBuffer(rioFunctionTable, context->localAddrRIOBuffer.BufferId);
+
+		context->BufferId = RIO_INVALID_BUFFERID;
+		context->clientAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
+		context->localAddrRIOBuffer.BufferId = RIO_INVALID_BUFFERID;
 	}
 }
 
@@ -466,15 +471,10 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 		return;
 	}
 
-	SendPacketInfo* sendPacketInfo;
+	SendPacketInfo* sendPacketInfo = sendContext.FindAndEraseSendPacketInfo(packetSequence);
+	if (sendPacketInfo == nullptr)
 	{
-		sendPacketInfo = sendContext.FindAndEraseSendPacketInfo(packetSequence);
-		if (sendPacketInfo == nullptr)
-		{
-			return;
-		}
-
-		sendContext.EraseSendPacketInfo(packetSequence);
+		return;
 	}
 
 	flowManager.OnAckReceived(packetSequence);

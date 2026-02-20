@@ -11,6 +11,7 @@ SessionSendContext::SessionSendContext()
 void SessionSendContext::Reset()
 {
 	lastSendPacketSequence = 0;
+	sendBufferId = RIO_INVALID_BUFFERID;
 
 	if (reservedSendPacketInfo != nullptr)
 	{
