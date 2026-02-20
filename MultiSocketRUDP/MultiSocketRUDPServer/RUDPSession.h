@@ -1,17 +1,15 @@
 #pragma once
 #include <functional>
-#include <map>
 #include <set>
 #include "../Common/etc/CoreType.h"
 #include "Queue.h"
 #include <shared_mutex>
-#include <unordered_set>
-#include <queue>
 #include "PacketManager.h"
 #include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
 #include "SessionCryptoContext.h"
 #include "SessionSendContext.h"
+#include "SessionPacketOrderer.h"
 
 namespace MultiSocketRUDP
 {
@@ -24,18 +22,6 @@ class IPacket;
 
 struct SendPacketInfo;
 struct IOContext;
-
-struct RecvPacketInfo
-{
-	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence)
-		: buffer(inBuffer)
-		, packetSequence(inPacketSequence)
-	{
-	}
-
-	NetBuffer* buffer{};
-	PacketSequence packetSequence{};
-};
 
 struct RecvBuffer
 {
@@ -108,8 +94,6 @@ private:
 	bool OnRecvPacket(NetBuffer& recvPacket);
 	[[nodiscard]]
 	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence);
-	[[nodiscard]]
-	bool ProcessHoldingPacket();
 	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
 
@@ -194,18 +178,7 @@ private:
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
 
-	std::atomic<PacketSequence> nextRecvPacketSequence{};
-	struct RecvPacketInfoPriority
-	{
-		bool operator()(const RecvPacketInfo& lfh, const RecvPacketInfo& rfh) const
-		{
-			return lfh.packetSequence > rfh.packetSequence;
-		}
-	};
-	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
-	std::unordered_set<PacketSequence> recvHoldingPacketSequences;
 	static BYTE maximumHoldingPacketQueueSize;
-	std::atomic_uchar sequenceViolationCounter{};
 
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
 	std::mutex cachedSequenceSetLock;
@@ -229,6 +202,7 @@ private:
 	RUDPFlowManager flowManager;
 	SessionSendContext sendContext;
 	SessionCryptoContext cryptoContext;
+	SessionPacketOrderer sessionPacketOrderer;
 
 private:
 	MultiSocketRUDPCore& core;

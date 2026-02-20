@@ -9,6 +9,8 @@ public:
 	~RUDPReceiveWindow() = default;
 
 public:
+	void ResizeRecvWindowSize(BYTE recvWindowSize);
+
 	[[nodiscard]]
 	bool CanReceive(PacketSequence inSequence) const noexcept;
 	void MarkReceived(PacketSequence inSequence) noexcept;

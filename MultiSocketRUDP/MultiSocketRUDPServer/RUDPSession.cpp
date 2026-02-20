@@ -13,8 +13,9 @@ BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: sock(INVALID_SOCKET)
-	, flowManager(maximumHoldingPacketQueueSize)
 	, recvBuffer()
+	, flowManager(maximumHoldingPacketQueueSize)
+	, sessionPacketOrderer(maximumHoldingPacketQueueSize)
 	, core(inCore)
 {
 	ZeroMemory(recvBuffer.buffer, sizeof(recvBuffer.buffer));
@@ -95,8 +96,9 @@ void RUDPSession::InitializeSession()
 	nowInReleaseThread = {};
 	sessionReservedTime = {};
 
-	flowManager.Reset(0);
+	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	sendContext.Reset();
+	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
 }
 
 void RUDPSession::SetSessionId(const SessionIdType inSessionId)
@@ -365,9 +367,11 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 	clientAddr = inClientAddr;
 	memset(&clientSockAddrInet, 0, sizeof(clientSockAddrInet));
 	clientSockAddrInet.Ipv4 = inClientAddr;
-	++nextRecvPacketSequence;
 
-	flowManager.Reset(nextRecvPacketSequence);
+	constexpr PacketSequence startSequence = LOGIN_PACKET_SEQUENCE + 1;
+	sessionPacketOrderer.Reset(startSequence);
+	flowManager.Reset(startSequence);
+
 	OnConnected(sessionId);
 	SendReplyToClient(packetSequence);
 
@@ -389,65 +393,37 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 		return true;
 	}
 
-	if (nextRecvPacketSequence != packetSequence)
-	{
-		if (packetSequence < nextRecvPacketSequence)
+	const auto packetProcessResult = sessionPacketOrderer.OnReceive(
+		packetSequence,
+		recvPacket,
+		[this](NetBuffer& buffer, const PacketSequence sequence) -> bool
 		{
-			SendReplyToClient(packetSequence);
-		}
-		else if (nextRecvPacketSequence < packetSequence && not recvHoldingPacketSequences.contains(packetSequence))
-		{
-			NetBuffer::AddRefCount(&recvPacket);
-			recvPacketHolderQueue.emplace(&recvPacket, packetSequence);
-			recvHoldingPacketSequences.emplace(packetSequence);
-		}
+			return ProcessPacket(buffer, sequence);
+		});
 
+	switch (packetProcessResult)
+	{
+	case ON_RECV_RESULT::DUPLICATED_RECV:
+	{
+		SendReplyToClient(packetSequence);
+		[[fallthrough]];
+	}
+	case ON_RECV_RESULT::PROCESSED:
+	case ON_RECV_RESULT::PACKET_HELD:
+	{
 		return true;
 	}
-
-	if (ProcessPacket(recvPacket, packetSequence) == false)
+	case ON_RECV_RESULT::ERROR_OCCURED:
 	{
 		return false;
 	}
-
-	return ProcessHoldingPacket();
-}
-
-bool RUDPSession::ProcessHoldingPacket()
-{
-	PacketSequence packetSequence;
-
-	while (not recvPacketHolderQueue.empty())
-	{
-		NetBuffer* storedBuffer;
-		{
-			auto& recvPacketHolderTop = recvPacketHolderQueue.top();
-			if (recvPacketHolderTop.packetSequence > nextRecvPacketSequence)
-			{
-				break;
-			}
-
-			packetSequence = recvPacketHolderTop.packetSequence;
-			storedBuffer = recvPacketHolderTop.buffer;
-			recvPacketHolderQueue.pop();
-		}
-		
-		if (ProcessPacket(*storedBuffer, packetSequence) == false)
-		{
-			return false;
-		}
-
-		NetBuffer::Free(storedBuffer);
 	}
-	
-	return true;
+
+	return false;
 }
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
-	recvHoldingPacketSequences.erase(recvPacketSequence);
-	++nextRecvPacketSequence;
-
 	PacketId packetId;
 	recvPacket >> packetId;
 
@@ -466,6 +442,7 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 
 	flowManager.MarkReceived(recvPacketSequence);
 	SendReplyToClient(recvPacketSequence);
+
 	return true;
 }
 
