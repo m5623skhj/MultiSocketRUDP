@@ -126,6 +126,9 @@
     <ClCompile Include="RIOManager.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
     </ClCompile>
+    <ClCompile Include="SessionPacketOrderer.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h">
@@ -193,6 +196,9 @@
     </ClInclude>
     <ClInclude Include="RIOManager.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionPacketOrderer.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

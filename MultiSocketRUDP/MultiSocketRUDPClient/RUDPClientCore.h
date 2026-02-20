@@ -179,7 +179,7 @@ public:
 #endif
 
 private:
-	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, const bool isCorePacket);
+	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
 	static inline WORD GetPayloadLength(const NetBuffer& buffer);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);

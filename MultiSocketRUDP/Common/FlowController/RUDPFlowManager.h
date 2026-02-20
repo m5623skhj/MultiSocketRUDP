@@ -12,6 +12,11 @@ public:
 	}
 
 public:
+	void ResizeRecvWindowSize(BYTE recvWindowSize)
+	{
+		receiveWindow.ResizeRecvWindowSize(recvWindowSize);
+	}
+
 	[[nodiscard]]
 	bool CanSend(PacketSequence nextSend) noexcept
 	{
@@ -51,7 +56,13 @@ public:
 		return flowController.GetCwnd();
 	}
 
-	void Reset(PacketSequence recvStartSequence) noexcept
+	void Initialize(const BYTE recvWindowSize) noexcept
+	{
+		Reset(0);
+		ResizeRecvWindowSize(recvWindowSize);
+	}
+
+	void Reset(const PacketSequence recvStartSequence) noexcept
 	{
 		flowController.Reset();
 		receiveWindow.Reset(recvStartSequence);
