@@ -9,6 +9,10 @@ public:
 	~RUDPReceiveWindow() = default;
 
 public:
+	// ----------------------------------------
+	// @brief 수신 윈도우의 크기를 조절하고, 수신 플래그 벡터를 새 크기로 재할당합니다.
+	// @param recvWindowSize 새로운 수신 윈도우 크기
+	// ----------------------------------------
 	void ResizeRecvWindowSize(BYTE recvWindowSize);
 
 	[[nodiscard]]

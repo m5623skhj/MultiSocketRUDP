@@ -12,6 +12,10 @@ public:
 	}
 
 public:
+	// ----------------------------------------
+	// @brief 수신 윈도우 크기를 동적으로 조절합니다.
+	// @param recvWindowSize 새로운 수신 윈도우 크기
+	// ----------------------------------------
 	void ResizeRecvWindowSize(BYTE recvWindowSize)
 	{
 		receiveWindow.ResizeRecvWindowSize(recvWindowSize);
