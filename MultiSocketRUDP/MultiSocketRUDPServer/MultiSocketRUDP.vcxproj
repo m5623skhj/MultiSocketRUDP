@@ -47,6 +47,7 @@
     <ClCompile Include="SessionRIOContext.cpp" />
     <ClCompile Include="SessionSendContext.cpp" />
     <ClCompile Include="SessionSocketContext.cpp" />
+    <ClCompile Include="SessionStateMachine.cpp" />
     <ClCompile Include="Ticker.cpp" />
     <ClCompile Include="TimerEvent.cpp" />
   </ItemGroup>
@@ -76,6 +77,7 @@
     <ClInclude Include="SessionRIOContext.h" />
     <ClInclude Include="SessionSendContext.h" />
     <ClInclude Include="SessionSocketContext.h" />
+    <ClInclude Include="SessionStateMachine.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />
   </ItemGroup>
