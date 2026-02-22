@@ -129,6 +129,15 @@
     <ClCompile Include="SessionPacketOrderer.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClCompile>
+    <ClCompile Include="SessionSocketContext.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionRecvContext.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionRIOContext.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h">
@@ -198,6 +207,18 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
     </ClInclude>
     <ClInclude Include="SessionPacketOrderer.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="RecvBuffer.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionSocketContext.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionRecvContext.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionRIOContext.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClInclude>
   </ItemGroup>

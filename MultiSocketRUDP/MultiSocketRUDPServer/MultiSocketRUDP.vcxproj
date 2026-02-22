@@ -43,7 +43,10 @@
     <ClCompile Include="SendPacketInfo.cpp" />
     <ClCompile Include="SessionCryptoContext.cpp" />
     <ClCompile Include="SessionPacketOrderer.cpp" />
+    <ClCompile Include="SessionRecvContext.cpp" />
+    <ClCompile Include="SessionRIOContext.cpp" />
     <ClCompile Include="SessionSendContext.cpp" />
+    <ClCompile Include="SessionSocketContext.cpp" />
     <ClCompile Include="Ticker.cpp" />
     <ClCompile Include="TimerEvent.cpp" />
   </ItemGroup>
@@ -57,6 +60,7 @@
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="PacketSequenceSetKey.h" />
+    <ClInclude Include="RecvBuffer.h" />
     <ClInclude Include="RIOManager.h" />
     <ClInclude Include="RUDPIOHandler.h" />
     <ClInclude Include="RUDPPacketProcessor.h" />
@@ -68,7 +72,10 @@
     <ClInclude Include="SendPacketInfo.h" />
     <ClInclude Include="SessionCryptoContext.h" />
     <ClInclude Include="SessionPacketOrderer.h" />
+    <ClInclude Include="SessionRecvContext.h" />
+    <ClInclude Include="SessionRIOContext.h" />
     <ClInclude Include="SessionSendContext.h" />
+    <ClInclude Include="SessionSocketContext.h" />
     <ClInclude Include="Ticker.h" />
     <ClInclude Include="TimerEvent.h" />
   </ItemGroup>

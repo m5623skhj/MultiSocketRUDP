@@ -30,6 +30,12 @@ public:
 
 public:
 	[[nodiscard]]
+	bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
+	void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
+
+	void Reset();
+
+	[[nodiscard]]
 	bool IsSendPacketInfoQueueEmpty();
 	[[nodiscard]]
 	size_t GetSendPacketInfoQueueSize();
@@ -71,8 +77,6 @@ public:
 	PacketSequence GetLastSendPacketSequence() const;
 	[[nodiscard]]
 	PacketSequence IncrementLastSendPacketSequence();
-
-	void Reset();
 
 private:
 	SendPacketInfo* reservedSendPacketInfo = nullptr;

@@ -1,7 +1,6 @@
 #include "PreCompile.h"
 #include "RUDPSessionFunctionDelegate.h"
 #include "RUDPSession.h"
-#include "RIOManager.h"
 
 bool RUDPSessionFunctionDelegate::InitializeSessionRIO(RUDPSession& session, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& recvCQ, const RIO_CQ& sendCQ)
 {
@@ -215,6 +214,6 @@ void RUDPSessionFunctionDelegate::SetSessionKeyHandle(RUDPSession& session, cons
 
 void RUDPSessionFunctionDelegate::GetServerPortAndSessionId(const RUDPSession& session, PortType& outServerPort, SessionIdType& outSessionId)
 {
-	outServerPort = session.serverPort;
+	outServerPort = session.socketContext.GetServerPort();
 	outSessionId = session.sessionId;
 }

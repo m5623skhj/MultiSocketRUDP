@@ -8,6 +8,27 @@ SessionSendContext::SessionSendContext()
 	ZeroMemory(rioSendBuffer, sizeof(rioSendBuffer));
 }
 
+bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
+{
+	const RIO_BUFFERID bufferId = rioFunctionTable.RIORegisterBuffer(rioSendBuffer, MAX_SEND_BUFFER_SIZE);
+	if (bufferId == RIO_INVALID_BUFFERID)
+	{
+		return false;
+	}
+
+	sendBufferId = bufferId;
+	return true;
+}
+
+void SessionSendContext::Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
+{
+	if (sendBufferId != RIO_INVALID_BUFFERID)
+	{
+		rioFunctionTable.RIODeregisterBuffer(sendBufferId);
+		sendBufferId = RIO_INVALID_BUFFERID;
+	}
+}
+
 void SessionSendContext::Reset()
 {
 	lastSendPacketSequence = 0;
