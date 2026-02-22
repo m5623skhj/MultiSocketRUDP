@@ -524,21 +524,30 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 		case WAIT_OBJECT_0:
 		{
 			std::scoped_lock lock(releaseSessionIdListLock);
-			for (const auto& releaseSessionId : releaseSessionIdList)
-			{
-				if (const auto releaseSession = GetReleasingSession(releaseSessionId))
-				{
-					if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
-						releaseSession->nowInProcessingRecvPacket)
-					{
-						continue;
-					}
+			
+            std::erase_if(releaseSessionIdList, [this](const SessionIdType releaseSessionId)
+            {
+                const auto releaseSession = GetReleasingSession(releaseSessionId);
+                if (releaseSession == nullptr)
+                {
+                    return true;
+                }
 
-					releaseSession->Disconnect();
-					releaseSession->InitializeSession();
-				}
-			}
-			releaseSessionIdList.clear();
+                if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
+                    releaseSession->nowInProcessingRecvPacket)
+                {
+                    return false;
+                }
+
+                releaseSession->Disconnect();
+                releaseSession->InitializeSession();
+                return true;
+            });
+
+            if (not releaseSessionIdList.empty())
+            {
+                SetEvent(sessionReleaseEventHandle);
+            }
 		}
 		break;
 		case WAIT_OBJECT_0 + 1:
