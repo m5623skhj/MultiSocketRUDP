@@ -7,6 +7,7 @@
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
+#include "RIOManager.h"
 #include "RUDPSessionManager.h"
 #include "RUDPThreadManager.h"
 #include "RUDPPacketProcessor.h"
@@ -41,14 +42,14 @@ public:
 	// @return 연결된 사용자 수
 	// ----------------------------------------
 	[[nodiscard]]
-	bool IsServerStopped() const { return isServerStopped; }
+	bool IsServerStopped() const;
 	[[nodiscard]]
 	unsigned short GetConnectedUserCount() const;
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true) const;
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
-	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const { return rioManager->GetRIOFunctionTable(); }
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 
 	// Never call this function directly. It should only be called within RDPSession::Disconnect()
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;

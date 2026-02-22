@@ -2,14 +2,13 @@
 #include <functional>
 #include <set>
 #include "../Common/etc/CoreType.h"
-#include "Queue.h"
 #include <shared_mutex>
 #include "PacketManager.h"
-#include "RIOManager.h"
 #include "../Common/FlowController/RUDPFlowManager.h"
 #include "SessionCryptoContext.h"
-#include "SessionSendContext.h"
 #include "SessionPacketOrderer.h"
+#include "SessionSocketContext.h"
+#include "SessionRIOContext.h"
 
 namespace MultiSocketRUDP
 {
@@ -21,14 +20,8 @@ class RUDPSessionFunctionDelegate;
 class IPacket;
 
 struct SendPacketInfo;
+struct RecvBuffer;
 struct IOContext;
-
-struct RecvBuffer
-{
-	std::shared_ptr<IOContext> recvContext{};
-	char buffer[RECV_BUFFER_SIZE];
-	CListBaseQueue<NetBuffer*> recvBufferList;
-};
 
 class RUDPSession
 {
@@ -43,15 +36,13 @@ private:
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
 	[[nodiscard]]
 	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
-	[[nodiscard]]
-	bool InitRIORecvBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	void InitializeSession();
 
 	void SetSessionId( const SessionIdType inSessionId);
 	void SetThreadId(const ThreadIdType inThreadId);
 
 public:
-	virtual ~RUDPSession();
+	virtual ~RUDPSession() = default;
 
 public:
 	void DoDisconnect();
@@ -171,9 +162,6 @@ private:
 	std::atomic<SESSION_STATE> sessionState{ SESSION_STATE::DISCONNECTED };
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
-	PortType serverPort{ INVALID_PORT_NUMBER };
-	SOCKET sock{};
-	mutable std::shared_mutex socketLock;
 	bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
@@ -187,11 +175,6 @@ private:
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
 
 private:
-	RecvBuffer recvBuffer;
-
-	RIO_RQ rioRQ = RIO_INVALID_RQ;
-
-private:
 	SessionCryptoContext& GetCryptoContext();
 	const SessionCryptoContext& GetCryptoContext() const;
 
@@ -200,9 +183,10 @@ private:
 
 private:
 	RUDPFlowManager flowManager;
-	SessionSendContext sendContext;
 	SessionCryptoContext cryptoContext;
 	SessionPacketOrderer sessionPacketOrderer;
+	SessionSocketContext socketContext;
+	SessionRIOContext rioContext;
 
 private:
 	MultiSocketRUDPCore& core;

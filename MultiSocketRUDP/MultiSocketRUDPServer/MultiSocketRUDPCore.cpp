@@ -140,6 +140,11 @@ void MultiSocketRUDPCore::StopServer()
 	Logger::GetInstance().WriteLog(log);
 }
 
+bool MultiSocketRUDPCore::IsServerStopped() const
+{
+	return isServerStopped;
+}
+
 unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
 {
 	return sessionManager->GetConnectedCount();
@@ -171,7 +176,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		buffer->m_iRead = 0;
 	}
 
-	sendPacketInfo->owner->sendContext.PushSendPacketInfo(sendPacketInfo);
+	sendPacketInfo->owner->rioContext.GetSendContext().PushSendPacketInfo(sendPacketInfo);
 	if (not ioHandler->DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
 		SendPacketInfo::Free(sendPacketInfo, 2);
@@ -215,6 +220,11 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 	} while (false);
 
 	SendPacketInfo::Free(eraseTarget);
+}
+
+RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const
+{
+	return rioManager->GetRIOFunctionTable();
 }
 
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
@@ -353,25 +363,26 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
 {
-	session.sock = CreateRUDPSocket();
-	if (session.GetSocket() == INVALID_SOCKET)
+	session.socketContext.SetSocket(CreateRUDPSocket());
+	const SOCKET sock = session.GetSocket();
+	if (sock == INVALID_SOCKET)
 	{
 		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
 
-	auto raii = Util::MakeScopeExit([&session]() {
+	auto raii = Util::MakeScopeExit([&session, this]() {
 		if (session.GetSocket() != INVALID_SOCKET)
 		{
-			closesocket(session.GetSocket());
-			session.sock = INVALID_SOCKET;
+			session.rioContext.Cleanup(rioManager->GetRIOFunctionTable());
+			session.socketContext.CloseSocket();
 		}
 	});
 
 	sockaddr_in serverAddr;
 	socklen_t len = sizeof(serverAddr);
-	getsockname(session.sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
-	session.serverPort = ntohs(serverAddr.sin_port);
+	getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
+	session.socketContext.SetServerPort(ntohs(serverAddr.sin_port));
 
 	if (not rioManager->InitializeSessionRIO(session, session.GetThreadId()))
 	{
@@ -605,7 +616,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 			}
 
 			context->session->nowInProcessingRecvPacket = true;
-			if (context->session->recvBuffer.recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
+			if (context->session->rioContext.GetRecvBuffer().recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
 			{
 				break;
 			}
