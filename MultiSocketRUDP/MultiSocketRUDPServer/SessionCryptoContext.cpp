@@ -77,10 +77,4 @@ void SessionCryptoContext::Release()
 		delete[] keyObjectBuffer;
 		keyObjectBuffer = nullptr;
 	}
-
-	if (sessionKeyHandle != nullptr)
-	{
-		std::ignore = BCryptDestroyKey(sessionKeyHandle);
-		sessionKeyHandle = nullptr;
-	}
 }
