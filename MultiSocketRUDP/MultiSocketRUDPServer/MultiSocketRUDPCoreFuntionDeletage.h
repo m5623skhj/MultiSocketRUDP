@@ -1,16 +1,18 @@
 #pragma once
 #include <cassert>
+#include "../Common/etc/CoreType.h"
 
 enum class CONNECT_RESULT_CODE : unsigned char;
-class RUDPSession;
 struct IOContext;
 
+class RUDPSession;
 class MultiSocketRUDPCore;
 class RUDPIOHandler;
 class RUDPSessionBroker;
 
 class MultiSocketRUDPCoreFunctionDelegate
 {
+    friend RUDPSession;
     friend MultiSocketRUDPCore;
     friend RUDPIOHandler;
     friend RUDPSessionBroker;
@@ -42,6 +44,8 @@ private:
     static void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
 	static RUDPSession* AcquireSession();
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
+    static void DisconnectSession(SessionIdType sessionId);
+    static void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
     MultiSocketRUDPCore* core = nullptr;

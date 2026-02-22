@@ -186,18 +186,6 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 	return true;
 }
 
-void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId) const
-{
-	if (not sessionManager->ReleaseSession(disconnectTargetSessionId))
-	{
-		return;
-	}
-
-	const auto log = Logger::MakeLogObject<ServerLog>();
-	log->logString = std::format("Session id {} is disconnected", disconnectTargetSessionId);
-	Logger::GetInstance().WriteLog(log);
-}
-
 void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
 	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo == true)
@@ -225,6 +213,18 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const
 {
 	return rioManager->GetRIOFunctionTable();
+}
+
+void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId) const
+{
+	if (not sessionManager->ReleaseSession(disconnectTargetSessionId))
+	{
+		return;
+	}
+
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = std::format("Session id {} is disconnected", disconnectTargetSessionId);
+	Logger::GetInstance().WriteLog(log);
 }
 
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)

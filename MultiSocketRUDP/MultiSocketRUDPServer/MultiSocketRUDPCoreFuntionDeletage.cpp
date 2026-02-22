@@ -25,3 +25,19 @@ CONNECT_RESULT_CODE MultiSocketRUDPCoreFunctionDelegate::InitReserveSession(RUDP
 	assert(inst.core != nullptr);
 	return inst.core->InitReserveSession(session);
 }
+
+void MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(const SessionIdType sessionId)
+{
+	const auto& inst = Instance();
+
+	assert(inst.core != nullptr);
+	inst.core->DisconnectSession(sessionId);
+}
+
+void MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(RUDPSession& session)
+{
+	const auto& inst = Instance();
+
+	assert(inst.core != nullptr);
+	inst.core->PushToDisconnectTargetSession(session);
+}

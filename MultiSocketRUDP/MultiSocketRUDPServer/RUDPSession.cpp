@@ -6,6 +6,7 @@
 #include "Logger.h"
 #include "MemoryTracer.h"
 #include "IOContext.h"
+#include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
@@ -59,7 +60,7 @@ void RUDPSession::DoDisconnect()
 	}
 
 	OnDisconnected();
-	core.PushToDisconnectTargetSession(*this);
+	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
 void RUDPSession::Disconnect()
@@ -78,7 +79,7 @@ void RUDPSession::Disconnect()
 	}
 	OnReleased();
 
-	core.DisconnectSession(sessionId);
+	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
 }
 
 bool RUDPSession::SendPacket(IPacket& packet)
@@ -195,7 +196,7 @@ void RUDPSession::AbortReservedSession()
 	}
 
 	CloseSocket();
-	core.DisconnectSession(sessionId);
+	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
 }
 
 void RUDPSession::CloseSocket()

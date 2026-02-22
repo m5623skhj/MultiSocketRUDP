@@ -51,10 +51,6 @@ public:
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
 	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 
-	// Never call this function directly. It should only be called within RDPSession::Disconnect()
-	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
-	void PushToDisconnectTargetSession(RUDPSession& session);
-
 	// ----------------------------------------
 	// @brief NetBuffer에서 페이로드 길이를 추출합니다.
 	// @param buffer 페이로드 길이를 포함하는 NetBuffer 객체
@@ -66,6 +62,10 @@ public:
 		static constexpr int PAYLOAD_LENGTH_POSITION = 1;
 		return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[PAYLOAD_LENGTH_POSITION]);
 	}
+
+private:
+	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
+	void PushToDisconnectTargetSession(RUDPSession& session);
 
 private:
 	void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
