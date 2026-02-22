@@ -34,6 +34,7 @@ void RUDPSession::InitializeSession()
 	nowInReleaseThread = {};
 	sessionReservedTime = {};
 
+	stateMachine.Reset();
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
 	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
@@ -51,21 +52,19 @@ void RUDPSession::SetThreadId(const ThreadIdType inThreadId)
 
 void RUDPSession::DoDisconnect()
 {
-	if (auto expectReserved{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(expectReserved, SESSION_STATE::RELEASING))
+	if (not stateMachine.TryTransitionToReleasing())
 	{
-		if (auto expectConnected{ SESSION_STATE::CONNECTED }; not sessionState.compare_exchange_strong(expectConnected, SESSION_STATE::RELEASING))
-		{
-			return;
-		}
+		return;
 	}
 
+	nowInReleaseThread = true;
 	OnDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
 void RUDPSession::Disconnect()
 {
-	if (sessionState != SESSION_STATE::RELEASING)
+	if (not stateMachine.IsReleasing())
 	{
 		return;
 	}
@@ -79,6 +78,7 @@ void RUDPSession::Disconnect()
 	}
 	OnReleased();
 
+	stateMachine.SetDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
 }
 
@@ -118,7 +118,6 @@ void RUDPSession::OnConnected(const SessionIdType inSessionId)
 {
 	UNREFERENCED_PARAMETER(inSessionId);
 
-	sessionState = SESSION_STATE::CONNECTED;
 	OnConnected();
 }
 
@@ -185,16 +184,17 @@ void RUDPSession::SendHeartbeatPacket()
 
 bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const
 {
-	return (sessionState.load() == SESSION_STATE::RESERVED) && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);
+	return stateMachine.IsReserved() && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);
 }
 
 void RUDPSession::AbortReservedSession()
 {
-	if (auto connectState{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::RELEASING))
+	if (not stateMachine.TryAbortReserved())
 	{
 		return;
 	}
 
+	nowInReleaseThread = true;
 	CloseSocket();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
 }
@@ -251,7 +251,7 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 		return false;
 	}
 
-	if (auto connectState{ SESSION_STATE::RESERVED }; not sessionState.compare_exchange_strong(connectState, SESSION_STATE::CONNECTED))
+	if (not stateMachine.TryTransitionToConnected())
 	{
 		return false;
 	}
@@ -400,8 +400,29 @@ SOCKADDR_INET& RUDPSession::GetSocketAddressInetRef()
 
 bool RUDPSession::IsConnected() const
 {
-	return sessionState == SESSION_STATE::CONNECTED;
+	return stateMachine.IsConnected();
 }
+
+bool RUDPSession::IsReserved() const
+{
+	return stateMachine.IsReserved();
+}
+
+bool RUDPSession::IsUsingSession() const
+{
+	return stateMachine.IsUsingSession();
+}
+
+SESSION_STATE RUDPSession::GetSessionState() const
+{
+	return stateMachine.GetSessionState();
+}
+
+bool RUDPSession::IsReleasing() const
+{
+	return nowInReleaseThread;
+}
+
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
 {
@@ -417,26 +438,6 @@ bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 	}
 
 	return true;
-}
-
-bool RUDPSession::IsReserved() const
-{
-	return sessionState == SESSION_STATE::RESERVED;
-}
-
-bool RUDPSession::IsUsingSession() const
-{
-	return sessionState == SESSION_STATE::RESERVED || sessionState == SESSION_STATE::CONNECTED;
-}
-
-SESSION_STATE RUDPSession::GetSessionState() const
-{
-	return sessionState.load();
-}
-
-bool RUDPSession::IsReleasing() const
-{
-	return nowInReleaseThread;
 }
 
 SessionCryptoContext& RUDPSession::GetCryptoContext()

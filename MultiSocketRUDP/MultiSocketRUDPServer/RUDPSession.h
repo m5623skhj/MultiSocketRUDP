@@ -9,6 +9,7 @@
 #include "SessionPacketOrderer.h"
 #include "SessionSocketContext.h"
 #include "SessionRIOContext.h"
+#include "SessionStateMachine.h"
 
 namespace MultiSocketRUDP
 {
@@ -159,7 +160,6 @@ private:
 
 private:
 	SessionIdType sessionId = INVALID_SESSION_ID;
-	std::atomic<SESSION_STATE> sessionState{ SESSION_STATE::DISCONNECTED };
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
 	bool nowInReleaseThread{};
@@ -187,6 +187,7 @@ private:
 	SessionPacketOrderer sessionPacketOrderer;
 	SessionSocketContext socketContext;
 	SessionRIOContext rioContext;
+	SessionStateMachine stateMachine;
 
 private:
 	MultiSocketRUDPCore& core;
