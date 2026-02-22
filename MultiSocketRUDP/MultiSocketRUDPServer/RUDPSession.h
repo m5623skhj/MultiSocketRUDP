@@ -46,6 +46,10 @@ public:
 	virtual ~RUDPSession() = default;
 
 public:
+	// ----------------------------------------
+	// @brief 현재 세션을 RELEASING 상태로 전이시키고 연결 해제 프로세스를 시작합니다.
+	// @details 예약 상태 또는 연결 상태에서만 RELEASING 상태로 전이할 수 있습니다.
+	// ----------------------------------------
 	void DoDisconnect();
 	bool SendPacket(IPacket& packet);
 
@@ -61,12 +65,19 @@ private:
 
 	void SendHeartbeatPacket();
 
+	// ----------------------------------------
+	// @brief 예약된 세션이 타임아웃되었는지 확인합니다.
+	// @param now 현재 시간 (밀리초)
+	// @return 타임아웃되었으면 true, 아니면 false
+	// ----------------------------------------
 	[[nodiscard]]
 	bool CheckReservedSessionTimeout(unsigned long long now) const;
+	// ----------------------------------------
+	// @brief 예약 상태의 세션을 강제로 중단시키고 RELEASING 상태로 전이합니다.
+	// @details 주로 예약 세션 타임아웃 시 호출됩니다.
+	// ----------------------------------------
 	void AbortReservedSession();
 	void CloseSocket();
-	static void UnregisterRIOBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, OUT RIO_BUFFERID& bufferId);
-	void UnregisterRIOBuffers();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
 	void EnqueueToRecvBufferList(NetBuffer* buffer);
 	RecvBuffer& GetRecvBuffer();
@@ -79,6 +90,10 @@ private:
 
 private:
 	bool TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
+	// ----------------------------------------
+	// @brief RELEASING 상태의 세션을 최종적으로 해제하고 DISCONNECTED 상태로 전환합니다.
+	// @details 세션의 소켓을 닫고 리소스 풀로 반환합니다.
+	// ----------------------------------------
 	void Disconnect();
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
@@ -109,12 +124,29 @@ public:
 	SOCKADDR_INET GetSocketAddressInet() const;
 	[[nodiscard]]
 	SOCKADDR_INET& GetSocketAddressInetRef();
+	// ----------------------------------------
+	// @brief 세션이 현재 연결 상태인지 확인합니다.
+	// @return 연결 상태이면 true, 아니면 false
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsConnected() const;
+	// ----------------------------------------
+	// @brief 세션이 현재 예약 상태인지 확인합니다.
+	// @return 예약 상태이면 true, 아니면 false
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsReserved() const;
+	// ----------------------------------------
+	// @brief 세션이 현재 사용 중 (예약 또는 연결) 상태인지 확인합니다.
+	// @return 사용 중이면 true, 아니면 false
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsUsingSession() const;
+	// ----------------------------------------
+	// @brief 현재 세션의 상태를 반환합니다.
+	// @return 현재 세션의 SESSION_STATE 값
+	// ----------------------------------------
+	[[nodiscard]]
 	SESSION_STATE GetSessionState() const;
 	[[nodiscard]]
 	bool IsReleasing() const;
