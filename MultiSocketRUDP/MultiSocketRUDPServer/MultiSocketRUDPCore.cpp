@@ -395,7 +395,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
 	}
-	session.sessionState = SESSION_STATE::RESERVED;
+	session.stateMachine.SetReserved();
 
 	raii.Dismiss();
 	return CONNECT_RESULT_CODE::SUCCESS;
