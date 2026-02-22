@@ -106,8 +106,9 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPServer;C:\Users\KimHyeongJin\Desktop\Common\json-develop\include;C:\Users\KimHyeongJin\Desktop\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

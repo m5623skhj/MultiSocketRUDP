@@ -104,10 +104,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPClient;C:\Users\KimHyeongJin\Desktop\Common\json-develop\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
