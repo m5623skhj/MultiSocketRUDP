@@ -231,10 +231,7 @@ bool RIOManager::LoadRIOFunctionTable()
 
 RIO_CQ RIOManager::CreateCompletionQueue(const size_t queueSize) const
 {
-	if (isInitialized == true)
-	{
-		return RIO_INVALID_CQ;
-	}
+	assert(not isInitialized);
 
 	const RIO_CQ rioCq = rioFunctionTable.RIOCreateCompletionQueue(static_cast<ULONG>(queueSize), nullptr);
 	if (rioCq == RIO_INVALID_CQ)

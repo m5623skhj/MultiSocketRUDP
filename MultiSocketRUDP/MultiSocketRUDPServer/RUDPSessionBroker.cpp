@@ -188,6 +188,7 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
 		SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);
+		RUDPSessionFunctionDelegate::SetSessionReservedTime(*session, GetTickCount64());
 	}
 	else
 	{
@@ -197,7 +198,6 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 		}
 	}
 
-	RUDPSessionFunctionDelegate::SetSessionReservedTime(*session, GetTickCount64());
 	return session;
 }
 
