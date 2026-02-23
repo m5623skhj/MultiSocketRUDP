@@ -45,6 +45,12 @@
     <ClCompile Include="RUDPFlowManagerTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
+    <ClCompile Include="SessionStateMachineTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionPacketOrderer.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h">
