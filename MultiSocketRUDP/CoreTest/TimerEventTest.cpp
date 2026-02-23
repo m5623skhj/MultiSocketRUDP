@@ -9,18 +9,18 @@
 class MockTimerEvent : public TimerEvent
 {
 public:
-    MockTimerEvent(const TimerEventId id, const TimerEventInterval intervalMs)
-        : TimerEvent(id, intervalMs)
-    {
-    }
+	MockTimerEvent(const TimerEventId id, const TimerEventInterval intervalMs)
+		: TimerEvent(id, intervalMs)
+	{
+	}
 
-    std::atomic<int> fireCount{ 0 };
+	std::atomic<int> fireCount{ 0 };
 
 private:
-    void Fire() override
-    {
-        ++fireCount;
-    }
+	void Fire() override
+	{
+		++fireCount;
+	}
 };
 
 class TickerTimerEventTest : public::testing::Test
@@ -28,7 +28,7 @@ class TickerTimerEventTest : public::testing::Test
 protected:
 	void SetUp() override
 	{
-        Ticker::GetInstance().Start(TICK_INTERVAL_MS);
+		Ticker::GetInstance().Start(TICK_INTERVAL_MS);
 	}
 
 	void TearDown() override
@@ -36,23 +36,23 @@ protected:
 		Ticker::GetInstance().Stop();
 	}
 
-    static bool WaitUntilFireCount(const MockTimerEvent& event, const int targetCount, const int timeoutMs = WAIT_TIMEOUT_MS)
+	static bool WaitUntilFireCount(const MockTimerEvent& event, const int targetCount, const int timeoutMs = WAIT_TIMEOUT_MS)
 	{
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (event.fireCount.load() >= targetCount)
-            {
-                return true;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+		while (std::chrono::steady_clock::now() < deadline)
+		{
+			if (event.fireCount.load() >= targetCount)
+			{
+				return true;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 
-        return false;
+		return false;
 	}
 
-    static constexpr unsigned int TICK_INTERVAL_MS = 5;
-    static constexpr int WAIT_TIMEOUT_MS = 1000;
+	static constexpr unsigned int TICK_INTERVAL_MS = 5;
+	static constexpr int WAIT_TIMEOUT_MS = 1000;
 };
 
 // ------------------------------------------------------------
@@ -60,12 +60,12 @@ protected:
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, RegisterTimerEvent_FiresAfterInterval)
 {
-    constexpr TimerEventInterval intervalMs = 10;
+	constexpr TimerEventInterval intervalMs = 10;
 
-    const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
+	const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
 
-    EXPECT_TRUE(WaitUntilFireCount(*event, 1));
+	EXPECT_TRUE(WaitUntilFireCount(*event, 1));
 }
 
 // ------------------------------------------------------------
@@ -73,13 +73,13 @@ TEST_F(TickerTimerEventTest, RegisterTimerEvent_FiresAfterInterval)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, RegisterTimerEvent_FiresRepeatedly)
 {
-    constexpr TimerEventInterval intervalMs = 10;
-    constexpr int targetFireCount = 3;
+	constexpr TimerEventInterval intervalMs = 10;
+	constexpr int targetFireCount = 3;
 
-    const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
+	const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
 
-    EXPECT_TRUE(WaitUntilFireCount(*event, targetFireCount));
+	EXPECT_TRUE(WaitUntilFireCount(*event, targetFireCount));
 }
 
 // ------------------------------------------------------------
@@ -87,18 +87,18 @@ TEST_F(TickerTimerEventTest, RegisterTimerEvent_FiresRepeatedly)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, MultipleEvents_FireAtTheirOwnInterval)
 {
-    constexpr TimerEventInterval fastIntervalMs = 10;
-    constexpr TimerEventInterval slowIntervalMs = 50;
+	constexpr TimerEventInterval fastIntervalMs = 10;
+	constexpr TimerEventInterval slowIntervalMs = 50;
 
-    const auto fastEvent = TimerEventCreator::Create<MockTimerEvent>(fastIntervalMs);
-    const auto slowEvent = TimerEventCreator::Create<MockTimerEvent>(slowIntervalMs);
+	const auto fastEvent = TimerEventCreator::Create<MockTimerEvent>(fastIntervalMs);
+	const auto slowEvent = TimerEventCreator::Create<MockTimerEvent>(slowIntervalMs);
 
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(fastEvent));
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(slowEvent));
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(fastEvent));
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(slowEvent));
 
-    ASSERT_TRUE(WaitUntilFireCount(*slowEvent, 2));
+	ASSERT_TRUE(WaitUntilFireCount(*slowEvent, 2));
 
-    EXPECT_GT(fastEvent->fireCount.load(), slowEvent->fireCount.load());
+	EXPECT_GT(fastEvent->fireCount.load(), slowEvent->fireCount.load());
 }
 
 // ------------------------------------------------------------
@@ -106,7 +106,7 @@ TEST_F(TickerTimerEventTest, MultipleEvents_FireAtTheirOwnInterval)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, RegisterTimerEvent_ReturnsFalse_WhenNullptr)
 {
-    EXPECT_FALSE(Ticker::GetInstance().RegisterTimerEvent(nullptr));
+	EXPECT_FALSE(Ticker::GetInstance().RegisterTimerEvent(nullptr));
 }
 
 // ------------------------------------------------------------
@@ -114,19 +114,19 @@ TEST_F(TickerTimerEventTest, RegisterTimerEvent_ReturnsFalse_WhenNullptr)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, UnregisterTimerEvent_StopsFiring)
 {
-    constexpr TimerEventInterval intervalMs = 10;
+	constexpr TimerEventInterval intervalMs = 10;
 
-    const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
+	const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
 
-    ASSERT_TRUE(WaitUntilFireCount(*event, 1));
+	ASSERT_TRUE(WaitUntilFireCount(*event, 1));
 
-    Ticker::GetInstance().UnregisterTimerEvent(event->GetTimerEventId());
+	Ticker::GetInstance().UnregisterTimerEvent(event->GetTimerEventId());
 
-    const int countAfterUnregister = event->fireCount.load();
+	const int countAfterUnregister = event->fireCount.load();
 
-    ASSERT_TRUE(WaitUntilFireCount(*event, countAfterUnregister + 2, 200)
-        == false || event->fireCount.load() <= countAfterUnregister + 1);
+	ASSERT_TRUE(WaitUntilFireCount(*event, countAfterUnregister + 2, 200)
+		== false || event->fireCount.load() <= countAfterUnregister + 1);
 }
 
 // ------------------------------------------------------------
@@ -134,8 +134,8 @@ TEST_F(TickerTimerEventTest, UnregisterTimerEvent_StopsFiring)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, UnregisterTimerEvent_InvalidId_DoesNotCrash)
 {
-    constexpr TimerEventId invalidId = 9999;
-    EXPECT_NO_FATAL_FAILURE(Ticker::GetInstance().UnregisterTimerEvent(invalidId));
+	constexpr TimerEventId invalidId = 9999;
+	EXPECT_NO_FATAL_FAILURE(Ticker::GetInstance().UnregisterTimerEvent(invalidId));
 }
 
 // ------------------------------------------------------------
@@ -143,16 +143,16 @@ TEST_F(TickerTimerEventTest, UnregisterTimerEvent_InvalidId_DoesNotCrash)
 // ------------------------------------------------------------
 TEST_F(TickerTimerEventTest, Stop_PreventsFiring)
 {
-    constexpr TimerEventInterval intervalMs = 10;
+	constexpr TimerEventInterval intervalMs = 10;
 
-    const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
-    ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
+	const auto event = TimerEventCreator::Create<MockTimerEvent>(intervalMs);
+	ASSERT_TRUE(Ticker::GetInstance().RegisterTimerEvent(event));
 
-    ASSERT_TRUE(WaitUntilFireCount(*event, 1));
+	ASSERT_TRUE(WaitUntilFireCount(*event, 1));
 
-    Ticker::GetInstance().Stop();
-    const int countAfterStop = event->fireCount.load();
+	Ticker::GetInstance().Stop();
+	const int countAfterStop = event->fireCount.load();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    EXPECT_EQ(event->fireCount.load(), countAfterStop);
+	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	EXPECT_EQ(event->fireCount.load(), countAfterStop);
 }

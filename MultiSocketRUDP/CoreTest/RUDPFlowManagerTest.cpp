@@ -5,13 +5,13 @@
 class RUDPFlowManagerTest : public ::testing::Test
 {
 protected:
-    void SetUp() override
-    {
-        fm.Reset(0);
-    }
+	void SetUp() override
+	{
+		fm.Reset(0);
+	}
 
-    static constexpr BYTE WINDOW_SIZE = 16;
-    RUDPFlowManager fm{ WINDOW_SIZE };
+	static constexpr BYTE WINDOW_SIZE = 16;
+	RUDPFlowManager fm{ WINDOW_SIZE };
 };
 
 
@@ -20,8 +20,8 @@ protected:
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 {
-    EXPECT_TRUE(fm.CanSend(1));
-    EXPECT_TRUE(fm.CanSend(4));
+	EXPECT_TRUE(fm.CanSend(1));
+	EXPECT_TRUE(fm.CanSend(4));
 }
 
 // ------------------------------------------------------------
@@ -29,7 +29,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 {
-    EXPECT_FALSE(fm.CanSend(5));
+	EXPECT_FALSE(fm.CanSend(5));
 }
 
 // ------------------------------------------------------------
@@ -37,10 +37,10 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 {
-    EXPECT_FALSE(fm.CanSend(5));
+	EXPECT_FALSE(fm.CanSend(5));
 
-    fm.OnAckReceived(1);
-    EXPECT_TRUE(fm.CanSend(5));
+	fm.OnAckReceived(1);
+	EXPECT_TRUE(fm.CanSend(5));
 }
 
 // ------------------------------------------------------------
@@ -48,8 +48,8 @@ TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 {
-    EXPECT_TRUE(fm.CanAccept(0));
-    EXPECT_TRUE(fm.CanAccept(WINDOW_SIZE - 1));
+	EXPECT_TRUE(fm.CanAccept(0));
+	EXPECT_TRUE(fm.CanAccept(WINDOW_SIZE - 1));
 }
 
 // ------------------------------------------------------------
@@ -57,7 +57,7 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 {
-    EXPECT_FALSE(fm.CanAccept(WINDOW_SIZE));
+	EXPECT_FALSE(fm.CanAccept(WINDOW_SIZE));
 }
 
 // ------------------------------------------------------------
@@ -65,10 +65,10 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 {
-    EXPECT_FALSE(fm.CanAccept(WINDOW_SIZE));
+	EXPECT_FALSE(fm.CanAccept(WINDOW_SIZE));
 
-    fm.MarkReceived(0);
-    EXPECT_TRUE(fm.CanAccept(WINDOW_SIZE));
+	fm.MarkReceived(0);
+	EXPECT_TRUE(fm.CanAccept(WINDOW_SIZE));
 }
 
 // ------------------------------------------------------------
@@ -76,11 +76,11 @@ TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, OnTimeout_ReducesCwndToOne)
 {
-    fm.OnTimeout();
-    EXPECT_EQ(fm.GetCwnd(), 1);
+	fm.OnTimeout();
+	EXPECT_EQ(fm.GetCwnd(), 1);
 
-    EXPECT_TRUE(fm.CanSend(1));
-    EXPECT_FALSE(fm.CanSend(2));
+	EXPECT_TRUE(fm.CanSend(1));
+	EXPECT_FALSE(fm.CanSend(2));
 }
 
 // ------------------------------------------------------------
@@ -88,15 +88,15 @@ TEST_F(RUDPFlowManagerTest, OnTimeout_ReducesCwndToOne)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 {
-    fm.MarkReceived(0);
-    fm.MarkReceived(1);
-    fm.OnAckReceived(1);
+	fm.MarkReceived(0);
+	fm.MarkReceived(1);
+	fm.OnAckReceived(1);
 
-    fm.Reset(100);
+	fm.Reset(100);
 
-    EXPECT_TRUE(fm.CanAccept(100));
-    EXPECT_FALSE(fm.CanAccept(99));
-    EXPECT_EQ(fm.GetCwnd(), 4);
+	EXPECT_TRUE(fm.CanAccept(100));
+	EXPECT_FALSE(fm.CanAccept(99));
+	EXPECT_EQ(fm.GetCwnd(), 4);
 }
 
 // ------------------------------------------------------------
@@ -104,8 +104,8 @@ TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, GetReceiveWindowEnd_ReturnsCorrectEnd)
 {
-    EXPECT_EQ(fm.GetReceiveWindowEnd(), WINDOW_SIZE);
+	EXPECT_EQ(fm.GetReceiveWindowEnd(), WINDOW_SIZE);
 
-    fm.MarkReceived(0);
-    EXPECT_EQ(fm.GetReceiveWindowEnd(), WINDOW_SIZE + 1);
+	fm.MarkReceived(0);
+	EXPECT_EQ(fm.GetReceiveWindowEnd(), WINDOW_SIZE + 1);
 }

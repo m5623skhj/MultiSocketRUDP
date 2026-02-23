@@ -5,31 +5,31 @@
 class RUDPFlowControllerTest : public ::testing::Test
 {
 protected:
-    void SetUp() override
-    {
-        fc.Reset();
-    }
+	void SetUp() override
+	{
+		fc.Reset();
+	}
 
-    RUDPFlowController fc;
+	RUDPFlowController fc;
 
-    void GrowCwndTo(const uint16_t targetCwnd)
-    {
-        PacketSequence seq = fc.GetLastAckedSequence() + 1;
-        while (fc.GetCwnd() < targetCwnd)
-        {
-            fc.OnReplyReceived(seq++);
-        }
-    }
+	void GrowCwndTo(const uint16_t targetCwnd)
+	{
+		PacketSequence seq = fc.GetLastAckedSequence() + 1;
+		while (fc.GetCwnd() < targetCwnd)
+		{
+			fc.OnReplyReceived(seq++);
+		}
+	}
 };
 
 TEST_F(RUDPFlowControllerTest, InitialState_CwndIsInitialValue)
 {
-    EXPECT_EQ(fc.GetCwnd(), 4);
+	EXPECT_EQ(fc.GetCwnd(), 4);
 }
 
 TEST_F(RUDPFlowControllerTest, InitialState_LastAckedSequenceIsZero)
 {
-    EXPECT_EQ(fc.GetLastAckedSequence(), 0);
+	EXPECT_EQ(fc.GetLastAckedSequence(), 0);
 }
 
 // ------------------------------------------------------------
@@ -37,8 +37,8 @@ TEST_F(RUDPFlowControllerTest, InitialState_LastAckedSequenceIsZero)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenOutstandingBelowCwnd)
 {
-    EXPECT_TRUE(fc.CanSendPacket(1, 0));
-    EXPECT_TRUE(fc.CanSendPacket(4, 0));
+	EXPECT_TRUE(fc.CanSendPacket(1, 0));
+	EXPECT_TRUE(fc.CanSendPacket(4, 0));
 }
 
 // ------------------------------------------------------------
@@ -46,8 +46,8 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenOutstandingBelowCwn
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsFalse_WhenOutstandingReachesCwnd)
 {
-    EXPECT_FALSE(fc.CanSendPacket(5, 0));
-    EXPECT_FALSE(fc.CanSendPacket(6, 0));
+	EXPECT_FALSE(fc.CanSendPacket(5, 0));
+	EXPECT_FALSE(fc.CanSendPacket(6, 0));
 }
 
 // ------------------------------------------------------------
@@ -55,7 +55,7 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsFalse_WhenOutstandingReaches
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenNoOutstanding)
 {
-    EXPECT_TRUE(fc.CanSendPacket(1, 1));
+	EXPECT_TRUE(fc.CanSendPacket(1, 1));
 }
 
 // ------------------------------------------------------------
@@ -63,9 +63,9 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenNoOutstanding)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_IncrementsCwnd)
 {
-    const uint16_t before = fc.GetCwnd();
-    fc.OnReplyReceived(1);
-    EXPECT_EQ(fc.GetCwnd(), before + 1);
+	const uint16_t before = fc.GetCwnd();
+	fc.OnReplyReceived(1);
+	EXPECT_EQ(fc.GetCwnd(), before + 1);
 }
 
 // ------------------------------------------------------------
@@ -73,8 +73,8 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_IncrementsCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_UpdatesLastAckedSequence)
 {
-    fc.OnReplyReceived(3);
-    EXPECT_EQ(fc.GetLastAckedSequence(), 3);
+	fc.OnReplyReceived(3);
+	EXPECT_EQ(fc.GetLastAckedSequence(), 3);
 }
 
 // ------------------------------------------------------------
@@ -82,12 +82,12 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_UpdatesLastAckedSequence)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_DuplicateAck_DoesNotChangeCwnd)
 {
-    fc.OnReplyReceived(5);
-    const uint16_t cwndAfterFirst = fc.GetCwnd();
+	fc.OnReplyReceived(5);
+	const uint16_t cwndAfterFirst = fc.GetCwnd();
 
-    fc.OnReplyReceived(5);
-    fc.OnReplyReceived(3);
-    EXPECT_EQ(fc.GetCwnd(), cwndAfterFirst);
+	fc.OnReplyReceived(5);
+	fc.OnReplyReceived(3);
+	EXPECT_EQ(fc.GetCwnd(), cwndAfterFirst);
 }
 
 // ------------------------------------------------------------
@@ -95,11 +95,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_DuplicateAck_DoesNotChangeCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_LargeGap_TriggersCongestion)
 {
-    fc.OnReplyReceived(1);
-    const uint16_t cwndBefore = fc.GetCwnd();
+	fc.OnReplyReceived(1);
+	const uint16_t cwndBefore = fc.GetCwnd();
 
-    fc.OnReplyReceived(8);
-    EXPECT_LT(fc.GetCwnd(), cwndBefore);
+	fc.OnReplyReceived(8);
+	EXPECT_LT(fc.GetCwnd(), cwndBefore);
 }
 
 // ------------------------------------------------------------
@@ -107,11 +107,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_LargeGap_TriggersCongestion)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion)
 {
-    fc.OnReplyReceived(1);
-    const uint16_t cwndBefore = fc.GetCwnd();
+	fc.OnReplyReceived(1);
+	const uint16_t cwndBefore = fc.GetCwnd();
 
-    fc.OnReplyReceived(6);
-    EXPECT_GE(fc.GetCwnd(), cwndBefore);
+	fc.OnReplyReceived(6);
+	EXPECT_GE(fc.GetCwnd(), cwndBefore);
 }
 
 // ------------------------------------------------------------
@@ -119,11 +119,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 {
-    GrowCwndTo(1024);
-    const uint16_t cwndAtMax = fc.GetCwnd();
+	GrowCwndTo(1024);
+	const uint16_t cwndAtMax = fc.GetCwnd();
 
-    fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
-    EXPECT_EQ(fc.GetCwnd(), cwndAtMax);
+	fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
+	EXPECT_EQ(fc.GetCwnd(), cwndAtMax);
 }
 
 // ------------------------------------------------------------
@@ -131,11 +131,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnCongestionEvent_HalvesCwnd)
 {
-    GrowCwndTo(8);
-    const uint16_t before = fc.GetCwnd();
+	GrowCwndTo(8);
+	const uint16_t before = fc.GetCwnd();
 
-    fc.OnCongestionEvent();
-    EXPECT_EQ(fc.GetCwnd(), before / 2);
+	fc.OnCongestionEvent();
+	EXPECT_EQ(fc.GetCwnd(), before / 2);
 }
 
 // ------------------------------------------------------------
@@ -143,9 +143,9 @@ TEST_F(RUDPFlowControllerTest, OnCongestionEvent_HalvesCwnd)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnCongestionEvent_CwndMinimumIsOne)
 {
-    fc.OnTimeout();
-    fc.OnCongestionEvent();
-    EXPECT_EQ(fc.GetCwnd(), 1);
+	fc.OnTimeout();
+	fc.OnCongestionEvent();
+	EXPECT_EQ(fc.GetCwnd(), 1);
 }
 
 // ------------------------------------------------------------
@@ -153,9 +153,9 @@ TEST_F(RUDPFlowControllerTest, OnCongestionEvent_CwndMinimumIsOne)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnTimeout_ResetsCwndToOne)
 {
-    GrowCwndTo(10);
-    fc.OnTimeout();
-    EXPECT_EQ(fc.GetCwnd(), 1);
+	GrowCwndTo(10);
+	fc.OnTimeout();
+	EXPECT_EQ(fc.GetCwnd(), 1);
 }
 
 // ------------------------------------------------------------
@@ -163,14 +163,14 @@ TEST_F(RUDPFlowControllerTest, OnTimeout_ResetsCwndToOne)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnTimeout_EntersRecovery_CwndNotIncreasedOnFirstAck)
 {
-    GrowCwndTo(8);
-    fc.OnTimeout();
+	GrowCwndTo(8);
+	fc.OnTimeout();
 
-    const uint16_t cwndAfterTimeout = fc.GetCwnd();
-    fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
+	const uint16_t cwndAfterTimeout = fc.GetCwnd();
+	fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
 
-    // recovery 상태에서 첫 ACK는 cwnd를 증가시키지 않고 recovery 해제만 함
-    EXPECT_EQ(fc.GetCwnd(), cwndAfterTimeout);
+	// recovery 상태에서 첫 ACK는 cwnd를 증가시키지 않고 recovery 해제만 함
+	EXPECT_EQ(fc.GetCwnd(), cwndAfterTimeout);
 }
 
 // ------------------------------------------------------------
@@ -178,15 +178,15 @@ TEST_F(RUDPFlowControllerTest, OnTimeout_EntersRecovery_CwndNotIncreasedOnFirstA
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, AfterRecovery_CwndIncreasesNormally)
 {
-    fc.OnTimeout();
-    PacketSequence seq = fc.GetLastAckedSequence() + 1;
+	fc.OnTimeout();
+	PacketSequence seq = fc.GetLastAckedSequence() + 1;
 
-    fc.OnReplyReceived(seq);
-    ++seq;
-    const uint16_t cwndAfterRecovery = fc.GetCwnd();
+	fc.OnReplyReceived(seq);
+	++seq;
+	const uint16_t cwndAfterRecovery = fc.GetCwnd();
 
-    fc.OnReplyReceived(seq);
-    EXPECT_EQ(fc.GetCwnd(), cwndAfterRecovery + 1);
+	fc.OnReplyReceived(seq);
+	EXPECT_EQ(fc.GetCwnd(), cwndAfterRecovery + 1);
 }
 
 // ------------------------------------------------------------
@@ -194,12 +194,12 @@ TEST_F(RUDPFlowControllerTest, AfterRecovery_CwndIncreasesNormally)
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, Reset_RestoresInitialState)
 {
-    GrowCwndTo(20);
-    fc.OnReplyReceived(10);
-    fc.OnTimeout();
+	GrowCwndTo(20);
+	fc.OnReplyReceived(10);
+	fc.OnTimeout();
 
-    fc.Reset();
+	fc.Reset();
 
-    EXPECT_EQ(fc.GetCwnd(), 4);
-    EXPECT_EQ(fc.GetLastAckedSequence(), 0);
+	EXPECT_EQ(fc.GetCwnd(), 4);
+	EXPECT_EQ(fc.GetLastAckedSequence(), 0);
 }

@@ -8,23 +8,23 @@ constexpr PacketId TEST_PACKET_ID_B = 9002;
 class TestPacketA : public IPacket
 {
 public:
-    PacketId GetPacketId() const override { return TEST_PACKET_ID_A; }
+	PacketId GetPacketId() const override { return TEST_PACKET_ID_A; }
 };
 
 class TestPacketB : public IPacket
 {
 public:
-    PacketId GetPacketId() const override { return TEST_PACKET_ID_B; }
+	PacketId GetPacketId() const override { return TEST_PACKET_ID_B; }
 };
 
 class PacketManagerTest : public ::testing::Test
 {
 protected:
-    void SetUp() override
-    {
-        PacketManager::RegisterPacket<TestPacketA>();
-        PacketManager::RegisterPacket<TestPacketB>();
-    }
+	void SetUp() override
+	{
+		PacketManager::RegisterPacket<TestPacketA>();
+		PacketManager::RegisterPacket<TestPacketB>();
+	}
 };
 
 // ------------------------------------------------------------
@@ -32,11 +32,11 @@ protected:
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, MakePacket_ReturnsNonNull_WhenRegistered)
 {
-    const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
-    const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
+	const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
 
-    EXPECT_NE(packetA, nullptr);
-    EXPECT_NE(packetB, nullptr);
+	EXPECT_NE(packetA, nullptr);
+	EXPECT_NE(packetB, nullptr);
 }
 
 // ------------------------------------------------------------
@@ -44,14 +44,14 @@ TEST_F(PacketManagerTest, MakePacket_ReturnsNonNull_WhenRegistered)
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, MakePacket_ReturnsCorrectType)
 {
-    const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
-    const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
+	const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
 
-    ASSERT_NE(packetA, nullptr);
-    ASSERT_NE(packetB, nullptr);
+	ASSERT_NE(packetA, nullptr);
+	ASSERT_NE(packetB, nullptr);
 
-    EXPECT_NE(dynamic_cast<TestPacketA*>(packetA.get()), nullptr);
-    EXPECT_NE(dynamic_cast<TestPacketB*>(packetB.get()), nullptr);
+	EXPECT_NE(dynamic_cast<TestPacketA*>(packetA.get()), nullptr);
+	EXPECT_NE(dynamic_cast<TestPacketB*>(packetB.get()), nullptr);
 }
 
 // ------------------------------------------------------------
@@ -59,13 +59,13 @@ TEST_F(PacketManagerTest, MakePacket_ReturnsCorrectType)
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, MakePacket_ReturnsPacketWithCorrectId)
 {
-    const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
-    ASSERT_NE(packetA, nullptr);
-    EXPECT_EQ(packetA->GetPacketId(), TEST_PACKET_ID_A);
+	const auto packetA = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	ASSERT_NE(packetA, nullptr);
+	EXPECT_EQ(packetA->GetPacketId(), TEST_PACKET_ID_A);
 
-    const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
-    ASSERT_NE(packetB, nullptr);
-    EXPECT_EQ(packetB->GetPacketId(), TEST_PACKET_ID_B);
+	const auto packetB = PacketManager::MakePacket(TEST_PACKET_ID_B);
+	ASSERT_NE(packetB, nullptr);
+	EXPECT_EQ(packetB->GetPacketId(), TEST_PACKET_ID_B);
 }
 
 // ------------------------------------------------------------
@@ -73,13 +73,13 @@ TEST_F(PacketManagerTest, MakePacket_ReturnsPacketWithCorrectId)
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, MakePacket_ReturnsNewInstanceEachCall)
 {
-    const auto packet1 = PacketManager::MakePacket(TEST_PACKET_ID_A);
-    const auto packet2 = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	const auto packet1 = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	const auto packet2 = PacketManager::MakePacket(TEST_PACKET_ID_A);
 
-    ASSERT_NE(packet1, nullptr);
-    ASSERT_NE(packet2, nullptr);
+	ASSERT_NE(packet1, nullptr);
+	ASSERT_NE(packet2, nullptr);
 
-    EXPECT_NE(packet1.get(), packet2.get());
+	EXPECT_NE(packet1.get(), packet2.get());
 }
 
 // ------------------------------------------------------------
@@ -87,10 +87,10 @@ TEST_F(PacketManagerTest, MakePacket_ReturnsNewInstanceEachCall)
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, MakePacket_ReturnsNull_WhenNotRegistered)
 {
-    constexpr PacketId unregisteredId = 9999;
-    const auto packet = PacketManager::MakePacket(unregisteredId);
+	constexpr PacketId unregisteredId = 9999;
+	const auto packet = PacketManager::MakePacket(unregisteredId);
 
-    EXPECT_EQ(packet, nullptr);
+	EXPECT_EQ(packet, nullptr);
 }
 
 // ------------------------------------------------------------
@@ -98,19 +98,19 @@ TEST_F(PacketManagerTest, MakePacket_ReturnsNull_WhenNotRegistered)
 // ------------------------------------------------------------
 TEST_F(PacketManagerTest, RegisterPacket_Overwrite_UpdatesFactory)
 {
-    struct OverridePacket : IPacket
-    {
-        [[nodiscard]]
-    	PacketId GetPacketId() const override { return TEST_PACKET_ID_A; }
-    };
+	struct OverridePacket : IPacket
+	{
+		[[nodiscard]]
+		PacketId GetPacketId() const override { return TEST_PACKET_ID_A; }
+	};
 
-    PacketManager::RegisterPacket<OverridePacket>();
+	PacketManager::RegisterPacket<OverridePacket>();
 
-    const auto packet = PacketManager::MakePacket(TEST_PACKET_ID_A);
-    ASSERT_NE(packet, nullptr);
+	const auto packet = PacketManager::MakePacket(TEST_PACKET_ID_A);
+	ASSERT_NE(packet, nullptr);
 
-    EXPECT_EQ(dynamic_cast<TestPacketA*>(packet.get()), nullptr);
-    EXPECT_NE(dynamic_cast<OverridePacket*>(packet.get()), nullptr);
+	EXPECT_EQ(dynamic_cast<TestPacketA*>(packet.get()), nullptr);
+	EXPECT_NE(dynamic_cast<OverridePacket*>(packet.get()), nullptr);
 
-    PacketManager::RegisterPacket<TestPacketA>();
+	PacketManager::RegisterPacket<TestPacketA>();
 }

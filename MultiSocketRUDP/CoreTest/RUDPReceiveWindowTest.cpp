@@ -5,28 +5,28 @@
 class RUDPReceiveWindowTest : public ::testing::Test
 {
 protected:
-    void SetUp() override
-    {
-        rw.Reset(0);
-    }
+	void SetUp() override
+	{
+		rw.Reset(0);
+	}
 
-    static constexpr BYTE WINDOW_SIZE = 16;
-    RUDPReceiveWindow rw{ WINDOW_SIZE };
+	static constexpr BYTE WINDOW_SIZE = 16;
+	RUDPReceiveWindow rw{ WINDOW_SIZE };
 };
 
 TEST_F(RUDPReceiveWindowTest, InitialState_WindowStartIsZero)
 {
-    EXPECT_EQ(rw.GetWindowStart(), 0);
+	EXPECT_EQ(rw.GetWindowStart(), 0);
 }
 
 TEST_F(RUDPReceiveWindowTest, InitialState_WindowEndEqualsWindowSize)
 {
-    EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE);
+	EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE);
 }
 
 TEST_F(RUDPReceiveWindowTest, InitialState_WindowSizeIsCorrect)
 {
-    EXPECT_EQ(rw.GetWindowSize(), WINDOW_SIZE);
+	EXPECT_EQ(rw.GetWindowSize(), WINDOW_SIZE);
 }
 
 // ------------------------------------------------------------
@@ -34,8 +34,8 @@ TEST_F(RUDPReceiveWindowTest, InitialState_WindowSizeIsCorrect)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsTrue_WhenWithinWindow)
 {
-    EXPECT_TRUE(rw.CanReceive(0));
-    EXPECT_TRUE(rw.CanReceive(WINDOW_SIZE - 1));
+	EXPECT_TRUE(rw.CanReceive(0));
+	EXPECT_TRUE(rw.CanReceive(WINDOW_SIZE - 1));
 }
 
 // ------------------------------------------------------------
@@ -43,8 +43,8 @@ TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsTrue_WhenWithinWindow)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsFalse_WhenOutsideWindow)
 {
-    EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE));
-    EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE + 1));
+	EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE));
+	EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE + 1));
 }
 
 // ------------------------------------------------------------
@@ -52,8 +52,8 @@ TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsFalse_WhenOutsideWindow)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsFalse_WhenBeforeWindowStart)
 {
-    rw.MarkReceived(0);
-    EXPECT_FALSE(rw.CanReceive(0));
+	rw.MarkReceived(0);
+	EXPECT_FALSE(rw.CanReceive(0));
 }
 
 // ------------------------------------------------------------
@@ -61,14 +61,14 @@ TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsFalse_WhenBeforeWindowStart)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_InOrder_AdvancesWindowStart)
 {
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), 1);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), 1);
 
-    rw.MarkReceived(1);
-    EXPECT_EQ(rw.GetWindowStart(), 2);
+	rw.MarkReceived(1);
+	EXPECT_EQ(rw.GetWindowStart(), 2);
 
-    rw.MarkReceived(2);
-    EXPECT_EQ(rw.GetWindowStart(), 3);
+	rw.MarkReceived(2);
+	EXPECT_EQ(rw.GetWindowStart(), 3);
 }
 
 // ------------------------------------------------------------
@@ -76,8 +76,8 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_InOrder_AdvancesWindowStart)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_InOrder_AdvancesWindowEnd)
 {
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE + 1);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE + 1);
 }
 
 // ------------------------------------------------------------
@@ -85,8 +85,8 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_InOrder_AdvancesWindowEnd)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfOrder_DoesNotAdvanceWindowStart)
 {
-    rw.MarkReceived(1);
-    EXPECT_EQ(rw.GetWindowStart(), 0);
+	rw.MarkReceived(1);
+	EXPECT_EQ(rw.GetWindowStart(), 0);
 }
 
 // ------------------------------------------------------------
@@ -94,12 +94,12 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfOrder_DoesNotAdvanceWindowStart)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfOrder_AdvancesWindowStartWhenGapFilled)
 {
-    rw.MarkReceived(1);
-    rw.MarkReceived(2);
-    EXPECT_EQ(rw.GetWindowStart(), 0);
+	rw.MarkReceived(1);
+	rw.MarkReceived(2);
+	EXPECT_EQ(rw.GetWindowStart(), 0);
 
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), 3);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), 3);
 }
 
 // ------------------------------------------------------------
@@ -107,8 +107,8 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfOrder_AdvancesWindowStartWhenGap
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfWindow_IsIgnored)
 {
-    rw.MarkReceived(WINDOW_SIZE);
-    EXPECT_EQ(rw.GetWindowStart(), 0);
+	rw.MarkReceived(WINDOW_SIZE);
+	EXPECT_EQ(rw.GetWindowStart(), 0);
 }
 
 // ------------------------------------------------------------
@@ -116,11 +116,11 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfWindow_IsIgnored)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_Duplicate_DoesNotAdvanceWindowStartTwice)
 {
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), 1);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), 1);
 
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), 1);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), 1);
 }
 
 // ------------------------------------------------------------
@@ -128,12 +128,12 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_Duplicate_DoesNotAdvanceWindowStartTw
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_FullWindow_InOrder_AdvancesCorrectly)
 {
-    for (BYTE i = 0; i < WINDOW_SIZE; ++i)
-    {
-        rw.MarkReceived(i);
-    }
-    EXPECT_EQ(rw.GetWindowStart(), WINDOW_SIZE);
-    EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE * 2);
+	for (BYTE i = 0; i < WINDOW_SIZE; ++i)
+	{
+		rw.MarkReceived(i);
+	}
+	EXPECT_EQ(rw.GetWindowStart(), WINDOW_SIZE);
+	EXPECT_EQ(rw.GetWindowEnd(), WINDOW_SIZE * 2);
 }
 
 // ------------------------------------------------------------
@@ -141,14 +141,14 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_FullWindow_InOrder_AdvancesCorrectly)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, MarkReceived_FullWindow_ReverseOrder_AdvancesCorrectly)
 {
-    for (int i = WINDOW_SIZE - 1; i > 0; --i)
-    {
-        rw.MarkReceived(static_cast<PacketSequence>(i));
-        EXPECT_EQ(rw.GetWindowStart(), 0);
-    }
+	for (int i = WINDOW_SIZE - 1; i > 0; --i)
+	{
+		rw.MarkReceived(static_cast<PacketSequence>(i));
+		EXPECT_EQ(rw.GetWindowStart(), 0);
+	}
 
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), WINDOW_SIZE);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), WINDOW_SIZE);
 }
 
 // ------------------------------------------------------------
@@ -156,12 +156,12 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_FullWindow_ReverseOrder_AdvancesCorre
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Reset_SetsWindowStartToGivenSequence)
 {
-    rw.MarkReceived(0);
-    rw.MarkReceived(1);
+	rw.MarkReceived(0);
+	rw.MarkReceived(1);
 
-    rw.Reset(100);
-    EXPECT_EQ(rw.GetWindowStart(), 100);
-    EXPECT_EQ(rw.GetWindowEnd(), 100 + WINDOW_SIZE);
+	rw.Reset(100);
+	EXPECT_EQ(rw.GetWindowStart(), 100);
+	EXPECT_EQ(rw.GetWindowEnd(), 100 + WINDOW_SIZE);
 }
 
 // ------------------------------------------------------------
@@ -169,11 +169,11 @@ TEST_F(RUDPReceiveWindowTest, Reset_SetsWindowStartToGivenSequence)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Reset_ClearsPreviousReceivedFlags)
 {
-    rw.MarkReceived(1);
-    rw.Reset(0);
+	rw.MarkReceived(1);
+	rw.Reset(0);
 
-    rw.MarkReceived(0);
-    EXPECT_EQ(rw.GetWindowStart(), 1);
+	rw.MarkReceived(0);
+	EXPECT_EQ(rw.GetWindowStart(), 1);
 }
 
 // ------------------------------------------------------------
@@ -182,12 +182,12 @@ TEST_F(RUDPReceiveWindowTest, Reset_ClearsPreviousReceivedFlags)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Wraparound_CanReceiveAcrossSequenceBoundary)
 {
-    constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 2;
-    rw.Reset(nearMax);
+	constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 2;
+	rw.Reset(nearMax);
 
-    EXPECT_TRUE(rw.CanReceive(nearMax));
-    EXPECT_TRUE(rw.CanReceive(nearMax + 1));
-    EXPECT_TRUE(rw.CanReceive(nearMax + 2));
+	EXPECT_TRUE(rw.CanReceive(nearMax));
+	EXPECT_TRUE(rw.CanReceive(nearMax + 1));
+	EXPECT_TRUE(rw.CanReceive(nearMax + 2));
 }
 
 // ------------------------------------------------------------
@@ -196,12 +196,12 @@ TEST_F(RUDPReceiveWindowTest, Wraparound_CanReceiveAcrossSequenceBoundary)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Wraparound_MarkReceivedAcrossSequenceBoundary)
 {
-    constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 1;
-    rw.Reset(nearMax);
+	constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 1;
+	rw.Reset(nearMax);
 
-    rw.MarkReceived(nearMax);
-    rw.MarkReceived(nearMax + 1);
-    rw.MarkReceived(nearMax + 2);
+	rw.MarkReceived(nearMax);
+	rw.MarkReceived(nearMax + 1);
+	rw.MarkReceived(nearMax + 2);
 
-    EXPECT_EQ(rw.GetWindowStart(), nearMax + 3);
+	EXPECT_EQ(rw.GetWindowStart(), nearMax + 3);
 }

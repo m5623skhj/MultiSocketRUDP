@@ -25,6 +25,8 @@
     <ClCompile Include="RUDPFlowControllerTest.cpp" />
     <ClCompile Include="RUDPFlowManagerTest.cpp" />
     <ClCompile Include="RUDPReceiveWindowTest.cpp" />
+    <ClCompile Include="SessionPacketOrderer.cpp" />
+    <ClCompile Include="SessionStateMachineTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>
   <ItemGroup>
