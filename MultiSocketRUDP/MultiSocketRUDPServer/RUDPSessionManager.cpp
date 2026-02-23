@@ -190,7 +190,7 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now)
 {
 	for (auto* session : sessionList)
 	{
-		if (session == nullptr || not session->IsConnected())
+		if (session == nullptr || not session->IsUsingSession())
 		{
 			continue;
 		}
@@ -199,8 +199,7 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now)
 		{
 			RUDPSessionFunctionDelegate::SendHeartbeatPacket(*session);
 		}
-
-		if (session->IsReserved() == true)
+		else if (session->IsReserved() == true)
 		{
 			// Waiting 30 seconds
 			if (RUDPSessionFunctionDelegate::CheckReservedSessionTimeout(*session, now) == true)
