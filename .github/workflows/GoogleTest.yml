@@ -36,7 +36,7 @@ jobs:
       - name: Build GTest (x64 Debug)
         shell: pwsh
         run: |
-          $GTestRoot = "${{ github.workspace }}/MultiSocketRUDP/external/CommonCode/Common/googletest-main"
+          $GTestRoot = "${{ github.workspace }}/MultiSocketRUDP/external/CommonCode/Common/googletest-main/googletest"
           $BuildDir = "$GTestRoot/build"
           New-Item -ItemType Directory -Force -Path $BuildDir
           Push-Location $BuildDir
