@@ -10,15 +10,12 @@ def get_file_content(path):
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json"
     }
-
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
         return None
-
     data = r.json()
     if "content" not in data:
         return None
-
     import base64
     return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
 
@@ -26,25 +23,14 @@ def has_existing_comment(file_path, line):
     content = get_file_content(file_path)
     if not content:
         return False
-
     lines = content.splitlines()
-
     start = max(0, line - 6)
     end = min(len(lines), line + 1)
-
     region = "\n".join(lines[start:end])
-
-    comment_patterns = [
-        "@brief",
-        "/**",
-        "///",
-        "// ----------------------------------------"
-    ]
-
+    comment_patterns = ["@brief", "/**", "///", "// ----------------------------------------"]
     for p in comment_patterns:
         if p in region:
             return True
-
     return False
 
 def approve_pr():
@@ -53,19 +39,8 @@ def approve_pr():
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json"
     }
-    data = {
-        "event": "APPROVE",
-        "body": "AI review passed."
-    }
+    data = {"event": "APPROVE", "body": "AI review passed."}
     requests.post(url, headers=headers, json=data)
-
-MAX_LINES = 1000
-
-api_key = os.environ["GEMINI_API_KEY"]
-pr_number = os.environ["PR_NUMBER"]
-repo = os.environ["REPO"]
-github_token = os.environ["GITHUB_TOKEN"]
-commit_sha = os.environ["GITHUB_SHA"]
 
 def set_status(state, description):
     url = f"https://api.github.com/repos/{repo}/statuses/{commit_sha}"
@@ -80,6 +55,14 @@ def set_status(state, description):
     }
     requests.post(url, headers=headers, json=data)
 
+MAX_LINES = 1000
+
+api_key = os.environ["GEMINI_API_KEY"]
+pr_number = os.environ["PR_NUMBER"]
+repo = os.environ["REPO"]
+github_token = os.environ["GITHUB_TOKEN"]
+commit_sha = os.environ["GITHUB_SHA"]
+
 with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
     diff = f.read()
 
@@ -87,12 +70,7 @@ if not diff.strip():
     set_status("success", "No target file changes")
     exit(0)
 
-line_count = diff.count("\n")
-if line_count == 0:
-    set_status("success", "No target file changes")
-    exit(0)
-
-if line_count > MAX_LINES:
+if diff.count("\n") > MAX_LINES:
     set_status("success", "Diff too large - skipped")
     exit(0)
 
@@ -120,21 +98,7 @@ severity는 critical 또는 warning만 사용하세요.
 불필요한 서두, 인사말, 결론 문장을 작성하지 마세요.
 중복 표현을 사용하지 마세요.
 함수나 클래스에 대한 설명이 필요한 경우,
-"주석을 추가해야 합니다" 같은 설명 문장을 작성하지 마세요.
 반드시 실제 코드에 삽입 가능한 주석 형태로 작성하세요.
-
-C++ / C# 함수 주석은 다음 형식을 사용하세요:
-
-// ----------------------------------------
-// @brief 함수의 역할 한 줄 요약
-// @param 매개변수 설명
-// @return 반환값 설명
-// ----------------------------------------
-
-생성자 및 소멸자, 변수에 대해서는 주석을 추가하지 마세요.
-
-comment 필드에는 오직 주석 코드만 작성하세요.
-일반 문장이나 리뷰 문구를 작성하지 마세요.
 """
 
 client = genai.Client(api_key=api_key)
@@ -160,8 +124,7 @@ json_text = text[start:end]
 
 try:
     reviews = json.loads(json_text)
-except Exception as e:
-    print("JSON parse error:", e)
+except:
     set_status("failure", "AI JSON parse failed")
     exit(1)
 
@@ -174,37 +137,67 @@ headers = {
     "Accept": "application/vnd.github+json"
 }
 
+marker = "<!-- GEMINI_INLINE_REVIEW -->"
+
+existing_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
+existing_resp = requests.get(existing_url, headers=headers)
+existing_comments = existing_resp.json() if existing_resp.status_code == 200 else []
+
+ai_existing = {
+    (c["path"], c.get("line")): c
+    for c in existing_comments
+    if marker in c.get("body", "")
+}
+
+current_keys = set()
 critical_found = False
 
-for r in reviews[:20]:
+for r in reviews:
     try:
-        body = r["comment"]
-        severity = r.get("severity", "warning")
         file_path = r["file"]
         line = r["line"]
+        comment_body = r["comment"]
+        severity = r.get("severity", "warning")
     except:
         continue
 
     if has_existing_comment(file_path, line):
-        print(f"Skip existing comment: {file_path}:{line}")
         continue
+
+    key = (file_path, line)
+    current_keys.add(key)
 
     if severity == "critical":
         critical_found = True
-        body = "🚨\n" + body
+        body = f"{marker}\n🚨\n{comment_body}"
+    else:
+        body = f"""{marker}
+<details>
+<summary>⚠ Warning</summary>
 
-    url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
+{comment_body}
 
-    data = {
-        "body": body,
-        "commit_id": commit_sha,
-        "path": file_path,
-        "line": line,
-        "side": "RIGHT"
-    }
+</details>
+"""
 
-    resp = requests.post(url, headers=headers, json=data)
-    print(resp.status_code, resp.text)
+    if key in ai_existing:
+        update_url = f"https://api.github.com/repos/{repo}/pulls/comments/{ai_existing[key]['id']}"
+        requests.patch(update_url, headers=headers, json={"body": body})
+    else:
+        create_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
+        data = {
+            "body": body,
+            "commit_id": commit_sha,
+            "path": file_path,
+            "line": line,
+            "side": "RIGHT"
+        }
+        requests.post(create_url, headers=headers, json=data)
+
+for key, comment in ai_existing.items():
+    if key not in current_keys:
+        delete_url = f"https://api.github.com/repos/{repo}/pulls/comments/{comment['id']}"
+        requests.delete(delete_url, headers=headers)
 
 if critical_found:
     set_status("failure", "Critical issues detected by AI review")
