@@ -631,7 +631,8 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 			}
 			packetProcessor->OnRecvPacket(*context->session
 				, *buffer
-				, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer), sizeof(context->clientAddrBuffer)));
+				, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer)
+				, sizeof(context->clientAddrBuffer)));
 		} while (false);
 
 		if (buffer != nullptr)
