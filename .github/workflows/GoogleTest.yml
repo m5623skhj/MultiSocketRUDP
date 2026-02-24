@@ -33,16 +33,18 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
-      - name: Build GTest (x64 Debug)
+      - name: Build GTest
         shell: pwsh
         run: |
-          $GTestRoot = "${{ github.workspace }}/MultiSocketRUDP/external/CommonCode/Common/googletest-main/googletest"
-          $BuildDir = "$GTestRoot/build"
-          New-Item -ItemType Directory -Force -Path $BuildDir
-          Push-Location $BuildDir
-          cmake .. -A x64 -DCMAKE_BUILD_TYPE=Debug
-          cmake --build . --config Debug
-          Pop-Location
+          $gtestRoot = "MultiSocketRUDP/MultiSocketRUDP/external/CommonCode/Common/googletest-main"
+          $gtestBuild = "$gtestRoot/build"
+          
+          if (!(Test-Path $gtestBuild)) 
+          { 
+            New-Item -ItemType Directory -Path $gtestBuild 
+          }
+          cmake -S $gtestRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
+          cmake --build $gtestBuild --config Debug
 
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
