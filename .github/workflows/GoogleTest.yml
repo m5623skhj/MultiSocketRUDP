@@ -33,6 +33,9 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
+      - name: Build GTest (x64 Debug)
+        run: msbuild external/CommonCode/Common/googletest-main/gtest/gtest.sln /m /p:Configuration=Debug /p:Platform=x64
+
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
 
