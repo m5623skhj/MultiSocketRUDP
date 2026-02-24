@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common\json-develop\include;C:\Users\KimHyeongJin\Desktop\Common;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\Logger;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\external\CommonCode\Common\json-develop\include;$(SolutionDir)\..\external\CommonCode\Common;$(SolutionDir)\Logger;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -135,12 +135,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\Log.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetClient.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\Ringbuffer.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\NetServerSerializeBuffer.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\Parse.cpp" />
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\PreCompile.cpp" />
     <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp" />
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
     <ClCompile Include="PacketManager.cpp" />

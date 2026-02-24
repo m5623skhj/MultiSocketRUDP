@@ -118,7 +118,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\KimHyeongJin\Desktop\Common\googletest-main\googletest\include;C:\Users\KimHyeongJin\source\repos\MultiSocketRUDP\MultiSocketRUDP\MultiSocketRUDPServer;C:\Users\KimHyeongJin\Desktop\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\external\CommonCode\json-develop\include;$(SolutionDir)\MultiSocketRUDPServer;$(SolutionDir)\..\external\CommonCode\Common;$(SolutionDir)\..\external\CommonCode\Common\googletest-main\googletest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompile.h</PrecompiledHeaderFile>

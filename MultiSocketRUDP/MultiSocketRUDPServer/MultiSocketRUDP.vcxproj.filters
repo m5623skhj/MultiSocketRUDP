@@ -48,20 +48,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServerSerializeBuffer.cpp">
-      <Filter>소스 파일\lib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\NetServer.cpp">
-      <Filter>소스 파일\lib</Filter>
-    </ClCompile>
     <ClCompile Include="PacketManager.cpp">
       <Filter>소스 파일\PacketManager</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\PreCompile.cpp">
-      <Filter>소스 파일\lib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\Common\Parse.cpp">
-      <Filter>소스 파일\lib</Filter>
     </ClCompile>
     <ClCompile Include="Ticker.cpp">
       <Filter>소스 파일\Ticker</Filter>
@@ -140,6 +128,15 @@
     </ClCompile>
     <ClCompile Include="SessionStateMachine.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\NetServerSerializeBuffer.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\PreCompile.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\Parse.cpp">
+      <Filter>소스 파일\lib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
