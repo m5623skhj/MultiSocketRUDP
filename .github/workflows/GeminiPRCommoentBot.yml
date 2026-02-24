@@ -33,7 +33,7 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
-      - name: Build Solution (x64 Release)
+      - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
 
       - name: Run GTests with Retry
