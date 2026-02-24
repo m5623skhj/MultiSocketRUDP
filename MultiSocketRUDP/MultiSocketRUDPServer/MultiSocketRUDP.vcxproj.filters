@@ -129,13 +129,13 @@
     <ClCompile Include="SessionStateMachine.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\NetServerSerializeBuffer.cpp">
+    <ClCompile Include="..\..\external\CommonCode\Common\NetServerSerializeBuffer.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\PreCompile.cpp">
+    <ClCompile Include="..\..\external\CommonCode\Common\PreCompile.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\Parse.cpp">
+    <ClCompile Include="..\..\external\CommonCode\Common\Parse.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
   </ItemGroup>
