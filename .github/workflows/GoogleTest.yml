@@ -36,55 +36,50 @@ jobs:
       - name: Run GTests with Retry
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Continue"
+
           $failedTests = @()
           $finalFailed = @()
 
-          Get-ChildItem -Recurse -Filter "*Test.exe" |
-          Where-Object { $_.FullName -match "Release" } |
-          ForEach-Object {
+          function Parse-XmlFailures($xmlPath, [ref]$failedList) {
+              if (!(Test-Path $xmlPath)) { return }
+              try { [xml]$xml = Get-Content $xmlPath } catch { return }
 
-              $exePath = $_.FullName
-              $xmlPath = "$($_.DirectoryName)\test_result.xml"
-
-              & $exePath --gtest_output=xml:$xmlPath
-
-              if (Test-Path $xmlPath) {
-                  [xml]$xml = Get-Content $xmlPath
-
-                  foreach ($suite in $xml.testsuites.testsuite) {
-                      foreach ($test in $suite.testcase) {
+              if ($xml.testsuites -and $xml.testsuites.testsuite) {
+                  foreach ($suite in @($xml.testsuites.testsuite)) {
+                      foreach ($test in @($suite.testcase)) {
                           if ($test.failure) {
-                              $failedTests += "$($suite.name).$($test.name)"
+                              $failedList.Value += $test
                           }
                       }
                   }
               }
           }
 
-          if ($failedTests.Count -gt 0) {
+          Get-ChildItem -Recurse -Filter "*Test.exe" |
+          Where-Object { $_.FullName -match "Release" } |
+          ForEach-Object {
+              $exePath = $_.FullName
+              $xmlPath = "$($_.DirectoryName)\test_result.xml"
+              & $exePath --gtest_output=xml:$xmlPath
 
+              $temp = @()
+              Parse-XmlFailures $xmlPath ([ref]$temp)
+              foreach ($t in $temp) {
+                  $failedTests += "$($t.classname).$($t.name)"
+              }
+          }
+
+          if ($failedTests.Count -gt 0) {
               $filter = $failedTests -join ":"
 
               Get-ChildItem -Recurse -Filter "*Test.exe" |
               Where-Object { $_.FullName -match "Release" } |
               ForEach-Object {
-
                   $exePath = $_.FullName
                   $retryXml = "$($_.DirectoryName)\retry_result.xml"
-
                   & $exePath --gtest_filter=$filter --gtest_output=xml:$retryXml
-
-                  if (Test-Path $retryXml) {
-                      [xml]$retry = Get-Content $retryXml
-
-                      foreach ($suite in $retry.testsuites.testsuite) {
-                          foreach ($test in $suite.testcase) {
-                              if ($test.failure) {
-                                  $finalFailed += $test
-                              }
-                          }
-                      }
-                  }
+                  Parse-XmlFailures $retryXml ([ref]$finalFailed)
               }
           }
 
@@ -105,10 +100,9 @@ jobs:
                   $summary += "### ❌ $($t.name)`n"
                   $summary += "```"
                   $summary += "`n"
-                  $summary += $t.failure.message
-                  $summary += "`n"
-                  $summary += $t.failure.'#text'
-                  $summary += "`n```"
+                  if ($t.failure.message) { $summary += $t.failure.message + "`n" }
+                  if ($t.failure.'#text') { $summary += $t.failure.'#text' + "`n" }
+                  $summary += "```"
                   $summary += "`n---`n"
               }
               $summary += "`n**Total Final Failed: $($finalFailed.Count)**"
@@ -116,7 +110,9 @@ jobs:
 
           $summary | Out-File -FilePath test_summary.txt -Encoding utf8
 
-          if ($finalFailed.Count -gt 0) { exit 1 }
+          if ($finalFailed.Count -gt 0) {
+              exit 1
+          }
 
       - name: Upsert PR Comment
         if: always()
@@ -125,7 +121,14 @@ jobs:
           script: |
             const fs = require('fs');
             const marker = '<!-- GTEST_SUMMARY_MARKER -->';
-            const body = fs.readFileSync('test_summary.txt', 'utf8');
+
+            let body;
+
+            if (fs.existsSync('test_summary.txt')) {
+              body = fs.readFileSync('test_summary.txt', 'utf8');
+            } else {
+              body = marker + "\n## 🧪 Native GTest Result\n\n❌ Test execution failed before summary generation.";
+            }
 
             const { data: comments } = await github.rest.issues.listComments({
               issue_number: context.issue.number,
