@@ -36,13 +36,21 @@ jobs:
       - name: Build GTest
         shell: pwsh
         run: |
-          $gtestRoot = "external/CommonCode/Common/googletest-main"
-          $gtestBuild = "$gtestRoot/build"
-      
-          if (!(Test-Path $gtestBuild)) { New-Item -ItemType Directory -Path $gtestBuild }
-      
-          cmake -S $gtestRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
-          cmake --build $gtestBuild --config Debug
+                $slnDir = "${{ github.workspace }}/MultiSocketRUDP"
+                $gtestRoot = "$slnDir/MultiSocketRUDP/external/CommonCode/Common/googletest-main"
+                $gtestBuild = "$gtestRoot/build"
+
+                if (!(Test-Path $gtestBuild)) { New-Item -ItemType Directory -Path $gtestBuild }
+                cmake -S $gtestRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
+                cmake --build $gtestBuild --config Debug
+
+                $expectedLibDir = "$slnDir/../external/CommonCode/Common/googletest-main/build/Debug"
+                if (!(Test-Path $expectedLibDir)) { New-Item -ItemType Directory -Path $expectedLibDir -Force }
+
+                Copy-Item "$gtestBuild/lib/Debug/*.lib" -Destination $expectedLibDir -Force
+
+                Write-Host "Libraries copied to: $expectedLibDir"
+                Get-ChildItem $expectedLibDir
 
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
