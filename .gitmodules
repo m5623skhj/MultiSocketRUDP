@@ -1,0 +1,3 @@
+[submodule "external/CommonCode"]
+	path = external/CommonCode
+	url = https://github.com/m5623skhj/CommonCode.git
