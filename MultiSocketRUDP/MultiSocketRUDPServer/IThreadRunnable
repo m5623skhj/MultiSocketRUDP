@@ -1,0 +1,8 @@
+#include<jthread>
+
+class IThreadRunnable
+{
+public:
+  virtual ~IThreadRunnable() = default;
+  virtual void Run(const std::stop_token& stopToken, unsigned char threadId) = 0;
+};
