@@ -36,36 +36,24 @@ jobs:
       - name: Build GTest
         shell: pwsh
         run: |
-          $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" | 
-                             Where-Object { Test-Path "$($_.FullName)/CMakeLists.txt" } | 
+          $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" |
+                             Where-Object { Test-Path "$($_.FullName)/CMakeLists.txt" } |
                              Select-Object -First 1 -ExpandProperty FullName
 
           if (-not $gtestActualRoot) {
               Write-Error "Could not find googletest-main with CMakeLists.txt"
               exit 1
           }
+
           Write-Host "Found GTest at: $gtestActualRoot"
 
-          $gtestBuild = "$gtestActualRoot/build"
-          if (!(Test-Path $gtestBuild)) { New-Item -ItemType Directory -Path $gtestBuild }
-          
+          $gtestBuild = Join-Path $gtestActualRoot "build"
+          if (!(Test-Path $gtestBuild)) {
+              New-Item -ItemType Directory -Path $gtestBuild | Out-Null
+          }
+
           cmake -S $gtestActualRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
           cmake --build $gtestBuild --config Debug
-
-          $builtLibDir = Get-ChildItem -Recurse -Path $gtestBuild -Filter "gtest.lib" | Select-Object -First 1 -ExpandProperty DirectoryName
-          if (-not $builtLibDir) {
-              Write-Error "gtest.lib was not built successfully."
-              exit 1
-          }
-          Write-Host "Built libs found in: $builtLibDir"
-
-          $slnPath = Get-ChildItem -Recurse -Filter "MultiSocketRUDP.sln" | Select-Object -First 1 -ExpandProperty DirectoryName
-          $expectedLibDir = "$slnPath/../external/CommonCode/Common/googletest-main/build/Debug"
-          
-          if (!(Test-Path $expectedLibDir)) { New-Item -ItemType Directory -Path $expectedLibDir -Force }
-          
-          Copy-Item "$builtLibDir/*.lib" -Destination $expectedLibDir -Force
-          Write-Host "Successfully copied libs to: $expectedLibDir"
 
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
@@ -97,11 +85,13 @@ jobs:
           Where-Object { $_.FullName -match "Debug" } |
           ForEach-Object {
               $exePath = $_.FullName
-              $xmlPath = "$($_.DirectoryName)\test_result.xml"
+              $xmlPath = Join-Path $_.DirectoryName "test_result.xml"
+
               & $exePath --gtest_output=xml:$xmlPath
 
               $temp = @()
               Parse-XmlFailures $xmlPath ([ref]$temp)
+
               foreach ($t in $temp) {
                   $failedTests += "$($t.classname).$($t.name)"
               }
@@ -114,35 +104,36 @@ jobs:
               Where-Object { $_.FullName -match "Debug" } |
               ForEach-Object {
                   $exePath = $_.FullName
-                  $retryXml = "$($_.DirectoryName)\retry_result.xml"
+                  $retryXml = Join-Path $_.DirectoryName "retry_result.xml"
+
                   & $exePath --gtest_filter=$filter --gtest_output=xml:$retryXml
                   Parse-XmlFailures $retryXml ([ref]$finalFailed)
               }
           }
 
-          $summary = "<!-- GTEST_SUMMARY_MARKER -->`n"
-          $summary += "## 🧪 Native GTest Result (with retry)`n`n"
+          $summary = @"
+          <!-- GTEST_SUMMARY_MARKER -->
+          ## 🧪 Native GTest Result (with retry)
+          
+          "@
 
           if ($finalFailed.Count -eq 0 -and $failedTests.Count -eq 0) {
-              $summary += "✅ All tests passed`n"
+              $summary += "All tests passed.`r`n"
           }
           elseif ($finalFailed.Count -eq 0) {
-              $summary += "⚠️ Flaky tests detected but passed on retry:`n"
+              $summary += "Flaky tests detected but passed on retry:`r`n"
               foreach ($t in $failedTests) {
-                  $summary += "- $t`n"
+                  $summary += "- $t`r`n"
               }
           }
           else {
               foreach ($t in $finalFailed) {
-                  $summary += "### ❌ $($t.name)`n"
-                  $summary += "```"
-                  $summary += "`n"
-                  if ($t.failure.message) { $summary += $t.failure.message + "`n" }
-                  if ($t.failure.'#text') { $summary += $t.failure.'#text' + "`n" }
-                  $summary += "```"
-                  $summary += "`n---`n"
+                  $summary += "FAILED: $($t.name)`r`n"
+                  if ($t.failure.message) { $summary += $t.failure.message + "`r`n" }
+                  if ($t.failure.'#text') { $summary += $t.failure.'#text' + "`r`n" }
+                  $summary += "`r`n"
               }
-              $summary += "`n**Total Final Failed: $($finalFailed.Count)**"
+              $summary += "Total Final Failed: $($finalFailed.Count)"
           }
 
           $summary | Out-File -FilePath test_summary.txt -Encoding utf8
@@ -164,7 +155,7 @@ jobs:
             if (fs.existsSync('test_summary.txt')) {
               body = fs.readFileSync('test_summary.txt', 'utf8');
             } else {
-              body = marker + "\n## 🧪 Native GTest Result\n\n❌ Test execution failed before summary generation.";
+              body = marker + "\nTest execution failed before summary generation.";
             }
 
             const { data: comments } = await github.rest.issues.listComments({
