@@ -33,24 +33,39 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
-      - name: Build GTest
+- name: Build GTest
         shell: pwsh
         run: |
-                $slnDir = "${{ github.workspace }}/MultiSocketRUDP"
-                $gtestRoot = "$slnDir/MultiSocketRUDP/external/CommonCode/Common/googletest-main"
-                $gtestBuild = "$gtestRoot/build"
+          $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" | 
+                             Where-Object { Test-Path "$($_.FullName)/CMakeLists.txt" } | 
+                             Select-Object -First 1 -ExpandProperty FullName
 
-                if (!(Test-Path $gtestBuild)) { New-Item -ItemType Directory -Path $gtestBuild }
-                cmake -S $gtestRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
-                cmake --build $gtestBuild --config Debug
+          if (-not $gtestActualRoot) {
+              Write-Error "Could not find googletest-main with CMakeLists.txt"
+              exit 1
+          }
+          Write-Host "Found GTest at: $gtestActualRoot"
 
-                $expectedLibDir = "$slnDir/../external/CommonCode/Common/googletest-main/build/Debug"
-                if (!(Test-Path $expectedLibDir)) { New-Item -ItemType Directory -Path $expectedLibDir -Force }
+          $gtestBuild = "$gtestActualRoot/build"
+          if (!(Test-Path $gtestBuild)) { New-Item -ItemType Directory -Path $gtestBuild }
+          
+          cmake -S $gtestActualRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
+          cmake --build $gtestBuild --config Debug
 
-                Copy-Item "$gtestBuild/lib/Debug/*.lib" -Destination $expectedLibDir -Force
+          $builtLibDir = Get-ChildItem -Recurse -Path $gtestBuild -Filter "gtest.lib" | Select-Object -First 1 -ExpandProperty DirectoryName
+          if (-not $builtLibDir) {
+              Write-Error "gtest.lib was not built successfully."
+              exit 1
+          }
+          Write-Host "Built libs found in: $builtLibDir"
 
-                Write-Host "Libraries copied to: $expectedLibDir"
-                Get-ChildItem $expectedLibDir
+          $slnPath = Get-ChildItem -Recurse -Filter "MultiSocketRUDP.sln" | Select-Object -First 1 -ExpandProperty DirectoryName
+          $expectedLibDir = "$slnPath/../external/CommonCode/Common/googletest-main/build/Debug"
+          
+          if (!(Test-Path $expectedLibDir)) { New-Item -ItemType Directory -Path $expectedLibDir -Force }
+          
+          Copy-Item "$builtLibDir/*.lib" -Destination $expectedLibDir -Force
+          Write-Host "Successfully copied libs to: $expectedLibDir"
 
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
