@@ -33,7 +33,7 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
-- name: Build GTest
+      - name: Build GTest
         shell: pwsh
         run: |
           $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" | 
