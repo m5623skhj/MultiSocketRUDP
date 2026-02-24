@@ -135,9 +135,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\NetServerSerializeBuffer.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\Parse.cpp" />
-    <ClCompile Include="..\..\..\..\..\Desktop\CommonForGit\Common\PreCompile.cpp" />
+    <ClCompile Include="..\..\external\CommonCode\Common\NetServerSerializeBuffer.cpp" />
+    <ClCompile Include="..\..\external\CommonCode\Common\Parse.cpp" />
+    <ClCompile Include="..\..\external\CommonCode\Common\PreCompile.cpp" />
     <ClCompile Include="..\Common\Crypto\CryptoHelper.cpp" />
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
     <ClCompile Include="PacketManager.cpp" />
