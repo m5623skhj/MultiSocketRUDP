@@ -13,8 +13,11 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout
+      - name: Checkout (with private submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN }}
 
       - name: Cache NuGet
         uses: actions/cache@v4
@@ -28,10 +31,10 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Restore NuGet
-        run: nuget restore MultiSocketRUDP.sln
+        run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
-      - name: Build Solution (x64 Release)
-        run: msbuild MultiSocketRUDP.sln /m /p:Configuration=Release /p:Platform=x64
+      - name: Build Solution (x64 Debug)
+        run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
 
       - name: Run GTests with Retry
         shell: pwsh
@@ -57,7 +60,7 @@ jobs:
           }
 
           Get-ChildItem -Recurse -Filter "*Test.exe" |
-          Where-Object { $_.FullName -match "Release" } |
+          Where-Object { $_.FullName -match "Debug" } |
           ForEach-Object {
               $exePath = $_.FullName
               $xmlPath = "$($_.DirectoryName)\test_result.xml"
@@ -74,7 +77,7 @@ jobs:
               $filter = $failedTests -join ":"
 
               Get-ChildItem -Recurse -Filter "*Test.exe" |
-              Where-Object { $_.FullName -match "Release" } |
+              Where-Object { $_.FullName -match "Debug" } |
               ForEach-Object {
                   $exePath = $_.FullName
                   $retryXml = "$($_.DirectoryName)\retry_result.xml"
