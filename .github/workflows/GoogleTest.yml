@@ -13,11 +13,11 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout (with private submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SUBMODULE_TOKEN }}
 
       - name: Cache NuGet
         uses: actions/cache@v4
