@@ -26,7 +26,7 @@ public:
     [[nodiscard]]
     std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession&) override { return recvBufferContextReturn; }
     [[nodiscard]]
-    RecvBuffer& GetRecvBuffer(RUDPSession& session) override;   // 별도 정의
+    RecvBuffer& GetRecvBuffer(RUDPSession& session) override { return dummyRecvBuffer; }
     void EnqueueToRecvBufferList(RUDPSession&, NetBuffer* buf) override { enqueueBuffer = buf; }
     [[nodiscard]]
     RIO_RQ GetRecvRIORQ(const RUDPSession&) override { return recvRIORQReturn; }
@@ -161,6 +161,7 @@ public:
 
     int recvContextResetCount = 0;
     std::shared_ptr<IOContext> recvBufferContextReturn;
+    RecvBuffer dummyRecvBuffer{};
     NetBuffer* enqueueBuffer = nullptr;
     RIO_RQ recvRIORQReturn = RIO_INVALID_RQ;
 };
