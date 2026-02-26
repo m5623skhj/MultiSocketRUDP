@@ -1,8 +1,6 @@
 #pragma once
+#include "ISessionDelegate.h"
 #include <shared_mutex>
-#include <set>
-
-#include "RIOManager.h"
 #include "NetServerSerializeBuffer.h"
 
 namespace MultiSocketRUDP
@@ -12,7 +10,7 @@ namespace MultiSocketRUDP
 
 struct RecvBuffer;
 struct SendPacketInfo;
-enum class IO_MODE : LONG;
+enum class IO_MODE : unsigned int;
 struct IOContext;
 class RUDPSession;
 class RIOManager;
@@ -24,7 +22,7 @@ class RUDPSessionBroker;
 // ----------------------------------------
 // @brief RUDPSession 클래스의 특정 private/protected 메서드에 대한 접근을 위임하는 클래스입니다.
 // ----------------------------------------
-class RUDPSessionFunctionDelegate
+class RUDPSessionFunctionDelegate : public ISessionDelegate
 {
 	friend RIOManager;
 	friend RUDPSessionManager;
@@ -32,70 +30,70 @@ class RUDPSessionFunctionDelegate
 	friend RUDPIOHandler;
 	friend RUDPSessionBroker;
 
-private:
+public:
 	RUDPSessionFunctionDelegate() = default;
-	~RUDPSessionFunctionDelegate() = default;
+	~RUDPSessionFunctionDelegate() override = default;
 
 private:
 #pragma region For RIOManager
 	[[nodiscard]]
-	static bool InitializeSessionRIO(RUDPSession& session, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& recvCQ, const RIO_CQ& sendCQ);
+	bool InitializeSessionRIO(RUDPSession& session, const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& recvCQ, const RIO_CQ& sendCQ) override;
 #pragma endregion For RIOManager
 
 #pragma region For SessionManager
-	static void SetSessionId(RUDPSession& session, SessionIdType sessionId);
-	static void SetThreadId(RUDPSession& session, ThreadIdType threadId);
-	static void CloseSocket(RUDPSession& session);
-	static void RecvContextReset(RUDPSession& session);
-	static void SendHeartbeatPacket(RUDPSession& session);
-	static bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now);
-	static void AbortReservedSession(RUDPSession& session);
+	void SetSessionId(RUDPSession& session, SessionIdType sessionId) override;
+	void SetThreadId(RUDPSession& session, ThreadIdType threadId) override;
+	void CloseSocket(RUDPSession& session) override;
+	void RecvContextReset(RUDPSession& session) override;
+	void SendHeartbeatPacket(RUDPSession& session) override;
+	bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) override;
+	void AbortReservedSession(RUDPSession& session) override;
 #pragma endregion For SessionManager
 
 #pragma region For RUDPPacketProcessor
-	static bool TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr);
-	static bool CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr);
-	static void OnSendReply(RUDPSession& session, NetBuffer& recvPacket);
-	static bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket);
+	bool TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr) override;
+	bool CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr) override;
+	void OnSendReply(RUDPSession& session, NetBuffer& recvPacket) override;
+	bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket) override;
 #pragma endregion For RUDPPacketProcessor
 
 #pragma region For RUDPIOHandler
-	static std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session);
-	static RIO_BUFFERID GetSendBufferId(const RUDPSession& session);
-	static IO_MODE& GetSendIOMode(RUDPSession& session);
-	static bool IsSendPacketInfoQueueEmpty(RUDPSession& session);
-	static SendPacketInfo* TryGetFrontAndPop(RUDPSession& session);
-	static SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session);
-	static bool IsNothingToSend(RUDPSession& session);
-	static void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer);
-	static std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session);
-	static std::mutex& GetCachedSequenceSetMutex(RUDPSession& session);
-	static size_t GetSendPacketInfoQueueSize(RUDPSession& session);
-	static char* GetRIOSendBuffer(RUDPSession& session);
-	static void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo);
+	std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session) override;
+	RIO_BUFFERID GetSendBufferId(const RUDPSession& session) override;
+	IO_MODE& GetSendIOMode(RUDPSession& session) override;
+	bool IsSendPacketInfoQueueEmpty(RUDPSession& session) override;
+	SendPacketInfo* TryGetFrontAndPop(RUDPSession& session) override;
+	SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session) override;
+	bool IsNothingToSend(RUDPSession& session) override;
+	void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) override;
+	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) override;
+	std::mutex& GetCachedSequenceSetMutex(RUDPSession& session) override;
+	size_t GetSendPacketInfoQueueSize(RUDPSession& session) override;
+	char* GetRIOSendBuffer(RUDPSession& session) override;
+	void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo) override;
 	static SendPacketInfo* GetSendPacketInfoQueueFrontAndPop(RUDPSession& session);
-	static RecvBuffer& GetRecvBuffer(RUDPSession& session);
+	RecvBuffer& GetRecvBuffer(RUDPSession& session) override;
 #pragma endregion For RUDPIOHandler
 
 #pragma region For RUDPSessionBroker
 	static void SetAbortReservedSession(RUDPSession& session);
-	static void SetSessionReservedTime(RUDPSession& session, unsigned long long now);
-	static unsigned char* GetSessionKeyObjectBuffer(const RUDPSession& session);
-	static void SetSessionKeyObjectBuffer(RUDPSession& session, unsigned char* inKeyObjectBuffer);
+	void SetSessionReservedTime(RUDPSession& session, unsigned long long now) override;
+	unsigned char* GetSessionKeyObjectBuffer(const RUDPSession& session) override;
+	void SetSessionKeyObjectBuffer(RUDPSession& session, unsigned char* inKeyObjectBuffer) override;
 #pragma endregion For RUDPSessionBroker
 
 #pragma region Util
-	static void Disconnect(RUDPSession& session, NetBuffer& recvPacket);
-	static std::shared_mutex& GetSocketMutex(const RUDPSession& session);
-	static SOCKET GetSocket(const RUDPSession& session);
-	static RIO_RQ GetRecvRIORQ(const RUDPSession& session);
-	static RIO_RQ GetSendRIORQ(const RUDPSession& session);
-	static const unsigned char* GetSessionKey(const RUDPSession& session);
-	static void SetSessionKey(RUDPSession& session, const unsigned char* inSessionKey);
-	static const unsigned char* GetSessionSalt(const RUDPSession& session);
-	static void SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt);
-	static const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession& session);
-	static void SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle);
-	static void GetServerPortAndSessionId(const RUDPSession& session, OUT PortType& outServerPort, OUT SessionIdType& outSessionId);
+	void Disconnect(RUDPSession& session, NetBuffer& recvPacket);
+	std::shared_mutex& GetSocketMutex(const RUDPSession& session) override;
+	SOCKET GetSocket(const RUDPSession& session) override;
+	RIO_RQ GetRecvRIORQ(const RUDPSession& session) override;
+	RIO_RQ GetSendRIORQ(const RUDPSession& session) override;
+	const unsigned char* GetSessionKey(const RUDPSession& session) override;
+	void SetSessionKey(RUDPSession& session, const unsigned char* inSessionKey) override;
+	const unsigned char* GetSessionSalt(const RUDPSession& session) override;
+	void SetSessionSalt(RUDPSession& session, const unsigned char* inSessionSalt) override;
+	const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession& session) override;
+	void SetSessionKeyHandle(RUDPSession& session, const BCRYPT_KEY_HANDLE& inKeyHandle) override;
+	void GetServerPortAndSessionId(const RUDPSession& session, OUT PortType& outServerPort, OUT SessionIdType& outSessionId) override;
 #pragma endregion Util
 };

@@ -7,14 +7,16 @@
 #include "Logger.h"
 #include "RUDPSessionFunctionDelegate.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
-#include "NetServerSerializeBuffer.h"
+#include "ISessionDelegate.h"
 
 #define DECODE_PACKET() \
     if (not PacketCryptoHelper::DecodePacket(recvPacket, sessionSalt, SESSION_SALT_SIZE, sessionKeyHandle, isCorePacket, direction)) \
     { break; }
 
-RUDPPacketProcessor::RUDPPacketProcessor(RUDPSessionManager& inSessionManager)
+RUDPPacketProcessor::RUDPPacketProcessor(RUDPSessionManager& inSessionManager
+	, ISessionDelegate& inSessionDelegate)
 	: sessionManager(inSessionManager)
+	, sessionDelegate(inSessionDelegate)
 {
 }
 
@@ -26,8 +28,8 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
     bool isCorePacket = true;
     auto direction = PACKET_DIRECTION::CLIENT_TO_SERVER;
 
-    const auto sessionKeyHandle = RUDPSessionFunctionDelegate::GetSessionKeyHandle(session);
-	const auto sessionSalt = RUDPSessionFunctionDelegate::GetSessionSalt(session);
+    const auto sessionKeyHandle = sessionDelegate.GetSessionKeyHandle(session);
+	const auto sessionSalt = sessionDelegate.GetSessionSalt(session);
 	if (sessionKeyHandle == nullptr || sessionSalt == nullptr)
 	{
 		LOG_ERROR("Session key or salt is nullptr in RUDPPacketProcessor::ProcessByPacketType()");
@@ -40,7 +42,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
     {
         DECODE_PACKET()
 
-        if (RUDPSessionFunctionDelegate::TryConnect(session, recvPacket, clientAddr))
+        if (sessionDelegate.TryConnect(session, recvPacket, clientAddr))
         {
 			sessionManager.IncrementConnectedCount();
         }
@@ -48,25 +50,25 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
     }
     case PACKET_TYPE::DISCONNECT_TYPE:
     {
-        if (not RUDPSessionFunctionDelegate::CanProcessPacket(session, clientAddr))
+        if (not sessionDelegate.CanProcessPacket(session, clientAddr))
         {
             break;
         }
         DECODE_PACKET()
 
-   		RUDPSessionFunctionDelegate::Disconnect(session, recvPacket);
+   		sessionDelegate.Disconnect(session, recvPacket);
         break;
     }
     case PACKET_TYPE::SEND_TYPE:
     {
-        if (not RUDPSessionFunctionDelegate::CanProcessPacket(session, clientAddr))
+        if (not sessionDelegate.CanProcessPacket(session, clientAddr))
         {
             break;
         }
         isCorePacket = false;
         DECODE_PACKET()
 
-        if (RUDPSessionFunctionDelegate::OnRecvPacket(session, recvPacket) == false)
+        if (sessionDelegate.OnRecvPacket(session, recvPacket) == false)
         {
 			session.DoDisconnect();
         }
@@ -75,7 +77,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
     case PACKET_TYPE::SEND_REPLY_TYPE:
     case PACKET_TYPE::HEARTBEAT_REPLY_TYPE:
     {
-        if (not RUDPSessionFunctionDelegate::CanProcessPacket(session, clientAddr))
+        if (not sessionDelegate.CanProcessPacket(session, clientAddr))
         {
             break;
         }
@@ -83,7 +85,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
         direction = PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY;
         DECODE_PACKET()
 
-		RUDPSessionFunctionDelegate::OnSendReply(session, recvPacket);
+		sessionDelegate.OnSendReply(session, recvPacket);
         break;
     }
     default:

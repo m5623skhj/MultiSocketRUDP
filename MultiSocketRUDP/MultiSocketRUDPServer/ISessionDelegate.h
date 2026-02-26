@@ -5,11 +5,11 @@
 #include <winsock2.h>
 #include <MSWSock.h>
 #include <bcrypt.h>
+#include "NetServerSerializeBuffer.h"
 
 #include "../Common/etc/CoreType.h"
 
 class RUDPSession;
-class NetBuffer;
 struct IOContext;
 struct RecvBuffer;
 struct SendPacketInfo;

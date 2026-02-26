@@ -46,6 +46,9 @@
     <Filter Include="소스 파일\MultiSocketRUDPCore\Core\CoreComponent">
       <UniqueIdentifier>{9aab2a3d-cb3d-446b-96f3-e81803f66cba}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\MultiSocketRUDPCore\Interface">
+      <UniqueIdentifier>{791568fc-f46d-42e2-b6a4-c2a2af6978b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PacketManager.cpp">
@@ -223,6 +226,18 @@
     </ClInclude>
     <ClInclude Include="SessionStateMachine.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="IIOHandler.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="IMultiSocketRUDPCore.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="IRIOManager.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="ISessionDelegate.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Interface</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

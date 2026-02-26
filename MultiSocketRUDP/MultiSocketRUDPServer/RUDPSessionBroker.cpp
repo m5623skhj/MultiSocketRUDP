@@ -5,15 +5,17 @@
 #include "LogExtension.h"
 #include "Logger.h"
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
-#include "RUDPSessionFunctionDelegate.h"
+#include "ISessionDelegate.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 RUDPSessionBroker::RUDPSessionBroker(
 	MultiSocketRUDPCore& inCore,
+	ISessionDelegate& inSessionDelegate,
 	const std::wstring& certStoreName,
 	const std::wstring& certSubjectName)
 	: core(inCore)
+	, sessionDelegate(inSessionDelegate)
 	, tlsHelper(certStoreName, certSubjectName)
 {
 }
@@ -108,7 +110,7 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 		{
 			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
 			{
-				RUDPSessionFunctionDelegate::AbortReservedSession(*session);
+				sessionDelegate.AbortReservedSession(*session);
 			}
 		}
 	}
@@ -158,7 +160,7 @@ void RUDPSessionBroker::CloseListenSocket()
 	}
 }
 
-RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP)
+RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP) const
 {
 	CONNECT_RESULT_CODE connectResultCode;
 	const auto session = MultiSocketRUDPCoreFunctionDelegate::AcquireSession();
@@ -188,7 +190,7 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
 		SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);
-		RUDPSessionFunctionDelegate::SetSessionReservedTime(*session, GetTickCount64());
+		sessionDelegate.SetSessionReservedTime(*session, GetTickCount64());
 	}
 	else
 	{
@@ -212,23 +214,23 @@ CONNECT_RESULT_CODE RUDPSessionBroker::InitReserveSession(OUT RUDPSession& sessi
 	return MultiSocketRUDPCoreFunctionDelegate::InitReserveSession(session);
 }
 
-bool RUDPSessionBroker::InitSessionCrypto(OUT RUDPSession& session)
+bool RUDPSessionBroker::InitSessionCrypto(OUT RUDPSession& session) const
 {
 	if (not GenerateSessionKey(session) || not GenerateSaltKey(session))
 	{
 		return false;
 	}
 
-	if (RUDPSessionFunctionDelegate::GetSessionKeyHandle(session) == nullptr)
+	if (sessionDelegate.GetSessionKeyHandle(session) == nullptr)
 	{
-		RUDPSessionFunctionDelegate::SetSessionKeyObjectBuffer(session, new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()]);
+		sessionDelegate.SetSessionKeyObjectBuffer(session, new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()]);
 	}
 
-	RUDPSessionFunctionDelegate::SetSessionKeyHandle(session, 
+	sessionDelegate.SetSessionKeyHandle(session, 
 		CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(
-			RUDPSessionFunctionDelegate::GetSessionKeyObjectBuffer(session),
-			const_cast<unsigned char*>(RUDPSessionFunctionDelegate::GetSessionKey(session))));
-	if (RUDPSessionFunctionDelegate::GetSessionKeyHandle(session) == nullptr)
+			sessionDelegate.GetSessionKeyObjectBuffer(session),
+			const_cast<unsigned char*>(sessionDelegate.GetSessionKey(session))));
+	if (sessionDelegate.GetSessionKeyHandle(session) == nullptr)
 	{
 		LOG_ERROR("InitSessionCrypto failed : GetSymmetricKeyHandle failed");
 		return false;
@@ -237,38 +239,38 @@ bool RUDPSessionBroker::InitSessionCrypto(OUT RUDPSession& session)
 	return true;
 }
 
-bool RUDPSessionBroker::GenerateSessionKey(OUT RUDPSession& session)
+bool RUDPSessionBroker::GenerateSessionKey(OUT RUDPSession& session) const
 {
 	if (const auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE); bytes.has_value())
 	{
-		RUDPSessionFunctionDelegate::SetSessionKey(session, bytes->data());
+		sessionDelegate.SetSessionKey(session, bytes->data());
 		return true;
 	}
 
 	return false;
 }
 
-bool RUDPSessionBroker::GenerateSaltKey(OUT RUDPSession& session)
+bool RUDPSessionBroker::GenerateSaltKey(OUT RUDPSession& session) const
 {
 	if (const auto bytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE); bytes.has_value())
 	{
-		RUDPSessionFunctionDelegate::SetSessionSalt(session, bytes->data());
+		sessionDelegate.SetSessionSalt(session, bytes->data());
 		return true;
 	}
 
 	return false;
 }
 
-void RUDPSessionBroker::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer)
+void RUDPSessionBroker::SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer) const
 {
 	PortType targetPort;
 	SessionIdType sessionId;
-	RUDPSessionFunctionDelegate::GetServerPortAndSessionId(session, targetPort, sessionId);
+	sessionDelegate.GetServerPortAndSessionId(session, targetPort, sessionId);
 
 	//Send rudp session information packet to client
 	buffer << rudpServerIP << targetPort << sessionId;
-	buffer.WriteBuffer(RUDPSessionFunctionDelegate::GetSessionKey(session), SESSION_KEY_SIZE);
-	buffer.WriteBuffer(RUDPSessionFunctionDelegate::GetSessionSalt(session), SESSION_SALT_SIZE);
+	buffer.WriteBuffer(sessionDelegate.GetSessionKey(session), SESSION_KEY_SIZE);
+	buffer.WriteBuffer(sessionDelegate.GetSessionSalt(session), SESSION_SALT_SIZE);
 }
 
 bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
@@ -279,7 +281,6 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 	char encryptedBuffer[maxTlsPacketSize];
 	size_t encryptedSize = 0;
 	constexpr DWORD tlsShutdownTimeout = 300;
-	constexpr size_t tlsFinBufferSize = 256;
 
 	if (not tlsHelper.EncryptData(
 		sendBuffer.GetBufferPtr(),
@@ -311,6 +312,7 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 
 	while (true)
 	{
+		constexpr size_t tlsFinBufferSize = 256;
 		if (char finRecv[tlsFinBufferSize]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
 		{
 			break;

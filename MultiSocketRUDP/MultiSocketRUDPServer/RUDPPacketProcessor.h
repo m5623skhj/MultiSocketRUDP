@@ -1,9 +1,10 @@
 #pragma once
-#include <NetServerSerializeBuffer.h>
+#include "NetServerSerializeBuffer.h"
 #include <span>
 
 class RUDPSession;
 class RUDPSessionManager;
+class ISessionDelegate;
 
 // ----------------------------------------
 // @brief RUDP 패킷을 유형별로 처리하는 클래스입니다.
@@ -11,7 +12,7 @@ class RUDPSessionManager;
 class RUDPPacketProcessor
 {
 public:
-    RUDPPacketProcessor(RUDPSessionManager& inSessionManager);
+    RUDPPacketProcessor(RUDPSessionManager& inSessionManager, ISessionDelegate& inSessionDelegate);
     ~RUDPPacketProcessor() = default;
 
     RUDPPacketProcessor(const RUDPPacketProcessor&) = delete;
@@ -43,4 +44,5 @@ public:
 
 private:
 	RUDPSessionManager& sessionManager;
+    ISessionDelegate& sessionDelegate;
 };

@@ -4,9 +4,10 @@
 #include "LogExtension.h"
 #include "RUDPSessionFunctionDelegate.h"
 
-RUDPSessionManager::RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore)
+RUDPSessionManager::RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore, ISessionDelegate& inSessionDelegate)
     : maxSessionSize(inMaxSessionSize)
     , core(inCore)
+	, sessionDelegate(inSessionDelegate)
 {
 }
 
@@ -149,7 +150,7 @@ void RUDPSessionManager::CloseAllSessions()
 			continue;
 		}
 
-		RUDPSessionFunctionDelegate::CloseSocket(*session);
+		sessionDelegate.CloseSocket(*session);
 	}
 
 	connectedUserCount.store(0);
@@ -173,7 +174,7 @@ void RUDPSessionManager::ClearAllSessions()
 			continue;
 		}
 
-		RUDPSessionFunctionDelegate::RecvContextReset(*session);
+		sessionDelegate.RecvContextReset(*session);
 		delete session;
 	}
 
@@ -186,7 +187,7 @@ void RUDPSessionManager::ClearAllSessions()
 	Logger::GetInstance().WriteLog(log);
 }
 
-void RUDPSessionManager::HeartbeatCheck(const unsigned long long now)
+void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
 {
 	for (auto* session : sessionList)
 	{
@@ -197,15 +198,15 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now)
 
 		if (session->IsConnected() == true)
 		{
-			RUDPSessionFunctionDelegate::SendHeartbeatPacket(*session);
+			sessionDelegate.SendHeartbeatPacket(*session);
 		}
 		else if (session->IsReserved() == true)
 		{
 			// Waiting 30 seconds
-			if (RUDPSessionFunctionDelegate::CheckReservedSessionTimeout(*session, now) == true)
+			if (sessionDelegate.CheckReservedSessionTimeout(*session, now) == true)
 			{
 				// if not connected within the time, disconnect the session
-				RUDPSessionFunctionDelegate::AbortReservedSession(*session);
+				sessionDelegate.AbortReservedSession(*session);
 			}
 		}
 	}
@@ -226,8 +227,8 @@ bool RUDPSessionManager::CreateSessionPool()
 				return false;
 			}
 
-			RUDPSessionFunctionDelegate::SetSessionId(*session, static_cast<SessionIdType>(i));
-			RUDPSessionFunctionDelegate::SetThreadId(*session, i % numOfWorkerThreads);
+			sessionDelegate.SetSessionId(*session, static_cast<SessionIdType>(i));
+			sessionDelegate.SetThreadId(*session, i % numOfWorkerThreads);
 			sessionList.emplace_back(session);
 			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(i));
 		}
