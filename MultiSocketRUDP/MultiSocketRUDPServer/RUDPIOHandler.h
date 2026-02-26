@@ -28,6 +28,8 @@ enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
 	IS_SENT = -4,
 };
 
+// RUDPIOHandler 클래스는 RIO(Registered I/O) 기반의 네트워크 통신을 처리하는 핸들러입니다.
+// 세션 관리, 패킷 송수신, 재전송 처리 등 RUDP 프로토콜의 핵심 I/O 로직을 담당합니다.
 class RUDPIOHandler : public IIOHandler
 {
 public:
@@ -47,10 +49,16 @@ public:
 	RUDPIOHandler& operator=(RUDPIOHandler&&) = delete;
 
 public:
+	// IOCompleted 함수는 비동기 I/O 작업이 완료되었을 때 호출됩니다.
+	// 전송된 바이트 수와 스레드 ID를 기반으로 후속 처리를 수행합니다.
 	[[nodiscard]]
 	bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const override;
+	// DoRecv 함수는 주어진 세션으로부터 데이터를 수신하는 작업을 시작합니다.
+	// RIO 수신 요청을 트리거하고 필요한 경우 버퍼를 관리합니다.
 	[[nodiscard]]
 	bool DoRecv(const RUDPSession& session) const override;
+	// DoSend 함수는 주어진 세션에 데이터를 전송하는 작업을 시작합니다.
+	// RIO 송신 요청을 트리거하고 전송 대기열을 관리합니다.
 	[[nodiscard]]
 	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId) const override;
 
