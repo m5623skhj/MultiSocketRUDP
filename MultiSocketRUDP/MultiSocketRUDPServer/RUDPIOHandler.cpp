@@ -17,7 +17,7 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
 	, const BYTE inMaxHoldingPacketQueueSize
 	, const unsigned int inRetransmissionMs)
-	: rioManager(rioManager)
+	: rioManager(inRioManager)
 	, sessionDelegate(inSessionDelegate)
 	, contextPool(contextPool)
 	, sendPacketInfoList(sendPacketInfoList)

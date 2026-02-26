@@ -28,7 +28,7 @@ enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
 	IS_SENT = -4,
 };
 
-class RUDPIOHandler
+class RUDPIOHandler : public IIOHandler
 {
 public:
 	RUDPIOHandler(IRIOManager& inRioManager
@@ -39,7 +39,7 @@ public:
 		, BYTE inMaxHoldingPacketQueueSize
 		, unsigned int inRetransmissionMs
 	);
-	~RUDPIOHandler() = default;
+	~RUDPIOHandler() override = default;
 
 	RUDPIOHandler(const RUDPIOHandler&) = delete;
 	RUDPIOHandler& operator=(const RUDPIOHandler&) = delete;
@@ -48,11 +48,11 @@ public:
 
 public:
 	[[nodiscard]]
-	bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const;
+	bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const override;
 	[[nodiscard]]
-	bool DoRecv(const RUDPSession& session) const;
+	bool DoRecv(const RUDPSession& session) const override;
 	[[nodiscard]]
-	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId) const;
+	bool DoSend(OUT RUDPSession& session, ThreadIdType threadId) const override;
 
 private:
 	[[nodiscard]]
