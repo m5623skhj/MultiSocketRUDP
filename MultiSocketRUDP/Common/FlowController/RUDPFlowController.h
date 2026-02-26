@@ -18,7 +18,7 @@ public:
 	void Reset() noexcept;
 
 	[[nodiscard]]
-	uint16_t GetCwnd() const noexcept { return cwnd; }
+	uint8_t GetCwnd() const noexcept { return cwnd; }
 	[[nodiscard]]
 	PacketSequence GetLastAckedSequence() const noexcept { return lastReplySequence; }
 
@@ -26,14 +26,14 @@ private:
 	static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
 
 private:
-	uint16_t cwnd{};
+	uint8_t cwnd{};
 	PacketSequence lastReplySequence{};
 	bool inRecovery{};
 
-	static constexpr uint16_t INITIAL_CWND = 4;
-	static constexpr uint16_t MAX_CWND = 1024;
+	static constexpr uint8_t INITIAL_CWND = 4;
+	static constexpr uint8_t MAX_CWND = 255;
 
 #ifdef _DEBUG
-	uint16_t duplicateReplyCount{};
+	uint8_t duplicateReplyCount{};
 #endif
 };

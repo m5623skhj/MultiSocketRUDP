@@ -23,6 +23,7 @@ void PlayerManager::ErasePlayer(const PlayerIdType playerId)
 {
 	SessionIdType sessionId;
 	{
+		std::shared_lock lock(sessionIdToPlayerMapMutex);
 		const auto itor = playerMap.find(playerId);
 		if (itor == playerMap.end())
 		{
@@ -49,11 +50,13 @@ void PlayerManager::ErasePlayerBySessionId(const SessionIdType sessionId)
 {
 	PlayerIdType playerId;
 	{
+		std::shared_lock lock(sessionIdToPlayerMapMutex);
 		const auto itor = sessionIdToPlayerMap.find(sessionId);
 		if (itor == sessionIdToPlayerMap.end())
 		{
 			return;
 		}
+
 		playerId = itor->second->GetPlayerId();
 	}
 

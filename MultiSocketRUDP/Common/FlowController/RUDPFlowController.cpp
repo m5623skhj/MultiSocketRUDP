@@ -2,7 +2,7 @@
 #include "RUDPFlowController.h"
 #include <algorithm>
 
-int32_t RUDPFlowController::SeqDiff(PacketSequence a, PacketSequence b) noexcept
+int32_t RUDPFlowController::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept
 {
 	return static_cast<int32_t>(a - b);
 }
@@ -15,7 +15,7 @@ RUDPFlowController::RUDPFlowController()
 bool RUDPFlowController::CanSendPacket(const PacketSequence nextSendSequence, const PacketSequence lastAckedSequence) const noexcept
 {
 	const int32_t diff = SeqDiff(nextSendSequence, lastAckedSequence);
-	const uint16_t outstanding = diff > 1 ? static_cast<uint16_t>(diff - 1) : 0;
+	const uint8_t outstanding = diff > 1 ? static_cast<uint8_t>(diff - 1) : 0;
 	return outstanding < cwnd;
 }
 
@@ -41,7 +41,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 
 	if (not inRecovery)
 	{
-		cwnd = std::min<uint16_t>(cwnd + 1, MAX_CWND);
+		cwnd = std::min<uint8_t>(cwnd + 1, MAX_CWND);
 	}
 	else
 	{
@@ -51,7 +51,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 
 void RUDPFlowController::OnCongestionEvent() noexcept
 {
-	cwnd = std::max<uint16_t>(cwnd / 2, 1);
+	cwnd = std::max<uint8_t>(cwnd / 2, 1);
 	inRecovery = true;
 }
 
