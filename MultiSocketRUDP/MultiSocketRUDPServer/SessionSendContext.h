@@ -11,7 +11,7 @@
 
 struct SendPacketInfo;
 
-enum class IO_MODE : LONG
+enum class IO_MODE : unsigned int
 {
 	IO_NONE_SENDING = 0
 	, IO_SENDING

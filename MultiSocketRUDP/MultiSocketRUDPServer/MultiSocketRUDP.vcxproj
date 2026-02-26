@@ -52,7 +52,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
+    <ClInclude Include="IIOHandler.h" />
+    <ClInclude Include="IMultiSocketRUDPCore.h" />
     <ClInclude Include="IOContext.h" />
+    <ClInclude Include="IRIOManager.h" />
+    <ClInclude Include="ISessionDelegate.h" />
     <ClInclude Include="LogExtension.h" />
     <ClInclude Include="MemoryTracer.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />

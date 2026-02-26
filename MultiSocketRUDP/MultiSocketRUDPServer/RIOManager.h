@@ -1,16 +1,17 @@
 #pragma once
-
+#include "IRIOManager.h"
 #include <MSWSock.h>
 #include <vector>
 #include <mutex>
 #include "../Common/etc/CoreType.h"
 
 class RUDPSession;
+class ISessionDelegate;
 
-class RIOManager
+class RIOManager : public IRIOManager
 {
 public:
-	RIOManager() = default;
+	explicit RIOManager(ISessionDelegate& inSessionDelegate);
 	~RIOManager();
 
 public:
@@ -77,6 +78,8 @@ private:
 	void CleanupRegisteredBuffers();
 
 private:
+	ISessionDelegate& sessionDelegate;
+
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctionTable{};
 	std::vector<RIO_CQ> rioCompletionQueues;
 

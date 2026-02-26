@@ -8,9 +8,12 @@
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "RIOManager.h"
 #include "RUDPSessionBroker.h"
-#include "RUDPSessionFunctionDelegate.h"
 #include "SendPacketInfo.h"
 #include "../Common/etc/UtilFunc.h"
+#include "RUDPSessionManager.h"
+#include "RUDPThreadManager.h"
+#include "RUDPPacketProcessor.h"
+#include "RUDPIOHandler.h"
 
 namespace
 {
@@ -57,6 +60,11 @@ MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStore
 	: sessionBrokerCertStoreName(std::move(inSessionBrokerCertStoreName))
 	, sessionBrokerCertSubjectName(std::move(inSessionBrokerCertSubjectName))
 	, contextPool(2, false)
+	, sessionDelegate()
+{
+}
+
+MultiSocketRUDPCore::~MultiSocketRUDPCore()
 {
 }
 
@@ -78,7 +86,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 		return false;
 	}
 
-	sessionManager = std::make_unique<RUDPSessionManager>(numOfSockets, *this);
+	sessionManager = std::make_unique<RUDPSessionManager>(numOfSockets, *this, sessionDelegate);
 	if (sessionManager == nullptr)
 	{
 		LOG_ERROR("Session manager creation failed");
@@ -260,8 +268,8 @@ bool MultiSocketRUDPCore::InitRIO()
 	bool result = true;
 	do
 	{
-		rioManager = std::make_unique<RIOManager>();
-		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, contextPool, sendPacketInfoList, sendPacketInfoListLock, maxHoldingPacketQueueSize, retransmissionMs);
+		rioManager = std::make_unique<RIOManager>(sessionDelegate);
+		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, sessionDelegate, contextPool, sendPacketInfoList, sendPacketInfoListLock, maxHoldingPacketQueueSize, retransmissionMs);
 		if (rioManager == nullptr || ioHandler == nullptr)
 		{
 			LOG_ERROR("RIOManager or RUDPIOHandler creation failed");
@@ -283,7 +291,7 @@ bool MultiSocketRUDPCore::InitRIO()
 bool MultiSocketRUDPCore::RunAllThreads()
 {
 	threadManager = std::make_unique<RUDPThreadManager>();
-	packetProcessor = std::make_unique<RUDPPacketProcessor>(*sessionManager);
+	packetProcessor = std::make_unique<RUDPPacketProcessor>(*sessionManager, sessionDelegate);
 	if (threadManager == nullptr || packetProcessor == nullptr)
 	{
 		LOG_ERROR("ThreadManager or PacketProcessor creation failed");
@@ -316,7 +324,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	threadManager->StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
 
 	Sleep(1000);
-	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionBrokerCertStoreName, sessionBrokerCertSubjectName);
+	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionDelegate, sessionBrokerCertStoreName, sessionBrokerCertSubjectName);
 	if (not sessionBroker->Start(sessionBrokerPort, coreServerIp))
 	{
 		LOG_ERROR("RunSessionBroker failed");

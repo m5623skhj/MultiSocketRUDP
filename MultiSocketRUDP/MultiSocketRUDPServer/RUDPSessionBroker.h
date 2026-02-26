@@ -8,12 +8,14 @@
 
 class RUDPSession;
 class MultiSocketRUDPCore;
+class ISessionDelegate;
 
 class RUDPSessionBroker
 {
 public:
-    explicit RUDPSessionBroker(
-        MultiSocketRUDPCore& inCore,
+	explicit RUDPSessionBroker(
+		MultiSocketRUDPCore& inCore,
+		ISessionDelegate& inSessionDelegate,
         const std::wstring& certStoreName,
         const std::wstring& certSubjectName);
     ~RUDPSessionBroker();
@@ -36,20 +38,20 @@ private:
 	void CloseListenSocket();
 
     [[nodiscard]]
-    static RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP);
+    RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP) const;
 	[[nodiscard]]
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
 
 private:
 	[[nodiscard]]
-	static bool InitSessionCrypto(OUT RUDPSession& session);
+	bool InitSessionCrypto(OUT RUDPSession& session) const;
 	[[nodiscard]]
-	static bool GenerateSessionKey(OUT RUDPSession& session);
+	bool GenerateSessionKey(OUT RUDPSession& session) const;
 	[[nodiscard]]
-	static bool GenerateSaltKey(OUT RUDPSession& session);
+	bool GenerateSaltKey(OUT RUDPSession& session) const;
 
 private:
-    static void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer);
+    void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer) const;
 	[[nodiscard]]
 	bool SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
 	[[nodiscard]]
@@ -57,6 +59,7 @@ private:
 
 private:
 	MultiSocketRUDPCore& core;
+	ISessionDelegate& sessionDelegate;
 	TLSHelper::TLSHelperServer tlsHelper;
 
 	SOCKET sessionBrokerListenSocket = INVALID_SOCKET;

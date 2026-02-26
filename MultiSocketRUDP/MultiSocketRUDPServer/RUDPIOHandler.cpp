@@ -10,13 +10,15 @@
 #include "MultiSocketRUDPCoreFuntionDeletage.h"
 #include "SendPacketInfo.h"
 
-RUDPIOHandler::RUDPIOHandler(RIOManager& rioManager
-                             , CTLSMemoryPool<IOContext>& contextPool
-                             , std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
-                             , std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
-                             , const BYTE inMaxHoldingPacketQueueSize
-                             , const unsigned int inRetransmissionMs)
+RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
+	, ISessionDelegate& inSessionDelegate
+	, CTLSMemoryPool<IOContext>& contextPool
+	, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
+	, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
+	, const BYTE inMaxHoldingPacketQueueSize
+	, const unsigned int inRetransmissionMs)
 	: rioManager(rioManager)
+	, sessionDelegate(inSessionDelegate)
 	, contextPool(contextPool)
 	, sendPacketInfoList(sendPacketInfoList)
 	, sendPacketInfoListLock(sendPacketInfoListLock)
@@ -67,7 +69,7 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 
 bool RUDPIOHandler::DoRecv(const RUDPSession& session) const
 {
-	const auto context = RUDPSessionFunctionDelegate::GetRecvBufferContext(session);
+	const auto context = sessionDelegate.GetRecvBufferContext(session);
 	if (context == nullptr)
 	{
 		LOG_ERROR("DoRecv context is nullptr");
@@ -75,13 +77,13 @@ bool RUDPIOHandler::DoRecv(const RUDPSession& session) const
 	}
 
 	{
-		std::shared_lock lock(RUDPSessionFunctionDelegate::GetSocketMutex(session));
-		if (RUDPSessionFunctionDelegate::GetSocket(session) == INVALID_SOCKET)
+		std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+		if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
 		{
 			return false;
 		}
 
-		if (not rioManager.RIOReceiveEx(RUDPSessionFunctionDelegate::GetRecvRIORQ(session)
+		if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
 			, context.get()
 			, 1
 			, &context->localAddrRIOBuffer
@@ -102,17 +104,17 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 {
 	while (true)
 	{
-		if (InterlockedCompareExchange(reinterpret_cast<UINT*>(&RUDPSessionFunctionDelegate::GetSendIOMode(session))
+		if (InterlockedCompareExchange(reinterpret_cast<UINT*>(&sessionDelegate.GetSendIOMode(session))
 			, static_cast<UINT>(IO_MODE::IO_SENDING)
 			, static_cast<UINT>(IO_MODE::IO_NONE_SENDING)))
 		{
 			break;
 		}
 
-		if (RUDPSessionFunctionDelegate::IsNothingToSend(session))
+		if (sessionDelegate.IsNothingToSend(session))
 		{
-			InterlockedExchange(reinterpret_cast<UINT*>(&RUDPSessionFunctionDelegate::GetSendIOMode(session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
-			if (not RUDPSessionFunctionDelegate::IsNothingToSend(session))
+			InterlockedExchange(reinterpret_cast<UINT*>(&sessionDelegate.GetSendIOMode(session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+			if (not sessionDelegate.IsNothingToSend(session))
 			{
 				continue;
 			}
@@ -141,14 +143,14 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	}
 
 	const auto buffer = NetBuffer::Alloc();
-	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, RUDPSessionFunctionDelegate::GetRecvBuffer(*contextResult->session).buffer, transferred) != 0)
+	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, sessionDelegate.GetRecvBuffer(*contextResult->session).buffer, transferred) != 0)
 	{
 		NetBuffer::Free(buffer);
 		return false;
 	}
 	buffer->m_iWrite = static_cast<WORD>(transferred);
 
-	RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(*contextResult->session, buffer);
+	sessionDelegate.EnqueueToRecvBufferList(*contextResult->session, buffer);
 	MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(contextResult, threadId);
 	return DoRecv(*contextResult->session);
 }
@@ -161,7 +163,7 @@ bool RUDPIOHandler::SendIOCompleted(IOContext* context, const BYTE threadId) con
 		return false;
 	}
 
-	InterlockedExchange(reinterpret_cast<UINT*>(&RUDPSessionFunctionDelegate::GetSendIOMode(*context->session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+	InterlockedExchange(reinterpret_cast<UINT*>(&sessionDelegate.GetSendIOMode(*context->session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
 
 	const bool result = DoSend(*context->session, threadId);
 	contextPool.Free(context);
@@ -173,13 +175,13 @@ bool RUDPIOHandler::TryRIOSend(RUDPSession& session, IOContext* context) const
 	context->session = &session;
 
 	{
-		std::shared_lock lock(RUDPSessionFunctionDelegate::GetSocketMutex(session));
-		if (RUDPSessionFunctionDelegate::GetSocket(session) == INVALID_SOCKET)
+		std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+		if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
 		{
 			return false;
 		}
 
-		if (not rioManager.RIOSendEx(RUDPSessionFunctionDelegate::GetSendRIORQ(session)
+		if (not rioManager.RIOSendEx(sessionDelegate.GetSendRIORQ(session)
 			, context
 			, 1
 			, nullptr
@@ -208,7 +210,7 @@ IOContext* RUDPIOHandler::MakeSendContext(RUDPSession& session, const ThreadIdTy
 	}
 
 	context->InitContext(session.GetSessionId(), RIO_OPERATION_TYPE::OP_SEND);
-	context->BufferId = RUDPSessionFunctionDelegate::GetSendBufferId(session);
+	context->BufferId = sessionDelegate.GetSendBufferId(session);
 	context->Offset = 0;
 	context->Length = MakeSendStream(session, threadId);
 	if (context->Length == 0)
@@ -242,13 +244,13 @@ IOContext* RUDPIOHandler::MakeSendContext(RUDPSession& session, const ThreadIdTy
 
 unsigned int RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdType threadId) const
 {
-	std::scoped_lock cachedSequenceLock(RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(session));
-	auto& packetSequenceSet = RUDPSessionFunctionDelegate::GetCachedSequenceSet(session);
+	std::scoped_lock cachedSequenceLock(sessionDelegate.GetCachedSequenceSetMutex(session));
+	auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
 	packetSequenceSet.clear();
 	
 	unsigned int totalSendSize = 0;
-	const size_t bufferCount = RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(session);
-	if (RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session) != nullptr)
+	const size_t bufferCount = sessionDelegate.GetSendPacketInfoQueueSize(session);
+	if (sessionDelegate.GetReservedSendPacketInfo(session) != nullptr)
 	{
 		if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
 		{
@@ -278,7 +280,7 @@ unsigned int RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdT
 
 SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
-	SendPacketInfo* sendPacketInfo = RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session);
+	SendPacketInfo* sendPacketInfo = sessionDelegate.GetReservedSendPacketInfo(session);
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
 	if (useSize >= MAX_SEND_BUFFER_SIZE)
 	{
@@ -293,23 +295,23 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
-	char* bufferPositionPointer = RUDPSessionFunctionDelegate::GetRIOSendBuffer(session);
+	char* bufferPositionPointer = sessionDelegate.GetRIOSendBuffer(session);
 	memcpy_s(bufferPositionPointer, MAX_SEND_BUFFER_SIZE, sendPacketInfo->buffer->GetBufferPtr(), useSize);
 	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence });
 
 	totalSendSize += static_cast<int>(useSize);
 	if (sendPacketInfo->isReplyType == true)
 	{
-		SendPacketInfo::Free(RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(session));
+		SendPacketInfo::Free(sessionDelegate.GetReservedSendPacketInfo(session));
 	}
-	RUDPSessionFunctionDelegate::SetReservedSendPacketInfo(session, nullptr);
+	sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
 
 SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
-	SendPacketInfo* sendPacketInfo = RUDPSessionFunctionDelegate::TryGetFrontAndPop(session);
+	SendPacketInfo* sendPacketInfo = sessionDelegate.TryGetFrontAndPop(session);
 	if (sendPacketInfo == nullptr)
 	{
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
@@ -334,7 +336,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	totalSendSize += useSize;
 	if (totalSendSize >= MAX_SEND_BUFFER_SIZE)
 	{
-		RUDPSessionFunctionDelegate::SetReservedSendPacketInfo(session, sendPacketInfo);
+		sessionDelegate.SetReservedSendPacketInfo(session, sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL;
 	}
 
@@ -344,7 +346,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	}
 
 	packetSequenceSet.insert(key);
-	memcpy_s(&RUDPSessionFunctionDelegate::GetRIOSendBuffer(session)[beforeSendSize]
+	memcpy_s(&sessionDelegate.GetRIOSendBuffer(session)[beforeSendSize]
 		, MAX_SEND_BUFFER_SIZE - beforeSendSize
 		, sendPacketInfo->buffer->GetBufferPtr()
 		, useSize);

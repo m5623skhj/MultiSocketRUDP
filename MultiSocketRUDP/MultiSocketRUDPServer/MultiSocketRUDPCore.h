@@ -1,19 +1,15 @@
 #pragma once
+#include "IMultiSocketRUDPCore.h"
 #include <list>
 #include <thread>
 #include <MSWSock.h>
 #include "NetServer.h"
-#include <shared_mutex>
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
-#include "RIOManager.h"
-#include "RUDPSessionManager.h"
-#include "RUDPThreadManager.h"
-#include "RUDPPacketProcessor.h"
-#include "RUDPIOHandler.h"
-#include "RUDPSessionBroker.h"
+#include "RUDPSessionFunctionDelegate.h"
 #include "IOContext.h"
+#include "RUDPSessionManager.h"
 
 #include "../Common/TLS/TLSHelper.h"
 
@@ -23,14 +19,19 @@ struct SendPacketInfo;
 
 class RIOManager;
 class MultiSocketRUDPCoreFunctionDelegate;
+class RUDPThreadManager;
+class RUDPPacketProcessor;
+class RUDPIOHandler;
+class RUDPSessionBroker;
+class RUDPSessionManager;
 
-class MultiSocketRUDPCore
+class MultiSocketRUDPCore : public ICore
 {
 	friend MultiSocketRUDPCoreFunctionDelegate;
 
 public:
 	explicit MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName);
-	virtual ~MultiSocketRUDPCore() = default;
+	~MultiSocketRUDPCore() override;
 
 public:
 	[[nodiscard]]
@@ -47,9 +48,9 @@ public:
 	unsigned short GetConnectedUserCount() const;
 
 public:
-	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true) const;
-	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId);
-	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
+	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true) const override;
+	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
+	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const override;
 
 	// ----------------------------------------
 	// @brief NetBuffer에서 페이로드 길이를 추출합니다.
@@ -64,8 +65,8 @@ public:
 	}
 
 private:
-	void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
-	void PushToDisconnectTargetSession(RUDPSession& session);
+	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
+	void PushToDisconnectTargetSession(RUDPSession& session) override;
 
 private:
 	void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
@@ -157,4 +158,5 @@ private:
 	std::unique_ptr<RUDPIOHandler> ioHandler;
 	std::unique_ptr<RUDPSessionBroker> sessionBroker;
 	std::unique_ptr<RUDPSessionManager> sessionManager;
+	RUDPSessionFunctionDelegate sessionDelegate;
 };

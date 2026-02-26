@@ -1,6 +1,7 @@
 #pragma once
 #include "RUDPSession.h"
 
+class ISessionDelegate;
 class MultiSocketRUDPCore;
 // ----------------------------------------
 // @brief RUDPSession 객체를 생성하는 데 사용되는 팩토리 함수의 타입 정의입니다.
@@ -21,7 +22,7 @@ public:
 	// @param inMaxSessionSize 관리할 최대 세션의 수입니다.
 	// @param inCore RUDP 코어 인스턴스에 대한 참조입니다.
 	// ----------------------------------------
-	explicit RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore);
+	explicit RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore, ISessionDelegate& inSessionDelegate);
 	// ----------------------------------------
 	// @brief RUDPSessionManager 클래스의 소멸자입니다.
 	// 관리 중인 모든 세션을 정리하고 리소스를 해제합니다.
@@ -125,7 +126,7 @@ public:
 	// @brief 모든 활성 세션에 대해 하트비트 검사를 수행합니다.
 	// 일정 시간 동안 응답이 없는 세션이 감지되면 해당 세션의 연결 상태를 해제합니다.
 	// ----------------------------------------
-	void HeartbeatCheck(const unsigned long long now);
+	void HeartbeatCheck(const unsigned long long now) const;
 
 private:
 	// ----------------------------------------
@@ -154,4 +155,5 @@ private:
 
 	bool isInitialized{};
 	MultiSocketRUDPCore& core;
+	ISessionDelegate& sessionDelegate;
 };

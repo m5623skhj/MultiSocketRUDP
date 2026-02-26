@@ -6,6 +6,11 @@
 #include "RUDPSessionFunctionDelegate.h"
 #include "../Common/etc/UtilFunc.h"
 
+RIOManager::RIOManager(ISessionDelegate& inSessionDelegate)
+	: sessionDelegate(inSessionDelegate)
+{
+}
+
 RIOManager::~RIOManager()
 {
 	Shutdown();
@@ -109,7 +114,7 @@ bool RIOManager::InitializeSessionRIO(RUDPSession& session, const ThreadIdType t
 
 	const RIO_CQ recvCQ = rioCompletionQueues[threadId];
 	const RIO_CQ sendCQ = rioCompletionQueues[threadId];
-	if (not RUDPSessionFunctionDelegate::InitializeSessionRIO(session, GetRIOFunctionTable(), recvCQ, sendCQ))
+	if (not sessionDelegate.InitializeSessionRIO(session, GetRIOFunctionTable(), recvCQ, sendCQ))
 	{
 		LOG_ERROR("Failed to initialize RIO for session");
 		return false;

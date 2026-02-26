@@ -1,5 +1,5 @@
 #pragma once
-#include "../Common/etc/CoreType.h"
+#include "IIOHandler.h"
 #include <vector>
 #include <list>
 #include <mutex>
@@ -11,7 +11,9 @@ namespace MultiSocketRUDP
 	struct PacketSequenceSetKey;
 }
 
-class RIOManager;
+class IRIOManager;
+class ISessionDelegate;
+class ICore;
 class RUDPSession;
 
 struct IOContext;
@@ -29,7 +31,8 @@ enum class SEND_PACKET_INFO_TO_STREAM_RETURN : char
 class RUDPIOHandler
 {
 public:
-	RUDPIOHandler(RIOManager& rioManager
+	RUDPIOHandler(IRIOManager& inRioManager
+		, ISessionDelegate& inSessionDelegate
 		, CTLSMemoryPool<IOContext>& contextPool
 		, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
 		, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
@@ -73,7 +76,8 @@ private:
 	bool RefreshRetransmissionSendPacketInfo(OUT SendPacketInfo* sendPacketInfo, ThreadIdType threadId) const;
 
 private:
-	RIOManager& rioManager;
+	IRIOManager& rioManager;
+	ISessionDelegate& sessionDelegate;
 	CTLSMemoryPool<IOContext>& contextPool;
 	std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList;
 	std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock;
