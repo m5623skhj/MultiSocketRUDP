@@ -34,20 +34,18 @@ namespace MultiSocketRUDPBotTester.Bot
                 var result = Condition(context);
                 Log.Debug("Conditional check: {Result}", result);
 
-                var branchVisited = new HashSet<ActionNodeBase>();
                 var nodesToExecute = result ? TrueNodes : FalseNodes;
-
+                var branchVisited = new HashSet<ActionNodeBase>();
                 foreach (var node in nodesToExecute)
                 {
-                    ExecuteNodeChain(context, node, branchVisited);
+                    NodeExecutionHelper.ExecuteChain(context, node, branchVisited);
                 }
 
                 Log.Debug("ConditionalNode: Executing {Count} next nodes after branch", NextNodes.Count);
                 var nextVisited = new HashSet<ActionNodeBase>();
-
                 foreach (var nextNode in NextNodes)
                 {
-                    ExecuteNodeChain(context, nextNode, nextVisited);
+                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
                 }
             }
             catch (Exception ex)
@@ -55,38 +53,6 @@ namespace MultiSocketRUDPBotTester.Bot
                 Log.Error(ex, "Conditional evaluation failed");
                 throw;
             }
-        }
-
-        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node, HashSet<ActionNodeBase> visited)
-        {
-            if (!visited.Add(node))
-            {
-                Log.Warning("Circular reference detected in node: {NodeName}", node.Name);
-                return;
-            }
-
-            node.Execute(context.Client, context.GetPacket());
-
-            if (IsAsyncNode(node))
-            {
-                return;
-            }
-
-            foreach (var next in node.NextNodes)
-            {
-                ExecuteNodeChain(context, next, visited);
-            }
-        }
-
-        private static bool IsAsyncNode(ActionNodeBase node)
-        {
-            return node is DelayNode
-                or RandomDelayNode
-                or RepeatTimerNode
-                or WaitForPacketNode
-                or RetryNode
-                or ConditionalNode
-                or LoopNode;
         }
     }
 
@@ -119,7 +85,7 @@ namespace MultiSocketRUDPBotTester.Bot
                     var visited = new HashSet<ActionNodeBase>();
                     foreach (var node in LoopBody)
                     {
-                        ExecuteNodeChain(context, node, visited);
+                        NodeExecutionHelper.ExecuteChain(context, node, visited);
                     }
 
                     iteration++;
@@ -133,52 +99,20 @@ namespace MultiSocketRUDPBotTester.Bot
                 var exitVisited = new HashSet<ActionNodeBase>();
                 foreach (var node in ExitNodes)
                 {
-                    ExecuteNodeChain(context, node, exitVisited);
+                    NodeExecutionHelper.ExecuteChain(context, node, exitVisited);
                 }
 
                 Log.Debug("LoopNode: Executing {Count} next nodes after loop", NextNodes.Count);
                 var nextVisited = new HashSet<ActionNodeBase>();
                 foreach (var nextNode in NextNodes)
                 {
-                    ExecuteNodeChain(context, nextNode, nextVisited);
+                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
                 }
             }
             catch (Exception ex)
             {
                 Log.Error("Loop execution failed: {Message}", ex.Message);
             }
-        }
-
-        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node, HashSet<ActionNodeBase> visited)
-        {
-            if (!visited.Add(node))
-            {
-                Log.Warning("Circular reference detected in node: {NodeName}", node.Name);
-                return;
-            }
-
-            node.Execute(context.Client, context.GetPacket());
-
-            if (IsAsyncNode(node))
-            {
-                return;
-            }
-
-            foreach (var next in node.NextNodes)
-            {
-                ExecuteNodeChain(context, next, visited);
-            }
-        }
-
-        private static bool IsAsyncNode(ActionNodeBase node)
-        {
-            return node is DelayNode
-                or RandomDelayNode
-                or RepeatTimerNode
-                or WaitForPacketNode
-                or RetryNode
-                or ConditionalNode
-                or LoopNode;
         }
     }
 
@@ -190,8 +124,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
         protected override void ExecuteImpl(RuntimeContext context)
         {
-            var instanceId = Guid.NewGuid().ToString();
-            var iterationKey = $"__repeat_iteration_{instanceId}";
+            var iterationKey = $"__repeat_iteration_{Guid.NewGuid()}";
 
             Task.Run(async () =>
             {
@@ -205,7 +138,7 @@ namespace MultiSocketRUDPBotTester.Bot
                         var visited = new HashSet<ActionNodeBase>();
                         foreach (var node in RepeatBody)
                         {
-                            ExecuteNodeChain(context, node, visited);
+                            NodeExecutionHelper.ExecuteChain(context, node, visited);
                         }
 
                         if (i < RepeatCount - 1)
@@ -214,10 +147,10 @@ namespace MultiSocketRUDPBotTester.Bot
                         }
                     }
 
-                    var visitedNext = new HashSet<ActionNodeBase>();
+                    var nextVisited = new HashSet<ActionNodeBase>();
                     foreach (var next in NextNodes)
                     {
-                        ExecuteNodeChain(context, next, visitedNext);
+                        NodeExecutionHelper.ExecuteChain(context, next, nextVisited);
                     }
                 }
                 catch (Exception e)
@@ -225,38 +158,6 @@ namespace MultiSocketRUDPBotTester.Bot
                     Log.Error("RepeatTimerNode failed: {Message}", e.Message);
                 }
             });
-        }
-
-        private static void ExecuteNodeChain(RuntimeContext context, ActionNodeBase node, HashSet<ActionNodeBase> visited)
-        {
-            if (!visited.Add(node))
-            {
-                Log.Warning("Circular reference detected in node: {NodeName}", node.Name);
-                return;
-            }
-
-            node.Execute(context.Client, context.GetPacket());
-
-            if (IsAsyncNode(node))
-            {
-                return;
-            }
-
-            foreach (var next in node.NextNodes)
-            {
-                ExecuteNodeChain(context, next, visited);
-            }
-        }
-
-        private static bool IsAsyncNode(ActionNodeBase node)
-        {
-            return node is DelayNode
-                or RandomDelayNode
-                or RepeatTimerNode
-                or WaitForPacketNode
-                or RetryNode
-                or ConditionalNode
-                or LoopNode;
         }
     }
 }

@@ -12,6 +12,8 @@ namespace MultiSocketRUDPBotTester.Bot
         private readonly ConcurrentDictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
         private readonly List<ActionNodeBase> allNodes = [];
         private readonly Lock allNodesLock = new();
+        private readonly Lock triggerNodesLock = new();
+        private readonly Lock packetTriggerNodesLock = new();
 
         public string Name { get; set; } = "Unnamed Graph";
 
@@ -22,9 +24,6 @@ namespace MultiSocketRUDPBotTester.Bot
                 return allNodes.ToList();
             }
         }
-
-        private readonly Lock triggerNodesLock = new();
-        private readonly Lock packetTriggerNodesLock = new();
 
         public void AddNode(ActionNodeBase node)
         {
@@ -69,44 +68,20 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             Log.Debug("TriggerEvent called - Type: {Type}, PacketId: {PacketId}", triggerType, packetId);
 
-            List<ActionNodeBase>? candidates = null;
-
-            if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
-            {
-                lock (packetTriggerNodesLock)
-                {
-                    if (packetTriggerNodes.TryGetValue(packetId.Value, out var list))
-                    {
-                        candidates = list.ToList();
-                    }
-                }
-                Log.Debug("Found {Count} nodes for PacketId {PacketId}", candidates?.Count ?? 0, packetId);
-            }
-            else
-            {
-                lock (triggerNodesLock)
-                {
-                    if (triggerNodes.TryGetValue(triggerType, out var list))
-                    {
-                        candidates = list.ToList();
-                    }
-                }
-                Log.Debug("Found {Count} nodes for TriggerType {Type}", candidates?.Count ?? 0, triggerType);
-            }
-
+            var candidates = ResolveCandidates(triggerType, packetId);
             if (candidates == null || candidates.Count == 0)
             {
                 Log.Debug("No matching nodes found for trigger");
                 return;
             }
 
-            foreach (var node in candidates.Where(node => node.Trigger?.Matches(triggerType, packetId, buffer) == true))
+            foreach (var node in candidates.Where(n => n.Trigger?.Matches(triggerType, packetId, buffer) == true))
             {
                 Log.Information("Triggering node: {NodeName} (Type: {TriggerType})", node.Name, triggerType);
                 try
                 {
                     var visited = new HashSet<ActionNodeBase>();
-                    ExecuteNodeChain(client, node, buffer, visited);
+                    NodeExecutionHelper.ExecuteChainWithStats(client, node, buffer, visited);
                     Log.Information("Node executed successfully: {NodeName}", node.Name);
                 }
                 catch (Exception ex)
@@ -116,64 +91,32 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private static void ExecuteNodeChain(Client client, ActionNodeBase node, NetBuffer? buffer, HashSet<ActionNodeBase> visited)
+        private List<ActionNodeBase>? ResolveCandidates(TriggerType triggerType, PacketId? packetId)
         {
-            if (!visited.Add(node))
+            if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
             {
-                Log.Warning("Circular reference detected in execution chain: {NodeName}", node.Name);
-                return;
+                lock (packetTriggerNodesLock)
+                {
+                    if (!packetTriggerNodes.TryGetValue(packetId.Value, out var list))
+                    {
+                        return null;
+                    }
+
+                    Log.Debug("Found {Count} nodes for PacketId {PacketId}", list.Count, packetId);
+                    return list.ToList();
+                }
             }
 
-            Log.Debug("Executing node: {NodeName}", node.Name);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var success = true;
-            string? error = null;
+            lock (triggerNodesLock)
+            {
+                if (!triggerNodes.TryGetValue(triggerType, out var list))
+                {
+                    return null;
+                }
 
-            try
-            {
-                node.Execute(client, buffer);
+                Log.Debug("Found {Count} nodes for TriggerType {Type}", list.Count, triggerType);
+                return list.ToList();
             }
-            catch (Exception ex)
-            {
-                success = false;
-                error = ex.Message;
-                Log.Error("Node execution failed: {NodeName} - {Error}", node.Name, ex.Message);
-                throw;
-            }
-            finally
-            {
-                sw.Stop();
-                ActionNodeBase.GetStatsTracker()?.RecordExecution(node.Name, sw.ElapsedMilliseconds, success, error);
-                client.GlobalContext.IncrementExecutionCount(node.Name);
-                client.GlobalContext.RecordMetric($"{node.Name}_time", sw.ElapsedMilliseconds);
-            }
-
-            if (IsAsyncNode(node))
-            {
-                Log.Debug("Node {NodeName} is async, it will handle its own NextNodes", node.Name);
-                return;
-            }
-
-            if (node.NextNodes.Count > 0)
-            {
-                Log.Debug("Node {NodeName} has {Count} next nodes", node.Name, node.NextNodes.Count);
-            }
-
-            foreach (var nextNode in node.NextNodes)
-            {
-                ExecuteNodeChain(client, nextNode, buffer, visited);
-            }
-        }
-
-        private static bool IsAsyncNode(ActionNodeBase node)
-        {
-            return node is DelayNode
-                or RandomDelayNode
-                or RepeatTimerNode
-                or WaitForPacketNode
-                or RetryNode
-                or ConditionalNode
-                or LoopNode;
         }
     }
 }
