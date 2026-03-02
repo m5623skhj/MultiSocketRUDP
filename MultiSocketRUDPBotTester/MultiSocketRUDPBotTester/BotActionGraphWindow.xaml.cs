@@ -1386,10 +1386,5 @@ namespace MultiSocketRUDPBotTester
             window.Content = stack;
             window.ShowDialog();
         }
-
-        private void AITreeGenerator_Click(object sender, RoutedEventArgs e)
-        {
-            ShowAiTreeGenerator();
-        }
     }
 }
