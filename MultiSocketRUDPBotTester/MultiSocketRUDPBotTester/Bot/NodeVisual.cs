@@ -6,43 +6,39 @@ namespace MultiSocketRUDPBotTester.Bot
 {
     public class NodeVisual
     {
-        public Border Border = null!;
-        public NodeCategory Category;
-        public FrameworkElement InputPort = null!;
-        public FrameworkElement? OutputPort;
-        public FrameworkElement? OutputPortTrue;
-        public FrameworkElement? OutputPortFalse;
-        public NodeVisual? Next;
-        public NodeVisual? TrueChild;
-        public NodeVisual? FalseChild;
-        public string? NextPortType;
-        public string? TruePortType;
-        public string? FalsePortType;
-        public bool IsRoot;
+        public Border Border { get; set; } = null!;
+        public NodeCategory Category { get; set; }
+        public FrameworkElement InputPort { get; set; } = null!;
+        public FrameworkElement? OutputPort { get; set; }
+        public FrameworkElement? OutputPortTrue { get; set; }
+        public FrameworkElement? OutputPortFalse { get; set; }
 
-        public List<FrameworkElement> DynamicOutputPorts = [];
-        public List<string> DynamicPortTypes = [];
-        public List<NodeVisual?> DynamicChildren = [];
+        public List<FrameworkElement> DynamicOutputPorts { get; set; } = [];
+        public List<string> DynamicPortTypes { get; set; } = [];
+        public List<NodeVisual?> DynamicChildren { get; set; } = [];
 
+        public NodeVisual? Next { get; set; }
+        public NodeVisual? TrueChild { get; set; }
+        public NodeVisual? FalseChild { get; set; }
+        public string? NextPortType { get; set; }
+        public string? TruePortType { get; set; }
+        public string? FalsePortType { get; set; }
+
+        public bool IsRoot { get; set; }
+        public Type? NodeType { get; set; }
+        public NodeConfiguration? Configuration { get; set; }
         public ActionNodeBase? ActionNode { get; set; }
-        public Type? NodeType;
-        public NodeConfiguration? Configuration;
+        public NodeRuntimeState RuntimeState { get; set; }
 
-        public NodeRuntimeState RuntimeState;
+        public bool HasPort(FrameworkElement p) =>
+            p == InputPort ||
+            p == OutputPort ||
+            p == OutputPortTrue ||
+            p == OutputPortFalse ||
+            DynamicOutputPorts.Contains(p);
 
-        public bool HasPort(FrameworkElement p)
-        {
-            return p == InputPort ||
-                   p == OutputPort ||
-                   p == OutputPortTrue ||
-                   p == OutputPortFalse ||
-                   DynamicOutputPorts.Contains(p);
-        }
-
-        public Point GetPortCenter(FrameworkElement p, Canvas canvas)
-        {
-            return p.TranslatePoint(new Point(p.ActualWidth / 2, p.ActualHeight / 2), canvas);
-        }
+        public Point GetPortCenter(FrameworkElement p, Canvas canvas) =>
+            p.TranslatePoint(new Point(p.ActualWidth / 2, p.ActualHeight / 2), canvas);
     }
 
     public class NodeConfiguration
