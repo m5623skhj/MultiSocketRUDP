@@ -12,7 +12,7 @@ protected:
 
 	RUDPFlowController fc;
 
-	void GrowCwndTo(const uint16_t targetCwnd)
+	void GrowCwndTo(const uint8_t targetCwnd)
 	{
 		PacketSequence seq = fc.GetLastAckedSequence() + 1;
 		while (fc.GetCwnd() < targetCwnd)
@@ -115,11 +115,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion
 }
 
 // ------------------------------------------------------------
-// cwnd는 MAX_CWND(1024)를 초과하지 않아야 한다
+// cwnd는 MAX_CWND(255)를 초과하지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 {
-	GrowCwndTo(1024);
+	GrowCwndTo(255);
 	const uint16_t cwndAtMax = fc.GetCwnd();
 
 	fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
