@@ -1,6 +1,6 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
-using System.Windows;
+﻿using System.Windows;
 using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.Graph;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -9,400 +9,42 @@ namespace MultiSocketRUDPBotTester
         private ActionGraph BuildActionGraph()
         {
             var graph = new ActionGraph { Name = "Bot Action Graph" };
-            var nodeMapping = new Dictionary<NodeVisual, ActionNodeBase>();
+            var mapping = new Dictionary<NodeVisual, ActionNodeBase>();
+            var registry = new NodeBuilderRegistry(EvaluateConditionWithAccessors);
 
             foreach (var visual in allNodes)
             {
                 try
                 {
-                    ActionNodeBase? actionNode = null;
-
-                    if (visual.IsRoot)
-                    {
-                        actionNode = visual.ActionNode!;
-                    }
-                    else if (visual.NodeType == typeof(SendPacketNode))
-                    {
-                        var packetId = visual.Configuration?.PacketId ?? PacketId.InvalidPacketId;
-                        if (packetId == PacketId.InvalidPacketId)
-                        {
-                            throw new InvalidOperationException(
-                                $"SendPacketNode '{visual.NodeType.Name}' requires a valid PacketId. " +
-                                "Please double-click the node to configure it.");
-                        }
-
-                        actionNode = new SendPacketNode
-                        {
-                            Name = visual.NodeType.Name,
-                            PacketId = packetId,
-                            PacketBuilder = (_) => new NetBuffer()
-                        };
-                    }
-                    else if (visual.NodeType == typeof(DelayNode))
-                    {
-                        actionNode = new DelayNode
-                        {
-                            Name = visual.NodeType.Name,
-                            DelayMilliseconds = visual.Configuration?.IntValue ?? 1000
-                        };
-                    }
-                    else if (visual.NodeType == typeof(RandomDelayNode))
-                    {
-                        var minDelay = visual.Configuration?.Properties.GetValueOrDefault("MinDelay") as int? ?? 500;
-                        var maxDelay = visual.Configuration?.Properties.GetValueOrDefault("MaxDelay") as int? ?? 2000;
-
-                        actionNode = new RandomDelayNode
-                        {
-                            Name = visual.NodeType.Name,
-                            MinDelayMilliseconds = minDelay,
-                            MaxDelayMilliseconds = maxDelay
-                        };
-                    }
-                    else if (visual.NodeType == typeof(DisconnectNode))
-                    {
-                        actionNode = new DisconnectNode
-                        {
-                            Name = visual.NodeType.Name,
-                            Reason = visual.Configuration?.StringValue ?? "User requested disconnect"
-                        };
-                    }
-                    else if (visual.NodeType == typeof(WaitForPacketNode))
-                    {
-                        var packetId = visual.Configuration?.PacketId ?? PacketId.InvalidPacketId;
-                        var timeout = visual.Configuration?.IntValue ?? 5000;
-
-                        if (packetId == PacketId.InvalidPacketId)
-                        {
-                            throw new InvalidOperationException(
-                                "WaitForPacketNode requires a valid PacketId. " +
-                                "Please double-click the node to configure it.");
-                        }
-
-                        actionNode = new WaitForPacketNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ExpectedPacketId = packetId,
-                            TimeoutMilliseconds = timeout
-                        };
-                    }
-                    else if (visual.NodeType == typeof(SetVariableNode))
-                    {
-                        var variableName = visual.Configuration?.Properties.GetValueOrDefault("VariableName")?.ToString() ?? "value";
-                        var valueType = visual.Configuration?.Properties.GetValueOrDefault("ValueType")?.ToString() ?? "int";
-                        var value = visual.Configuration?.Properties.GetValueOrDefault("Value")?.ToString() ?? "0";
-
-                        actionNode = new SetVariableNode
-                        {
-                            Name = visual.NodeType.Name,
-                            VariableName = variableName,
-                            ValueType = valueType,
-                            StringValue = value
-                        };
-                    }
-                    else if (visual.NodeType == typeof(GetVariableNode))
-                    {
-                        var variableName = visual.Configuration?.StringValue ?? "value";
-
-                        actionNode = new GetVariableNode
-                        {
-                            Name = visual.NodeType.Name,
-                            VariableName = variableName
-                        };
-                    }
-                    else if (visual.NodeType == typeof(LogNode))
-                    {
-                        var logMessage = visual.Configuration?.StringValue ?? "No log message configured";
-                        actionNode = new LogNode
-                        {
-                            Name = visual.NodeType.Name,
-                            MessageBuilder = (client, buffer) =>
-                            {
-                                var message = logMessage;
-                                message = message.Replace("{sessionId}", client.GetSessionId().ToString());
-                                message = message.Replace("{isConnected}", client.IsConnected().ToString());
-
-                                if (buffer != null)
-                                {
-                                    message = message.Replace("{packetSize}", buffer.GetLength().ToString());
-                                }
-
-                                return message;
-                            }
-                        };
-                    }
-                    else if (visual.NodeType == typeof(CustomActionNode))
-                    {
-                        actionNode = new CustomActionNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ActionHandler = (_, _) =>
-                            {
-                                Serilog.Log.Information($"Custom action: {visual.NodeType.Name}");
-                            }
-                        };
-                    }
-                    else if (visual.NodeType == typeof(ConditionalNode))
-                    {
-                        var leftType = visual.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString();
-                        var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString();
-                        var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString();
-                        var rightType = visual.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString();
-                        var right = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString();
-
-                        if (left != null && op != null && right != null)
-                        {
-                            actionNode = new ConditionalNode
-                            {
-                                Name = visual.NodeType.Name,
-                                Condition = ctx => EvaluateConditionWithAccessors(ctx, leftType, left, op, rightType, right)
-                            };
-                        }
-                    }
-                    else if (visual.NodeType == typeof(LoopNode))
-                    {
-                        var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
-                        var loopId = Guid.NewGuid().ToString();
-
-                        actionNode = new LoopNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ContinueCondition = ctx =>
-                            {
-                                var key = $"__loop_{loopId}_index";
-                                var i = ctx.GetOrDefault(key, 0);
-                                ctx.Set(key, i + 1);
-                                return i < count;
-                            },
-                            MaxIterations = count
-                        };
-                    }
-                    else if (visual.NodeType == typeof(RepeatTimerNode))
-                    {
-                        var interval = visual.Configuration?.IntValue ?? 1000;
-                        var repeatCount = visual.Configuration?.Properties.GetValueOrDefault("RepeatCount") as int? ?? 10;
-
-                        actionNode = new RepeatTimerNode
-                        {
-                            Name = visual.NodeType.Name,
-                            IntervalMilliseconds = interval,
-                            RepeatCount = repeatCount
-                        };
-                    }
-                    else if (visual.NodeType == typeof(PacketParserNode))
-                    {
-                        var setterMethod = visual.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
-
-                        if (!string.IsNullOrEmpty(setterMethod))
-                        {
-                            actionNode = new PacketParserNode
-                            {
-                                Name = visual.NodeType.Name,
-                                SetterMethodName = setterMethod
-                            };
-                        }
-                    }
-                    else if (visual.NodeType == typeof(RandomChoiceNode))
-                    {
-                        actionNode = new RandomChoiceNode
-                        {
-                            Name = visual.NodeType.Name,
-                            Choices = []
-                        };
-
-                        for (var i = 0; i < visual.DynamicChildren.Count; i++)
-                        {
-                            var childVisual = visual.DynamicChildren[i];
-                            if (childVisual != null && nodeMapping.TryGetValue(childVisual, out var childNode))
-                            {
-                                ((RandomChoiceNode)actionNode).Choices.Add(new ChoiceOption
-                                {
-                                    Name = $"Choice {i + 1}",
-                                    Weight = 1,
-                                    Node = childNode
-                                });
-                            }
-                        }
-                    }
-                    else if (visual.NodeType == typeof(AssertNode))
-                    {
-                        var errorMessage = visual.Configuration?.StringValue ?? "Assertion failed";
-                        var stopOnFailure = visual.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true;
-
-                        actionNode = new AssertNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ErrorMessage = errorMessage,
-                            StopOnFailure = stopOnFailure,
-                            Condition = _ => true
-                        };
-                    }
-                    else if (visual.NodeType == typeof(RetryNode))
-                    {
-                        var maxRetries = visual.Configuration?.Properties.GetValueOrDefault("MaxRetries") as int? ?? 3;
-                        var retryDelay = visual.Configuration?.Properties.GetValueOrDefault("RetryDelay") as int? ?? 1000;
-                        var exponentialBackoff = visual.Configuration?.Properties.GetValueOrDefault("ExponentialBackoff") as bool? ?? false;
-
-                        actionNode = new RetryNode
-                        {
-                            Name = visual.NodeType.Name,
-                            MaxRetries = maxRetries,
-                            RetryDelayMilliseconds = retryDelay,
-                            UseExponentialBackoff = exponentialBackoff
-                        };
-                    }
-                    else if (visual.NodeType != null)
-                    {
-                        actionNode = new CustomActionNode
-                        {
-                            Name = visual.NodeType.Name,
-                            ActionHandler = (_, _) =>
-                            {
-                                Serilog.Log.Information($"Executing node: {visual.NodeType.Name}");
-                            }
-                        };
-                    }
+                    var actionNode = visual.IsRoot
+                        ? visual.ActionNode!
+                        : registry.TryBuild(visual);
 
                     if (actionNode == null)
                     {
-                        Serilog.Log.Warning($"Node {visual.NodeType?.Name} could not be created, skipping");
+                        Serilog.Log.Warning("Node {NodeType} could not be created, skipping", visual.NodeType?.Name);
                         continue;
                     }
 
-                    nodeMapping[visual] = actionNode;
+                    mapping[visual] = actionNode;
                     visual.ActionNode = actionNode;
                 }
                 catch (Exception ex)
                 {
-                    Serilog.Log.Error($"Error creating action node for {visual.NodeType?.Name}: {ex.Message}");
                     throw new Exception($"Failed to create node '{visual.NodeType?.Name}': {ex.Message}");
                 }
             }
 
             foreach (var visual in allNodes)
             {
-                if (!nodeMapping.TryGetValue(visual, out var actionNode))
+                if (!mapping.TryGetValue(visual, out var actionNode))
                 {
-                    Serilog.Log.Warning("Visual node not in mapping, skipping connections");
+                    Serilog.Log.Warning("Visual not in mapping, skipping connections");
                     continue;
                 }
 
-                if (visual.Next != null)
-                {
-                    if (nodeMapping.TryGetValue(visual.Next, out var nextNode))
-                    {
-                        actionNode.NextNodes.Add(nextNode);
-                    }
-                    else
-                    {
-                        Serilog.Log.Warning($"Next node not found in mapping for {actionNode.Name}");
-                    }
-                }
-
-                switch (actionNode)
-                {
-                    case WaitForPacketNode waitNode:
-                        {
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var timeoutNode))
-                            {
-                                waitNode.TimeoutNodes.Add(timeoutNode);
-                            }
-                            break;
-                        }
-
-                    case RandomChoiceNode randomChoiceNode:
-                        {
-                            if (visual.Next != null && nodeMapping.TryGetValue(visual.Next, out var choice1))
-                            {
-                                randomChoiceNode.Choices.Add(new ChoiceOption
-                                {
-                                    Name = "Choice 1",
-                                    Weight = 1,
-                                    Node = choice1
-                                });
-                            }
-
-                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var choice2))
-                            {
-                                randomChoiceNode.Choices.Add(new ChoiceOption
-                                {
-                                    Name = "Choice 2",
-                                    Weight = 1,
-                                    Node = choice2
-                                });
-                            }
-
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var choice3))
-                            {
-                                randomChoiceNode.Choices.Add(new ChoiceOption
-                                {
-                                    Name = "Choice 3",
-                                    Weight = 1,
-                                    Node = choice3
-                                });
-                            }
-                            break;
-                        }
-
-                    case AssertNode assertNode:
-                        {
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var failureNode))
-                            {
-                                assertNode.FailureNodes.Add(failureNode);
-                            }
-                            break;
-                        }
-
-                    case RetryNode retryNode:
-                        {
-                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
-                            {
-                                retryNode.RetryBody.Add(bodyNode);
-                            }
-
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var failureNode))
-                            {
-                                retryNode.FailureNodes.Add(failureNode);
-                            }
-                            break;
-                        }
-
-                    case ConditionalNode conditionalNode:
-                        {
-                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var trueNode))
-                            {
-                                conditionalNode.TrueNodes.Add(trueNode);
-                            }
-
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var falseNode))
-                            {
-                                conditionalNode.FalseNodes.Add(falseNode);
-                            }
-                            break;
-                        }
-
-                    case LoopNode loopNode:
-                        {
-                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
-                            {
-                                loopNode.LoopBody.Add(bodyNode);
-                            }
-
-                            if (visual.FalseChild != null && nodeMapping.TryGetValue(visual.FalseChild, out var exitNode))
-                            {
-                                loopNode.ExitNodes.Add(exitNode);
-                            }
-                            break;
-                        }
-
-                    case RepeatTimerNode repeatNode:
-                        {
-                            if (visual.TrueChild != null && nodeMapping.TryGetValue(visual.TrueChild, out var bodyNode))
-                            {
-                                repeatNode.RepeatBody.Add(bodyNode);
-                            }
-                            break;
-                        }
-                }
+                ConnectNext(visual, actionNode, mapping);
+                ConnectBranches(visual, actionNode, mapping);
 
                 if (actionNode.Trigger != null)
                 {
@@ -410,8 +52,110 @@ namespace MultiSocketRUDPBotTester
                 }
             }
 
-            Serilog.Log.Information($"Graph built with {nodeMapping.Count} nodes");
+            Serilog.Log.Information("Graph built with {Count} nodes", mapping.Count);
             return graph;
+        }
+
+        private static void ConnectNext(
+            NodeVisual visual,
+            ActionNodeBase actionNode,
+            Dictionary<NodeVisual, ActionNodeBase> mapping)
+        {
+            if (visual.Next == null)
+            {
+                return;
+            }
+
+            if (mapping.TryGetValue(visual.Next, out var nextNode))
+            {
+                actionNode.NextNodes.Add(nextNode);
+            }
+            else
+            {
+                Serilog.Log.Warning("Next node not found in mapping for {Name}", actionNode.Name);
+            }
+        }
+
+        private static void ConnectBranches(
+            NodeVisual visual,
+            ActionNodeBase actionNode,
+            Dictionary<NodeVisual, ActionNodeBase> mapping)
+        {
+            switch (actionNode)
+            {
+                case ConditionalNode conditional:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var trueNode))
+                    {
+                        conditional.TrueNodes.Add(trueNode);
+                    }
+
+                    if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var falseNode))
+                    {
+                        conditional.FalseNodes.Add(falseNode);
+                    }
+                    break;
+
+                case LoopNode loop:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var loopBody))
+                    {
+                        loop.LoopBody.Add(loopBody);
+                    }
+
+                    if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var exitNode))
+                    {
+                        loop.ExitNodes.Add(exitNode);
+                    }
+                    break;
+
+                case RepeatTimerNode repeat:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var repeatBody))
+                    {
+                        repeat.RepeatBody.Add(repeatBody);
+                    }
+                    break;
+
+                case WaitForPacketNode wait:
+                    if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var timeoutNode))
+                    {
+                        wait.TimeoutNodes.Add(timeoutNode);
+                    }
+                    break;
+
+                case AssertNode assert:
+                    if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var failNode))
+                    {
+                        assert.FailureNodes.Add(failNode);
+                    }
+                    break;
+
+                case RetryNode retry:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var retryBody))
+                    {
+                        retry.RetryBody.Add(retryBody);
+                    }
+
+                    if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var retryFail))
+                    {
+                        retry.FailureNodes.Add(retryFail);
+                    }
+                    break;
+
+                case RandomChoiceNode randomChoice:
+                    for (var i = 0; i < visual.DynamicChildren.Count; i++)
+                    {
+                        var childVisual = visual.DynamicChildren[i];
+                        if (childVisual != null && mapping.TryGetValue(childVisual, out var choiceNode))
+                        {
+                            randomChoice.Choices.Add(new ChoiceOption
+                            {
+                                Name = $"Choice {i + 1}",
+                                Weight = 1,
+                                Node = choiceNode
+                            });
+                        }
+                    }
+                    break;
+            }
         }
     }
 }
