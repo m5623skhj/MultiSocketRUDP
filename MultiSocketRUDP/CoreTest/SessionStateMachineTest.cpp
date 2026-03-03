@@ -12,16 +12,16 @@
 //	   ∪
 //   [RESERVED] 式式TryAbortReserved() 式式式式式式式式式式式式式式
 //	   弛										 弛
-//	   弛 TryTransitionToConnected()			  弛
+//	   弛 TryTransitionToConnected()			 弛
 //	   ∪										 ∪
 //   [CONNECTED] 式式TryTransitionToReleasing()式式Ⅱ[RELEASING]
 //	   弛										 弛
 //	   戌式式TryTransitionToReleasing()式式式式式式式式式式式式式
-//												  弛
-//										   SetDisconnected()
-//												  弛
-//												  ∪
-//											[DISCONNECTED]
+//												 弛
+//										  SetDisconnected()
+//												 弛
+//												 ∪
+//										   [DISCONNECTED]
 // ============================================================
 
 class SessionStateMachineTest : public ::testing::Test
