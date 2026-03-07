@@ -5,6 +5,8 @@
 struct SendPacketInfo;
 class RUDPSession;
 
+class RUDPSession;
+
 class ICore
 {
 public:

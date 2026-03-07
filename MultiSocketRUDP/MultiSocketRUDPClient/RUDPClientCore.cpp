@@ -366,6 +366,8 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		std::scoped_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.erase(packetSequence);
 	}
+
+	TryFlushPendingQueue();
 }
 
 void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence, const PACKET_TYPE packetType)
@@ -513,28 +515,61 @@ void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 
 void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isCorePacket)
 {
+	PacketCryptoHelper::EncodePacket(
+		buffer,
+		inSendPacketSequence,
+		PACKET_DIRECTION::CLIENT_TO_SERVER,
+		sessionSalt,
+		SESSION_SALT_SIZE,
+		sessionKeyHandle,
+		isCorePacket
+	);
+
+	if (not isCorePacket)
+	{
+		if (const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed); window > 0)
+		{
+			BYTE outstanding;
+			{
+				std::scoped_lock lock(sendPacketInfoMapLock);
+				outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
+			}
+
+			if (outstanding >= window)
+			{
+				std::scoped_lock lock(pendingPacketQueueLock);
+				pendingPacketQueue.push({ inSendPacketSequence, &buffer });
+				return;
+			}
+		}
+	}
+
+	RegisterSendPacketInfo(buffer, inSendPacketSequence);
+}
+
+void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
+{
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		sendBufferQueue.Enqueue(sendPacketInfo.buffer);
+	}
+	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+}
+
+void RUDPClientCore::RegisterSendPacketInfo(NetBuffer& buffer, const PacketSequence inSendPacketSequence)
+{
 	auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		LOG_ERROR("SendPacketInfo is nullptr in RUDPSession::SendPacket()");
+		LOG_ERROR("SendPacketInfo is nullptr in RegisterSendPacketInfo()");
 		NetBuffer::Free(&buffer);
 		return;
 	}
 
 	sendPacketInfo->Initialize(&buffer, inSendPacketSequence);
 	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
-	if (sendPacketInfo->retransmissionCount == 0)
-	{
-		PacketCryptoHelper::EncodePacket(
-			buffer,
-			inSendPacketSequence,
-			PACKET_DIRECTION::CLIENT_TO_SERVER,
-			sessionSalt,
-			SESSION_SALT_SIZE,
-			sessionKeyHandle,
-			isCorePacket
-		);
 
+	{
 		std::unique_lock lock(sendPacketInfoMapLock);
 		sendPacketInfoMap.insert({ inSendPacketSequence, sendPacketInfo });
 	}
@@ -547,13 +582,30 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 }
 
-void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
+void RUDPClientCore::TryFlushPendingQueue()
 {
+	const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
+	if (window == 0)
 	{
-		std::scoped_lock lock(sendBufferQueueLock);
-		sendBufferQueue.Enqueue(sendPacketInfo.buffer);
+		return;
 	}
-	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+
+	std::scoped_lock pendingLock(pendingPacketQueueLock);
+	while (not pendingPacketQueue.empty())
+	{
+		{
+			std::scoped_lock infoLock(sendPacketInfoMapLock);
+			if (const auto outstanding = static_cast<BYTE>(sendPacketInfoMap.size()); outstanding >= window)
+			{
+				break;
+			}
+		}
+
+		auto [sequence, buffer] = pendingPacketQueue.top();
+		pendingPacketQueue.pop();
+
+		RegisterSendPacketInfo(*buffer, sequence);
+	}
 }
 
 WORD RUDPClientCore::GetPayloadLength(const NetBuffer& buffer)

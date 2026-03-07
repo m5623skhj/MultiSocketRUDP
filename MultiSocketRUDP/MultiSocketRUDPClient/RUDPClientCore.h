@@ -183,6 +183,8 @@ public:
 private:
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
+	void RegisterSendPacketInfo(NetBuffer& buffer, PacketSequence inSendPacketSequence);
+	void TryFlushPendingQueue();
 	static inline WORD GetPayloadLength(const NetBuffer& buffer);
 	bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath);
 	bool ReadClientCoreOptionFile(const std::wstring& optionFilePath);
@@ -191,6 +193,20 @@ private:
 private:
 	CListBaseQueue<NetBuffer*> sendBufferQueue;
 	std::mutex sendBufferQueueLock;
+
+	struct PendingPacketInfo
+	{
+		PacketSequence sequence;
+		NetBuffer* buffer;
+
+		bool operator>(const PendingPacketInfo& other) const
+		{
+			return sequence > other.sequence;
+		}
+	};
+
+	std::priority_queue<PendingPacketInfo, std::vector<PendingPacketInfo>, std::greater<PendingPacketInfo>> pendingPacketQueue;
+	std::mutex pendingPacketQueueLock;
 
 private:
 	PacketRetransmissionCount maxPacketRetransmissionCount{};
