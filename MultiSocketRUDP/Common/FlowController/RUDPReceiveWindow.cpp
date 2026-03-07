@@ -28,27 +28,37 @@ void RUDPReceiveWindow::MarkReceived(const PacketSequence inSequence) noexcept
 	}
 
 	const int32_t offset = SeqDiff(inSequence, windowStart);
-	const size_t idx = (startIndex + static_cast<size_t>(offset)) % windowSize;
-	receivedFlags[idx] = 1;
+	if (const size_t idx = (startIndex + static_cast<size_t>(offset)) % windowSize; not receivedFlags[idx])
+	{
+		receivedFlags[idx] = 1;
+		++usedCount;
+	}
 
 	while (receivedFlags[startIndex])
 	{
 		receivedFlags[startIndex] = 0;
 		startIndex = (startIndex + 1) % windowSize;
 		++windowStart;
+		--usedCount;
 	}
 }
 
 void RUDPReceiveWindow::Reset(const PacketSequence startSequence) noexcept  
 {  
-   windowStart = startSequence;  
-   startIndex = 0;  
-   std::ranges::fill(receivedFlags, 0);  
+   windowStart = startSequence;
+   startIndex = 0;
+   usedCount = 0;
+   std::ranges::fill(receivedFlags, 0);
 }
 
 PacketSequence RUDPReceiveWindow::GetWindowEnd() const noexcept
 {
 	return windowStart + windowSize;
+}
+
+BYTE RUDPReceiveWindow::GetAdvertiseWindow() const noexcept
+{
+	return windowSize - usedCount;
 }
 
 int32_t RUDPReceiveWindow::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept

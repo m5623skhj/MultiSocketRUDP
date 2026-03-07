@@ -27,6 +27,8 @@ public:
 	PacketSequence GetWindowEnd() const noexcept;
 	[[nodiscard]]
 	BYTE GetWindowSize() const noexcept { return windowSize; }
+	[[nodiscard]]
+	BYTE GetAdvertiseWindow() const noexcept;
 
 private:
 	static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
@@ -35,5 +37,6 @@ private:
 	PacketSequence windowStart{};
 	BYTE windowSize{};
 	std::vector<uint8_t> receivedFlags;
+	BYTE usedCount{};
 	size_t startIndex{};
 };

@@ -72,6 +72,12 @@ public:
 		receiveWindow.Reset(recvStartSequence);
 	}
 
+	[[nodiscard]]
+	BYTE GetAdvertisableWindow() const noexcept
+	{
+		return receiveWindow.GetAdvertiseWindow();
+	}
+
 private:
 	RUDPFlowController flowController;
 	RUDPReceiveWindow receiveWindow;

@@ -39,7 +39,7 @@ private:
 	bool inRecovery{};
 
 	static constexpr uint8_t INITIAL_CWND = 4;
-	static constexpr uint8_t MAX_CWND = 255;
+	static constexpr uint8_t MAX_CWND = 250;
 
 #ifdef _DEBUG
 	uint8_t duplicateReplyCount{};
