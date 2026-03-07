@@ -24,9 +24,13 @@ void ServerAliveChecker::StopServerAliveCheck()
 	}
 
 	isStopped = true;
-	if (serverAliveCheckThread.joinable())
+	if (serverAliveCheckThread.joinable() && serverAliveCheckThread.get_id() != std::this_thread::get_id())
 	{
 		serverAliveCheckThread.join();
+	}
+	else
+	{
+		serverAliveCheckThread.detach();
 	}
 }
 
