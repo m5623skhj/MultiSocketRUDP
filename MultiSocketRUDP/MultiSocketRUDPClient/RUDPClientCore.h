@@ -165,6 +165,8 @@ private:
 	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHoldingQueue;
 	std::mutex recvPacketHoldingQueueLock;
 
+	std::atomic<BYTE> remoteAdvertisedWindow{ 1 };
+	std::atomic<PacketSequence> lastAckedSequence{ 0 };
 	PacketSequence nextRecvPacketSequence{ 1 };
 #pragma endregion RUDP
 

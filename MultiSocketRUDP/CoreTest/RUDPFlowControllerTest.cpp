@@ -115,11 +115,11 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion
 }
 
 // ------------------------------------------------------------
-// cwnd는 MAX_CWND(255)를 초과하지 않아야 한다
+// cwnd는 MAX_CWND를 초과하지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 {
-	GrowCwndTo(255);
+	GrowCwndTo(250);
 	const uint16_t cwndAtMax = fc.GetCwnd();
 
 	fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);

@@ -351,6 +351,11 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		return;
 	}
 
+	BYTE remoteWindow;
+	recvPacket >> remoteWindow;
+	remoteAdvertisedWindow.store(remoteWindow, std::memory_order_relaxed);
+	lastAckedSequence.store(packetSequence, std::memory_order_relaxed);
+
 	if (packetSequence == 0)
 	{
 		isConnected = true;
@@ -455,6 +460,9 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 
 void RUDPClientCore::SendPacket(OUT IPacket& packet)
 {
+	const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
+	const auto outstanding = static_cast<BYTE>(lastSendPacketSequence - lastAckedSequence.load(std::memory_order_relaxed));
+
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{

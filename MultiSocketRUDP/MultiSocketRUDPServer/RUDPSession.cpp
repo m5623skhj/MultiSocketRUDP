@@ -123,7 +123,7 @@ void RUDPSession::OnConnected(const SessionIdType inSessionId)
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType, const bool isCorePacket)
 {
-	auto sendPacketInfo = sendPacketInfoPool->Alloc();
+	const auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
 		LOG_ERROR("SendPacketInfo is nullptr in RUDPSession::SendPacket()");
@@ -343,7 +343,8 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	NetBuffer& buffer = *NetBuffer::Alloc();
 
 	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
-	buffer << packetType << recvPacketSequence;
+	const BYTE advertiseWindow = flowManager.GetAdvertisableWindow();
+	buffer << packetType << recvPacketSequence << advertiseWindow;
 
 	std::ignore = SendPacket(buffer, recvPacketSequence, true, true);
 }
