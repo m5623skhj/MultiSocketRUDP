@@ -8,7 +8,7 @@ SessionSendContext::SessionSendContext()
 	ZeroMemory(rioSendBuffer, sizeof(rioSendBuffer));
 }
 
-bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
+bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, unsigned short pendingQueueCapacity)
 {
 	const RIO_BUFFERID bufferId = rioFunctionTable.RIORegisterBuffer(rioSendBuffer, MAX_SEND_BUFFER_SIZE);
 	if (bufferId == RIO_INVALID_BUFFERID)
@@ -17,6 +17,7 @@ bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 	}
 
 	sendBufferId = bufferId;
+	pendingPacketQueue.Resize(pendingQueueCapacity);
 	return true;
 }
 
@@ -40,11 +41,18 @@ void SessionSendContext::Reset()
 		reservedSendPacketInfo = nullptr;
 	}
 
-	std::scoped_lock lock(sendPacketInfoQueueLock);
-	while (not sendPacketInfoQueue.empty())
 	{
-		SendPacketInfo::Free(sendPacketInfoQueue.front());
-		sendPacketInfoQueue.pop();
+		std::scoped_lock lock(sendPacketInfoQueueLock);
+		while (not sendPacketInfoQueue.empty())
+		{
+			SendPacketInfo::Free(sendPacketInfoQueue.front());
+			sendPacketInfoQueue.pop();
+		}
+	}
+
+	{
+		std::scoped_lock lock(pendingPacketQueueLock);
+		ClearPendingQueue();
 	}
 }
 
@@ -179,4 +187,48 @@ PacketSequence SessionSendContext::GetLastSendPacketSequence() const
 PacketSequence SessionSendContext::IncrementLastSendPacketSequence()
 {
 	return ++lastSendPacketSequence;
+}
+
+void SessionSendContext::InitializePendingQueue(const unsigned short capacity)
+{
+	pendingPacketQueue.Resize(capacity);
+}
+
+std::mutex& SessionSendContext::GetPendingQueueLock()
+{
+	return pendingPacketQueueLock;
+}
+
+bool SessionSendContext::IsPendingQueueEmpty() const noexcept
+{
+	return pendingPacketQueue.IsEmpty();
+}
+
+bool SessionSendContext::IsPendingQueueFull() const noexcept
+{
+	return pendingPacketQueue.IsFull();
+}
+
+const std::pair<PacketSequence, NetBuffer*>& SessionSendContext::PendingQueueFront() const
+{
+	return pendingPacketQueue.Front();
+}
+
+bool SessionSendContext::PushToPendingQueue(const PacketSequence sequence, NetBuffer* buffer)
+{
+	return pendingPacketQueue.Push({ sequence, buffer });
+}
+
+bool SessionSendContext::PopFromPendingQueue(std::pair<PacketSequence, NetBuffer*>& item)
+{
+	return pendingPacketQueue.Pop(item);
+}
+
+void SessionSendContext::ClearPendingQueue()
+{
+	std::pair<PacketSequence, NetBuffer*> item;
+	while (pendingPacketQueue.Pop(item))
+	{
+		NetBuffer::Free(item.second);
+	}
 }

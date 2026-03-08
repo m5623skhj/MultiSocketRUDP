@@ -22,7 +22,14 @@ RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 
 bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ)
 {
-	return rioContext.Initialize(rioFunctionTable, rioRecvCQ, rioSendCQ, socketContext.GetSocket(), sessionId, this);
+	return rioContext.Initialize(
+		rioFunctionTable, 
+		rioRecvCQ, 
+		rioSendCQ, 
+		socketContext.GetSocket(), 
+		sessionId, 
+		this,
+		maximumHoldingPacketQueueSize);
 }
 
 void RUDPSession::InitializeSession()
@@ -89,15 +96,11 @@ bool RUDPSession::SendPacket(IPacket& packet)
 		return false;
 	}
 
-	if (const PacketSequence nextSequence = rioContext.GetSendContext().GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
-	{
-		return false;
-	}
-
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("Buffer is nullptr in RUDPSession::SendPacket()");
+		DoDisconnect();
 		return false;
 	}
 
@@ -106,7 +109,13 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	*buffer << packetType << packetSequence << packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence, false, false);
+	if (not SendPacket(*buffer, packetSequence, false, false))
+	{
+		DoDisconnect();
+		return false;
+	}
+
+	return true;
 }
 
 ThreadIdType RUDPSession::GetThreadId() const
@@ -123,10 +132,36 @@ void RUDPSession::OnConnected(const SessionIdType inSessionId)
 
 bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType, const bool isCorePacket)
 {
+	if (not isReplyType)
+	{
+		std::scoped_lock lock(rioContext.GetSendContext().GetPendingQueueLock());
+
+		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(inSendPacketSequence))
+		{
+			if (not rioContext.GetSendContext().PushToPendingQueue(inSendPacketSequence, &buffer))
+			{
+				LOG_ERROR("Pending queue is full in RUDPSession::SendPacket()");
+				NetBuffer::Free(&buffer);
+				return false;
+			}
+
+			return true;
+		}
+	}
+
+	return SendPacketImmediate(buffer, inSendPacketSequence, isReplyType, isCorePacket);
+}
+
+bool RUDPSession::SendPacketImmediate(
+	NetBuffer& buffer, 
+	const PacketSequence inSendPacketSequence,
+	const bool isReplyType, 
+	const bool isCorePacket)
+{
 	const auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
-		LOG_ERROR("SendPacketInfo is nullptr in RUDPSession::SendPacket()");
+		LOG_ERROR("SendPacketInfo is nullptr in RUDPSession::SendPacketImmediate()");
 		NetBuffer::Free(&buffer);
 		return false;
 	}
@@ -166,6 +201,33 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 	return true;
 }
 
+void RUDPSession::TryFlushPendingQueue()
+{
+	std::vector<std::pair<PacketSequence, NetBuffer*>> sendBuffers;
+	{
+		std::scoped_lock lock(rioContext.GetSendContext().GetPendingQueueLock());
+		while (not rioContext.GetSendContext().IsPendingQueueEmpty())
+		{
+			if (const auto& [sequence, _] = rioContext.GetSendContext().PendingQueueFront(); not flowManager.CanSend(sequence))
+			{
+				break;
+			}
+
+			std::pair<PacketSequence, NetBuffer*> item;
+			rioContext.GetSendContext().PopFromPendingQueue(item);
+			sendBuffers.push_back(item);
+		}
+	}
+
+	for (auto& [packetSequence, buffer] : sendBuffers)
+	{
+		if (not SendPacketImmediate(*buffer, packetSequence, false, false))
+		{
+			DoDisconnect();
+		}
+	}
+}
+
 void RUDPSession::SendHeartbeatPacket()
 {
 	if (const PacketSequence nextSequence = rioContext.GetSendContext().GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
@@ -173,13 +235,22 @@ void RUDPSession::SendHeartbeatPacket()
 		return;
 	}
 
-	NetBuffer& buffer = *NetBuffer::Alloc();
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		LOG_ERROR("Buffer is nullptr in RUDPSession::SendHeartbeatPacket()");
+		DoDisconnect();
+		return;
+	}
 
 	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 	const PacketSequence packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
-	buffer << packetType << packetSequence;
+	*buffer << packetType << packetSequence;
 
-	std::ignore = SendPacket(buffer, packetSequence, false, true);
+	if (not SendPacket(*buffer, packetSequence, false, true))
+	{
+		DoDisconnect();
+	}
 }
 
 bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const
@@ -340,13 +411,22 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 
 void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 {
-	NetBuffer& buffer = *NetBuffer::Alloc();
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		LOG_ERROR("Buffer is nullptr in RUDPSession::SendReplyToClient()");
+		DoDisconnect();
+		return;
+	}
 
 	auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
 	const BYTE advertiseWindow = flowManager.GetAdvertisableWindow();
-	buffer << packetType << recvPacketSequence << advertiseWindow;
+	*buffer << packetType << recvPacketSequence << advertiseWindow;
 
-	std::ignore = SendPacket(buffer, recvPacketSequence, true, true);
+	if (not SendPacket(*buffer, recvPacketSequence, true, true))
+	{
+		DoDisconnect();
+	}
 }
 
 void RUDPSession::OnSendReply(NetBuffer& recvPacket)
@@ -367,6 +447,8 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 
 	flowManager.OnAckReceived(packetSequence);
 	core.EraseSendPacketInfo(sendPacketInfo, threadId);
+
+	TryFlushPendingQueue();
 }
 
 std::shared_mutex& RUDPSession::GetSocketMutex() const

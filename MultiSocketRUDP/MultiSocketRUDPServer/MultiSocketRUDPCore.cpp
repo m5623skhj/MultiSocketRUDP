@@ -168,7 +168,8 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 
 	if (sendPacketInfo->owner->nowInReleaseThread)
 	{
-		return false;
+		SendPacketInfo::Free(sendPacketInfo);
+		return true;
 	}
 
 	if (needAddRefCount)
@@ -515,7 +516,10 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 				continue;
 			}
 
-			SendPacket(sendPacketInfo, false);
+			if (not SendPacket(sendPacketInfo, false))
+			{
+				sendPacketInfo->owner->DoDisconnect();
+			}
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);

@@ -485,6 +485,7 @@ void RUDPClientCore::Disconnect()
 		LOG_ERROR("Buffer is nullptr in RUDPSession::Disconnect()");
 		return;
 	}
+
 	constexpr auto packetType = PACKET_TYPE::DISCONNECT_TYPE;
 	constexpr PacketSequence packetSequence = 0;
 	*buffer << packetType;
