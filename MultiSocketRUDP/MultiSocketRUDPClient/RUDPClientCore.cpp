@@ -462,9 +462,6 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 
 void RUDPClientCore::SendPacket(OUT IPacket& packet)
 {
-	const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
-	const auto outstanding = static_cast<BYTE>(lastSendPacketSequence - lastAckedSequence.load(std::memory_order_relaxed));
-
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
