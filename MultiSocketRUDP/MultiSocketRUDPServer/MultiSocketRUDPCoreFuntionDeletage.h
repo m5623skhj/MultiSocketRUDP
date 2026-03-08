@@ -41,7 +41,7 @@ private:
     }
 
 private:
-    static void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
+    static void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);
 	static RUDPSession* AcquireSession();
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
     static void DisconnectSession(SessionIdType sessionId);

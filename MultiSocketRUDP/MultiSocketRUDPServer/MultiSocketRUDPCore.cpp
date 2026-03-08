@@ -56,11 +56,12 @@ namespace
 	}
 }
 
-MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName)
+MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName
+	, std::wstring&& inSessionBrokerCertSubjectName)
 	: sessionBrokerCertStoreName(std::move(inSessionBrokerCertStoreName))
 	, sessionBrokerCertSubjectName(std::move(inSessionBrokerCertSubjectName))
+	, recvIOCompletedContextPool(2, false)
 	, contextPool(2, false)
-	, sessionDelegate()
 {
 }
 
@@ -244,9 +245,23 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 	SetEvent(sessionReleaseEventHandle);
 }
 
-void MultiSocketRUDPCore::EnqueueContextResult(IOContext* contextResult,const BYTE threadId)
+void MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, const BYTE threadId)
 {
-	ioCompletedContexts[threadId].Enqueue(contextResult);
+	if (contextResult == nullptr)
+	{
+		LOG_ERROR("ContextResult is nullptr in EnqueueContextResult()");
+		return;
+	}
+
+	const auto recvIOContext = recvIOCompletedContextPool.Alloc();
+	if (recvIOContext == nullptr)
+	{
+		LOG_ERROR("recvIOContext is nullptr in EnqueueContextResult()");
+		DisconnectSession(contextResult->ownerSessionId);
+	}
+
+	recvIOContext->InitContext(contextResult->session, contextResult->clientAddrBuffer);
+	recvIOCompletedContexts[threadId].Enqueue(recvIOContext);
 	ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr);
 }
 
@@ -305,12 +320,12 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	recvLogicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	sessionReleaseStopEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	sessionReleaseEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	ioCompletedContexts.reserve(numOfWorkerThread);
+	recvIOCompletedContexts.reserve(numOfWorkerThread);
 
 	Ticker::GetInstance().Start(timerTickMs);
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
-		ioCompletedContexts.emplace_back();
+		recvIOCompletedContexts.emplace_back();
 
 		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
 		sendPacketInfoList.emplace_back();
@@ -620,10 +635,10 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult
 
 void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 {
-	while (ioCompletedContexts[threadId].GetRestSize() > 0)
+	while (recvIOCompletedContexts[threadId].GetRestSize() > 0)
 	{
-		IOContext* context = nullptr;
-		if (ioCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
+		RecvIOCompletedContext* context = nullptr;
+		if (recvIOCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
 		{
 			continue;
 		}
@@ -656,5 +671,6 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		{
 			context->session->nowInProcessingRecvPacket = false;
 		}
+		recvIOCompletedContextPool.Free(context);
 	}
 }

@@ -69,7 +69,7 @@ private:
 	void PushToDisconnectTargetSession(RUDPSession& session) override;
 
 private:
-	void EnqueueContextResult(IOContext* contextResult, BYTE threadId);
+	void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);
 
 private:
 	[[nodiscard]]
@@ -140,9 +140,10 @@ private:
 	HANDLE sessionReleaseEventHandle{};
 
 	// objects
-	std::vector<CListBaseQueue<IOContext*>> ioCompletedContexts;
+	std::vector<CListBaseQueue<RecvIOCompletedContext*>> recvIOCompletedContexts;
 	std::list<SessionIdType> releaseSessionIdList;
 	std::mutex releaseSessionIdListLock;
+	CTLSMemoryPool<RecvIOCompletedContext> recvIOCompletedContextPool;
 
 #pragma endregion thread
 

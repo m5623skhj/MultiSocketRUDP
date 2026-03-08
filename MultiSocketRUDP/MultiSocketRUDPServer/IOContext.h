@@ -22,3 +22,18 @@ struct IOContext : RIO_BUF
 	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
 	char localAddrBuffer[sizeof(SOCKADDR_INET)];
 };
+
+struct RecvIOCompletedContext
+{
+	RecvIOCompletedContext() = default;
+	~RecvIOCompletedContext() = default;
+
+	void InitContext(RUDPSession* inOwnerSession, const char* inClientAddrBuffer)
+	{
+		session = inOwnerSession;
+		memcpy(clientAddrBuffer, inClientAddrBuffer, sizeof(SOCKADDR_INET));
+	}
+
+	RUDPSession* session{};
+	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
+};
