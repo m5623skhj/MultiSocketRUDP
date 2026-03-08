@@ -3,7 +3,6 @@
 #include "../Common/etc/CoreType.h"
 
 struct SendPacketInfo;
-class RUDPSession;
 
 class RUDPSession;
 

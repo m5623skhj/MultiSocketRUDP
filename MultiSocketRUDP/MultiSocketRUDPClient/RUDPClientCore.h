@@ -183,6 +183,11 @@ public:
 private:
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket);
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
+	// ----------------------------------------
+	// @brief NetBuffer를 SendPacketInfo에 등록하고, 재전송 큐에 추가하며 실제 전송을 위해 sendBufferQueue에 Enqueue합니다.
+	// @param buffer 전송할 NetBuffer(이미 인코딩되어 있어야 함)
+	// @param inSendPacketSequence 패킷 시퀀스 번호
+	// ----------------------------------------
 	void RegisterSendPacketInfo(NetBuffer& buffer, PacketSequence inSendPacketSequence);
 	void TryFlushPendingQueue();
 	static inline WORD GetPayloadLength(const NetBuffer& buffer);
