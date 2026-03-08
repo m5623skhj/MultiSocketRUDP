@@ -62,8 +62,19 @@ private:
 	virtual void OnReleased() {}
 	[[nodiscard]]
 	bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	// ----------------------------------------
+	// @brief 보류 큐를 거치지 않고 패킷을 즉시 전송합니다.직접 RIO Send 작업을 예약합니다.
+	// @param buffer 전송할 NetBuffer.
+	// @param inSendPacketSequence 전송할 패킷의 시퀀스 번호.
+	// @param isReplyType 응답 패킷인지 여부.
+	// @param isCorePacket 코어 기능 관련 패킷인지 여부.
+	// @return RIO Send 작업이 성공적으로 예약되면 true, 아니면 false.
+	// ----------------------------------------
 	[[nodiscard]]
 	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	// ----------------------------------------
+	// @brief 플로우 제어에 의해 보류된 패킷들을 전송 가능한지 확인하고 전송을 시도합니다.
+	// ----------------------------------------
 	void TryFlushPendingQueue();
 
 	void SendHeartbeatPacket();
