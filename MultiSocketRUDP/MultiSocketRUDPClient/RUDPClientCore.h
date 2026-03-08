@@ -181,7 +181,15 @@ public:
 #endif
 
 private:
+	// ----------------------------------------
+	// @brief NetBuffer와 PacketSequence를 사용하여 SendPacketInfo를 할당, 초기화하고 전송 맵에 등록 후, 실제 전송 큐에 추가합니다.
+	// @param buffer NetBuffer(이미 인코딩된 상태)
+	// @param inSendPacketSequence 패킷 순서 번호
+	// ----------------------------------------
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket);
+	// ----------------------------------------
+	// @brief 흐름 제어 윈도우에 여유가 생겼을 때, 대기 중인 패킷 큐(pendingPacketQueue)에서 패킷을 가져와 전송을 시도합니다.
+	// ----------------------------------------
 	void SendPacket(const SendPacketInfo& sendPacketInfo);
 	// ----------------------------------------
 	// @brief NetBuffer를 SendPacketInfo에 등록하고, 재전송 큐에 추가하며 실제 전송을 위해 sendBufferQueue에 Enqueue합니다.
