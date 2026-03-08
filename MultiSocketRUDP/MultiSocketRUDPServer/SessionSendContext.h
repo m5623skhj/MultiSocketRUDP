@@ -179,14 +179,40 @@ public:
 	void InitializePendingQueue(unsigned short capacity);
 	[[nodiscard]]
 	std::mutex& GetPendingQueueLock();
+	// ----------------------------------------
+	// @brief 보류 중인 패킷 큐가 비어있는지 확인합니다.
+	// @return 큐가 비어있으면 true, 아니면 false.
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsPendingQueueEmpty() const noexcept;
+	// ----------------------------------------
+	// @brief 보류 중인 패킷 큐가 가득 찼는지 확인합니다.
+	// @return 큐가 가득 찼으면 true, 아니면 false.
+	// ----------------------------------------
 	[[nodiscard]]
 	bool IsPendingQueueFull() const noexcept;
+	// ----------------------------------------
+	// @brief 보류 중인 패킷 큐의 맨 앞 아이템을 반환합니다.큐가 비어있지 않다는 전제가 필요합니다.
+	// @return 큐의 맨 앞 아이템에 대한 const 참조.
+	// ----------------------------------------
 	[[nodiscard]]
 	const std::pair<PacketSequence, NetBuffer*>& PendingQueueFront() const;
+	// ----------------------------------------
+	// @brief 보류 중인 패킷 큐에 아이템을 추가합니다.큐가 가득 차 있으면 실패합니다.
+	// @param sequence 패킷 시퀀스 번호.
+	// @param buffer 전송할 NetBuffer 포인터.
+	// @return 성공적으로 추가되면 true, 아니면 false.
+	// ----------------------------------------
 	bool PushToPendingQueue(PacketSequence sequence, NetBuffer* buffer);
+	// ----------------------------------------
+	// @brief 보류 중인 패킷 큐의 맨 앞에서 아이템을 가져옵니다.큐가 비어 있으면 실패합니다.
+	// @param item 가져온 아이템을 저장할 참조(패킷 시퀀스 및 NetBuffer 포인터).
+	// @return 성공적으로 가져오면 true, 아니면 false.
+	// ----------------------------------------
 	bool PopFromPendingQueue(OUT std::pair<PacketSequence, NetBuffer*>& item);
+	// ----------------------------------------
+	// @brief 전송을 위해 보류된 패킷들을 저장하는 링 버퍼.플로우 제어에 의해 즉시 전송되지 못하는 패킷들이 여기에 저장됩니다.
+	// ----------------------------------------
 	void ClearPendingQueue();
 
 private:
