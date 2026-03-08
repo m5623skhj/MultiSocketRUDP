@@ -152,6 +152,7 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 
 	sessionDelegate.EnqueueToRecvBufferList(*contextResult->session, buffer);
 	MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(contextResult, threadId);
+
 	return DoRecv(*contextResult->session);
 }
 
