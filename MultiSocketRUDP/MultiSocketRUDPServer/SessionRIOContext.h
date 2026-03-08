@@ -26,6 +26,7 @@ public:
     // @param sock RIO에 사용할 소켓
     // @param sessionId 세션 식별자
     // @param ownerSession 해당 컨텍스트를 소유하는 RUDPSession 포인터
+    // @param pendingQueueCapacity 펜딩 패킷 큐의 최대 용량입니다.
     // @return 초기화 성공 여부 (true: 성공, false: 실패)
     // ----------------------------------------
     [[nodiscard]]
