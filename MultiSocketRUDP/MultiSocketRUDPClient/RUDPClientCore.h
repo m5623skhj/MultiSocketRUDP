@@ -183,7 +183,7 @@ public:
 private:
 	// ----------------------------------------
 	// @brief NetBuffer와 PacketSequence를 사용하여 SendPacketInfo를 할당, 초기화하고 전송 맵에 등록 후, 실제 전송 큐에 추가합니다.
-	// @param buffer NetBuffer(이미 인코딩된 상태)
+	// @param buffer NetBuffer
 	// @param inSendPacketSequence 패킷 순서 번호
 	// ----------------------------------------
 	void SendPacket(OUT NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket);
