@@ -34,7 +34,8 @@ public:
         const RIO_CQ& rioSendCQ,
         SOCKET sock,
         SessionIdType sessionId,
-        RUDPSession* ownerSession);
+        RUDPSession* ownerSession,
+        unsigned short pendingQueueCapacity);
 
     // ----------------------------------------
     // @brief 내부 수신/송신 컨텍스트의 RIO 자원을 정리합니다.

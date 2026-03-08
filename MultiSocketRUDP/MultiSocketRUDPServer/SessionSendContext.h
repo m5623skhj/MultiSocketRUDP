@@ -7,7 +7,10 @@
 #include <atomic>
 #include <functional>
 #include <MSWSock.h>
+#include <NetServerSerializeBuffer.h>
+
 #include "PacketSequenceSetKey.h"
+#include "../Common/etc/RingBuffer.h"
 
 struct SendPacketInfo;
 
@@ -35,7 +38,7 @@ public:
 	// @return 초기화 성공 여부 (true: 성공, false: 실패)
 	// ----------------------------------------
 	[[nodiscard]]
-	bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
+	bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, unsigned short pendingQueueCapacity);
 	// ----------------------------------------
 	// @brief 등록된 RIO 송신 버퍼를 Deregister 합니다.
 	// @param rioFunctionTable RIO 확장 함수 테이블
@@ -173,6 +176,19 @@ public:
 	[[nodiscard]]
 	PacketSequence IncrementLastSendPacketSequence();
 
+	void InitializePendingQueue(unsigned short capacity);
+	[[nodiscard]]
+	std::mutex& GetPendingQueueLock();
+	[[nodiscard]]
+	bool IsPendingQueueEmpty() const noexcept;
+	[[nodiscard]]
+	bool IsPendingQueueFull() const noexcept;
+	[[nodiscard]]
+	const std::pair<PacketSequence, NetBuffer*>& PendingQueueFront() const;
+	bool PushToPendingQueue(PacketSequence sequence, NetBuffer* buffer);
+	bool PopFromPendingQueue(OUT std::pair<PacketSequence, NetBuffer*>& item);
+	void ClearPendingQueue();
+
 private:
 	SendPacketInfo* reservedSendPacketInfo = nullptr;
 	char rioSendBuffer[MAX_SEND_BUFFER_SIZE]{};
@@ -188,4 +204,7 @@ private:
 
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
 	std::mutex cachedSequenceSetLock;
+
+	RingBuffer<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue{ 0 };
+	std::mutex pendingPacketQueueLock;
 };

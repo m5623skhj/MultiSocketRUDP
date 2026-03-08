@@ -61,7 +61,10 @@ private:
 	virtual void OnDisconnected() {}
 	virtual void OnReleased() {}
 	[[nodiscard]]
-	inline bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	[[nodiscard]]
+	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	void TryFlushPendingQueue();
 
 	void SendHeartbeatPacket();
 

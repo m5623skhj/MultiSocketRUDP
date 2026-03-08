@@ -10,7 +10,8 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
     const RIO_CQ& rioSendCQ,
     const SOCKET sock,
     const SessionIdType sessionId,
-    RUDPSession* ownerSession)
+    RUDPSession* ownerSession,
+    unsigned short pendingQueueCapacity)
 {
     cachedSessionId = sessionId;
     if (not recvContext.Initialize(rioFunctionTable, sessionId, ownerSession))
@@ -19,7 +20,7 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
         return false;
     }
 
-    if (not sendContext.Initialize(rioFunctionTable))
+    if (not sendContext.Initialize(rioFunctionTable, pendingQueueCapacity))
     {
         LOG_ERROR("SessionRIOContext: sendContext.Initialize failed");
         return false;
