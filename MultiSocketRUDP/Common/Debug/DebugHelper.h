@@ -3,7 +3,7 @@
 #if defined(_DEBUG)
 #include <crtdbg.h>
 
-void EnableCrtDebug()
+inline void EnableCrtDebug()
 {
 	// Enable memory leak detection and check on every allocation/deallocation
 	int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
