@@ -230,6 +230,11 @@ void RUDPSession::TryFlushPendingQueue()
 
 void RUDPSession::SendHeartbeatPacket()
 {
+	if (nowInReleaseThread || not IsConnected())
+	{
+		return;
+	}
+
 	if (const PacketSequence nextSequence = rioContext.GetSendContext().GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
 	{
 		return;
