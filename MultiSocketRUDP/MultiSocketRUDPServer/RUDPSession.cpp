@@ -41,7 +41,6 @@ void RUDPSession::InitializeSession()
 	nowInReleaseThread = {};
 	sessionReservedTime = {};
 
-	stateMachine.Reset();
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
 	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
@@ -85,8 +84,8 @@ void RUDPSession::Disconnect()
 	}
 	OnReleased();
 
-	stateMachine.SetDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
+	stateMachine.SetDisconnected();
 }
 
 bool RUDPSession::SendPacket(IPacket& packet)
