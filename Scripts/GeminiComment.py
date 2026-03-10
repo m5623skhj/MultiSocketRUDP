@@ -1,11 +1,12 @@
 import os
+import re
 import json
 import requests
 import base64
 from google import genai
 from google.genai import types
 
-MAX_LINES       = 1000
+MAX_ADDED_LINES = 800
 REQUEST_TIMEOUT = 15
 
 api_key      = os.environ["GEMINI_API_KEY"]
@@ -14,7 +15,7 @@ repo         = os.environ["REPO"]
 github_token = os.environ["GITHUB_TOKEN"]
 commit_sha   = os.environ["GITHUB_SHA"]
 
-def gh_headers():
+def gh_headers() -> dict:
     return {
         "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github+json"
@@ -24,11 +25,12 @@ def gh_headers():
 _file_cache: dict[str, str | None] = {}
 
 def get_file_content(path: str) -> str | None:
+    """파일 내용을 캐시 포함해서 반환. API 중복 호출 방지."""
     if path in _file_cache:
         return _file_cache[path]
 
-    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={commit_sha}"
-    r   = requests.get(url, headers=gh_headers(), timeout=REQUEST_TIMEOUT)
+    url  = f"https://api.github.com/repos/{repo}/contents/{path}?ref={commit_sha}"
+    r    = requests.get(url, headers=gh_headers(), timeout=REQUEST_TIMEOUT)
 
     if r.status_code != 200:
         _file_cache[path] = None
@@ -55,8 +57,7 @@ def has_existing_comment(file_path: str, line: int) -> bool:
     end    = min(len(lines), line + 1)
     region = "\n".join(lines[start:end])
 
-    comment_patterns = ["@brief", "/**", "///", "// ----"]
-    return any(p in region for p in comment_patterns)
+    return any(p in region for p in ["@brief", "/**", "///", "// ----"])
 
 
 def approve_pr() -> None:
@@ -82,8 +83,8 @@ def set_status(state: str, description: str) -> None:
 
 def get_all_pr_comments() -> list:
     """
-    페이지네이션을 처리하여 PR의 모든 인라인 코멘트를 반환.
-    GitHub 기본 per_page=30이므로 전체를 순회해야 중복 코멘트를 방지할 수 있음.
+    페이지네이션 처리하여 PR 인라인 코멘트 전체 반환.
+    GitHub 기본 per_page=30이므로 전체 순회 필요.
     """
     comments: list = []
     page = 1
@@ -108,12 +109,69 @@ def get_all_pr_comments() -> list:
     print(f"[comments] 총 {len(comments)}개 조회")
     return comments
 
+def parse_added_lines(diff: str) -> list[dict]:
+    """
+    diff에서 추가된 라인(+ 로 시작)만 파일 기준 실제 라인 번호와 함께 추출.
+
+    반환: [{"file": str, "line": int, "content": str}, ...]
+
+    raw diff를 Gemini에게 그대로 주면 삭제된 라인이나 컨텍스트 라인을
+    잘못 판단하는 문제가 있으므로, 추가 라인만 구조화해서 전달한다.
+    """
+    results: list[dict] = []
+    current_file: str | None = None
+    new_line_num = 0
+
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            current_file = line[6:].strip()
+            new_line_num = 0
+
+        elif line.startswith("@@ "):
+            m = re.search(r"\+(\d+)", line)
+            if m:
+                new_line_num = int(m.group(1)) - 1
+
+        elif line.startswith("+") and not line.startswith("+++"):
+            new_line_num += 1
+            if current_file:
+                results.append({
+                    "file":    current_file,
+                    "line":    new_line_num,
+                    "content": line[1:]
+                })
+
+        elif not line.startswith("-"):
+            new_line_num += 1
+
+    return results
+
+
+def format_additions_for_prompt(additions: list[dict]) -> str:
+    """
+    추가된 라인을 파일별로 묶어 읽기 좋은 형태로 변환.
+    예:
+        === src/Foo.cpp ===
+        42: int* p = GetPointer();
+        43: p->DoSomething();
+    """
+    grouped: dict[str, list[dict]] = {}
+    for a in additions:
+        grouped.setdefault(a["file"], []).append(a)
+
+    parts: list[str] = []
+    for file_path, lines in grouped.items():
+        block = f"=== {file_path} ===\n"
+        block += "\n".join(f"{a['line']}: {a['content']}" for a in lines)
+        parts.append(block)
+
+    return "\n\n".join(parts)
 
 def extract_json(text: str) -> str | None:
     """
     Gemini 응답에서 JSON 배열만 추출.
     마크다운 코드블록(```json ... ```) 도 처리.
-    코드블록 파싱 실패 시 전체 텍스트에서 [ ... ] 로 fallback.
+    실패 시 전체 텍스트에서 [ ... ] 로 fallback.
     """
     text = text.strip()
 
@@ -134,7 +192,6 @@ def extract_json(text: str) -> str | None:
         return None
     return text[s:e]
 
-
 with open("diff.txt", "r", encoding="utf-8", errors="ignore") as f:
     diff = f.read()
 
@@ -142,55 +199,79 @@ if not diff.strip():
     set_status("success", "No target file changes")
     exit(0)
 
-if diff.count("\n") > MAX_LINES:
+additions = parse_added_lines(diff)
+
+if not additions:
+    set_status("success", "No added lines to review")
+    exit(0)
+
+if len(additions) > MAX_ADDED_LINES:
+    print(f"[diff] 추가 라인 {len(additions)}개 — 상한 {MAX_ADDED_LINES} 초과, skip")
     set_status("success", "Diff too large - skipped")
     exit(0)
 
-if len(diff) > 20000:
-    print(f"[diff] 20000자 초과로 잘림 (원본 {len(diff)}자)")
-    diff = diff[:20000]
+additions_text = format_additions_for_prompt(additions)
+print(f"[diff] 추가 라인 {len(additions)}개 파싱 완료")
 
 prompt = f"""
-다음은 PR의 변경 diff입니다. 새로 추가되거나 수정된 코드(+ 로 시작하는 라인)만 검토하세요.
-삭제된 라인(- 로 시작하는 라인)은 절대 지적하지 마세요.
+다음은 이번 PR에서 **새로 추가된 코드**입니다.
+각 블록은 파일 경로와 함께 "라인번호: 코드" 형식으로 구성되어 있습니다.
+이 코드들만 리뷰하세요.
 
-{diff}
+{additions_text}
 """
 
 system_instruction_prompt = """
 당신은 매우 엄격한 시니어 코드 리뷰어입니다.
 
-반드시 JSON 배열만 출력하세요. 다른 텍스트, 설명, 마크다운 코드블록은 출력하지 마세요.
+반드시 JSON 배열만 출력하세요. 마크다운 코드블록, 설명, 인사말을 절대 출력하지 마세요.
 
 각 항목 필드:
-  file     : 파일 경로 (문자열)
-  line     : 파일 기준 실제 줄 번호 (정수, diff position 아님)
-  comment  : 리뷰 내용 (두 문장 이하, 한국어)
+  file     : 파일 경로 (문자열, 입력에서 그대로 사용)
+  line     : 파일 기준 실제 줄 번호 (정수, 입력에서 제공된 번호 사용)
+  comment  : 리뷰 내용 (한국어, 두 문장 이하)
   severity : "critical" 또는 "warning"
 
-────────────────────────────
-critical 은 아래 경우만 사용하세요:
-  - 컴파일/런타임 오류가 확실한 코드
-  - 확실한 null 역참조 (null check 없이 사용)
-  - use-after-free, 메모리 corruption
-  - 무한 루프, deadlock
-  - 데이터 손실을 일으키는 명백한 로직 오류
+────────────────────────────────────────
+critical 판단 기준 — 아래 경우만 사용하세요:
 
-그 외 모든 것은 warning 으로 분류하세요:
-  - 스타일, 네이밍, 가독성
+  1. 컴파일/링크 오류가 확실한 코드
+     예) 존재하지 않는 함수 호출, 타입 불일치로 컴파일 불가
+  2. null/nullptr 역참조가 확실한 경우
+     예) null 체크 없이 포인터를 즉시 역참조
+  3. use-after-free, double-free, 메모리 corruption
+  4. 무한 루프 (탈출 조건이 코드상 절대 성립 불가)
+  5. deadlock (락 획득 순서가 항상 교착 상태를 유발)
+  6. 데이터 손실이 확실한 로직 오류
+     예) 저장 전 덮어쓰기, 조건 반전으로 항상 삭제
+
+"가능성이 있다", "경우에 따라", "특정 상황에서" → 전부 warning
+────────────────────────────────────────
+
+warning 예시:
+  - 예외 처리 누락 가능성
+  - 잠재적 성능 문제
+  - 네이밍, 스타일, 가독성
   - 주석 누락
-  - 잠재적(가능성만 있는) 문제
-  - 성능 개선 제안
-────────────────────────────
+  - 경계값 검사 누락 가능성
 
 출력 예시:
 [
-  {"file": "src/foo.cpp", "line": 42, "comment": "p가 nullptr일 때 역참조됩니다.", "severity": "critical"},
-  {"file": "src/bar.cpp", "line": 10, "comment": "변수명이 너무 짧습니다.", "severity": "warning"}
+  {
+    "file": "src/Foo.cpp",
+    "line": 42,
+    "comment": "ptr이 nullptr인 경우 역참조가 발생합니다. null 체크가 없습니다.",
+    "severity": "critical"
+  },
+  {
+    "file": "src/Bar.cpp",
+    "line": 17,
+    "comment": "함수명이 동작을 명확히 설명하지 않습니다. ProcessInput 등으로 변경을 고려하세요.",
+    "severity": "warning"
+  }
 ]
 
-지적할 내용이 없으면 빈 배열 [] 을 출력하세요.
-인사말, 서두, 결론 문장을 절대 작성하지 마세요.
+지적할 내용이 없으면 반드시 [] 만 출력하세요.
 """
 
 client = genai.Client(api_key=api_key)
@@ -213,7 +294,7 @@ try:
     finish_reason = response.candidates[0].finish_reason
     print(f"[gemini] finish_reason={finish_reason}")
     if str(finish_reason) not in ("FinishReason.STOP", "STOP", "1"):
-        print(f"[gemini] 비정상 종료: {finish_reason} — 응답이 불완전할 수 있어 skip 처리")
+        print(f"[gemini] 비정상 종료: {finish_reason} — skip 처리")
         set_status("success", "AI response truncated - skipped")
         exit(0)
 except Exception:
@@ -248,6 +329,8 @@ ai_existing = {
     if MARKER in c.get("body", "")
 }
 
+valid_positions = {(a["file"], a["line"]) for a in additions}
+
 current_keys   = set()
 critical_found = False
 
@@ -258,11 +341,15 @@ for r in reviews:
         comment_body = str(r["comment"])
         severity     = str(r.get("severity", "warning")).lower()
     except (KeyError, ValueError, TypeError) as e:
-        print(f"[skip] 항목 파싱 실패: {e} / {r}")
+        print(f"[skip] 파싱 실패: {e} / {r}")
         continue
 
     if severity not in ("critical", "warning"):
         severity = "warning"
+
+    if (file_path, line) not in valid_positions:
+        print(f"[skip] 추가되지 않은 라인 지적 무시: {file_path}:{line}")
+        continue
 
     print(f"[review] {severity.upper():8s} {file_path}:{line}  {comment_body[:80]}")
 
