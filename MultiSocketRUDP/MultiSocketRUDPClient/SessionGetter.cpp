@@ -266,6 +266,13 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	{
 		keyObjectBuffer = new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()];
 	}
+
+	if (sessionKeyHandle != nullptr)
+	{
+		CryptoHelper::DestroySymmetricKeyHandle(sessionKeyHandle);
+		sessionKeyHandle = nullptr;
+	}
+
 	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
 
 	return sessionKeyHandle != nullptr;

@@ -439,6 +439,12 @@ namespace TLSHelper
 
     bool TLSHelperServer::Handshake(const SOCKET socket)
     {
+        if (handshakeCompleted)
+        {
+            DeleteSecurityContext(&ctxtHandle);
+            ZeroMemory(&ctxtHandle, sizeof(ctxtHandle));
+        }
+
         handshakeCompleted = false;
         CtxtHandle* pContext = nullptr;
         std::vector<char> recvBuffer;
