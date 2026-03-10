@@ -19,6 +19,9 @@ public:
 public:
 	bool IsServerStopped() const;
 
+	int32_t GetTPS() const;
+	void ResetTPS() const;
+
 private:
 	MultiSocketRUDPCore serverCore;
 };

@@ -23,6 +23,9 @@ int main()
 			TestServer::GetInst().Stop();
 			break;
 		}
+
+		std::cout << "TPS : " << TestServer::GetInst().GetTPS() << std::endl;
+		TestServer::GetInst().ResetTPS();
 	}
 
 	while (not TestServer::GetInst().IsServerStopped())

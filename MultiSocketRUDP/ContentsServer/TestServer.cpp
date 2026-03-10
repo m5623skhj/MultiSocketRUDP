@@ -44,3 +44,13 @@ bool TestServer::IsServerStopped() const
 {
 	return serverCore.IsServerStopped();
 }
+
+int32_t TestServer::GetTPS() const
+{
+	return serverCore.GetTPS();
+}
+
+void TestServer::ResetTPS() const
+{
+	serverCore.ResetTPS();
+}

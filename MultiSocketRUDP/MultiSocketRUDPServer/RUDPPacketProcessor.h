@@ -25,14 +25,14 @@ public:
     // @param clientAddr 클라이언트 주소 정보
     // @param recvPacket 수신된 NetBuffer 패킷
     // ----------------------------------------
-    void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket) const;
+    void ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket);
     // ----------------------------------------
     // @brief RIO 완료 포트에서 수신된 패킷을 처리합니다.
     // @param session 패킷을 수신한 RUDPSession 객체
     // @param buffer 수신된 NetBuffer
     // @param clientAddrBuffer 클라이언트 주소 정보가 담긴 버퍼
     // ----------------------------------------
-    void OnRecvPacket(RUDPSession& session, NetBuffer& buffer, std::span<const unsigned char> clientAddrBuffer) const;
+    void OnRecvPacket(RUDPSession& session, NetBuffer& buffer, std::span<const unsigned char> clientAddrBuffer);
 
     // ----------------------------------------
     // @brief NetBuffer에서 페이로드 길이를 추출합니다.
@@ -42,7 +42,13 @@ public:
     [[nodiscard]]
     static WORD GetPayloadLength(const NetBuffer& buffer);
 
+    int32_t GetTPS() const;
+    void ResetTPS();
+
 private:
 	RUDPSessionManager& sessionManager;
     ISessionDelegate& sessionDelegate;
+
+private:
+    std::atomic_int32_t tps{};
 };

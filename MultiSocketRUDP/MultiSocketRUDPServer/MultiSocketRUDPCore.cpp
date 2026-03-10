@@ -225,6 +225,16 @@ RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const
 	return rioManager->GetRIOFunctionTable();
 }
 
+int32_t MultiSocketRUDPCore::GetTPS() const
+{
+	return packetProcessor->GetTPS();
+}
+
+void MultiSocketRUDPCore::ResetTPS() const
+{
+	packetProcessor->ResetTPS();
+}
+
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId) const
 {
 	if (not sessionManager->ReleaseSession(disconnectTargetSessionId))
