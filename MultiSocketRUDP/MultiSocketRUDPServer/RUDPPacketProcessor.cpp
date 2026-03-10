@@ -20,7 +20,7 @@ RUDPPacketProcessor::RUDPPacketProcessor(RUDPSessionManager& inSessionManager
 {
 }
 
-void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket) const
+void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockaddr_in& clientAddr, NetBuffer& recvPacket)
 {
     PACKET_TYPE packetType;
     recvPacket >> packetType;
@@ -68,9 +68,13 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
         isCorePacket = false;
         DECODE_PACKET()
 
-        if (sessionDelegate.OnRecvPacket(session, recvPacket) == false)
+        if (sessionDelegate.OnRecvPacket(session, recvPacket))
         {
-			session.DoDisconnect();
+            tps.fetch_add(1, std::memory_order_relaxed);
+        }
+        else
+        {
+            session.DoDisconnect();
         }
         break;
     }
@@ -94,7 +98,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
     }
 }
 
-void RUDPPacketProcessor::OnRecvPacket(RUDPSession& session, NetBuffer& buffer, const std::span<const unsigned char> clientAddrBuffer) const
+void RUDPPacketProcessor::OnRecvPacket(RUDPSession& session, NetBuffer& buffer, const std::span<const unsigned char> clientAddrBuffer)
 {
     if (buffer.GetUseSize() != GetPayloadLength(buffer))
     {
@@ -114,4 +118,14 @@ void RUDPPacketProcessor::OnRecvPacket(RUDPSession& session, NetBuffer& buffer, 
 WORD RUDPPacketProcessor::GetPayloadLength(const NetBuffer& buffer)
 {
     return MultiSocketRUDPCore::GetPayloadLength(buffer);
+}
+
+int32_t RUDPPacketProcessor::GetTPS() const
+{
+    return tps.load(std::memory_order_relaxed);
+}
+
+void RUDPPacketProcessor::ResetTPS()
+{
+    tps.store(0, std::memory_order_relaxed);
 }

@@ -64,6 +64,9 @@ public:
 		return *reinterpret_cast<WORD*>(&buffer.m_pSerializeBuffer[PAYLOAD_LENGTH_POSITION]);
 	}
 
+	int32_t GetTPS() const;
+	void ResetTPS() const;
+
 private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
 	void PushToDisconnectTargetSession(RUDPSession& session) override;
