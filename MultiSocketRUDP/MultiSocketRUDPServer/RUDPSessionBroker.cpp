@@ -224,7 +224,7 @@ bool RUDPSessionBroker::InitSessionCrypto(OUT RUDPSession& session) const
 
 	if (sessionDelegate.GetSessionKeyHandle(session) == nullptr)
 	{
-		sessionDelegate.SetSessionKeyObjectBuffer(session, new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()]);
+		sessionDelegate.SetSessionKeyObjectBuffer(session, new unsigned char[CryptoHelper::GetTLSInstance().GetKeyObjectSize()]);
 	}
 
 	sessionDelegate.SetSessionKeyHandle(session, 
