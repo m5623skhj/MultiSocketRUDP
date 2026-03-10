@@ -38,7 +38,7 @@ jobs:
           echo "line_count=$LINE_COUNT" >> $GITHUB_OUTPUT
 
       - name: Stop If Too Large
-        if: steps.diffcheck.outputs.line_count > 1000
+        if: ${{ steps.diffcheck.outputs.line_count > 1000 }}
         run: |
           echo "Diff too large. Skipping AI comment and review."
           exit 0
@@ -52,3 +52,17 @@ jobs:
           GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
         run: python Scripts/GeminiComment.py
         
+      - name: Report AI Review Status
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -d '{
+            "state": "success",
+            "context": "ai-review-check",
+            "description": "AI review completed"
+          }'
