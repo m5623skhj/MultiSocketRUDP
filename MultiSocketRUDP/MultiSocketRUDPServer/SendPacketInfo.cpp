@@ -43,8 +43,9 @@ void SendPacketInfo::Free(SendPacketInfo* deleteTarget)
 		return;
 	}
 
-	if (deleteTarget->refCount.fetch_sub(1, std::memory_order_relaxed) == 1)
+	if (deleteTarget->refCount.fetch_sub(1, std::memory_order_release) == 1)
 	{
+		std::atomic_thread_fence(std::memory_order_acquire);
 		NetBuffer::Free(deleteTarget->buffer);
 		sendPacketInfoPool->Free(deleteTarget);
 	}
@@ -57,8 +58,9 @@ void SendPacketInfo::Free(SendPacketInfo* deleteTarget, const char subCount)
 		return;
 	}
 
-	if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_relaxed) == 1)
+	if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_release) == 1)
 	{
+		std::atomic_thread_fence(std::memory_order_acquire);
 		NetBuffer::Free(deleteTarget->buffer);
 		sendPacketInfoPool->Free(deleteTarget);
 	}
