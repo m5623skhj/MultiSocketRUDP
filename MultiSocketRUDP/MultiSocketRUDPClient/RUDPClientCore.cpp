@@ -6,8 +6,8 @@
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 RUDPClientCore::RUDPClientCore()
-	: serverAliveChecker(std::bind(&RUDPClientCore::Stop, this)
-	, std::bind(&RUDPClientCore::GetNextRecvPacketSequence, this))
+	: serverAliveChecker([this] { Stop(); }
+	                     , [this] { return GetNextRecvPacketSequence(); })
 {
 }
 
@@ -46,8 +46,16 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 
 void RUDPClientCore::Stop()
 {
-	closesocket(sessionBrokerSocket);
-	closesocket(rudpSocket);
+	if (sessionBrokerSocket != INVALID_SOCKET)
+	{
+		closesocket(sessionBrokerSocket);
+		sessionBrokerSocket = INVALID_SOCKET;
+	}
+	if (rudpSocket != INVALID_SOCKET)
+	{
+		closesocket(rudpSocket);
+		rudpSocket = INVALID_SOCKET;
+	}
 
 	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
@@ -56,6 +64,12 @@ void RUDPClientCore::Stop()
 
 	WSACleanup();
 	isStopped = true;
+
+	if (sessionKeyHandle != nullptr)
+	{
+		CryptoHelper::DestroySymmetricKeyHandle(sessionKeyHandle);
+		sessionKeyHandle = nullptr;
+	}
 
 	if (keyObjectBuffer != nullptr)
 	{
@@ -237,21 +251,13 @@ void RUDPClientCore::RunRetransmissionThread()
 
 void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 {
-	NetBuffer* packetBuffer = nullptr;
-
 	while (recvSize > df_HEADER_SIZE)
 	{
-		if (packetBuffer != nullptr)
-		{
-			NetBuffer::Free(packetBuffer);
-			packetBuffer = nullptr;
-		}
-
 		NetBuffer* recvPacketBuffer = NetBuffer::Alloc();
 		recvBuffer.ReadBuffer(recvPacketBuffer->GetBufferPtr(), df_HEADER_SIZE);
 		recvPacketBuffer->m_iRead = 0;
 
-		WORD payloadLength = GetPayloadLength(*recvPacketBuffer);
+		const WORD payloadLength = GetPayloadLength(*recvPacketBuffer);
 		if (payloadLength <= 0 || payloadLength > dfDEFAULTSIZE || payloadLength > recvSize)
 		{
 			NetBuffer::Free(recvPacketBuffer);
@@ -439,6 +445,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 		if (holdingPacketInfo.packetSequence < nextRecvPacketSequence)
 		{
 			recvPacketHoldingQueue.pop();
+			NetBuffer::Free(holdingPacketInfo.buffer);
 			continue;
 		}
 
@@ -451,6 +458,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 		recvPacketHoldingQueue.pop();
 		if (holdingPacketInfo.packetType == PACKET_TYPE::HEARTBEAT_TYPE)
 		{
+			NetBuffer::Free(holdingPacketInfo.buffer);
 			continue;
 		}
 
@@ -525,7 +533,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 	if (not isCorePacket)
 	{
-		if (const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed); window > 0)
+		if (const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed))
 		{
 			BYTE outstanding;
 			{

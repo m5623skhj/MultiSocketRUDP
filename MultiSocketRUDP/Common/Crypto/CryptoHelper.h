@@ -53,7 +53,7 @@ public:
 	[[nodiscard]]
 	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const;
 	[[nodiscard]]
-	ULONG GetKeyOjbectSize() const { return keyObjectSize; }
+	ULONG GetKeyObjectSize() const { return keyObjectSize; }
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);
 
 	[[nodiscard]]

@@ -119,6 +119,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	{
 		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
 		closesocket(sessionBrokerSocket);
+		sessionBrokerSocket = INVALID_SOCKET;
 		WSACleanup();
 		return false;
 	}
@@ -127,6 +128,7 @@ bool RUDPClientCore::GetSessionFromServer()
 	{
 		LOG_ERROR("TLS Handshake failed in GetSessionFromServer()");
 		closesocket(sessionBrokerSocket);
+		sessionBrokerSocket = INVALID_SOCKET;
 		WSACleanup();
 		return false;
 	}
@@ -187,6 +189,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 			LOG_ERROR(std::format("recv() failed in TrySetTargetSessionInfo() with error code {}", error));
 			closesocket(sessionBrokerSocket);
+			sessionBrokerSocket = INVALID_SOCKET;
 			NetBuffer::Free(&recvBuffer);
 
 			return false;
@@ -201,6 +204,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 		{
 			LOG_ERROR("TLS DecryptDataStream failed");
 			closesocket(sessionBrokerSocket);
+			sessionBrokerSocket = INVALID_SOCKET;
 			NetBuffer::Free(&recvBuffer);
 
 			return false;
@@ -236,6 +240,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 	shutdown(sessionBrokerSocket, SD_BOTH);
 	closesocket(sessionBrokerSocket);
+	sessionBrokerSocket = INVALID_SOCKET;
 
 	if (not payloadComplete)
 	{
@@ -264,7 +269,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 
 	if (keyObjectBuffer == nullptr)
 	{
-		keyObjectBuffer = new unsigned char[CryptoHelper::GetTLSInstance().GetKeyOjbectSize()];
+		keyObjectBuffer = new unsigned char[CryptoHelper::GetTLSInstance().GetKeyObjectSize()];
 	}
 
 	if (sessionKeyHandle != nullptr)
