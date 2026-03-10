@@ -106,9 +106,10 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 			continue;
 		}
 
-		if (const auto session = ReserveSession(sendBuffer, rudpSessionIP); session != nullptr)
+		const auto session = ReserveSession(sendBuffer, rudpSessionIP);
+		if (not SendSessionInfoToClient(clientSocket, sendBuffer))
 		{
-			if (not SendSessionInfoToClient(clientSocket, sendBuffer))
+			if (session != nullptr)
 			{
 				sessionDelegate.AbortReservedSession(*session);
 			}
