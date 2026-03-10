@@ -169,8 +169,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 
 	if (sendPacketInfo->owner->nowInReleaseThread)
 	{
-		SendPacketInfo::Free(sendPacketInfo);
-		return true;
+		return false;
 	}
 
 	if (needAddRefCount)
@@ -189,7 +188,6 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 	sendPacketInfo->owner->rioContext.GetSendContext().PushSendPacketInfo(sendPacketInfo);
 	if (not ioHandler->DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
-		SendPacketInfo::Free(sendPacketInfo, 2);
 		return false;
 	}
 
