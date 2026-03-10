@@ -43,14 +43,21 @@ void Ticker::UpdateTick()
 		tickCounter.nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count();
 		UnregisterTimerEventImpl();
 		{
-			std::shared_lock lock(timerEventsMutex);
-			for (const auto& timerEvent : timerEvents | std::views::values)
+			std::vector<std::shared_ptr<TimerEvent>> fireTargets;
 			{
-				if (not timerEvent->ShouldFire(tickCounter.nowMs))
-				{
-					continue;
-				}
+				std::shared_lock lock(timerEventsMutex);
 
+				for (const auto& timerEvent : timerEvents | std::views::values)
+				{
+					if (timerEvent->ShouldFire(tickCounter.nowMs))
+					{
+						fireTargets.push_back(timerEvent);
+					}
+				}
+			}
+
+			for (const auto& timerEvent : fireTargets)
+			{
 				timerEvent->Fire();
 				timerEvent->SetNextTick(tickCounter.nowMs);
 			}
