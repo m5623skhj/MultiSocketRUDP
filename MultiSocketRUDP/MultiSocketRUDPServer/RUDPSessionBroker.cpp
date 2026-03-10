@@ -114,6 +114,8 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 				sessionDelegate.AbortReservedSession(*session);
 			}
 		}
+
+		closesocket(clientSocket);
 	}
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
@@ -320,7 +322,6 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 		}
 	}
 
-	closesocket(clientSocket);
 	sendBuffer.Init();
 
 	return true;
