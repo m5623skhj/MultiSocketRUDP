@@ -62,18 +62,12 @@ namespace MultiSocketRUDPBotTester
             Dictionary<NodeVisual, ActionNodeBase> mapping)
         {
             if (visual.Next == null)
-            {
                 return;
-            }
 
             if (mapping.TryGetValue(visual.Next, out var nextNode))
-            {
                 actionNode.NextNodes.Add(nextNode);
-            }
             else
-            {
                 Serilog.Log.Warning("Next node not found in mapping for {Name}", actionNode.Name);
-            }
         }
 
         private static void ConnectBranches(
@@ -85,59 +79,42 @@ namespace MultiSocketRUDPBotTester
             {
                 case ConditionalNode conditional:
                     if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var trueNode))
-                    {
                         conditional.TrueNodes.Add(trueNode);
-                    }
-
                     if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var falseNode))
-                    {
                         conditional.FalseNodes.Add(falseNode);
-                    }
                     break;
 
                 case LoopNode loop:
                     if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var loopBody))
-                    {
                         loop.LoopBody.Add(loopBody);
-                    }
-
                     if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var exitNode))
-                    {
                         loop.ExitNodes.Add(exitNode);
-                    }
                     break;
 
                 case RepeatTimerNode repeat:
                     if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var repeatBody))
-                    {
                         repeat.RepeatBody.Add(repeatBody);
-                    }
                     break;
 
                 case WaitForPacketNode wait:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var waitSuccess))
+                        wait.NextNodes.Add(waitSuccess);
                     if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var timeoutNode))
-                    {
                         wait.TimeoutNodes.Add(timeoutNode);
-                    }
                     break;
 
                 case AssertNode assert:
+                    if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var assertSuccess))
+                        assert.NextNodes.Add(assertSuccess);
                     if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var failNode))
-                    {
                         assert.FailureNodes.Add(failNode);
-                    }
                     break;
 
                 case RetryNode retry:
                     if (visual.TrueChild != null && mapping.TryGetValue(visual.TrueChild, out var retryBody))
-                    {
                         retry.RetryBody.Add(retryBody);
-                    }
-
                     if (visual.FalseChild != null && mapping.TryGetValue(visual.FalseChild, out var retryFail))
-                    {
                         retry.FailureNodes.Add(retryFail);
-                    }
                     break;
 
                 case RandomChoiceNode randomChoice:

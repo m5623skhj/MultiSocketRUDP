@@ -214,6 +214,11 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
                 if (n.Next != null) stack.Push(n.Next);
                 if (n.TrueChild != null) stack.Push(n.TrueChild);
                 if (n.FalseChild != null) stack.Push(n.FalseChild);
+
+                foreach (var child in n.DynamicChildren)
+                {
+                    if (child != null) stack.Push(child);
+                }
             }
 
             return false;
