@@ -369,6 +369,12 @@ namespace MultiSocketRUDPBotTester
                 if (n.Next == node) n.Next = null;
                 if (n.TrueChild == node) n.TrueChild = null;
                 if (n.FalseChild == node) n.FalseChild = null;
+
+                for (var i = 0; i < n.DynamicChildren.Count; i++)
+                {
+                    if (n.DynamicChildren[i] == node)
+                        n.DynamicChildren[i] = null;
+                }
             }
         }
 
@@ -421,6 +427,11 @@ namespace MultiSocketRUDPBotTester
                     WpfCanvas.SetLeft(newNode.OutputPortFalse, l + w - PortOffsetX);
                     WpfCanvas.SetTop(newNode.OutputPortFalse, t + h * 2 / 3 - HalfPortSize);
                 }
+
+                if (saved.NodeType == typeof(RandomChoiceNode) && saved.DynamicOutputPorts.Count > 0)
+                {
+                    CreateDynamicPorts(newNode, saved.DynamicOutputPorts.Count);
+                }
             }
 
             foreach (var saved in savedVisuals)
@@ -433,6 +444,17 @@ namespace MultiSocketRUDPBotTester
                     newNode.TrueChild = trueN;
                 if (saved.FalseChild != null && nodeMapping.TryGetValue(saved.FalseChild, out var falseN))
                     newNode.FalseChild = falseN;
+
+                for (var i = 0; i < saved.DynamicChildren.Count; i++)
+                {
+                    var savedChild = saved.DynamicChildren[i];
+                    if (savedChild != null
+                        && i < newNode.DynamicChildren.Count
+                        && nodeMapping.TryGetValue(savedChild, out var mappedChild))
+                    {
+                        newNode.DynamicChildren[i] = mappedChild;
+                    }
+                }
             }
 
             Dispatcher.BeginInvoke(
@@ -469,14 +491,17 @@ namespace MultiSocketRUDPBotTester
                 };
             }
 
-            if (original.Category == NodeCategory.Action)
-                newNode.OutputPort = CreateOutputPort("default");
-            else
+            if (original.NodeType != typeof(RandomChoiceNode))
             {
-                newNode.OutputPortTrue = CreateOutputPort(
-                    original.Category == NodeCategory.Condition ? "true" : "continue");
-                newNode.OutputPortFalse = CreateOutputPort(
-                    original.Category == NodeCategory.Condition ? "false" : "exit");
+                if (original.Category == NodeCategory.Action)
+                    newNode.OutputPort = CreateOutputPort("default");
+                else
+                {
+                    newNode.OutputPortTrue = CreateOutputPort(
+                        original.Category == NodeCategory.Condition ? "true" : "continue");
+                    newNode.OutputPortFalse = CreateOutputPort(
+                        original.Category == NodeCategory.Condition ? "false" : "exit");
+                }
             }
 
             WpfCanvas.SetLeft(border, position.left);

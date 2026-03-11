@@ -98,10 +98,7 @@ namespace MultiSocketRUDPBotTester.AI
                 child =>
                 {
                     if (visual.Category != BotActionGraphWindow.NodeCategory.Action)
-                    {
                         return;
-                    }
-
                     visual.Next = child;
                     visual.NextPortType = "default";
                 });
@@ -115,10 +112,19 @@ namespace MultiSocketRUDPBotTester.AI
             childY = TryCreateChild(jsonNode, "loop_body", childX, childY, createdNodes, nodePath,
                 child => { visual.TrueChild = child; visual.TruePortType = "continue"; });
 
+            childY = TryCreateChild(jsonNode, "exit_nodes", childX, childY, createdNodes, nodePath,
+                child => { visual.FalseChild = child; visual.FalsePortType = "exit"; });
+
             childY = TryCreateChild(jsonNode, "repeat_body", childX, childY, createdNodes, nodePath,
                 child => { visual.TrueChild = child; visual.TruePortType = "continue"; });
 
-            TryCreateChild(jsonNode, "timeout_nodes", childX, childY, createdNodes, nodePath,
+            childY = TryCreateChild(jsonNode, "retry_body", childX, childY, createdNodes, nodePath,
+                child => { visual.TrueChild = child; visual.TruePortType = "continue"; });
+
+            childY = TryCreateChild(jsonNode, "timeout_nodes", childX, childY, createdNodes, nodePath,
+                child => { visual.FalseChild = child; visual.FalsePortType = "exit"; });
+
+            TryCreateChild(jsonNode, "failure_nodes", childX, childY, createdNodes, nodePath,
                 child => { visual.FalseChild = child; visual.FalsePortType = "exit"; });
 
             return visual;
@@ -140,13 +146,10 @@ namespace MultiSocketRUDPBotTester.AI
                 childJson, childX, childY, createdNodes, $"{nodePath}.{propertyName}");
 
             if (child == null)
-            {
                 return childY;
-            }
 
             onCreated(child);
             return childY + 150;
-
         }
 
         private void Configure(NodeVisual visual, JsonElement jsonNode)
@@ -166,6 +169,8 @@ namespace MultiSocketRUDPBotTester.AI
                 else if (visual.NodeType == typeof(WaitForPacketNode)) ConfigureWaitForPacket(visual, jsonNode);
                 else if (visual.NodeType == typeof(SetVariableNode)) ConfigureSetVariable(visual, jsonNode);
                 else if (visual.NodeType == typeof(GetVariableNode)) ConfigureGetVariable(visual, jsonNode);
+                else if (visual.NodeType == typeof(AssertNode)) ConfigureAssert(visual, jsonNode);
+                else if (visual.NodeType == typeof(RetryNode)) ConfigureRetry(visual, jsonNode);
             }
             catch (Exception ex)
             {
@@ -258,6 +263,24 @@ namespace MultiSocketRUDPBotTester.AI
         {
             if (json.TryGetProperty("variable_name", out var prop))
                 visual.Configuration!.StringValue = prop.GetString() ?? "value";
+        }
+
+        private static void ConfigureAssert(NodeVisual visual, JsonElement json)
+        {
+            if (json.TryGetProperty("error_message", out var msg))
+                visual.Configuration!.StringValue = msg.GetString() ?? "Assertion failed";
+            if (json.TryGetProperty("stop_on_failure", out var stop))
+                visual.Configuration!.Properties["StopOnFailure"] = stop.GetBoolean();
+        }
+
+        private static void ConfigureRetry(NodeVisual visual, JsonElement json)
+        {
+            if (json.TryGetProperty("max_retries", out var maxRetries))
+                visual.Configuration!.Properties["MaxRetries"] = maxRetries.GetInt32();
+            if (json.TryGetProperty("retry_delay_ms", out var delay))
+                visual.Configuration!.Properties["RetryDelay"] = delay.GetInt32();
+            if (json.TryGetProperty("exponential_backoff", out var backoff))
+                visual.Configuration!.Properties["ExponentialBackoff"] = backoff.GetBoolean();
         }
 
         private static BotActionGraphWindow.NodeCategory ResolveCategory(string nodeTypeName) =>
