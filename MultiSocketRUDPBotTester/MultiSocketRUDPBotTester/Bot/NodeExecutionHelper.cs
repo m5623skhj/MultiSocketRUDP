@@ -13,7 +13,8 @@ namespace MultiSocketRUDPBotTester.Bot
                 or WaitForPacketNode
                 or RetryNode
                 or ConditionalNode
-                or LoopNode;
+                or LoopNode
+                or AssertNode;
 
         public static void ExecuteChain(
             RuntimeContext context,
@@ -29,9 +30,7 @@ namespace MultiSocketRUDPBotTester.Bot
             node.Execute(context.Client, context.GetPacket());
 
             if (IsAsyncNode(node))
-            {
                 return;
-            }
 
             foreach (var next in node.NextNodes)
             {

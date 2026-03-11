@@ -23,19 +23,23 @@ namespace MultiSocketRUDPBotTester.Bot
             if (context.Has(receivedKey))
             {
                 var buffer = context.Get<NetBuffer>(receivedKey);
-                Log.Information($"WaitForPacketNode: Packet {ExpectedPacketId} already received");
+                Log.Information("WaitForPacketNode: Packet {Id} already received", ExpectedPacketId);
 
+                var visited = new HashSet<ActionNodeBase>();
                 foreach (var nextNode in NextNodes)
                 {
-                    nextNode.Execute(context.Client, buffer);
+                    NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                 }
                 return;
             }
 
-            Log.Information($"WaitForPacketNode: Waiting for {ExpectedPacketId} (timeout: {TimeoutMilliseconds}ms)");
+            Log.Information("WaitForPacketNode: Waiting for {Id} (timeout: {Timeout}ms)",
+                ExpectedPacketId, TimeoutMilliseconds);
 
             var client = context.Client;
             var startTime = CommonFunc.GetNowMs();
+
+            var cancellationToken = client.CancellationToken.Token;
 
             Task.Run(async () =>
             {
@@ -43,14 +47,21 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     while (true)
                     {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            Log.Information("WaitForPacketNode: Cancelled while waiting for {Id}", ExpectedPacketId);
+                            return;
+                        }
+
                         if (context.Has(receivedKey))
                         {
                             var buffer = context.Get<NetBuffer>(receivedKey);
-                            Log.Information($"WaitForPacketNode: Received expected packet {ExpectedPacketId}");
+                            Log.Information("WaitForPacketNode: Received expected packet {Id}", ExpectedPacketId);
 
+                            var visited = new HashSet<ActionNodeBase>();
                             foreach (var nextNode in NextNodes)
                             {
-                                nextNode.Execute(client, buffer);
+                                NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                             }
                             return;
                         }
@@ -58,23 +69,28 @@ namespace MultiSocketRUDPBotTester.Bot
                         var elapsed = CommonFunc.GetNowMs() - startTime;
                         if (elapsed >= (ulong)TimeoutMilliseconds)
                         {
-                            Log.Warning($"WaitForPacketNode: Timeout waiting for {ExpectedPacketId}");
+                            Log.Warning("WaitForPacketNode: Timeout waiting for {Id}", ExpectedPacketId);
 
+                            var timeoutVisited = new HashSet<ActionNodeBase>();
                             foreach (var timeoutNode in TimeoutNodes)
                             {
-                                timeoutNode.Execute(client);
+                                NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
                             }
                             return;
                         }
 
-                        await Task.Delay(50);
+                        await Task.Delay(50, cancellationToken);
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Information("WaitForPacketNode: Cancelled");
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"WaitForPacketNode error: {ex.Message}");
+                    Log.Error("WaitForPacketNode error: {Message}", ex.Message);
                 }
-            });
+            }, cancellationToken);
         }
     }
 
@@ -100,11 +116,12 @@ namespace MultiSocketRUDPBotTester.Bot
                 };
 
                 context.Set(VariableName, value);
-                Log.Information($"SetVariableNode: Set '{VariableName}' = {value} ({ValueType})");
+                Log.Information("SetVariableNode: Set '{Name}' = {Value} ({Type})",
+                    VariableName, value, ValueType);
             }
             catch (Exception ex)
             {
-                Log.Error($"SetVariableNode failed: {ex.Message}");
+                Log.Error("SetVariableNode failed: {Message}", ex.Message);
             }
         }
     }
@@ -120,16 +137,16 @@ namespace MultiSocketRUDPBotTester.Bot
                 if (context.Has(VariableName))
                 {
                     var value = context.Get<object>(VariableName);
-                    Log.Information($"GetVariableNode: '{VariableName}' = {value}");
+                    Log.Information("GetVariableNode: '{Name}' = {Value}", VariableName, value);
                 }
                 else
                 {
-                    Log.Warning($"GetVariableNode: Variable '{VariableName}' not found");
+                    Log.Warning("GetVariableNode: Variable '{Name}' not found", VariableName);
                 }
             }
             catch (Exception ex)
             {
-                Log.Error($"GetVariableNode failed: {ex.Message}");
+                Log.Error("GetVariableNode failed: {Message}", ex.Message);
             }
         }
     }

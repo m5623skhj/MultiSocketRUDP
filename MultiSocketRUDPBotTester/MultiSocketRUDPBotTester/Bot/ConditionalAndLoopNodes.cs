@@ -125,6 +125,7 @@ namespace MultiSocketRUDPBotTester.Bot
         protected override void ExecuteImpl(RuntimeContext context)
         {
             var iterationKey = $"__repeat_iteration_{Guid.NewGuid()}";
+            var cancellationToken = context.Client.CancellationToken.Token;
 
             Task.Run(async () =>
             {
@@ -132,7 +133,13 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     for (var i = 0; i < RepeatCount; i++)
                     {
-                        Log.Debug("Repeat iteration: {Iteration}/{Total}", i + 1, RepeatCount);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            Log.Information("RepeatTimerNode: Cancelled at iteration {I}", i);
+                            return;
+                        }
+
+                        Log.Debug("Repeat iteration: {I}/{Total}", i + 1, RepeatCount);
                         context.Set(iterationKey, i);
 
                         var visited = new HashSet<ActionNodeBase>();
@@ -143,7 +150,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
                         if (i < RepeatCount - 1)
                         {
-                            await Task.Delay(IntervalMilliseconds);
+                            await Task.Delay(IntervalMilliseconds, cancellationToken);
                         }
                     }
 
@@ -153,11 +160,15 @@ namespace MultiSocketRUDPBotTester.Bot
                         NodeExecutionHelper.ExecuteChain(context, next, nextVisited);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    Log.Information("RepeatTimerNode: Cancelled");
+                }
                 catch (Exception e)
                 {
                     Log.Error("RepeatTimerNode failed: {Message}", e.Message);
                 }
-            });
+            }, cancellationToken);
         }
     }
 }

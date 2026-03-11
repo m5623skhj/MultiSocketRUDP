@@ -183,6 +183,12 @@ namespace MultiSocketRUDPBotTester
                 if (node.OutputPortFalse != null) GraphCanvas.Children.Remove(node.OutputPortFalse);
                 foreach (var port in node.DynamicOutputPorts)
                     GraphCanvas.Children.Remove(port);
+
+                if (node.Border.ContextMenu != null)
+                {
+                    node.Border.ContextMenu.Items.Clear();
+                    node.Border.ContextMenu = null;
+                }
             }
 
             allNodes.RemoveAll(n => !n.IsRoot);

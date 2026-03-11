@@ -25,47 +25,60 @@ namespace MultiSocketRUDPBotTester.Bot
 
                 if (result)
                 {
-                    Log.Information($"AssertNode: Assertion passed - {ErrorMessage ?? "Unnamed assertion"}");
+                    Log.Information("AssertNode: Assertion passed - {Message}",
+                        ErrorMessage ?? "Unnamed assertion");
 
+                    var visited = new HashSet<ActionNodeBase>();
                     foreach (var nextNode in NextNodes)
                     {
-                        nextNode.Execute(context.Client, context.GetPacket());
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                     }
                 }
                 else
                 {
                     var message = ErrorMessage ?? "Assertion failed";
-                    Log.Error($"AssertNode: ASSERTION FAILED - {message}");
+                    Log.Error("AssertNode: ASSERTION FAILED - {Message}", message);
 
+                    var failVisited = new HashSet<ActionNodeBase>();
                     foreach (var failureNode in FailureNodes)
                     {
-                        failureNode.Execute(context.Client, context.GetPacket());
+                        NodeExecutionHelper.ExecuteChain(context, failureNode, failVisited);
                     }
 
-                    if (!StopOnFailure)
+                    if (StopOnFailure)
                     {
-                        return;
+                        Log.Warning("AssertNode: Stopping execution chain due to assertion failure");
+                        throw new AssertionFailedException(message);
                     }
 
-                    Log.Warning("AssertNode: Stopping execution due to assertion failure");
+                    var nextVisited = new HashSet<ActionNodeBase>();
+                    foreach (var nextNode in NextNodes)
+                    {
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
+                    }
                 }
+            }
+            catch (AssertionFailedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                Log.Error($"AssertNode: Exception during assertion - {ex.Message}");
+                Log.Error("AssertNode: Exception during assertion - {Message}", ex.Message);
 
+                var failVisited = new HashSet<ActionNodeBase>();
                 foreach (var failureNode in FailureNodes)
                 {
-                    failureNode.Execute(context.Client, context.GetPacket());
+                    NodeExecutionHelper.ExecuteChain(context, failureNode, failVisited);
                 }
 
                 if (StopOnFailure)
-                {
                     throw;
-                }
             }
         }
     }
+
+    public class AssertionFailedException(string message) : Exception(message);
 
     public class RetryNode : ContextNodeBase
     {
@@ -79,6 +92,8 @@ namespace MultiSocketRUDPBotTester.Bot
 
         protected override void ExecuteImpl(RuntimeContext context)
         {
+            var cancellationToken = context.Client.CancellationToken.Token;
+
             Task.Run(async () =>
             {
                 var attempt = 0;
@@ -87,19 +102,20 @@ namespace MultiSocketRUDPBotTester.Bot
                 while (attempt < MaxRetries && !success)
                 {
                     attempt++;
-                    Log.Information($"RetryNode: Attempt {attempt}/{MaxRetries}");
+                    Log.Information("RetryNode: Attempt {Attempt}/{Max}", attempt, MaxRetries);
 
                     try
                     {
+                        var bodyVisited = new HashSet<ActionNodeBase>();
                         foreach (var node in RetryBody)
                         {
-                            node.Execute(context.Client, context.GetPacket());
+                            NodeExecutionHelper.ExecuteChain(context, node, bodyVisited);
                         }
 
                         if (SuccessCondition != null)
                         {
                             success = SuccessCondition(context);
-                            Log.Debug($"RetryNode: Success condition evaluated to {success}");
+                            Log.Debug("RetryNode: Success condition evaluated to {Success}", success);
                         }
                         else
                         {
@@ -108,48 +124,57 @@ namespace MultiSocketRUDPBotTester.Bot
 
                         if (success)
                         {
-                            Log.Information($"RetryNode: Success on attempt {attempt}");
-
+                            Log.Information("RetryNode: Success on attempt {Attempt}", attempt);
+                            var successVisited = new HashSet<ActionNodeBase>();
                             foreach (var successNode in SuccessNodes)
                             {
-                                successNode.Execute(context.Client, context.GetPacket());
+                                NodeExecutionHelper.ExecuteChain(context, successNode, successVisited);
                             }
                             break;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Log.Warning($"RetryNode: Attempt {attempt} failed with exception: {ex.Message}");
+                        Log.Warning("RetryNode: Attempt {Attempt} failed - {Message}", attempt, ex.Message);
                         success = false;
                     }
 
                     if (attempt >= MaxRetries || success)
-                    {
                         continue;
-                    }
 
                     var delay = UseExponentialBackoff
                         ? RetryDelayMilliseconds * (int)Math.Pow(2, attempt - 1)
                         : RetryDelayMilliseconds;
 
-                    Log.Debug($"RetryNode: Waiting {delay}ms before next attempt");
-                    await Task.Delay(delay);
+                    Log.Debug("RetryNode: Waiting {Delay}ms before next attempt", delay);
+
+                    try
+                    {
+                        await Task.Delay(delay, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Log.Information("RetryNode: Cancelled during delay");
+                        return;
+                    }
                 }
 
                 if (!success)
                 {
-                    Log.Error($"RetryNode: Failed after {MaxRetries} attempts");
+                    Log.Error("RetryNode: Failed after {Max} attempts", MaxRetries);
+                    var failVisited = new HashSet<ActionNodeBase>();
                     foreach (var failureNode in FailureNodes)
                     {
-                        failureNode.Execute(context.Client, context.GetPacket());
+                        NodeExecutionHelper.ExecuteChain(context, failureNode, failVisited);
                     }
                 }
 
+                var nextVisited = new HashSet<ActionNodeBase>();
                 foreach (var nextNode in NextNodes)
                 {
-                    nextNode.Execute(context.Client, context.GetPacket());
+                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
                 }
-            });
+            }, cancellationToken);
         }
     }
 }
