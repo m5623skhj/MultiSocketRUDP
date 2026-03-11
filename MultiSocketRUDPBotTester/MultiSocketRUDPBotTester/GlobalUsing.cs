@@ -1,5 +1,5 @@
 ﻿// Global usings
-global using SessionIdType = System.UInt16;
+global using SessionIdType = ushort;
 
 // Global constants
 public static class GlobalConstants

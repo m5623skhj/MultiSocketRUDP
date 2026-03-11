@@ -121,10 +121,8 @@
             {
                 if (!visited.Contains(next))
                 {
-                    if (DetectCycle(next, visited, recursionStack, [..path], result, depth + 1))
-                    {
+                    if (DetectCycle(next, visited, recursionStack, [.. path], result, depth + 1))
                         return true;
-                    }
                 }
                 else if (recursionStack.Contains(next))
                 {
@@ -165,10 +163,18 @@
                 case WaitForPacketNode wait:
                     result.AddRange(wait.TimeoutNodes);
                     break;
+                case AssertNode assert:
+                    result.AddRange(assert.FailureNodes);
+                    break;
                 case RetryNode retry:
                     result.AddRange(retry.RetryBody);
                     result.AddRange(retry.SuccessNodes);
                     result.AddRange(retry.FailureNodes);
+                    break;
+                case RandomChoiceNode randomChoice:
+                    result.AddRange(randomChoice.Choices
+                        .Where(c => c.Node != null)
+                        .Select(c => c.Node!));
                     break;
             }
 
@@ -212,6 +218,17 @@
                     case LoopNode { MaxIterations: > 10000 }:
                         result.AddWarning(node.Name, "Very high iteration limit", "Performance");
                         break;
+
+                    case AssertNode { Condition: null }:
+                        result.AddError(node.Name, "Condition is null", "Configuration");
+                        break;
+                    case AssertNode { FailureNodes.Count: 0 }:
+                        result.AddWarning(node.Name, "No failure handler configured", "Logic");
+                        break;
+
+                    case RandomChoiceNode { Choices.Count: < 2 }:
+                        result.AddError(node.Name, "RandomChoiceNode requires at least 2 choices", "Configuration");
+                        break;
                 }
             }
         }
@@ -235,9 +252,7 @@
         private static void CollectReachable(ActionNodeBase node, HashSet<ActionNodeBase> reachable)
         {
             if (!reachable.Add(node))
-            {
                 return;
-            }
 
             foreach (var next in GetAllNextNodes(node))
             {
