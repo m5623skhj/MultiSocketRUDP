@@ -22,6 +22,9 @@
     <Filter Include="소스 파일\GoogleTestForClientCore">
       <UniqueIdentifier>{b3094cbb-0578-4ad5-a1b0-09a36a1910fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Subhook">
+      <UniqueIdentifier>{c3f4f9f6-6668-4247-8789-3642d0bf6722}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GoogleTest.cpp">
@@ -50,6 +53,9 @@
     </ClCompile>
     <ClCompile Include="SessionPacketOrderer.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\CoreTest\subhook\subhook.c">
+      <Filter>소스 파일\Subhook</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
