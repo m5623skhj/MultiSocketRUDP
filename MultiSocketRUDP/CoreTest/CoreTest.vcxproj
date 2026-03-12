@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\CoreTest\subhook\subhook.c" />
     <ClCompile Include="GoogleTest.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PacketManagerTest.cpp" />
@@ -116,7 +117,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;SUBHOOK_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\external\CommonCode\json-develop\include;$(SolutionDir)\MultiSocketRUDPServer;$(SolutionDir)\..\external\CommonCode\Common;$(SolutionDir)\..\external\CommonCode\Common\googletest-main\googletest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>

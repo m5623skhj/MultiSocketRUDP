@@ -1,3 +1,6 @@
 [submodule "external/CommonCode"]
 	path = external/CommonCode
 	url = https://github.com/m5623skhj/CommonCode.git
+[submodule "CoreTest/subhook"]
+	path = CoreTest/subhook
+	url = https://github.com/savushkin-r-d/subhook.git
