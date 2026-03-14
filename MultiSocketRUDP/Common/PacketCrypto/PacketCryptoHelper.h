@@ -30,9 +30,16 @@ public:
 		const int bodySize = packet.GetUseSize() - (isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader);
 		const int bodyOffset = isCorePacket ? bodyOffsetWithHeaderForCorePacket : bodyOffsetWithHeader;
 
+		SetHeader(packet, AUTH_TAG_SIZE);
+
+		constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
+		const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
+
 		if (not CryptoHelper::EncryptAESGCM(
 			nonce.data(),
 			nonce.size(),
+			aad,
+			aadSize,
 			&packet.m_pSerializeBuffer[bodyOffset],
 			bodySize,
 			&packet.m_pSerializeBuffer[bodyOffset],
@@ -47,7 +54,6 @@ public:
 		}
 
 		packet.WriteBuffer(reinterpret_cast<char*>(authTag), AUTH_TAG_SIZE);
-		SetHeader(packet);
 		packet.m_bIsEncoded = true;
 	}
 
@@ -87,6 +93,9 @@ public:
 
 		const unsigned char* authTag = reinterpret_cast<const unsigned char*>(&packet.m_pSerializeBuffer[authTagOffset]);
 
+		constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
+		const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
+
 		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
 		if (nonce.empty())
 		{
@@ -96,6 +105,8 @@ public:
 		return CryptoHelper::DecryptAESGCM(
 			nonce.data(),
 			nonce.size(),
+			aad,
+			aadSize,
 			&packet.m_pSerializeBuffer[bodyOffset],
 			bodySize,
 			authTag,
@@ -105,13 +116,13 @@ public:
 		);
 	}
 
-	static void SetHeader(OUT NetBuffer& netBuffer)
+	static void SetHeader(OUT NetBuffer& netBuffer, const int extraSize = 0)
 	{
 		netBuffer.m_pSerializeBuffer[0] = NetBuffer::m_byHeaderCode;
-		*(reinterpret_cast<short*>(&netBuffer.m_pSerializeBuffer[1])) = static_cast<short>(netBuffer.m_iWrite - df_HEADER_SIZE);
+		*(reinterpret_cast<short*>(&netBuffer.m_pSerializeBuffer[1])) = static_cast<short>(netBuffer.m_iWrite - df_HEADER_SIZE + extraSize);
 
 		netBuffer.m_iRead = 0;
-		netBuffer.m_iWriteLast = netBuffer.m_iWrite;
+		netBuffer.m_iWriteLast = netBuffer.m_iWrite + extraSize;
 	}
 
 private:
