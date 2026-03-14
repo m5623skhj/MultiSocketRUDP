@@ -238,6 +238,7 @@ void RUDPClientCore::RunRetransmissionThread()
 				break;
 			}
 
+			sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 			SendPacket(*sendPacketInfo);
 		}
 
