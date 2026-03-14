@@ -32,6 +32,8 @@ public:
 	static bool EncryptAESGCM(
 		const unsigned char* nonce,
 		const size_t nonceSize,
+		const unsigned char* aad,
+		size_t aadSize,
 		const char* plaintext,
 		const size_t plaintextSize,
 		char* ciphertext,
@@ -43,6 +45,8 @@ public:
 	static bool DecryptAESGCM(
 		const unsigned char* nonce,
 		const size_t nonceSize,
+		const unsigned char* aad,
+		size_t aadSize,
 		const char* ciphertext,
 		const size_t ciphertextSize,
 		const unsigned char* tag,

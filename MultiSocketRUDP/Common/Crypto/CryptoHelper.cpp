@@ -55,6 +55,8 @@ CryptoHelper::~CryptoHelper()
 bool CryptoHelper::EncryptAESGCM(
 	const unsigned char* nonce,
 	const size_t nonceSize,
+	const unsigned char* aad,
+	size_t aadSize,
 	const char* plaintext,
 	const size_t plaintextSize,
 	char* ciphertext,
@@ -87,7 +89,8 @@ bool CryptoHelper::EncryptAESGCM(
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo)
 	authInfo.pbNonce = const_cast<unsigned char*>(nonce);
 	authInfo.cbNonce = static_cast<ULONG>(nonceSize);
-
+	authInfo.pbAuthData = const_cast<unsigned char*>(aad);
+	authInfo.cbAuthData = static_cast<ULONG>(aadSize);
 	authInfo.pbTag = tag;
 	authInfo.cbTag = static_cast<ULONG>(AUTH_TAG_SIZE);
 
@@ -111,6 +114,8 @@ bool CryptoHelper::EncryptAESGCM(
 bool CryptoHelper::DecryptAESGCM(
 	const unsigned char* nonce,
 	const size_t nonceSize,
+	const unsigned char* aad,
+	size_t aadSize,
 	const char* ciphertext,
 	const size_t ciphertextSize,
 	const unsigned char* tag,
@@ -143,6 +148,8 @@ bool CryptoHelper::DecryptAESGCM(
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo)
 	authInfo.pbNonce = const_cast<unsigned char*>(nonce);
 	authInfo.cbNonce = static_cast<ULONG>(nonceSize);
+	authInfo.pbAuthData = const_cast<unsigned char*>(aad);
+	authInfo.cbAuthData = static_cast<ULONG>(aadSize);
 	authInfo.pbTag = const_cast<unsigned char*>(tag);
 	authInfo.cbTag = AUTH_TAG_SIZE;
 
@@ -224,15 +231,20 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sess
 	std::vector<unsigned char> nonce;
 	nonce.resize(NONCE_SIZE);
 
-	memcpy(nonce.data(), sessionSalt, 8);
+	const unsigned char directionBits = static_cast<unsigned char>(direction) << 6;
+	nonce[0] = directionBits | (sessionSalt[0] & 0x3F);
+	nonce[1] = sessionSalt[1];
+	nonce[2] = sessionSalt[2];
+	nonce[3] = sessionSalt[3];
 
-	nonce[8] = (packetSequence >> 24) & 0x3F;
+	nonce[4] = (packetSequence >> 56) & 0xFF;
+	nonce[5] = (packetSequence >> 48) & 0xFF;
+	nonce[6] = (packetSequence >> 40) & 0xFF;
+	nonce[7] = (packetSequence >> 32) & 0xFF;
+	nonce[8] = (packetSequence >> 24) & 0xFF;
 	nonce[9] = (packetSequence >> 16) & 0xFF;
 	nonce[10] = (packetSequence >> 8) & 0xFF;
 	nonce[11] = packetSequence & 0xFF;
-
-	const uint8_t directionBits = static_cast<uint8_t>(direction) << 6;
-	nonce[8] |= directionBits;
 
 	return nonce;
 }
