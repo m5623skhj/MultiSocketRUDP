@@ -119,8 +119,6 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 void MultiSocketRUDPCore::StopServer()
 {
-	threadStopFlag = true;
-
 	sessionBroker->Stop();
 	CloseAllSessions();
 
