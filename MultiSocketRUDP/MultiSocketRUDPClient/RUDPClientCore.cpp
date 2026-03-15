@@ -4,6 +4,7 @@
 #include "LogExtension.h"
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
+#include <mutex>
 
 void SendPacketInfo::Free(SendPacketInfo* target)
 {
@@ -78,8 +79,24 @@ void RUDPClientCore::Stop()
 		rudpSocket = INVALID_SOCKET;
 	}
 
+	{
+		std::scoped_lock lock(sendPacketInfoMapLock);
+		for (auto& [sequence, info] : sendPacketInfoMap)
+		{
+			NetBuffer::Free(info->buffer);
+			sendPacketInfoPool->Free(info);
+		}
+		sendPacketInfoMap.clear();
+	}
+
 	WSACleanup();
 	isStopped = true;
+
+	if (sendEventHandles[0] != nullptr)
+	{
+		CloseHandle(sendEventHandles[0]);
+		sendEventHandles[0] = nullptr;
+	}
 
 	if (sessionKeyHandle != nullptr)
 	{
