@@ -576,8 +576,8 @@ void RUDPClientCore::Disconnect()
 		std::scoped_lock lock(sendBufferQueueLock);
 		sendBufferQueue.Enqueue(buffer);
 	}
-	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 
+	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
 	isConnected = false;
 }
 
@@ -613,20 +613,26 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 	if (not isCorePacket)
 	{
-		if (const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed))
+		const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
+		if (window == 0)
 		{
-			BYTE outstanding;
-			{
-				std::scoped_lock lock(sendPacketInfoMapLock);
-				outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
-			}
+			std::scoped_lock lock(pendingPacketQueueLock);
+			pendingPacketQueue.push({ inSendPacketSequence, &buffer });
+			return;
+		}
 
-			if (outstanding >= window)
-			{
-				std::scoped_lock lock(pendingPacketQueueLock);
-				pendingPacketQueue.push({ inSendPacketSequence, &buffer });
-				return;
-			}
+
+		BYTE outstanding;
+		{
+			std::scoped_lock lock(sendPacketInfoMapLock);
+			outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
+		}
+
+		if (outstanding >= window)
+		{
+			std::scoped_lock lock(pendingPacketQueueLock);
+			pendingPacketQueue.push({ inSendPacketSequence, &buffer });
+			return;
 		}
 	}
 
