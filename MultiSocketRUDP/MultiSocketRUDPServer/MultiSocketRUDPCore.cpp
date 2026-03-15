@@ -157,7 +157,7 @@ unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
 	return sessionManager->GetConnectedCount();
 }
 
-bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool needAddRefCount) const
+bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 {
 	if (sendPacketInfo == nullptr || sendPacketInfo->owner == nullptr || sendPacketInfo->GetBuffer() == nullptr)
 	{
@@ -170,11 +170,6 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		return false;
 	}
 
-	if (needAddRefCount)
-	{
-		sendPacketInfo->AddRefCount();
-	}
-
 	if (sendPacketInfo->retransmissionCount == 0)
 	{
 		NetBuffer* buffer = sendPacketInfo->GetBuffer();
@@ -183,6 +178,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 		buffer->m_iRead = 0;
 	}
 
+	sendPacketInfo->AddRefCount();
 	sendPacketInfo->owner->rioContext.GetSendContext().PushSendPacketInfo(sendPacketInfo);
 	if (not ioHandler->DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
@@ -520,40 +516,61 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 	{
 		{
 			std::scoped_lock lock(thisThreadSendPacketInfoListLock);
-			copyList.assign(thisThreadSendPacketInfoList.begin(), thisThreadSendPacketInfoList.end());
-
+			copyList.clear();
 			for (auto* info : copyList)
 			{
+				if (info->retransmissionTimeStamp > tickSet.nowTick || info->isErasedPacketInfo == true)
+				{
+					continue;
+				}
+
 				info->AddRefCount();
+				copyList.push_back(info);
 			}
 		}
 		
 		for (const auto& sendPacketInfo : copyList)
 		{
-			if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire) ||
-				sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick || 
-				sendPacketInfo->owner == nullptr || 
-				sendPacketInfo->owner->nowInReleaseThread)
+			bool shouldDisconnect = false;
+			bool shouldSkip = false;
 			{
+				std::scoped_lock lock(thisThreadSendPacketInfoListLock);
+				if (sendPacketInfo->isErasedPacketInfo)
+				{
+					shouldSkip = true;
+				}
+				else if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+				{
+					shouldDisconnect = true;
+				}
+			}
+
+			if (shouldSkip == true)
+			{
+				SendPacketInfo::Free(sendPacketInfo);
 				continue;
 			}
 
-			if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+			if (shouldDisconnect == true)
 			{
 				sendPacketInfo->owner->DoDisconnect();
 				++numOfTimeoutSession;
+				SendPacketInfo::Free(sendPacketInfo);
 				continue;
 			}
 
-			if (not SendPacket(sendPacketInfo, false))
+			if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread == true)
+			{
+				SendPacketInfo::Free(sendPacketInfo);
+				continue;
+			}
+
+			if (not SendPacket(sendPacketInfo))
 			{
 				sendPacketInfo->owner->DoDisconnect();
 			}
-		}
 
-		for (auto* info : copyList)
-		{
-			SendPacketInfo::Free(info);
+			SendPacketInfo::Free(sendPacketInfo);
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);

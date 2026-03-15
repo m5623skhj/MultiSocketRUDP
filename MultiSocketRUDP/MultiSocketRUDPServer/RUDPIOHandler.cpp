@@ -102,6 +102,11 @@ bool RUDPIOHandler::DoRecv(const RUDPSession& session) const
 
 bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) const
 {
+	if (session.IsReleasing())
+	{
+		return true;
+	}
+
 	const auto releaseIOSending = [&]()
 	{
 		InterlockedExchange(
@@ -173,6 +178,12 @@ bool RUDPIOHandler::SendIOCompleted(IOContext* context, const BYTE threadId) con
 	}
 
 	InterlockedExchange(reinterpret_cast<UINT*>(&sessionDelegate.GetSendIOMode(*context->session)), static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+
+	if (context->session->IsReleasing())
+	{
+		contextPool.Free(context);
+		return true;
+	}
 
 	const bool result = DoSend(*context->session, threadId);
 	contextPool.Free(context);
@@ -311,12 +322,15 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
-
+		SendPacketInfo::Free(sendPacketInfo);
+		sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
 
 	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
 	{
+		SendPacketInfo::Free(sendPacketInfo);
+		sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
@@ -325,10 +339,8 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence });
 
 	totalSendSize += static_cast<int>(useSize);
-	if (sendPacketInfo->isReplyType == true)
-	{
-		SendPacketInfo::Free(sessionDelegate.GetReservedSendPacketInfo(session));
-	}
+
+	SendPacketInfo::Free(sessionDelegate.GetReservedSendPacketInfo(session));
 	sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
@@ -345,6 +357,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
 	if (packetSequenceSet.contains(key) == true)
 	{
+		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
 	}
 
@@ -353,7 +366,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is invalid. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect();
-
+		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
 
@@ -367,6 +380,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 
 	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
 	{
+		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
@@ -376,10 +390,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 		, sendPacketInfo->buffer->GetBufferPtr()
 		, useSize);
 
-	if (sendPacketInfo->isReplyType == true)
-	{
-		SendPacketInfo::Free(sendPacketInfo);
-	}
+	SendPacketInfo::Free(sendPacketInfo);
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }

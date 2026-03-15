@@ -58,10 +58,10 @@ class MockCore final : public ICore
 {
 public:
 	[[nodiscard]]
-	bool SendPacket(SendPacketInfo* info, const bool needAddRefCount) override
+	bool SendPacket(SendPacketInfo* info) override
 	{
 		++sendPacketCount;
-		if (onSendPacket) return onSendPacket(info, needAddRefCount);
+		if (onSendPacket) return onSendPacket(info);
 		return sendPacketReturn;
 	}
 

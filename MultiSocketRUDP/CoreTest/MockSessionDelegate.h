@@ -32,7 +32,7 @@ public:
     RIO_RQ GetRecvRIORQ(const RUDPSession&) override { return recvRIORQReturn; }
 
     [[nodiscard]]
-    IO_MODE& GetSendIOMode(RUDPSession&) override { return dummyIOMode; }
+    std::atomic<IO_MODE>& GetSendIOMode(RUDPSession&) override { return dummyIOMode; }
     [[nodiscard]]
     bool IsNothingToSend(RUDPSession&) override { return isNothingToSendReturn; }
     [[nodiscard]]
