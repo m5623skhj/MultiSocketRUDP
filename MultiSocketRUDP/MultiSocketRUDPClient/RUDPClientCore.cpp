@@ -79,6 +79,17 @@ void RUDPClientCore::Stop()
 		rudpSocket = INVALID_SOCKET;
 	}
 
+	if (sendEventHandles[0] != nullptr)
+	{
+		CloseHandle(sendEventHandles[0]);
+		sendEventHandles[0] = nullptr;
+	}
+	if (sendEventHandles[1] != nullptr)
+	{
+		CloseHandle(sendEventHandles[1]);
+		sendEventHandles[1] = nullptr;
+	}
+
 	{
 		std::scoped_lock lock(sendPacketInfoMapLock);
 		for (auto& [sequence, info] : sendPacketInfoMap)
@@ -91,12 +102,6 @@ void RUDPClientCore::Stop()
 
 	WSACleanup();
 	isStopped = true;
-
-	if (sendEventHandles[0] != nullptr)
-	{
-		CloseHandle(sendEventHandles[0]);
-		sendEventHandles[0] = nullptr;
-	}
 
 	if (sessionKeyHandle != nullptr)
 	{
