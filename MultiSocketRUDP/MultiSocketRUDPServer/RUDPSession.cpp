@@ -83,9 +83,11 @@ void RUDPSession::Disconnect()
 		});
 	}
 	OnReleased();
+
+	const SessionIdType disconnectTargetSessionId = sessionId;
 	InitializeSession();
 	stateMachine.SetDisconnected();
-	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
+	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
 }
 
 bool RUDPSession::SendPacket(IPacket& packet)
@@ -269,9 +271,11 @@ void RUDPSession::AbortReservedSession()
 		return;
 	}
 
+	const SessionIdType disconnectTargetSessionId = sessionId;
 	nowInReleaseThread = true;
 	CloseSocket();
-	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
+	InitializeSession();
+	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
 }
 
 void RUDPSession::CloseSocket()
