@@ -569,30 +569,41 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 		{
 		case WAIT_OBJECT_0:
 		{
-			std::scoped_lock lock(releaseSessionIdListLock);
+			std::vector<SessionIdType> copyList;
+			{
+				std::scoped_lock lock(releaseSessionIdListLock);
+				copyList.assign(releaseSessionIdList.begin(), releaseSessionIdList.end());
+				releaseSessionIdList.clear();
+			}
 			
-            std::erase_if(releaseSessionIdList, [this](const SessionIdType releaseSessionId)
-            {
-                const auto releaseSession = GetReleasingSession(releaseSessionId);
-                if (releaseSession == nullptr)
-                {
-                    return true;
-                }
+			std::vector<SessionIdType> remainList;
+			for (const auto releaseSessionId : copyList)
+			{
+				const auto releaseSession = GetReleasingSession(releaseSessionId);
+				if (releaseSession == nullptr)
+				{
+					continue;
+				}
 
-                if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
-                    releaseSession->nowInProcessingRecvPacket)
-                {
-                    return false;
-                }
+				if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
+					releaseSession->nowInProcessingRecvPacket)
+				{
+					remainList.emplace_back(releaseSessionId);
+					continue;
+				}
 
-                releaseSession->Disconnect();
-                return true;
-            });
+				releaseSession->Disconnect();
+			}
 
-            if (not releaseSessionIdList.empty())
-            {
-                SetEvent(sessionReleaseEventHandle);
-            }
+			if (not remainList.empty())
+			{
+				std::scoped_lock lock(releaseSessionIdListLock);
+				for (const auto remainId : remainList)
+				{
+					releaseSessionIdList.emplace_back(remainId);
+				}
+				SetEvent(sessionReleaseEventHandle);
+			}
 		}
 		break;
 		case WAIT_OBJECT_0 + 1:

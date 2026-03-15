@@ -32,7 +32,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 		return;
 	}
 
-	if (const int32_t sequenceGap = diff - 1; sequenceGap > GAP_THRESHOLD)
+	if (const int32_t sequenceGap = diff - 1; sequenceGap >= GAP_THRESHOLD)
 	{
 		OnCongestionEvent();
 	}

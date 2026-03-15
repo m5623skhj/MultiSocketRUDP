@@ -148,6 +148,8 @@ private:
 	unsigned short maxSessionSize;
 	SessionFactoryFunc sessionFactory;
 	std::vector<RUDPSession*> sessionList;
+	// 반드시 sessionListLock 안에서 sessionList와 같이 수정되어야 합니다.
+	std::unordered_set<SessionIdType> unusedSessionIdSet;
 	std::atomic_uint16_t connectedUserCount{};
 
 	std::list<SessionIdType> unusedSessionIdList;
