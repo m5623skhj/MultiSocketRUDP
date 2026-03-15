@@ -23,13 +23,24 @@ struct SendPacketInfo
 	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
 	std::list<SendPacketInfo*>::iterator listItor;
+	std::atomic<int8_t> refCount{ 0 };
 
 	void Initialize(NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
 		buffer = inBuffer;
 		sendPacketSequence = inSendPacketSequence;
+		retransmissionCount = {};
+		retransmissionTimeStamp = {};
 		NetBuffer::AddRefCount(inBuffer);
+		refCount = 1;
 	}
+
+	void AddRefCount()
+	{
+		refCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	static void Free(SendPacketInfo* target);
 
 	[[nodiscard]]
 	NetBuffer* GetBuffer() const { return buffer; }

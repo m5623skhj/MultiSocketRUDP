@@ -59,6 +59,7 @@ RUDPSession* RUDPSessionManager::AcquireSession()
 
 		const SessionIdType sessionId = unusedSessionIdList.front();
 		unusedSessionIdList.pop_front();
+		unusedSessionIdSet.erase(sessionId);
 
 		RUDPSession* session = sessionList[sessionId];
 		if (session == nullptr)
@@ -86,13 +87,14 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
-		if (const auto itor = std::ranges::find(unusedSessionIdList, sessionId); itor != unusedSessionIdList.end())
+		if (unusedSessionIdSet.contains(sessionId))
 		{
 			LOG_ERROR("Session already released in ReleaseSession");
 			return false;
 		}
 
 		unusedSessionIdList.emplace_back(sessionId);
+		unusedSessionIdSet.emplace(sessionId);
 	}
 
 	DecrementConnectedCount();
@@ -165,6 +167,7 @@ void RUDPSessionManager::ClearAllSessions()
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
 		unusedSessionIdList.clear();
+		unusedSessionIdSet.clear();
 	}
 
 	for (auto* session : sessionList)
@@ -231,6 +234,7 @@ bool RUDPSessionManager::CreateSessionPool()
 			sessionDelegate.SetThreadId(*session, i % numOfWorkerThreads);
 			sessionList.emplace_back(session);
 			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(i));
+			unusedSessionIdSet.emplace(static_cast<SessionIdType>(i));
 		}
 
 		return true;

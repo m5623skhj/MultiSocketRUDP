@@ -12,11 +12,12 @@
 RUDPSessionBroker::RUDPSessionBroker(
 	MultiSocketRUDPCore& inCore,
 	ISessionDelegate& inSessionDelegate,
-	const std::wstring& certStoreName,
-	const std::wstring& certSubjectName)
+	const std::wstring& inCertStoreName,
+	const std::wstring& inCertSubjectName)
 	: core(inCore)
 	, sessionDelegate(inSessionDelegate)
-	, tlsHelper(certStoreName, certSubjectName)
+	, certStoreName(inCertStoreName)
+	, certSubjectName(inCertSubjectName)
 {
 }
 
@@ -33,16 +34,19 @@ bool RUDPSessionBroker::Start(const PortType listenPort, const std::string& rudp
 		return false;
 	}
 
-	if (not tlsHelper.Initialize())
-	{
-		LOG_ERROR("RUDPSessionBroker tlsHelper initialize failed");
-		return false;
-	}
-
 	if (not OpenSessionBrokerSocket(listenPort))
 	{
 		LOG_ERROR("RUDPSessionBroker OpenSessionBrokerSocket failed");
 		return false;
+	}
+
+	threadPool.reserve(BROKER_THREAD_POOL_SIZE);
+	for (unsigned int i = 0; i < BROKER_THREAD_POOL_SIZE; ++i)
+	{
+		threadPool.emplace_back([this](const std::stop_token& stopToken)
+			{
+				RunBrokerWorkerThread(stopToken);
+			});
 	}
 
 	isRunning = true;
@@ -68,6 +72,20 @@ void RUDPSessionBroker::Stop()
 		sessionBrokerThread.request_stop();
 		sessionBrokerThread.join();
 	}
+
+	for (auto& thread : threadPool)
+	{
+		thread.request_stop();
+	}
+
+	for (auto& thread : threadPool)
+	{
+		if (thread.joinable())
+		{
+			thread.join();
+		}
+	}
+
 	isRunning = false;
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
@@ -81,11 +99,8 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 	sockaddr_in clientAddr;
 	int sockAddrSize = sizeof(clientAddr);
 
-	NetBuffer sendBuffer;
 	while (not stopToken.stop_requested())
 	{
-		sendBuffer.Init();
-
 		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
@@ -99,28 +114,83 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 			continue;
 		}
 
-		if (tlsHelper.Handshake(clientSocket) == false)
 		{
-			LOG_ERROR("RunSessionBrokerThread tlsHelper.Handshake failed");
-			closesocket(clientSocket);
-			continue;
+			std::scoped_lock lock(clientQueueLock);
+			clientQueue.push({ clientSocket, rudpSessionIP });
 		}
-
-		const auto session = ReserveSession(sendBuffer, rudpSessionIP);
-		if (not SendSessionInfoToClient(clientSocket, sendBuffer))
-		{
-			if (session != nullptr)
-			{
-				sessionDelegate.AbortReservedSession(*session);
-			}
-		}
-
-		closesocket(clientSocket);
+		clientQueueCV.notify_one();
 	}
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
 	Logger::GetInstance().WriteLog(log);
+}
+
+void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
+{
+	std::stop_callback stopCallback(stopToken, [this]()
+		{
+			clientQueueCV.notify_all();
+		});
+
+	while (not stopToken.stop_requested())
+	{
+		SOCKET clientSocket = INVALID_SOCKET;
+		std::string rudpSessionIP;
+
+		{
+			std::unique_lock lock(clientQueueLock);
+			clientQueueCV.wait(lock, [this, &stopToken]()
+				{
+					return not clientQueue.empty() || stopToken.stop_requested();
+				});
+
+			if (stopToken.stop_requested() && clientQueue.empty())
+			{
+				return;
+			}
+
+			auto [socket, ip] = clientQueue.front();
+			clientSocket = socket;
+			rudpSessionIP = ip;
+			clientQueue.pop();
+		}
+
+		HandleClientConnection(clientSocket, rudpSessionIP);
+	}
+}
+
+void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP)
+{
+	TLSHelper::TLSHelperServer localTlsHelper(certStoreName, certSubjectName);
+
+	if (not localTlsHelper.Initialize())
+	{
+		LOG_ERROR("HandleClientConnection localTlsHelper.Initialize() failed");
+		closesocket(clientSocket);
+		return;
+	}
+
+	if (not localTlsHelper.Handshake(clientSocket))
+	{
+		LOG_ERROR("HandleClientConnection localTlsHelper.Handshake failed");
+		closesocket(clientSocket);
+		return;
+	}
+
+	NetBuffer sendBuffer;
+	sendBuffer.Init();
+
+	const auto session = ReserveSession(sendBuffer, rudpSessionIP);
+	if (not SendSessionInfoToClient(clientSocket, localTlsHelper, sendBuffer))
+	{
+		if (session != nullptr)
+		{
+			sessionDelegate.AbortReservedSession(*session);
+		}
+	}
+
+	closesocket(clientSocket);
 }
 
 bool RUDPSessionBroker::OpenSessionBrokerSocket(const PortType listenPort)
@@ -276,7 +346,7 @@ void RUDPSessionBroker::SetSessionInfoToBuffer(const RUDPSession& session, const
 	buffer.WriteBuffer(sessionDelegate.GetSessionSalt(session), SESSION_SALT_SIZE);
 }
 
-bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer)
+bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, TLSHelper::TLSHelperServer& localTlsHelper, OUT NetBuffer& sendBuffer)
 {
 	PacketCryptoHelper::SetHeader(sendBuffer);
 
@@ -285,7 +355,7 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 	size_t encryptedSize = 0;
 	constexpr DWORD tlsShutdownTimeout = 300;
 
-	if (not tlsHelper.EncryptData(
+	if (not localTlsHelper.EncryptData(
 		sendBuffer.GetBufferPtr(),
 		sendBuffer.GetAllUseSize(),
 		encryptedBuffer,
@@ -301,11 +371,11 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, OUT 
 		return false;
 	}
 
-	if (tlsHelper.EncryptCloseNotify(encryptedBuffer, sizeof(encryptedBuffer), encryptedSize))
+	if (localTlsHelper.EncryptCloseNotify(encryptedBuffer, sizeof(encryptedBuffer), encryptedSize))
 	{
 		if (not SendAll(clientSocket, encryptedBuffer, encryptedSize))
 		{
-			LOG_ERROR(std::format("RunSessionBrokerThread send close notify failed with error {}", WSAGetLastError()));
+			LOG_ERROR(std::format("SendSessionInfoToClient send close notify failed with error {}", WSAGetLastError()));
 			return false;
 		}
 	}

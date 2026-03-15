@@ -5,6 +5,21 @@
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
+void SendPacketInfo::Free(SendPacketInfo* target)
+{
+	if (target == nullptr)
+	{
+		return;
+	}
+
+	if (target->refCount.fetch_sub(1, std::memory_order_release) == 1)
+	{
+		std::atomic_thread_fence(std::memory_order_acquire);
+		NetBuffer::Free(target->buffer);
+		sendPacketInfoPool->Free(target);
+	}
+}
+
 RUDPClientCore::RUDPClientCore()
 	: serverAliveChecker([this] { Stop(); }
 	                     , [this] { return GetNextRecvPacketSequence(); })
@@ -216,31 +231,64 @@ void RUDPClientCore::RunRetransmissionThread()
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 
-	std::list<std::pair<PacketSequence, SendPacketInfo*>> copyList;
+	std::list<SendPacketInfo*> retransmitTargets;
 	while (not threadStopFlag)
 	{
 		{
 			std::scoped_lock lock(sendPacketInfoMapLock);
-			copyList.assign(sendPacketInfoMap.begin(), sendPacketInfoMap.end());
+			retransmitTargets.clear();
+			for (auto& [sequence, info] : sendPacketInfoMap)
+			{
+				if (info->retransmissionTimeStamp > tickSet.nowTick)
+				{
+					continue;
+				}
+
+				info->AddRefCount();
+				retransmitTargets.push_back(info);
+			}
 		}
 
-		for (const auto& sendPacketInfo : copyList | std::views::values)
+		for (auto* sendPacketInfo : retransmitTargets)
 		{
-			if (sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick)
+			if (threadStopFlag)
 			{
+				SendPacketInfo::Free(sendPacketInfo);
 				continue;
 			}
 
-			if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+			bool shouldSkip = false;
+			bool shouldDisconnect = false;
+			{
+				std::scoped_lock lock(sendPacketInfoMapLock);
+				if (sendPacketInfoMap.find(sendPacketInfo->sendPacketSequence) == sendPacketInfoMap.end())
+				{
+					shouldSkip = true;
+				}
+				else if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+				{
+					shouldDisconnect = true;
+				}
+			}
+
+			if (shouldSkip)
+			{
+				SendPacketInfo::Free(sendPacketInfo);
+				continue;
+			}
+
+			if (shouldDisconnect)
 			{
 				LOG_ERROR("The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates");
 				isConnected = false;
 				threadStopFlag = true;
-				break;
+				SendPacketInfo::Free(sendPacketInfo);
+				continue;
 			}
 
 			sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionThreadSleepMs;
 			SendPacket(*sendPacketInfo);
+			SendPacketInfo::Free(sendPacketInfo);
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
@@ -364,7 +412,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	remoteAdvertisedWindow.store(remoteWindow, std::memory_order_relaxed);
 	lastAckedSequence.store(packetSequence, std::memory_order_relaxed);
 
-	if (packetSequence == 0)
+	if (packetSequence == 0 && not isConnected)
 	{
 		isConnected = true;
 		serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
@@ -372,7 +420,13 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 
 	{
 		std::scoped_lock lock(sendPacketInfoMapLock);
-		sendPacketInfoMap.erase(packetSequence);
+		const auto itor = sendPacketInfoMap.find(packetSequence);
+		if (itor != sendPacketInfoMap.end())
+		{
+			SendPacketInfo* info = itor->second;
+			sendPacketInfoMap.erase(itor);
+			sendPacketInfoPool->Free(info);
+		}
 	}
 
 	TryFlushPendingQueue();
@@ -414,6 +468,7 @@ void RUDPClientCore::DoSend()
 
 		if (rudpSocket == INVALID_SOCKET)
 		{
+			NetBuffer::Free(packet);
 			return;
 		}
 
@@ -421,6 +476,8 @@ void RUDPClientCore::DoSend()
 		{
 			LOG_ERROR(std::format("sendto() failed with error code {}", WSAGetLastError()));
 		}
+
+		NetBuffer::Free(packet);
 	}
 }
 
@@ -504,7 +561,23 @@ void RUDPClientCore::Disconnect()
 	constexpr auto packetType = PACKET_TYPE::DISCONNECT_TYPE;
 	constexpr PacketSequence packetSequence = 0;
 	*buffer << packetType;
-	SendPacket(*buffer, packetSequence, true);
+
+	PacketCryptoHelper::EncodePacket(
+		*buffer,
+		packetSequence,
+		PACKET_DIRECTION::CLIENT_TO_SERVER,
+		sessionSalt,
+		SESSION_SALT_SIZE,
+		sessionKeyHandle,
+		true
+	);
+
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		sendBufferQueue.Enqueue(buffer);
+	}
+	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+
 	isConnected = false;
 }
 
@@ -562,6 +635,7 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 void RUDPClientCore::SendPacket(const SendPacketInfo& sendPacketInfo)
 {
+	NetBuffer::AddRefCount(sendPacketInfo.buffer);
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
 		sendBufferQueue.Enqueue(sendPacketInfo.buffer);

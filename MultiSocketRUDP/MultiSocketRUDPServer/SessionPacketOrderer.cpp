@@ -1,5 +1,7 @@
 #include "PreCompile.h"
 #include "SessionPacketOrderer.h"
+#include "../Logger/Logger.h"
+#include "LogExtension.h"
 
 SessionPacketOrderer::SessionPacketOrderer(const BYTE inMaxHoldingQueueSize)
 	: maxHoldingQueueSize(inMaxHoldingQueueSize)
@@ -46,9 +48,20 @@ ON_RECV_RESULT SessionPacketOrderer::OnReceive(const PacketSequence sequence, Ne
 		return ON_RECV_RESULT::PROCESSED;
 	}
 
-	if (not recvHoldingPacketSequences.contains(sequence) 
-		&& recvHoldingPacketSequences.size() < maxHoldingQueueSize)
+	if (not recvHoldingPacketSequences.contains(sequence) )
 	{
+		if (recvHoldingPacketSequences.size() >= maxHoldingQueueSize)
+		{
+			LOG_ERROR(std::format(
+				"SessionPacketOrderer: holding queue full. "
+				"maxHoldingQueueSize={}, nextExpected={}, lostSeq={} → DoDisconnect",
+				maxHoldingQueueSize,
+				nextRecvPacketSequence.load(std::memory_order_relaxed),
+				nextRecvPacketSequence.load(std::memory_order_relaxed)));
+
+			return ON_RECV_RESULT::ERROR_OCCURED;
+		}
+
 		NetBuffer::AddRefCount(&buffer);
 		recvPacketHolderQueue.emplace(&buffer, sequence);
 		recvHoldingPacketSequences.emplace(sequence);

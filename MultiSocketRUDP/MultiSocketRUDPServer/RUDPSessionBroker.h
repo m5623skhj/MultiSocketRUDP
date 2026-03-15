@@ -1,6 +1,8 @@
 #pragma once
 
 #include <thread>
+#include <mutex>
+#include <queue>
 
 #include "../Common/etc/CoreType.h"
 #include "../Common/TLS/TLSHelper.h"
@@ -32,6 +34,8 @@ public:
 
 private:
 	void RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP);
+	void RunBrokerWorkerThread(const std::stop_token& stopToken);
+	void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP);
 
 	[[nodiscard]]
 	bool OpenSessionBrokerSocket(PortType listenPort);
@@ -53,17 +57,26 @@ private:
 private:
     void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer) const;
 	[[nodiscard]]
-	bool SendSessionInfoToClient(const SOCKET& clientSocket, OUT NetBuffer& sendBuffer);
+	static bool SendSessionInfoToClient(const SOCKET& clientSocket, TLSHelper::TLSHelperServer& localTlsHelper, OUT NetBuffer& sendBuffer);
 	[[nodiscard]]
 	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize);
 
 private:
 	MultiSocketRUDPCore& core;
 	ISessionDelegate& sessionDelegate;
-	TLSHelper::TLSHelperServer tlsHelper;
+
+	std::wstring certStoreName;
+	std::wstring certSubjectName;
 
 	SOCKET sessionBrokerListenSocket = INVALID_SOCKET;
 	std::jthread sessionBrokerThread{};
+
+	static constexpr unsigned int BROKER_THREAD_POOL_SIZE = 4;
+	std::vector<std::jthread> threadPool;
+
+	std::queue<std::pair<SOCKET, std::string>> clientQueue;
+	std::mutex clientQueueLock;
+	std::condition_variable clientQueueCV;
 
 	bool isRunning{};
 };
