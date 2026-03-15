@@ -90,7 +90,6 @@ private:
 	void ReleaseAllSession() const;
 
 private:
-	bool threadStopFlag{};
 	bool isServerStopped{};
 	unsigned short numOfSockets{};
 	PortType sessionBrokerPort{};

@@ -17,7 +17,7 @@ struct SendPacketInfo
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
-	bool isErasedPacketInfo{};
+	std::atomic_bool isErasedPacketInfo{};
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
 	std::atomic_int8_t refCount{};
