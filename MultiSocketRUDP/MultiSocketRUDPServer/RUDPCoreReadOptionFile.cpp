@@ -55,7 +55,7 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 		return false;
 	}
 
-	ZeroMemory(buffer, BUFFER_MAX);
+	ZeroMemory(buffer, BUFFER_MAX * sizeof(WCHAR));
 	LoadParsingText(buffer, sessionBrokerOptionFilePath.c_str(), BUFFER_MAX);
 
 	// session broker

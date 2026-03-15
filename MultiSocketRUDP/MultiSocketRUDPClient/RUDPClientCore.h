@@ -72,7 +72,7 @@ private:
 
 private:
 	bool isStopped{};
-	bool threadStopFlag{};
+	std::atomic_bool threadStopFlag{};
 	bool isConnected{};
 
 #pragma region SessionGetter
