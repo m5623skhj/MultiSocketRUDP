@@ -194,7 +194,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo, const bool 
 
 void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
-	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo == true)
+	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo.load(std::memory_order_acquire))
 	{
 		return;
 	}
@@ -521,11 +521,19 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 		{
 			std::scoped_lock lock(thisThreadSendPacketInfoListLock);
 			copyList.assign(thisThreadSendPacketInfoList.begin(), thisThreadSendPacketInfoList.end());
+
+			for (auto* info : copyList)
+			{
+				info->AddRefCount();
+			}
 		}
 		
 		for (const auto& sendPacketInfo : copyList)
 		{
-			if (sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick || sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread || sendPacketInfo->isErasedPacketInfo)
+			if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire) ||
+				sendPacketInfo->retransmissionTimeStamp > tickSet.nowTick || 
+				sendPacketInfo->owner == nullptr || 
+				sendPacketInfo->owner->nowInReleaseThread)
 			{
 				continue;
 			}
@@ -541,6 +549,11 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 			{
 				sendPacketInfo->owner->DoDisconnect();
 			}
+		}
+
+		for (auto* info : copyList)
+		{
+			SendPacketInfo::Free(info);
 		}
 
 		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
