@@ -83,9 +83,9 @@ void RUDPSession::Disconnect()
 		});
 	}
 	OnReleased();
-
-	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
+	InitializeSession();
 	stateMachine.SetDisconnected();
+	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(sessionId);
 }
 
 bool RUDPSession::SendPacket(IPacket& packet)

@@ -575,7 +575,6 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
                 }
 
                 releaseSession->Disconnect();
-                releaseSession->InitializeSession();
                 return true;
             });
 
