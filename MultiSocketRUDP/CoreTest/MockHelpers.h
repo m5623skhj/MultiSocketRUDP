@@ -61,7 +61,11 @@ public:
 	bool SendPacket(SendPacketInfo* info) override
 	{
 		++sendPacketCount;
-		if (onSendPacket) return onSendPacket(info);
+		if (onSendPacket)
+		{
+			return onSendPacket(info, needAddRefCount);
+		}
+
 		return sendPacketReturn;
 	}
 
