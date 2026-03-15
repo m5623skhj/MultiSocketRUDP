@@ -48,7 +48,7 @@ public:
 	unsigned short GetConnectedUserCount() const;
 
 public:
-	bool SendPacket(SendPacketInfo* sendPacketInfo, bool needAddRefCount = true) const override;
+	bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
 	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
 	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const override;
 

@@ -73,7 +73,7 @@ RIO_BUFFERID RUDPSessionFunctionDelegate::GetSendBufferId(const RUDPSession& ses
 	return session.GetSendContext().GetSendBufferId();
 }
 
-IO_MODE& RUDPSessionFunctionDelegate::GetSendIOMode(RUDPSession& session)
+std::atomic<IO_MODE>& RUDPSessionFunctionDelegate::GetSendIOMode(RUDPSession& session)
 {
 	return session.GetSendContext().GetIOMode();
 }

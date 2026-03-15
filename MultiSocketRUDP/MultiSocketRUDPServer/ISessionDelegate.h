@@ -48,7 +48,7 @@ public:
 	virtual RIO_RQ GetRecvRIORQ(const RUDPSession& session) = 0;
 
 	[[nodiscard]]
-	virtual IO_MODE& GetSendIOMode(RUDPSession& session) = 0;
+	virtual std::atomic<IO_MODE>& GetSendIOMode(RUDPSession& session) = 0;
 	virtual bool IsNothingToSend(RUDPSession& session) = 0;
 	virtual bool IsSendPacketInfoQueueEmpty(RUDPSession& session) = 0;
 	[[nodiscard]]

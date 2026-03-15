@@ -115,7 +115,7 @@ public:
 	// @return IO_MODE 참조
 	// ----------------------------------------
 	[[nodiscard]]
-	IO_MODE& GetIOMode();
+	std::atomic<IO_MODE>& GetIOMode();
 
 	// ----------------------------------------
 	// @brief 시퀀스를 키로 송신 패킷 정보를 맵에 등록합니다.
@@ -219,7 +219,7 @@ private:
 	SendPacketInfo* reservedSendPacketInfo = nullptr;
 	char rioSendBuffer[MAX_SEND_BUFFER_SIZE]{};
 	RIO_BUFFERID sendBufferId = RIO_INVALID_BUFFERID;
-	IO_MODE ioMode = IO_MODE::IO_NONE_SENDING;
+	std::atomic<IO_MODE> ioMode = IO_MODE::IO_NONE_SENDING;
 
 	std::mutex sendPacketInfoQueueLock;
 	std::queue<SendPacketInfo*> sendPacketInfoQueue;

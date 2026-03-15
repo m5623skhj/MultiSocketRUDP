@@ -60,7 +60,7 @@ private:
 #pragma region For RUDPIOHandler
 	std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session) override;
 	RIO_BUFFERID GetSendBufferId(const RUDPSession& session) override;
-	IO_MODE& GetSendIOMode(RUDPSession& session) override;
+	std::atomic<IO_MODE>& GetSendIOMode(RUDPSession& session) override;
 	bool IsSendPacketInfoQueueEmpty(RUDPSession& session) override;
 	SendPacketInfo* TryGetFrontAndPop(RUDPSession& session) override;
 	SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session) override;

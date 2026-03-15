@@ -119,7 +119,7 @@ void SessionSendContext::SetSendRIOBufferId(const RIO_BUFFERID id)
 	sendBufferId = id;
 }
 
-IO_MODE& SessionSendContext::GetIOMode()
+std::atomic<IO_MODE>& SessionSendContext::GetIOMode()
 {
 	return ioMode;
 }
@@ -127,6 +127,7 @@ IO_MODE& SessionSendContext::GetIOMode()
 void SessionSendContext::InsertSendPacketInfo(const PacketSequence sequence, SendPacketInfo* info)
 {
 	std::unique_lock lock(sendPacketInfoMapLock);
+	info->AddRefCount();
 	sendPacketInfoMap.insert({ sequence, info });
 }
 
@@ -140,7 +141,12 @@ SendPacketInfo* SessionSendContext::FindSendPacketInfo(const PacketSequence sequ
 void SessionSendContext::EraseSendPacketInfo(const PacketSequence sequence)
 {
 	std::unique_lock lock(sendPacketInfoMapLock);
-	sendPacketInfoMap.erase(sequence);
+	const auto itor = sendPacketInfoMap.find(sequence);
+	if (itor != sendPacketInfoMap.end())
+	{
+		SendPacketInfo::Free(itor->second);
+		sendPacketInfoMap.erase(itor);
+	}
 }
 
 SendPacketInfo* SessionSendContext::FindAndEraseSendPacketInfo(const PacketSequence sequence)
