@@ -51,16 +51,17 @@ void RUDPClientCore::Stop()
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 	}
-	if (rudpSocket != INVALID_SOCKET)
-	{
-		closesocket(rudpSocket);
-		rudpSocket = INVALID_SOCKET;
-	}
 
 	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
 
 	JoinThreads();
+
+	if (rudpSocket != INVALID_SOCKET)
+	{
+		closesocket(rudpSocket);
+		rudpSocket = INVALID_SOCKET;
+	}
 
 	WSACleanup();
 	isStopped = true;
@@ -409,6 +410,11 @@ void RUDPClientCore::DoSend()
 		{
 			LOG_ERROR("sendBufferQueue.Dequeue() failed");
 			continue;
+		}
+
+		if (rudpSocket == INVALID_SOCKET)
+		{
+			return;
 		}
 
 		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
