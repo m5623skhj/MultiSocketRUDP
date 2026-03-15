@@ -30,3 +30,4 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/obj/
 MultiSocketRUDP/Tool/PacketUploader/credentials.json
 MultiSocketRUDP/CoreTest/x64/
 .vs/
+*.cpp
