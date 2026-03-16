@@ -63,7 +63,7 @@ void RUDPSession::DoDisconnect()
 		return;
 	}
 
-	nowInReleaseThread = true;
+	nowInReleaseThread.store(true, seq_cst)
 	OnDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
@@ -272,7 +272,7 @@ void RUDPSession::AbortReservedSession()
 	}
 
 	const SessionIdType disconnectTargetSessionId = sessionId;
-	nowInReleaseThread = true;
+	nowInReleaseThread.store(true, seq_cst);
 	CloseSocket();
 	InitializeSession();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
