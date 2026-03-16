@@ -21,6 +21,7 @@ struct SendPacketInfo
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
 	std::atomic_int8_t refCount{};
+	bool isInSendPacketInfoList{};
 
 	SendPacketInfo() = default;
 	~SendPacketInfo();
