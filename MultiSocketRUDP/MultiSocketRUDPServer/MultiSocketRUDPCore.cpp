@@ -700,7 +700,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 				break;
 			}
 
-			context->session->nowInProcessingRecvPacket = true;
+			context->session->nowInProcessingRecvPacket.store(true, std::memory_order_seq_cst);
 			if (context->session->rioContext.GetRecvBuffer().recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
 			{
 				break;
@@ -718,7 +718,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 
 		if (context->session != nullptr)
 		{
-			context->session->nowInProcessingRecvPacket = false;
+			context->session->nowInProcessingRecvPacket.store(false, std::memory_order_seq_cst);
 		}
 		recvIOCompletedContextPool.Free(context);
 	}
