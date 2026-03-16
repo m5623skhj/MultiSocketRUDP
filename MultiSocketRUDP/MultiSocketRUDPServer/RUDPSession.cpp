@@ -38,7 +38,7 @@ void RUDPSession::InitializeSession()
 	cryptoContext.Initialize();
 	clientAddr = {};
 	clientSockAddrInet = {};
-	nowInReleaseThread = {};
+	nowInReleaseThread.store(false, std::memory_order_release);
 	sessionReservedTime = {};
 
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
@@ -63,7 +63,7 @@ void RUDPSession::DoDisconnect()
 		return;
 	}
 
-	nowInReleaseThread.store(true, seq_cst)
+	nowInReleaseThread.store(true, memory_order_seq_cst)
 	OnDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
@@ -231,7 +231,7 @@ void RUDPSession::TryFlushPendingQueue()
 
 void RUDPSession::SendHeartbeatPacket()
 {
-	if (nowInReleaseThread || not IsConnected())
+	if (nowInReleaseThread.load(std::memory_order_acquire) || not IsConnected())
 	{
 		return;
 	}
@@ -272,7 +272,7 @@ void RUDPSession::AbortReservedSession()
 	}
 
 	const SessionIdType disconnectTargetSessionId = sessionId;
-	nowInReleaseThread.store(true, seq_cst);
+	nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	CloseSocket();
 	InitializeSession();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
@@ -511,7 +511,7 @@ SESSION_STATE RUDPSession::GetSessionState() const
 
 bool RUDPSession::IsReleasing() const
 {
-	return nowInReleaseThread;
+	return nowInReleaseThread.load(std::memory_order_seq_cst);
 }
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
