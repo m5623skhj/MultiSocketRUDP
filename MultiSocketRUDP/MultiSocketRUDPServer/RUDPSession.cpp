@@ -516,7 +516,7 @@ bool RUDPSession::IsReleasing() const
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const
 {
-	return CheckMyClient(clientAddr) && not IsReleasing();
+	return CheckMyClient(targetClientAddr) && not IsReleasing();
 }
 
 bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
