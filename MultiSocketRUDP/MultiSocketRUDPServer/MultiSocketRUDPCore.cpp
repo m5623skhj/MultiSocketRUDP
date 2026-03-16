@@ -202,6 +202,7 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 			break;
 		}
 
+		if (eraseTarget->isInSendPacketInfoList)
 		{
 			std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
 			sendPacketInfoList[threadId].erase(eraseTarget->listItor);
