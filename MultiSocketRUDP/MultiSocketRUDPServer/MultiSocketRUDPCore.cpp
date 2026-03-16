@@ -165,7 +165,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 		return false;
 	}
 
-	if (sendPacketInfo->owner->nowInReleaseThread)
+	if (sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire))
 	{
 		return false;
 	}
@@ -243,7 +243,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 {
 	std::scoped_lock lock(releaseSessionIdListLock);
-	session.nowInReleaseThread = true;
+	session.nowInReleaseThread.store(true, memory_order_seq_cst);
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 	SetEvent(sessionReleaseEventHandle);
 }
@@ -560,7 +560,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 				continue;
 			}
 
-			if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread == true)
+			if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire) == true)
 			{
 				SendPacketInfo::Free(sendPacketInfo);
 				continue;
@@ -603,8 +603,8 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 					continue;
 				}
 
-				if (releaseSession->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING ||
-					releaseSession->nowInProcessingRecvPacket)
+				if (releaseSession->GetSendContext().GetIOMode().load(std::memory_order_seq_cst) == IO_MODE::IO_SENDING ||
+					releaseSession->nowInProcessingRecvPacket.load(std::memory_order_seq_cst))
 				{
 					remainList.emplace_back(releaseSessionId);
 					continue;
