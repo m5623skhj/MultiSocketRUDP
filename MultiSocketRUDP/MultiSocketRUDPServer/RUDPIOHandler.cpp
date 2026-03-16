@@ -123,6 +123,12 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 			break;
 		}
 
+		if (session.IsReleasing())
+		{
+			releaseIOSending();
+			return true;
+		}
+		
 		if (sessionDelegate.IsNothingToSend(session))
 		{
 			releaseIOSending();
