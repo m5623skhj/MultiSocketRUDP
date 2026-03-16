@@ -63,7 +63,7 @@ void RUDPSession::DoDisconnect()
 		return;
 	}
 
-	nowInReleaseThread.store(true, memory_order_seq_cst)
+	nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	OnDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }

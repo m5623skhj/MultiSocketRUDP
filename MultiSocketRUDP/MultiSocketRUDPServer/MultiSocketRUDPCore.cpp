@@ -243,7 +243,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 {
 	std::scoped_lock lock(releaseSessionIdListLock);
-	session.nowInReleaseThread.store(true, memory_order_seq_cst);
+	session.nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 	SetEvent(sessionReleaseEventHandle);
 }
