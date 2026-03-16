@@ -55,8 +55,8 @@ void RIOManager::Shutdown()
 		return;
 	}
 
-	rioCompletionQueues.clear();
-	registeredBuffers.clear();
+    CleanupRegisteredBuffers();
+    CleanupCompletionQueues();
 
 	isInitialized = false;
 }
