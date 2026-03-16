@@ -182,6 +182,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 	sendPacketInfo->owner->rioContext.GetSendContext().PushSendPacketInfo(sendPacketInfo);
 	if (not ioHandler->DoSend(*sendPacketInfo->owner, sendPacketInfo->owner->threadId))
 	{
+		SendPacketInfo::Free(sendPacketInfo);
 		return false;
 	}
 
@@ -261,6 +262,7 @@ void MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, c
 	{
 		LOG_ERROR("recvIOContext is nullptr in EnqueueContextResult()");
 		DisconnectSession(contextResult->ownerSessionId);
+		return;
 	}
 
 	recvIOContext->InitContext(contextResult->session, contextResult->clientAddrBuffer);
@@ -518,7 +520,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 		{
 			std::scoped_lock lock(thisThreadSendPacketInfoListLock);
 			copyList.clear();
-			for (auto* info : copyList)
+			for (auto* info : thisThreadSendPacketInfoList)
 			{
 				if (info->retransmissionTimeStamp > tickSet.nowTick || info->isErasedPacketInfo == true)
 				{
