@@ -27,6 +27,7 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	retransmissionCount = {};
 	retransmissionTimeStamp = {};
 	isErasedPacketInfo = {};
+	isInSendPacketInfoList = {};
 
 	refCount = 1;
 }
