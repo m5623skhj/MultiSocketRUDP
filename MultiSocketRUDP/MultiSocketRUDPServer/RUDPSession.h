@@ -214,9 +214,6 @@ private:
 
 	static BYTE maximumHoldingPacketQueueSize;
 
-	std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
-	std::mutex cachedSequenceSetLock;
-
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
 
