@@ -92,14 +92,23 @@ void RUDPClientCore::Stop()
 
 	{
 		std::scoped_lock lock(sendPacketInfoMapLock);
-		for (auto& [sequence, info] : sendPacketInfoMap)
+		for (auto info : sendPacketInfoMap | std::views::values)
 		{
-			NetBuffer::Free(info->buffer);
-			sendPacketInfoPool->Free(info);
+			SendPacketInfo::Free(info);
 		}
 		sendPacketInfoMap.clear();
 	}
 
+	{
+		std::scoped_lock lock(pendingPacketQueueLock);
+		while (not pendingPacketQueue.empty())
+		{
+			auto [sequence, buffer] = pendingPacketQueue.top();
+			pendingPacketQueue.pop();
+			NetBuffer::Free(buffer);
+		}
+	}
+	
 	WSACleanup();
 	isStopped = true;
 
@@ -447,7 +456,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		{
 			SendPacketInfo* info = itor->second;
 			sendPacketInfoMap.erase(itor);
-			sendPacketInfoPool->Free(info);
+			SendPacketInfo::Free(info);
 		}
 	}
 
