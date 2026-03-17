@@ -24,7 +24,7 @@ private:
 	void RunServerAliveCheckerThread();
 
 private:
-	bool isStopped{ false };
+	std::atomic_bool isStopped{ false };
 
 private:
 	unsigned int checkIntervalMs{ 0 };
