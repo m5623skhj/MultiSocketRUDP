@@ -346,7 +346,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 
 	totalSendSize += static_cast<int>(useSize);
 
-	SendPacketInfo::Free(sessionDelegate.GetReservedSendPacketInfo(session));
+	SendPacketInfo::Free(sendPacketInfo);
 	sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
@@ -417,11 +417,12 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 			return false;
 		}
 
-		if (sendPacketInfo->retransmissionCount > 0)
+		if (sendPacketInfo->isInSendPacketInfoList)
 		{
 			sendPacketInfoList[threadId].erase(sendPacketInfo->listItor);
 		}
 		sendPacketInfo->listItor = sendPacketInfoList[threadId].emplace(sendPacketInfoList[threadId].end(), sendPacketInfo);
+		sendPacketInfo->isInSendPacketInfoList = true;
 	}
 
 	return true;

@@ -18,10 +18,10 @@ struct SendPacketInfo
 	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
 	std::atomic_bool isErasedPacketInfo{};
+	bool isInSendPacketInfoList{};
 	bool isReplyType{};
 	std::list<SendPacketInfo*>::iterator listItor;
 	std::atomic_int8_t refCount{};
-	bool isInSendPacketInfoList{};
 
 	SendPacketInfo() = default;
 	~SendPacketInfo();

@@ -113,6 +113,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	if (not SendPacket(*buffer, packetSequence, false, false))
 	{
 		DoDisconnect();
+		NetBuffer::Free(buffer);
 		return false;
 	}
 
@@ -139,6 +140,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(inSendPacketSequence))
 		{
+			NetBuffer::AddRefCount(&buffer);
 			if (not rioContext.GetSendContext().PushToPendingQueue(inSendPacketSequence, &buffer))
 			{
 				LOG_ERROR("Pending queue is full in RUDPSession::SendPacket()");
@@ -255,6 +257,7 @@ void RUDPSession::SendHeartbeatPacket()
 
 	if (not SendPacket(*buffer, packetSequence, false, true))
 	{
+		NetBuffer::Free(buffer);
 		DoDisconnect();
 	}
 }
@@ -433,6 +436,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 
 	if (not SendPacket(*buffer, recvPacketSequence, true, true))
 	{
+		NetBuffer::Free(buffer);
 		DoDisconnect();
 	}
 }
