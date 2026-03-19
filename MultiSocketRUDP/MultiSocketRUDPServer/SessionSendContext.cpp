@@ -35,14 +35,15 @@ void SessionSendContext::Reset()
 	lastSendPacketSequence = 0;
 	sendBufferId = RIO_INVALID_BUFFERID;
 
-	if (reservedSendPacketInfo != nullptr)
-	{
-		SendPacketInfo::Free(reservedSendPacketInfo);
-		reservedSendPacketInfo = nullptr;
-	}
-
 	{
 		std::scoped_lock lock(sendPacketInfoQueueLock);
+
+		if (reservedSendPacketInfo != nullptr)
+		{
+			SendPacketInfo::Free(reservedSendPacketInfo);
+			reservedSendPacketInfo = nullptr;
+		}
+
 		while (not sendPacketInfoQueue.empty())
 		{
 			SendPacketInfo::Free(sendPacketInfoQueue.front());
@@ -94,13 +95,15 @@ bool SessionSendContext::IsNothingToSend()
 	return sendPacketInfoQueue.empty() && reservedSendPacketInfo == nullptr;
 }
 
-SendPacketInfo* SessionSendContext::GetReservedSendPacketInfo() const
+SendPacketInfo* SessionSendContext::GetReservedSendPacketInfo()
 {
+	std::scoped_lock lock(sendPacketInfoQueueLock);
 	return reservedSendPacketInfo;
 }
 
 void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 {
+	std::scoped_lock lock(sendPacketInfoQueueLock);
 	reservedSendPacketInfo = info;
 }
 

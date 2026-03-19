@@ -113,7 +113,6 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	if (not SendPacket(*buffer, packetSequence, false, false))
 	{
 		DoDisconnect();
-		NetBuffer::Free(buffer);
 		return false;
 	}
 
@@ -140,7 +139,6 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 
 		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(inSendPacketSequence))
 		{
-			NetBuffer::AddRefCount(&buffer);
 			if (not rioContext.GetSendContext().PushToPendingQueue(inSendPacketSequence, &buffer))
 			{
 				LOG_ERROR("Pending queue is full in RUDPSession::SendPacket()");
@@ -191,10 +189,15 @@ bool RUDPSession::SendPacketImmediate(
 
 	if (not core.SendPacket(sendPacketInfo))
 	{
-		SendPacketInfo::Free(sendPacketInfo);
 		if (not isReplyType)
 		{
+			core.EraseSendPacketInfo(sendPacketInfo, threadId);
 			rioContext.GetSendContext().EraseSendPacketInfo(inSendPacketSequence);
+		}
+		else
+		{
+			sendPacketInfo->isErasedPacketInfo.store(true, std::memory_order_release);
+			SendPacketInfo::Free(sendPacketInfo);
 		}
 
 		return false;
@@ -222,12 +225,22 @@ void RUDPSession::TryFlushPendingQueue()
 		}
 	}
 
-	for (auto& [packetSequence, buffer] : sendBuffers)
+	size_t bufferIndex = 0;
+	const size_t sendBuffersSize = sendBuffers.size();
+	for (; bufferIndex < sendBuffersSize; ++bufferIndex)
 	{
+		auto& [packetSequence, buffer] = sendBuffers[bufferIndex];
 		if (not SendPacketImmediate(*buffer, packetSequence, false, false))
 		{
 			DoDisconnect();
+			++bufferIndex;
+			break;
 		}
+	}
+
+	for (; bufferIndex < sendBuffersSize; ++bufferIndex)
+	{
+		NetBuffer::Free(sendBuffers[bufferIndex].second);
 	}
 }
 
@@ -257,7 +270,6 @@ void RUDPSession::SendHeartbeatPacket()
 
 	if (not SendPacket(*buffer, packetSequence, false, true))
 	{
-		NetBuffer::Free(buffer);
 		DoDisconnect();
 	}
 }
@@ -436,7 +448,6 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 
 	if (not SendPacket(*buffer, recvPacketSequence, true, true))
 	{
-		NetBuffer::Free(buffer);
 		DoDisconnect();
 	}
 }

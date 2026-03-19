@@ -88,7 +88,7 @@ SendPacketInfo* RUDPSessionFunctionDelegate::TryGetFrontAndPop(RUDPSession& sess
 	return session.GetSendContext().TryGetFrontAndPop();
 }
 
-SendPacketInfo* RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(const RUDPSession& session)
+SendPacketInfo* RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(RUDPSession& session)
 {
 	return session.GetSendContext().GetReservedSendPacketInfo();
 }
