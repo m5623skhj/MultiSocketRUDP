@@ -73,14 +73,11 @@ namespace MultiSocketRUDPBotTester.Bot
 
             try
             {
-                var loopInstanceKey = $"__loop_instance_{Guid.NewGuid()}";
-                context.Set(loopInstanceKey, 0);
-
                 var iteration = 0;
                 while (iteration < MaxIterations && ContinueCondition(context))
                 {
                     Log.Debug("Loop iteration: {Iteration}", iteration);
-                    context.Set(loopInstanceKey, iteration);
+                    context.Set("__loop_iteration", iteration);
 
                     var visited = new HashSet<ActionNodeBase>();
                     foreach (var node in LoopBody)
@@ -112,6 +109,7 @@ namespace MultiSocketRUDPBotTester.Bot
             catch (Exception ex)
             {
                 Log.Error("Loop execution failed: {Message}", ex.Message);
+                throw;
             }
         }
     }

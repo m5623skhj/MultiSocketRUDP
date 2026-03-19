@@ -1,14 +1,13 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
-using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
     public class ActionGraph
     {
-        private readonly ConcurrentDictionary<TriggerType, List<ActionNodeBase>> triggerNodes = new();
-        private readonly ConcurrentDictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
+        private readonly Dictionary<TriggerType, List<ActionNodeBase>> triggerNodes = new();
+        private readonly Dictionary<PacketId, List<ActionNodeBase>> packetTriggerNodes = new();
         private readonly List<ActionNodeBase> allNodes = [];
         private readonly Lock allNodesLock = new();
         private readonly Lock triggerNodesLock = new();

@@ -31,7 +31,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            var randomValue = Random.Next(0, totalWeight);
+            var randomValue = Random.Shared.Next(0, totalWeight);
             var cumulativeWeight = 0;
             ChoiceOption? selectedChoice = null;
 
@@ -49,7 +49,8 @@ namespace MultiSocketRUDPBotTester.Bot
 
             if (selectedChoice?.Node != null)
             {
-                Log.Information($"RandomChoiceNode: Selected '{selectedChoice.Name}' (weight: {selectedChoice.Weight}/{totalWeight})");
+                Log.Information("RandomChoiceNode: Selected '{ChoiceName}' (weight: {Weight}/{TotalWeight})",
+                    selectedChoice.Name, selectedChoice.Weight, totalWeight);
                 selectedChoice.Node.Execute(client, receivedPacket);
             }
             else

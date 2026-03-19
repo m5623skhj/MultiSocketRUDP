@@ -1,6 +1,7 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
+using System.Globalization;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -106,10 +107,10 @@ namespace MultiSocketRUDPBotTester.Bot
             {
                 object value = ValueType.ToLower() switch
                 {
-                    "int" => int.Parse(StringValue),
-                    "long" => long.Parse(StringValue),
-                    "float" => float.Parse(StringValue),
-                    "double" => double.Parse(StringValue),
+                    "int" => int.Parse(StringValue, CultureInfo.InvariantCulture),
+                    "long" => long.Parse(StringValue, CultureInfo.InvariantCulture),
+                    "float" => float.Parse(StringValue, CultureInfo.InvariantCulture),
+                    "double" => double.Parse(StringValue, CultureInfo.InvariantCulture),
                     "bool" => bool.Parse(StringValue),
                     "string" => StringValue,
                     _ => StringValue

@@ -3,14 +3,6 @@ using MultiSocketRUDPBotTester.Contents.Client;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
-    public enum ActionNodeType
-    {
-        SendPacket,
-        Wait,
-        Loop,
-        Conditional,
-    }
-
     public abstract class ActionNodeBase
     {
         public string Name { get; set; } = string.Empty;
