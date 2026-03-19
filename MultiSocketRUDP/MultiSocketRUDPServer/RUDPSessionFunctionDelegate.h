@@ -63,7 +63,7 @@ private:
 	std::atomic<IO_MODE>& GetSendIOMode(RUDPSession& session) override;
 	bool IsSendPacketInfoQueueEmpty(RUDPSession& session) override;
 	SendPacketInfo* TryGetFrontAndPop(RUDPSession& session) override;
-	SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession& session) override;
+	SendPacketInfo* GetReservedSendPacketInfo(RUDPSession& session) override;
 	bool IsNothingToSend(RUDPSession& session) override;
 	void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) override;
 	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) override;

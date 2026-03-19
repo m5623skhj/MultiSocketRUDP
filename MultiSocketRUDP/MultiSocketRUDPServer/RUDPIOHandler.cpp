@@ -403,12 +403,16 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 
 bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPacketInfo, ThreadIdType threadId) const
 {
+	if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
+	{
+		return false;
+	}
+
 	if (sendPacketInfo->isReplyType == true)
 	{
 		return true;
 	}
 
-	sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
 	{
 		std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
 		if (sendPacketInfo->isErasedPacketInfo == true)
@@ -417,6 +421,7 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 			return false;
 		}
 
+		sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
 		if (sendPacketInfo->isInSendPacketInfoList)
 		{
 			sendPacketInfoList[threadId].erase(sendPacketInfo->listItor);

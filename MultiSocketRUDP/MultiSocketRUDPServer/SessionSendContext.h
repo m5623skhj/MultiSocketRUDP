@@ -85,7 +85,7 @@ public:
 	// @return 예약된 SendPacketInfo 포인터
 	// ----------------------------------------
 	[[nodiscard]]
-	SendPacketInfo* GetReservedSendPacketInfo() const;
+	SendPacketInfo* GetReservedSendPacketInfo();
 	// ----------------------------------------
 	// @brief 예약 송신 패킷 정보를 설정합니다.
 	// @param info 설정할 SendPacketInfo 포인터
