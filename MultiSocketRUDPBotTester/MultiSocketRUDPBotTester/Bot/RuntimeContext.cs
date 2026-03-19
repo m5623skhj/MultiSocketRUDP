@@ -21,11 +21,11 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        public void SetPacket(NetBuffer? packet)
+        public void SetPacket(NetBuffer? newPacket)
         {
             lock (packetLock)
             {
-                currentPacket = packet;
+                currentPacket = newPacket;
             }
         }
 

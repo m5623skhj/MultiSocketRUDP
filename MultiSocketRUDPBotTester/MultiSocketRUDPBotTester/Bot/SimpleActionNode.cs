@@ -20,7 +20,10 @@ namespace MultiSocketRUDPBotTester.Bot
             try
             {
                 var buffer = PacketBuilder(client);
-                _ = Task.Run(async () => await client.SendPacket(buffer, PacketId));
+                _ = Task.Run(async () => await client.SendPacket(buffer, PacketId))
+                    .ContinueWith(t => Log.Error(t.Exception!,
+                        "SendPacketNode failed: {PacketId}", PacketId),
+                        TaskContinuationOptions.OnlyOnFaulted);
                 Log.Debug("Sent packet: {PacketId}", PacketId);
             }
             catch (Exception ex)
@@ -75,12 +78,12 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            var delay = Random.Next(MinDelayMilliseconds, MaxDelayMilliseconds + 1);
+            var delay = Random.Shared.Next(MinDelayMilliseconds, MaxDelayMilliseconds + 1);
 
             Task.Run(async () =>
             {
                 await Task.Delay(delay);
-                Log.Debug($"RandomDelayNode: Delayed for {delay}ms (range: {MinDelayMilliseconds}-{MaxDelayMilliseconds}ms)");
+                Log.Debug("RandomDelayNode: Delayed for {Delay}ms (range: {Min}-{Max}ms", delay, MinDelayMilliseconds, MaxDelayMilliseconds);
 
                 foreach (var nextNode in NextNodes)
                 {
@@ -125,12 +128,12 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             try
             {
-                Log.Information($"DisconnectNode: Disconnecting - Reason: {Reason}");
+                Log.Information("DisconnectNode: Disconnecting - Reason: {Reason}", Reason);
                 client.Disconnect();
             }
             catch (Exception ex)
             {
-                Log.Error($"DisconnectNode failed: {ex.Message}");
+                Log.Error("DisconnectNode failed: {Message}", ex.Message);
             }
         }
     }

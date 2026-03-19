@@ -1,4 +1,5 @@
 ﻿using MultiSocketRUDPBotTester.Bot;
+using System.Globalization;
 
 namespace MultiSocketRUDPBotTester.Evaluation
 {
@@ -56,8 +57,8 @@ namespace MultiSocketRUDPBotTester.Evaluation
 
         private static object ParseConstant(string value)
         {
-            if (int.TryParse(value, out var intVal)) return intVal;
-            if (double.TryParse(value, out var dblVal)) return dblVal;
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal)) return intVal;
+            if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var dblVal)) return dblVal;
             if (bool.TryParse(value, out var boolVal)) return boolVal;
             return value;
         }
@@ -74,7 +75,10 @@ namespace MultiSocketRUDPBotTester.Evaluation
                 case uint ui: result = ui; return true;
                 case short s: result = s; return true;
                 case byte b: result = b; return true;
-                case string str when double.TryParse(str, out var parsed):
+                case string str when double.TryParse(str,
+                    NumberStyles.Float | NumberStyles.AllowThousands,
+                    CultureInfo.InvariantCulture,
+                    out var parsed):
                     result = parsed;
                     return true;
                 default:

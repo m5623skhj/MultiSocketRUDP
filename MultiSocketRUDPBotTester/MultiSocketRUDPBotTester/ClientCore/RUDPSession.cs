@@ -122,7 +122,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public CancellationTokenSource CancellationToken = new();
 
         private volatile bool isConnected;
-        private bool isDisposed;
+        private int isDisposed;
 
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual void OnConnected() { }
@@ -172,7 +172,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             PacketId packetId,
             PacketType packetType = PacketType.SendType)
         {
-            var sequence = ++lastSendSequence;
+            var sequence = Interlocked.Increment(ref lastSendSequence);
 
             packetBuffer.InsertPacketType(packetType);
             packetBuffer.InsertPacketSequence(sequence);
@@ -373,8 +373,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 Log.Information("Connected to server. SessionId={Id}", SessionInfo.SessionId);
             }
 
-            if (lastSendSequence < packetSequence)
+            if (Interlocked.Read(ref lastSendSequence) < packetSequence)
+            {
                 return;
+            }
 
             bufferStore.RemoveSendBuffer(packetSequence);
         }
@@ -430,7 +432,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private NetBuffer BuildDisconnectPacket()
         {
-            var seq = ++lastSendSequence;
+            var seq = Interlocked.Increment(ref lastSendSequence);
             var buffer = new NetBuffer();
             buffer.WriteByte((byte)PacketType.DisconnectType);
             buffer.WriteULong(seq);
@@ -472,8 +474,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void Cleanup()
         {
-            if (isDisposed) return;
-            isDisposed = true;
+            if (Interlocked.CompareExchange(ref isDisposed, 1, 0) != 0)
+            {
+                return;
+            }
 
             isConnected = false;
             OnDisconnected();
@@ -496,7 +500,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             TargetServerInfo.ServerIp = string.Empty;
             TargetServerInfo.ServerPort = 0;
-            lastSendSequence = 0;
+            Interlocked.Exchange(ref lastSendSequence, 0);
             lock (expectedRecvSequenceLock) { expectedRecvSequence = 0; }
 
             holdingPacketStore.Clear();

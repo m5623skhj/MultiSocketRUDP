@@ -210,15 +210,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public ActionGraphBuilder EndIf()
         {
-            if (lastTrueNode != null)
-            {
-                parent.SetLastNode(lastTrueNode);
-            }
-            else if (lastFalseNode != null)
-            {
-                parent.SetLastNode(lastFalseNode);
-            }
-
+            parent.SetLastNode(conditionalNode);
             return parent;
         }
     }
