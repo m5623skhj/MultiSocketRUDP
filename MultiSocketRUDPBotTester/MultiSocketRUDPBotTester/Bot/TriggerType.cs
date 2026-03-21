@@ -34,8 +34,13 @@ namespace MultiSocketRUDPBotTester.Bot
                 return false;
             }
 
-            if (PacketValidator != null && buffer != null)
+            if (PacketValidator != null)
             {
+                if (buffer == null)
+                {
+                    return false;
+                }
+
                 return PacketValidator(buffer);
             }
 

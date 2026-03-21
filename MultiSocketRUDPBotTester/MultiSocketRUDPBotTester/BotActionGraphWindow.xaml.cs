@@ -12,6 +12,7 @@ using MultiSocketRUDPBotTester.CanvasRenderer;
 using WpfCanvas = System.Windows.Controls.Canvas;
 using Microsoft.Extensions.Configuration;
 using Path = System.IO.Path;
+using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
 
 namespace MultiSocketRUDPBotTester
 {

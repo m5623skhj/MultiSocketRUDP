@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Data;
 using MultiSocketRUDPBotTester.Bot;
+using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
 
 namespace MultiSocketRUDPBotTester.Windows
 {

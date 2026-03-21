@@ -57,6 +57,11 @@ namespace MultiSocketRUDPBotTester.Bot
             {
                 Log.Warning("RandomChoiceNode: No choice was selected");
             }
+
+            foreach (var nextNode in NextNodes)
+            {
+                nextNode.Execute(client, receivedPacket);
+            }
         }
     }
 }

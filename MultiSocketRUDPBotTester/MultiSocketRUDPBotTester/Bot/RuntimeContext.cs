@@ -55,5 +55,13 @@ namespace MultiSocketRUDPBotTester.Bot
 
             return defaultValue;
         }
+
+        public int AtomicIncrement(string key, int delta = 1)
+        {
+            var result = vars.AddOrUpdate(key, delta,
+                (_, existing) => (existing is int i) ? i + delta : delta);
+            
+            return (int)result;
+        }
     }
 }

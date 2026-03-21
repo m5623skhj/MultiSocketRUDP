@@ -13,6 +13,7 @@ namespace MultiSocketRUDPBotTester.Bot
         public long MaxExecutionTimeMs { get; private set; }
         public DateTime LastExecutionTime { get; private set; }
         public string LastError { get; private set; } = "";
+        private readonly Lock _lock = new();
 
         public double AverageExecutionTimeMs =>
             ExecutionCount > 0 ? (double)TotalExecutionTimeMs / ExecutionCount : 0;
@@ -22,62 +23,69 @@ namespace MultiSocketRUDPBotTester.Bot
 
         internal void RecordExecution(long executionTimeMs, bool success, string? error)
         {
-            ExecutionCount++;
-
-            if (success)
-                SuccessCount++;
-            else
+            lock (_lock)
             {
-                FailureCount++;
-                if (error != null)
-                    LastError = error;
+                ExecutionCount++;
+
+                if (success)
+                {
+                    SuccessCount++;
+                }
+                else
+                {
+                    FailureCount++;
+                    if (error != null)
+                    {
+                        LastError = error;
+                    }
+
+                    TotalExecutionTimeMs += executionTimeMs;
+
+                    if (ExecutionCount == 1)
+                    {
+                        MinExecutionTimeMs = executionTimeMs;
+                        MaxExecutionTimeMs = executionTimeMs;
+                    }
+                    else
+                    {
+                        MinExecutionTimeMs = Math.Min(MinExecutionTimeMs, executionTimeMs);
+                        MaxExecutionTimeMs = Math.Max(MaxExecutionTimeMs, executionTimeMs);
+                    }
+
+                    LastExecutionTime = DateTime.Now;
+                }
+            }
+        }
+
+        public class NodeStatsTracker
+        {
+            private readonly ConcurrentDictionary<string, NodeExecutionStats> stats = new();
+
+            public void RecordExecution(string nodeName, long executionTimeMs, bool success, string? error = null)
+            {
+                var stat = stats.GetOrAdd(nodeName, _ => new NodeExecutionStats { NodeName = nodeName });
+                stat.RecordExecution(executionTimeMs, success, error);
             }
 
-            TotalExecutionTimeMs += executionTimeMs;
-
-            if (ExecutionCount == 1)
+            public NodeExecutionStats? GetStats(string nodeName)
             {
-                MinExecutionTimeMs = executionTimeMs;
-                MaxExecutionTimeMs = executionTimeMs;
-            }
-            else
-            {
-                MinExecutionTimeMs = Math.Min(MinExecutionTimeMs, executionTimeMs);
-                MaxExecutionTimeMs = Math.Max(MaxExecutionTimeMs, executionTimeMs);
+                return stats.GetValueOrDefault(nodeName);
             }
 
-            LastExecutionTime = DateTime.Now;
-        }
-    }
+            public List<NodeExecutionStats> GetAllStats()
+            {
+                return stats.Values.OrderByDescending(s => s.ExecutionCount).ToList();
+            }
 
-    public class NodeStatsTracker
-    {
-        private readonly ConcurrentDictionary<string, NodeExecutionStats> stats = new();
+            public void Reset()
+            {
+                stats.Clear();
+            }
 
-        public void RecordExecution(string nodeName, long executionTimeMs, bool success, string? error = null)
-        {
-            var stat = stats.GetOrAdd(nodeName, _ => new NodeExecutionStats { NodeName = nodeName });
-            stat.RecordExecution(executionTimeMs, success, error);
-        }
-
-        public NodeExecutionStats? GetStats(string nodeName)
-        {
-            return stats.GetValueOrDefault(nodeName);
-        }
-
-        public List<NodeExecutionStats> GetAllStats()
-        {
-            return stats.Values.OrderByDescending(s => s.ExecutionCount).ToList();
-        }
-
-        public void Reset()
-        {
-            stats.Clear();
-        }
-
-        public void ResetNode(string nodeName)
-        {
-            stats.TryRemove(nodeName, out _);
+            public void ResetNode(string nodeName)
+            {
+                stats.TryRemove(nodeName, out _);
+            }
         }
     }
 }

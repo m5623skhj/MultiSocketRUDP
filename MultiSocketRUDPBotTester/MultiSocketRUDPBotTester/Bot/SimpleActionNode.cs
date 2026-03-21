@@ -62,6 +62,9 @@ namespace MultiSocketRUDPBotTester.Bot
                 await Task.Delay(DelayMilliseconds);
                 Log.Debug("Delayed for {Ms}ms", DelayMilliseconds);
 
+                var context = client.GlobalContext;
+                context.SetPacket(receivedPacket);
+                var visited = new HashSet<ActionNodeBase>();
                 foreach (var nextNode in NextNodes)
                 {
                     nextNode.Execute(client, receivedPacket);
@@ -85,6 +88,9 @@ namespace MultiSocketRUDPBotTester.Bot
                 await Task.Delay(delay);
                 Log.Debug("RandomDelayNode: Delayed for {Delay}ms (range: {Min}-{Max}ms", delay, MinDelayMilliseconds, MaxDelayMilliseconds);
 
+                var context = client.GlobalContext;
+                context.SetPacket(receivedPacket);
+                var visited = new HashSet<ActionNodeBase>();
                 foreach (var nextNode in NextNodes)
                 {
                     nextNode.Execute(client, receivedPacket);

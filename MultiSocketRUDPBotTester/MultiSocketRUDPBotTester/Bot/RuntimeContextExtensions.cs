@@ -1,4 +1,6 @@
-﻿namespace MultiSocketRUDPBotTester.Bot
+﻿using System.Collections.Concurrent;
+
+namespace MultiSocketRUDPBotTester.Bot
 {
     public static class RuntimeContextExtensions
     {
@@ -30,10 +32,7 @@
 
         public static int Increment(this RuntimeContext ctx, string key, int delta = 1)
         {
-            var current = ctx.GetOrDefault(key, 0);
-            var newValue = current + delta;
-            ctx.Set(key, newValue);
-            return newValue;
+            return ctx.AtomicIncrement(key, delta);
         }
 
         public static void StartTimer(this RuntimeContext ctx, string name)
@@ -56,36 +55,38 @@
         public static void RecordMetric(this RuntimeContext ctx, string name, double value)
         {
             var key = $"__metric_{name}";
-            List<double> list;
+            ConcurrentBag<double> bag;
 
-            if (ctx.TryGet<List<double>>(key, out var existing) && existing != null)
-                list = existing;
+            if (ctx.TryGet<ConcurrentBag<double>>(key, out var existing) && existing != null)
+            {
+                bag = existing;
+            }
             else
             {
-                list = new List<double>();
-                ctx.Set(key, list);
+                bag = new ConcurrentBag<double>();
+                ctx.Set(key, bag);
             }
 
-            list.Add(value);
+            bag.Add(value);
         }
 
         public static double GetAverageMetric(this RuntimeContext ctx, string name)
         {
-            if (ctx.TryGet<List<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
                 return list.Average();
             return 0;
         }
 
         public static double GetMinMetric(this RuntimeContext ctx, string name)
         {
-            if (ctx.TryGet<List<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
                 return list.Min();
             return 0;
         }
 
         public static double GetMaxMetric(this RuntimeContext ctx, string name)
         {
-            if (ctx.TryGet<List<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
                 return list.Max();
             return 0;
         }

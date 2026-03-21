@@ -1,5 +1,6 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
+using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -17,9 +18,8 @@ namespace MultiSocketRUDPBotTester.Bot
             return nextNode;
         }
 
-        private static NodeStatsTracker? _statsTracker;
+        private static volatile NodeStatsTracker? _statsTracker;
         public static void SetStatsTracker(NodeStatsTracker? tracker) => _statsTracker = tracker;
         internal static NodeStatsTracker? GetStatsTracker() => _statsTracker;
-
     }
 }

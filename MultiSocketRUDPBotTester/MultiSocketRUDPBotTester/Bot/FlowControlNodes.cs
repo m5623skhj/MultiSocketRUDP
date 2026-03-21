@@ -96,83 +96,90 @@ namespace MultiSocketRUDPBotTester.Bot
 
             Task.Run(async () =>
             {
-                var attempt = 0;
-                var success = false;
-
-                while (attempt < MaxRetries && !success)
+                try
                 {
-                    attempt++;
-                    Log.Information("RetryNode: Attempt {Attempt}/{Max}", attempt, MaxRetries);
+                    var attempt = 0;
+                    var success = false;
 
-                    try
+                    while (attempt < MaxRetries && !success)
                     {
-                        var bodyVisited = new HashSet<ActionNodeBase>();
-                        foreach (var node in RetryBody)
-                        {
-                            NodeExecutionHelper.ExecuteChain(context, node, bodyVisited);
-                        }
+                        attempt++;
+                        Log.Information("RetryNode: Attempt {Attempt}/{Max}", attempt, MaxRetries);
 
-                        if (SuccessCondition != null)
+                        try
                         {
-                            success = SuccessCondition(context);
-                            Log.Debug("RetryNode: Success condition evaluated to {Success}", success);
-                        }
-                        else
-                        {
-                            success = true;
-                        }
-
-                        if (success)
-                        {
-                            Log.Information("RetryNode: Success on attempt {Attempt}", attempt);
-                            var successVisited = new HashSet<ActionNodeBase>();
-                            foreach (var successNode in SuccessNodes)
+                            var bodyVisited = new HashSet<ActionNodeBase>();
+                            foreach (var node in RetryBody)
                             {
-                                NodeExecutionHelper.ExecuteChain(context, successNode, successVisited);
+                                NodeExecutionHelper.ExecuteChain(context, node, bodyVisited);
                             }
-                            break;
+
+                            if (SuccessCondition != null)
+                            {
+                                success = SuccessCondition(context);
+                                Log.Debug("RetryNode: Success condition evaluated to {Success}", success);
+                            }
+                            else
+                            {
+                                success = true;
+                            }
+
+                            if (success)
+                            {
+                                Log.Information("RetryNode: Success on attempt {Attempt}", attempt);
+                                var successVisited = new HashSet<ActionNodeBase>();
+                                foreach (var successNode in SuccessNodes)
+                                {
+                                    NodeExecutionHelper.ExecuteChain(context, successNode, successVisited);
+                                }
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("RetryNode: Attempt {Attempt} failed - {Message}", attempt, ex.Message);
+                            success = false;
+                        }
+
+                        if (attempt >= MaxRetries || success)
+                        {
+                            continue;
+                        }
+
+                        var delay = UseExponentialBackoff
+                            ? RetryDelayMilliseconds * (int)Math.Pow(2, attempt - 1)
+                            : RetryDelayMilliseconds;
+
+                        Log.Debug("RetryNode: Waiting {Delay}ms before next attempt", delay);
+
+                        try
+                        {
+                            await Task.Delay(delay, cancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Log.Information("RetryNode: Cancelled during delay");
+                            return;
                         }
                     }
-                    catch (Exception ex)
+
+                    if (!success)
                     {
-                        Log.Warning("RetryNode: Attempt {Attempt} failed - {Message}", attempt, ex.Message);
-                        success = false;
-                    }
-
-                    if (attempt >= MaxRetries || success)
-                        continue;
-
-                    var delay = UseExponentialBackoff
-                        ? RetryDelayMilliseconds * (int)Math.Pow(2, attempt - 1)
-                        : RetryDelayMilliseconds;
-
-                    Log.Debug("RetryNode: Waiting {Delay}ms before next attempt", delay);
-
-                    try
-                    {
-                        await Task.Delay(delay, cancellationToken);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        Log.Information("RetryNode: Cancelled during delay");
-                        return;
+                        Log.Error("RetryNode: Failed after {Max} attempts", MaxRetries);
+                        var failVisited = new HashSet<ActionNodeBase>();
+                        foreach (var failureNode in FailureNodes)
+                        {
+                            NodeExecutionHelper.ExecuteChain(context, failureNode, failVisited);
+                        }
                     }
                 }
-
-                if (!success)
+                catch (OperationCanceledException)
                 {
-                    Log.Error("RetryNode: Failed after {Max} attempts", MaxRetries);
-                    var failVisited = new HashSet<ActionNodeBase>();
-                    foreach (var failureNode in FailureNodes)
-                    {
-                        NodeExecutionHelper.ExecuteChain(context, failureNode, failVisited);
-                    }
+                    Log.Information("RetryNode: Cancelled");
                 }
-
-                var nextVisited = new HashSet<ActionNodeBase>();
-                foreach (var nextNode in NextNodes)
+                catch (Exception ex)
                 {
-                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
+                    Log.Error(ex, "RetryNode: Unhandled exception");
                 }
             }, cancellationToken);
         }

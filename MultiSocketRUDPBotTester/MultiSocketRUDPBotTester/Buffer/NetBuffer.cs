@@ -176,7 +176,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         private void SetHeader()
         {
             _buffer[0] = HeaderCode;
-            var payloadSize = (short)(_writePos - HeaderSize);
+            var payloadSize = (ushort)(_writePos - HeaderSize);
             _buffer[1] = (byte)(payloadSize & 0xFF);
             _buffer[2] = (byte)((payloadSize >> 8) & 0xFF);
         }
@@ -193,15 +193,18 @@ namespace MultiSocketRUDPBotTester.Buffer
         private static byte[] GenerateNonce(byte[] sessionSalt, ulong packetSequence, PacketDirection direction)
         {
             var nonce = new byte[12];
-            Array.Copy(sessionSalt, nonce, 8);
+            Array.Copy(sessionSalt, nonce, 4);
 
-            var seq32 = (uint)packetSequence;
-            nonce[8] = (byte)((seq32 >> 24) & 0x3F);
-            nonce[9] = (byte)((seq32 >> 16) & 0xFF);
-            nonce[10] = (byte)((seq32 >> 8) & 0xFF);
-            nonce[11] = (byte)(seq32 & 0xFF);
+            nonce[4] = (byte)((packetSequence >> 56) & 0x3F);
+            nonce[5] = (byte)((packetSequence >> 48) & 0x3F);
+            nonce[6] = (byte)((packetSequence >> 40) & 0x3F);
+            nonce[7] = (byte)((packetSequence >> 32) & 0x3F);
+            nonce[8] = (byte)((packetSequence >> 24) & 0x3F);
+            nonce[9] = (byte)((packetSequence >> 16) & 0xFF);
+            nonce[10] = (byte)((packetSequence >> 8) & 0xFF);
+            nonce[11] = (byte)(packetSequence & 0xFF);
 
-            nonce[8] |= (byte)((byte)direction << 6);
+            nonce[4] |= (byte)(nonce[4] & 0x3F | ((byte)direction << 6));
             return nonce;
         }
 
