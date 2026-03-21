@@ -1,6 +1,5 @@
 #pragma once
 #include <functional>
-#include <set>
 #include "../Common/etc/CoreType.h"
 #include <shared_mutex>
 #include "PacketManager.h"
