@@ -107,7 +107,7 @@ private:
 	// @brief RELEASING 상태의 세션을 최종적으로 해제하고 DISCONNECTED 상태로 전환합니다.
 	// @details 세션의 소켓을 닫고 리소스 풀로 반환합니다.
 	// ----------------------------------------
-	void Disconnect();
+	void Disconnect(bool disconnectedByRetransmission = false);
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
 	[[nodiscard]]

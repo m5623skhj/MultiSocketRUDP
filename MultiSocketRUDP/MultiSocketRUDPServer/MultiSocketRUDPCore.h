@@ -11,8 +11,6 @@
 #include "IOContext.h"
 #include "RUDPSessionManager.h"
 
-#include "../Common/TLS/TLSHelper.h"
-
 #pragma comment(lib, "ws2_32.lib")
 
 struct SendPacketInfo;
@@ -45,7 +43,11 @@ public:
 	[[nodiscard]]
 	bool IsServerStopped() const;
 	[[nodiscard]]
-	unsigned short GetConnectedUserCount() const;
+	unsigned short GetNowSessionCount() const;
+	[[nodiscard]]
+	unsigned int GetAllConnectedCount() const;
+	[[nodiscard]]
+	unsigned int GetAllDisconnectedCount() const;
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
@@ -162,4 +164,11 @@ private:
 	std::unique_ptr<RUDPSessionBroker> sessionBroker;
 	std::unique_ptr<RUDPSessionManager> sessionManager;
 	RUDPSessionFunctionDelegate sessionDelegate;
+
+
+public:
+	int32_t GetNumOfTimeoutSession() const;
+
+private:
+	int32_t numOfTimeoutSession{};
 };

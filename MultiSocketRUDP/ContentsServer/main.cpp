@@ -1,18 +1,33 @@
 #include "PreCompile.h"
-#include "MultiSocketRUDPCore.h"
 #include "TestServer.h"
 #include "PlayerPacketHandlerRegister.h"
+#include <Windows.h>
+#include "ServerConsole.h"
 
 int main()
 {
-	ContentsPacketRegister::Init();
-
 	if (not TestServer::GetInst().Start(L"ServerOptionFile/CoreOption.txt", L"ServerOptionFile/SessionBrokerOption.txt"))
 	{
 		std::cout << "StartServer() failed" << '\n';
 		return 0;
 	}
-	std::cout << "Exit : ESC" << '\n';
+	Sleep(3000);
+	system("cls");
+
+	EnableANSI();
+	HideCursor();
+	DrawUI();
+
+	std::thread uiThread([]()
+		{
+			while (true)
+			{
+				UpdateUI(40);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			}
+		});
+
+	ContentsPacketRegister::Init();
 
 	while (true)
 	{
@@ -24,7 +39,13 @@ int main()
 			break;
 		}
 
-		std::cout << "TPS : " << TestServer::GetInst().GetTPS() << std::endl;
+		serverStats.player = TestServer::GetInst().GetNumOfPlayers();
+		serverStats.connected = TestServer::GetInst().GetNumOfConnected();
+		serverStats.disconnected = TestServer::GetInst().GetNumOfDisconnected();
+		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
+		serverStats.tps = TestServer::GetInst().GetTPS();
+		serverStats.error = TestServer::GetInst().GetNumOfError();
+
 		TestServer::GetInst().ResetTPS();
 	}
 
@@ -32,7 +53,10 @@ int main()
 	{
 		Sleep(1000);
 	}
+	system("cls");
 	std::cout << "Server stopped" << '\n';
+
+	uiThread.join();
 
 	return 0;
 }

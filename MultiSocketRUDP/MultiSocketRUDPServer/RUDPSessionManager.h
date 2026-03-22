@@ -82,10 +82,14 @@ public:
 	// @brief 현재 연결된 사용자의 수를 반환합니다.
 	// ----------------------------------------
 	[[nodiscard]]
-	unsigned short GetConnectedCount() const { return connectedUserCount.load(); }
+	unsigned short GetNowSessionCount() const { return connectedUserCount.load(std::memory_order_relaxed); }
 	// ----------------------------------------
 	// @brief 매니저가 관리할 수 있는 최대 세션 수를 반환합니다.
 	// ----------------------------------------
+	[[nodiscard]]
+	unsigned int GetAllConnectedCount() const { return allConnectedCount.load(std::memory_order_relaxed); }
+	[[nodiscard]]
+	unsigned int GetAllDisconnectedCount() const { return allDisconnectedCount.load(std::memory_order_relaxed); }
 	[[nodiscard]]
 	unsigned short GetMaxSessions() const { return maxSessionSize; }
 	// ----------------------------------------
@@ -115,11 +119,11 @@ public:
 	// ----------------------------------------
 	// @brief 연결된 사용자 수를 1 증가시킵니다.
 	// ----------------------------------------
-	void IncrementConnectedCount() { ++connectedUserCount; }
+	void IncrementConnectedCount();
 	// ----------------------------------------
 	// @brief 연결된 사용자 수를 1 감소시킵니다.
 	// ----------------------------------------
-	void DecrementConnectedCount() { --connectedUserCount; }
+	void DecrementConnectedCount();
 
 public:
 	// ----------------------------------------
@@ -151,6 +155,8 @@ private:
 	// 반드시 sessionListLock 안에서 sessionList와 같이 수정되어야 합니다.
 	std::unordered_set<SessionIdType> unusedSessionIdSet;
 	std::atomic_uint16_t connectedUserCount{};
+	std::atomic_uint32_t allConnectedCount{};
+	std::atomic_uint32_t allDisconnectedCount{};
 
 	std::list<SessionIdType> unusedSessionIdList;
 	mutable std::recursive_mutex unusedSessionIdListLock;

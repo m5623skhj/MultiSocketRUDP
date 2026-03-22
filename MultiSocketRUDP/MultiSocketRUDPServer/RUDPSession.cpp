@@ -68,7 +68,7 @@ void RUDPSession::DoDisconnect()
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
-void RUDPSession::Disconnect()
+void RUDPSession::Disconnect(bool disconnectedByRetransmission)
 {
 	if (not stateMachine.IsReleasing())
 	{

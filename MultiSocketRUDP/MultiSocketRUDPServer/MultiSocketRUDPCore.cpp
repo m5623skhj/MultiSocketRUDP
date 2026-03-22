@@ -152,9 +152,19 @@ bool MultiSocketRUDPCore::IsServerStopped() const
 	return isServerStopped;
 }
 
-unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const
+unsigned short MultiSocketRUDPCore::GetNowSessionCount() const
 {
-	return sessionManager->GetConnectedCount();
+	return sessionManager->GetNowSessionCount();
+}
+
+unsigned int MultiSocketRUDPCore::GetAllConnectedCount() const
+{
+	return sessionManager->GetAllConnectedCount();
+}
+
+unsigned int MultiSocketRUDPCore::GetAllDisconnectedCount() const
+{
+	return sessionManager->GetAllDisconnectedCount();
 }
 
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
@@ -519,8 +529,6 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 	auto& thisThreadSendPacketInfoListLock = *sendPacketInfoListLock[threadId];
 
 	std::list<SendPacketInfo*> copyList;
-	unsigned short numOfTimeoutSession{};
-
 	while (not stopToken.stop_requested())
 	{
 		{
@@ -562,15 +570,15 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 
 			if (shouldDisconnect == true)
 			{
-				sendPacketInfo->owner->DoDisconnect();
-				++numOfTimeoutSession;
-				SendPacketInfo::Free(sendPacketInfo);
-				continue;
-			}
+				if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire) == true)
+				{
+					SendPacketInfo::Free(sendPacketInfo);
+					continue;
+				}
 
-			if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire) == true)
-			{
+				sendPacketInfo->owner->DoDisconnect();
 				SendPacketInfo::Free(sendPacketInfo);
+				++numOfTimeoutSession;
 				continue;
 			}
 
@@ -728,4 +736,9 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		}
 		recvIOCompletedContextPool.Free(context);
 	}
+}
+
+int32_t MultiSocketRUDPCore::GetNumOfTimeoutSession() const
+{
+	return numOfTimeoutSession;
 }

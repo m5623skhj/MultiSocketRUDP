@@ -148,6 +148,7 @@
     <ClInclude Include="PlayerManager.h" />
     <ClInclude Include="PlayerPacketHandlerRegister.h" />
     <ClInclude Include="Protocol.h" />
+    <ClInclude Include="ServerConsole.h" />
     <ClInclude Include="TestServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

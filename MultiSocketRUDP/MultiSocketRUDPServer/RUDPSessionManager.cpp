@@ -190,6 +190,18 @@ void RUDPSessionManager::ClearAllSessions()
 	Logger::GetInstance().WriteLog(log);
 }
 
+void RUDPSessionManager::IncrementConnectedCount()
+{
+	++connectedUserCount;
+	allConnectedCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void RUDPSessionManager::DecrementConnectedCount()
+{
+	--connectedUserCount;
+	allDisconnectedCount.fetch_add(1, std::memory_order_relaxed);
+}
+
 void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
 {
 	for (auto* session : sessionList)

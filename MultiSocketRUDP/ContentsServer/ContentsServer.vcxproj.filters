@@ -65,5 +65,8 @@
     <ClInclude Include="PlayerManager.h">
       <Filter>소스 파일\Player</Filter>
     </ClInclude>
+    <ClInclude Include="ServerConsole.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

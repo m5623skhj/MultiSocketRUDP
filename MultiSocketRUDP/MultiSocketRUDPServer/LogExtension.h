@@ -14,6 +14,8 @@ public:
 	std::string logString;
 };
 
+inline std::atomic_uint32_t numOfOccurredError{};
+
 #ifdef NDEBUG
 #define LOG_DEBUG(x) ((void)0)
 #else
@@ -24,4 +26,5 @@ public:
 
 #define LOG_ERROR(LOG_STRING) const auto log = Logger::MakeLogObject<ServerLog>(); \
 			log->logString = LOG_STRING; \
-			Logger::GetInstance().WriteLog(log)
+			Logger::GetInstance().WriteLog(log); \
+			numOfOccurredError.fetch_add(1, std::memory_order_relaxed)
