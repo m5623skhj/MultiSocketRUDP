@@ -467,8 +467,11 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 			}
 		}
 
-#if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME
+#if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME == USE_WORKER_THREAD_SLEEP_FOR_FRAME
 		SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
+#elif USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME == USE_WORKER_THREAD_SLEEP_ZERO
+		Sleep(0);
+#else
 #endif
 	}
 
