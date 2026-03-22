@@ -1,0 +1,232 @@
+{
+  "main": {
+    "id": "b3c2a97ef30858c1",
+    "type": "split",
+    "children": [
+      {
+        "id": "e3199c888185b535",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2923850d16653fd7",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "MultiSocketRUDP-Docs/BotTester/00_BotTester_Overview.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "00_BotTester_Overview"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "a79a12e86d092bf2",
+    "type": "split",
+    "children": [
+      {
+        "id": "8c0b87488575bf4e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6a48daf28bac8179",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "파일 탐색기"
+            }
+          },
+          {
+            "id": "fe7a38d35ba0dfc2",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "검색"
+            }
+          },
+          {
+            "id": "320000e5306ab4b1",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "북마크"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "677ef3ba32880eae",
+    "type": "split",
+    "children": [
+      {
+        "id": "b0a5a6a366de70f4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "492ef31410e524f7",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "백링크"
+            }
+          },
+          {
+            "id": "0998ac8a15354810",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "나가는 링크"
+            }
+          },
+          {
+            "id": "d5ac679e4c51fdf9",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "태그"
+            }
+          },
+          {
+            "id": "fc3c80df8d3e316c",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "모든 속성"
+            }
+          },
+          {
+            "id": "e690f84794a7f862",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "개요"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:빠른 전환기 열기": false,
+      "graph:그래프 뷰 열기": false,
+      "canvas:새 캔버스 만들기": false,
+      "daily-notes:오늘의 일일 노트 열기": false,
+      "templates:템플릿 삽입": false,
+      "command-palette:명령어 팔레트 열기": false,
+      "bases:새 베이스 생성하기": false
+    }
+  },
+  "active": "2923850d16653fd7",
+  "lastOpenFiles": [
+    "MultiSocketRUDP-Docs/BotTester/ClientCore/BotTesterCore.md",
+    "MultiSocketRUDP-Docs/BotTester/Bot/GraphValidator.md",
+    "MultiSocketRUDP-Docs/BotTester/Bot/ActionNodes.md",
+    "MultiSocketRUDP-Docs/BotTester/Bot/BotActionGraph.md",
+    "MultiSocketRUDP-Docs/BotTester/Bot/NodeExecutionStats.md",
+    "MultiSocketRUDP-Docs/BotTester/Bot/RuntimeContext.md",
+    "MultiSocketRUDP-Docs/BotTester/AI/GeminiClient.md",
+    "MultiSocketRUDP-Docs/ContentServerGuide.md",
+    "MultiSocketRUDP-Docs/00_Overview.md",
+    "새 폴더/MultiSocketRUDP-Docs/MultiSocketRUDP-Docs/Troubleshooting.md",
+    "MultiSocketRUDP-Docs/BotTester/UI/NodeConfigPanels.md",
+    "MultiSocketRUDP-Docs/BotTester/UI/CanvasRenderer.md",
+    "MultiSocketRUDP-Docs/BotTester/UI/BotActionGraphWindow.md",
+    "MultiSocketRUDP-Docs/BotTester/ClientCore/SessionGetter_CS.md",
+    "MultiSocketRUDP-Docs/BotTester/ClientCore/RudpSession_CS.md",
+    "MultiSocketRUDP-Docs/BotTester/AI/AiTreeGenerator.md",
+    "MultiSocketRUDP-Docs/Tools/PacketGenerator.md",
+    "MultiSocketRUDP-Docs/Server/Ticker.md",
+    "MultiSocketRUDP-Docs/Server/ThreadModel.md",
+    "MultiSocketRUDP-Docs/Server/SessionLifecycle.md",
+    "MultiSocketRUDP-Docs/Server/SessionComponents.md",
+    "MultiSocketRUDP-Docs/Server/SendPacketInfo.md",
+    "MultiSocketRUDP-Docs/Server/RUDPThreadManager.md",
+    "MultiSocketRUDP-Docs/Server/RUDPSessionManager.md",
+    "MultiSocketRUDP-Docs/Server/RUDPSessionBroker.md",
+    "MultiSocketRUDP-Docs/Server/RUDPSession.md",
+    "MultiSocketRUDP-Docs/Diagrams/ThreadModel.svg",
+    "MultiSocketRUDP-Docs/Diagrams/SessionStateMachine.svg",
+    "MultiSocketRUDP-Docs/Diagrams/PacketFlow.svg",
+    "MultiSocketRUDP-Docs/Diagrams/NodeHierarchy.svg",
+    "MultiSocketRUDP-Docs/Diagrams/GraphEditor_Layout.svg",
+    "MultiSocketRUDP-Docs/Diagrams/CryptoStructure.svg",
+    "MultiSocketRUDP-Docs/Diagrams/Connection_Sequence.svg",
+    "MultiSocketRUDP-Docs/Diagrams/BotTester_Architecture.svg",
+    "MultiSocketRUDP-Docs/Diagrams/Architecture_Overview.svg",
+    "MultiSocketRUDP-Docs/Diagrams/AiTreeFlow.svg",
+    "MultiSocketRUDP-Docs/BotTester/{Bot,AI,ClientCore,UI,Diagrams}",
+    "MultiSocketRUDP-Docs/BotTester/UI",
+    "MultiSocketRUDP-Docs/BotTester/ClientCore",
+    "MultiSocketRUDP-Docs/BotTester/AI",
+    "MultiSocketRUDP-Docs/BotTester/Bot",
+    "MultiSocketRUDP-Docs/Tools",
+    "MultiSocketRUDP-Docs/Server",
+    "MultiSocketRUDP-Docs/Logger",
+    "MultiSocketRUDP-Docs/Diagrams",
+    "MultiSocketRUDP-Docs/Client"
+  ]
+}

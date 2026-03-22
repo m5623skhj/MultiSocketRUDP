@@ -1,0 +1,169 @@
+<svg viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="620" fill="#0f172a" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="#f1f5f9">MultiSocketRUDP — 전체 아키텍처</text>
+
+  <!-- ===== CLIENT ZONE ===== -->
+  <rect x="30" y="60" width="240" height="310" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="150" y="83" text-anchor="middle" font-size="13" font-weight="600" fill="#60a5fa">Client</text>
+
+  <!-- RUDPClientCore -->
+  <rect x="50" y="95" width="200" height="48" rx="8" fill="#1d4ed8" filter="url(#shadow)"/>
+  <text x="150" y="114" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">RUDPClientCore</text>
+  <text x="150" y="132" text-anchor="middle" font-size="10" fill="#bfdbfe">송수신 · 재전송 · 흐름제어</text>
+
+  <!-- ServerAliveChecker -->
+  <rect x="50" y="155" width="200" height="36" rx="8" fill="#1e3a5f" filter="url(#shadow)"/>
+  <text x="150" y="178" text-anchor="middle" font-size="11" fill="#93c5fd">ServerAliveChecker</text>
+
+  <!-- TLSHelperClient -->
+  <rect x="50" y="202" width="200" height="36" rx="8" fill="#1e3a5f" filter="url(#shadow)"/>
+  <text x="150" y="225" text-anchor="middle" font-size="11" fill="#93c5fd">TLSHelperClient</text>
+
+  <!-- PacketManager (client) -->
+  <rect x="50" y="249" width="200" height="36" rx="8" fill="#1e3a5f" filter="url(#shadow)"/>
+  <text x="150" y="272" text-anchor="middle" font-size="11" fill="#93c5fd">PacketManager</text>
+
+  <!-- CryptoHelper (client) -->
+  <rect x="50" y="296" width="200" height="36" rx="8" fill="#14532d" filter="url(#shadow)"/>
+  <text x="150" y="319" text-anchor="middle" font-size="11" fill="#86efac">CryptoHelper (AES-GCM)</text>
+
+  <!-- ===== SESSION BROKER ZONE ===== -->
+  <rect x="330" y="60" width="240" height="140" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="450" y="83" text-anchor="middle" font-size="13" font-weight="600" fill="#fbbf24">Session Broker (TCP+TLS)</text>
+
+  <!-- RUDPSessionBroker -->
+  <rect x="350" y="95" width="200" height="48" rx="8" fill="#92400e" filter="url(#shadow)"/>
+  <text x="450" y="114" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">RUDPSessionBroker</text>
+  <text x="450" y="132" text-anchor="middle" font-size="10" fill="#fde68a">세션 발급 · TLS 암호화</text>
+
+  <!-- TLSHelperServer -->
+  <rect x="350" y="155" width="200" height="36" rx="8" fill="#451a03" filter="url(#shadow)"/>
+  <text x="450" y="178" text-anchor="middle" font-size="11" fill="#fed7aa">TLSHelperServer</text>
+
+  <!-- ===== SERVER CORE ZONE ===== -->
+  <rect x="330" y="220" width="540" height="370" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="600" y="243" text-anchor="middle" font-size="13" font-weight="600" fill="#34d399">Server Core (UDP+RIO)</text>
+
+  <!-- MultiSocketRUDPCore -->
+  <rect x="350" y="255" width="200" height="48" rx="8" fill="#065f46" filter="url(#shadow)"/>
+  <text x="450" y="274" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">MultiSocketRUDPCore</text>
+  <text x="450" y="292" text-anchor="middle" font-size="10" fill="#a7f3d0">오케스트레이터</text>
+
+  <!-- RUDPSessionManager -->
+  <rect x="350" y="315" width="200" height="36" rx="8" fill="#064e3b" filter="url(#shadow)"/>
+  <text x="450" y="338" text-anchor="middle" font-size="11" fill="#6ee7b7">RUDPSessionManager</text>
+
+  <!-- RIOManager -->
+  <rect x="350" y="362" width="200" height="36" rx="8" fill="#064e3b" filter="url(#shadow)"/>
+  <text x="450" y="385" text-anchor="middle" font-size="11" fill="#6ee7b7">RIOManager</text>
+
+  <!-- RUDPIOHandler -->
+  <rect x="350" y="409" width="200" height="36" rx="8" fill="#064e3b" filter="url(#shadow)"/>
+  <text x="450" y="432" text-anchor="middle" font-size="11" fill="#6ee7b7">RUDPIOHandler</text>
+
+  <!-- RUDPSession -->
+  <rect x="600" y="255" width="200" height="60" rx="8" fill="#1a4731" filter="url(#shadow)"/>
+  <text x="700" y="276" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">RUDPSession</text>
+  <text x="700" y="294" text-anchor="middle" font-size="10" fill="#a7f3d0">상태머신 · 암호화 · 흐름제어</text>
+  <text x="700" y="308" text-anchor="middle" font-size="10" fill="#a7f3d0">순서보장 · 패킷 핸들러</text>
+
+  <!-- FlowManager -->
+  <rect x="600" y="328" width="200" height="36" rx="8" fill="#064e3b" filter="url(#shadow)"/>
+  <text x="700" y="351" text-anchor="middle" font-size="11" fill="#6ee7b7">RUDPFlowManager</text>
+
+  <!-- PacketProcessor -->
+  <rect x="600" y="375" width="200" height="36" rx="8" fill="#064e3b" filter="url(#shadow)"/>
+  <text x="700" y="398" text-anchor="middle" font-size="11" fill="#6ee7b7">RUDPPacketProcessor</text>
+
+  <!-- CryptoHelper (server) -->
+  <rect x="600" y="422" width="200" height="36" rx="8" fill="#14532d" filter="url(#shadow)"/>
+  <text x="700" y="445" text-anchor="middle" font-size="11" fill="#86efac">CryptoHelper (AES-GCM)</text>
+
+  <!-- Thread labels -->
+  <rect x="350" y="468" width="450" height="100" rx="8" fill="#0f2b1e" stroke="#166534" stroke-width="1"/>
+  <text x="575" y="488" text-anchor="middle" font-size="11" font-weight="600" fill="#4ade80">스레드 그룹</text>
+  <text x="380" y="508" font-size="10" fill="#86efac">● IO Worker (N개)</text>
+  <text x="380" y="524" font-size="10" fill="#86efac">● RecvLogic Worker (N개)</text>
+  <text x="380" y="540" font-size="10" fill="#86efac">● Retransmission (N개)</text>
+  <text x="560" y="508" font-size="10" fill="#86efac">● Session Release (1개)</text>
+  <text x="560" y="524" font-size="10" fill="#86efac">● Heartbeat (1개)</text>
+  <text x="560" y="540" font-size="10" fill="#86efac">● Ticker (1개)</text>
+  <text x="575" y="558" text-anchor="middle" font-size="9" fill="#4b7a5e">N = numOfWorkerThread (옵션 파일)</text>
+
+  <!-- ===== LOGGER ZONE ===== -->
+  <rect x="630" y="60" width="240" height="140" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="750" y="83" text-anchor="middle" font-size="13" font-weight="600" fill="#a78bfa">Logger</text>
+  <rect x="650" y="95" width="200" height="48" rx="8" fill="#4c1d95" filter="url(#shadow)"/>
+  <text x="750" y="114" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">Logger (Singleton)</text>
+  <text x="750" y="132" text-anchor="middle" font-size="10" fill="#ddd6fe">비동기 JSON 파일 로거</text>
+  <rect x="650" y="155" width="200" height="36" rx="8" fill="#3b0764" filter="url(#shadow)"/>
+  <text x="750" y="178" text-anchor="middle" font-size="11" fill="#c4b5fd">LogBase / ServerLog</text>
+
+  <!-- ===== ARROWS ===== -->
+  <!-- Client ↔ SessionBroker (TCP+TLS) -->
+  <line x1="250" y1="175" x2="348" y2="130" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="348" y1="145" x2="250" y2="195" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="295" y="148" text-anchor="middle" font-size="9" fill="#fbbf24" transform="rotate(-18,295,148)">TCP+TLS</text>
+
+  <!-- Client ↔ Server (UDP RUDP) -->
+  <line x1="150" y1="370" x2="150" y2="430" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <line x1="150" y1="430" x2="348" y2="430" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="248" y="446" text-anchor="middle" font-size="9" fill="#60a5fa">UDP (RUDP)</text>
+
+  <!-- SessionBroker → Core -->
+  <line x1="450" y1="200" x2="450" y2="253" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Core → Session -->
+  <line x1="552" y1="275" x2="598" y2="275" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Core → SessionManager -->
+  <line x1="452" y1="303" x2="452" y2="313" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Core → RIOManager -->
+  <line x1="452" y1="351" x2="452" y2="360" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Core → IOHandler -->
+  <line x1="452" y1="398" x2="452" y2="407" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Session → FlowManager -->
+  <line x1="700" y1="315" x2="700" y2="326" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Session → PacketProcessor -->
+  <line x1="700" y1="364" x2="700" y2="373" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Session → CryptoHelper -->
+  <line x1="700" y1="411" x2="700" y2="420" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Logger usage arrows -->
+  <line x1="628" y1="119" x2="552" y2="300" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
+
+  <!-- Legend -->
+  <rect x="30" y="385" width="240" height="100" rx="8" fill="#0f172a" stroke="#374151" stroke-width="1"/>
+  <text x="150" y="403" text-anchor="middle" font-size="11" font-weight="600" fill="#9ca3af">범례</text>
+  <line x1="50" y1="420" x2="80" y2="420" stroke="#f59e0b" stroke-width="2"/>
+  <text x="88" y="424" font-size="10" fill="#d1d5db">TCP + TLS (세션 발급)</text>
+  <line x1="50" y1="438" x2="80" y2="438" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="88" y="442" font-size="10" fill="#d1d5db">UDP / RUDP (데이터)</text>
+  <line x1="50" y1="456" x2="80" y2="456" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="88" y="460" font-size="10" fill="#d1d5db">내부 참조</text>
+  <line x1="50" y1="474" x2="80" y2="474" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="88" y="478" font-size="10" fill="#d1d5db">로깅</text>
+</svg>

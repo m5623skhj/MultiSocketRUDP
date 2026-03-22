@@ -1,0 +1,87 @@
+<svg viewBox="0 0 780 480" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+    <marker id="arr-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/>
+    </marker>
+    <marker id="arr-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f87171"/>
+    </marker>
+    <marker id="arr-yellow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="780" height="480" fill="#0f172a" rx="12"/>
+  <text x="390" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#f1f5f9">RUDPSession — 상태 전이 다이어그램</text>
+
+  <!-- DISCONNECTED (left) -->
+  <ellipse cx="130" cy="230" rx="100" ry="50" fill="#1e293b" stroke="#64748b" stroke-width="2" filter="url(#glow)"/>
+  <text x="130" y="224" text-anchor="middle" font-size="13" font-weight="700" fill="#94a3b8">DISCONNECTED</text>
+  <text x="130" y="242" text-anchor="middle" font-size="10" fill="#64748b">세션 풀 대기</text>
+
+  <!-- RESERVED (top center) -->
+  <ellipse cx="390" cy="130" rx="100" ry="50" fill="#1e293b" stroke="#f59e0b" stroke-width="2" filter="url(#glow)"/>
+  <text x="390" y="124" text-anchor="middle" font-size="13" font-weight="700" fill="#fbbf24">RESERVED</text>
+  <text x="390" y="142" text-anchor="middle" font-size="10" fill="#d97706">클라이언트 연결 대기</text>
+
+  <!-- CONNECTED (right) -->
+  <ellipse cx="650" cy="230" rx="100" ry="50" fill="#1e293b" stroke="#22c55e" stroke-width="2.5" filter="url(#glow)"/>
+  <text x="650" y="224" text-anchor="middle" font-size="13" font-weight="700" fill="#22c55e">CONNECTED</text>
+  <text x="650" y="242" text-anchor="middle" font-size="10" fill="#16a34a">패킷 송수신 가능</text>
+
+  <!-- RELEASING (bottom center) -->
+  <ellipse cx="390" cy="370" rx="100" ry="50" fill="#1e293b" stroke="#ef4444" stroke-width="2" filter="url(#glow)"/>
+  <text x="390" y="364" text-anchor="middle" font-size="13" font-weight="700" fill="#f87171">RELEASING</text>
+  <text x="390" y="382" text-anchor="middle" font-size="10" fill="#dc2626">IO 완료 대기 중</text>
+
+  <!-- DISCONNECTED → RESERVED -->
+  <path d="M 218 175 Q 300 80 288 130" fill="none" stroke="#f59e0b" stroke-width="2" marker-end="url(#arr-yellow)"/>
+  <rect x="220" y="115" width="68" height="28" rx="4" fill="#0f172a"/>
+  <text x="254" y="127" text-anchor="middle" font-size="9" fill="#fbbf24">AcquireSession()</text>
+  <text x="254" y="139" text-anchor="middle" font-size="9" fill="#fbbf24">+InitReserveSession()</text>
+
+  <!-- RESERVED → CONNECTED -->
+  <path d="M 488 150 Q 580 130 550 208" fill="none" stroke="#22c55e" stroke-width="2" marker-end="url(#arr-green)"/>
+  <rect x="510" y="140" width="74" height="28" rx="4" fill="#0f172a"/>
+  <text x="547" y="152" text-anchor="middle" font-size="9" fill="#22c55e">TryConnect()</text>
+  <text x="547" y="164" text-anchor="middle" font-size="9" fill="#22c55e">CONNECT 패킷 수신</text>
+
+  <!-- CONNECTED → RELEASING -->
+  <path d="M 590 268 Q 540 340 488 356" fill="none" stroke="#f87171" stroke-width="2" marker-end="url(#arr-red)"/>
+  <rect x="513" y="294" width="74" height="28" rx="4" fill="#0f172a"/>
+  <text x="550" y="306" text-anchor="middle" font-size="9" fill="#f87171">DoDisconnect()</text>
+  <text x="550" y="318" text-anchor="middle" font-size="9" fill="#ef4444">오류/재전송초과/</text>
+
+  <!-- RESERVED → RELEASING (timeout) -->
+  <path d="M 305 160 Q 240 270 295 350" fill="none" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-red)"/>
+  <rect x="186" y="230" width="80" height="28" rx="4" fill="#0f172a"/>
+  <text x="226" y="242" text-anchor="middle" font-size="9" fill="#f87171">AbortReserved()</text>
+  <text x="226" y="254" text-anchor="middle" font-size="9" fill="#dc2626">30초 타임아웃</text>
+
+  <!-- RELEASING → DISCONNECTED -->
+  <path d="M 295 390 Q 200 430 168 278" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="154" y="385" width="80" height="28" rx="4" fill="#0f172a"/>
+  <text x="194" y="397" text-anchor="middle" font-size="9" fill="#94a3b8">Disconnect()</text>
+  <text x="194" y="409" text-anchor="middle" font-size="9" fill="#64748b">소켓 닫기+풀반환</text>
+
+  <!-- Condition notes -->
+  <rect x="30" y="390" width="230" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="145" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">RELEASING → DISCONNECTED 조건</text>
+  <text x="45" y="424" font-size="9" fill="#64748b">✓ IO_SENDING 상태가 아닐 것</text>
+  <text x="45" y="438" font-size="9" fill="#64748b">✓ nowInProcessingRecvPacket = false</text>
+  <text x="45" y="452" font-size="9" fill="#64748b">✓ SessionReleaseThread가 처리</text>
+
+  <!-- Connected state description -->
+  <rect x="530" y="390" width="230" height="75" rx="8" fill="#1e293b" stroke="#166534" stroke-width="1"/>
+  <text x="645" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#22c55e">CONNECTED 상태에서 가능한 것</text>
+  <text x="545" y="424" font-size="9" fill="#4ade80">✓ SendPacket() — 데이터 전송</text>
+  <text x="545" y="438" font-size="9" fill="#4ade80">✓ OnRecvPacket() — 데이터 수신</text>
+  <text x="545" y="452" font-size="9" fill="#4ade80">✓ SendHeartbeatPacket()</text>
+</svg>

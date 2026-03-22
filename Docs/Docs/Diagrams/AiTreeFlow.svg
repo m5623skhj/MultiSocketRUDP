@@ -1,0 +1,102 @@
+<svg viewBox="0 0 860 500" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#94a3b8"/>
+    </marker>
+    <marker id="arr-p" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#a78bfa"/>
+    </marker>
+    <marker id="arr-g" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#34d399"/>
+    </marker>
+    <marker id="arr-r" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#f87171"/>
+    </marker>
+  </defs>
+
+  <rect width="860" height="500" fill="#0f172a" rx="12"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#f1f5f9">AI 트리 생성 흐름</text>
+
+  <!-- Step 1: User Input -->
+  <rect x="30" y="60" width="180" height="70" rx="8" fill="#1d4ed8"/>
+  <text x="120" y="83" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">① 사용자 입력</text>
+  <text x="120" y="100" text-anchor="middle" font-size="9" fill="#bfdbfe">AI Tree Generator 창</text>
+  <text x="120" y="114" text-anchor="middle" font-size="9" fill="#bfdbfe">"Ping 5번 보내고 Pong 대기"</text>
+
+  <!-- Arrow 1 -->
+  <line x1="212" y1="95" x2="248" y2="95" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 2: Prompt Build -->
+  <rect x="250" y="60" width="180" height="70" rx="8" fill="#1e3a5f"/>
+  <text x="340" y="83" text-anchor="middle" font-size="11" font-weight="700" fill="#93c5fd">② 프롬프트 구성</text>
+  <text x="340" y="100" text-anchor="middle" font-size="9" fill="#6b8db5">System: 노드 명세 + 규칙</text>
+  <text x="340" y="114" text-anchor="middle" font-size="9" fill="#6b8db5">User: 사용자 입력 텍스트</text>
+
+  <!-- Arrow 2 -->
+  <line x1="432" y1="95" x2="468" y2="95" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 3: Gemini API -->
+  <rect x="470" y="55" width="180" height="80" rx="8" fill="#3b0764" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="560" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#ddd6fe">③ Gemini API</text>
+  <text x="560" y="94" text-anchor="middle" font-size="9" fill="#c4b5fd">gemini-2.5-flash</text>
+  <text x="560" y="108" text-anchor="middle" font-size="9" fill="#c4b5fd">GenerateContentAsync()</text>
+  <text x="560" y="122" text-anchor="middle" font-size="9" fill="#a78bfa">JSON 트리 생성</text>
+
+  <!-- Arrow 3 -->
+  <line x1="652" y1="95" x2="688" y2="95" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr-p)"/>
+
+  <!-- Step 4: Raw Response -->
+  <rect x="690" y="60" width="150" height="70" rx="8" fill="#172032"/>
+  <text x="765" y="83" text-anchor="middle" font-size="11" font-weight="700" fill="#93c5fd">④ 원시 응답</text>
+  <text x="765" y="99" text-anchor="middle" font-size="9" fill="#6b8db5">```json {...} ```</text>
+  <text x="765" y="113" text-anchor="middle" font-size="9" fill="#6b8db5">or { "error": ... }</text>
+
+  <!-- Down arrow from step 4 -->
+  <line x1="765" y1="132" x2="765" y2="168" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 5: AiTreeService.Parse -->
+  <rect x="580" y="170" width="370" height="80" rx="8" fill="#1a2744" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="765" y="192" text-anchor="middle" font-size="11" font-weight="700" fill="#60a5fa">⑤ AiTreeService.Parse()</text>
+  <text x="765" y="208" text-anchor="middle" font-size="9" fill="#93c5fd">StripMarkdownFence() → JSON 범위 추출</text>
+  <text x="765" y="222" text-anchor="middle" font-size="9" fill="#93c5fd">JsonDocument.Parse() → error? / description + tree</text>
+  <text x="765" y="238" text-anchor="middle" font-size="9" fill="#60a5fa">AiTreeResponse { IsError, Description, RootNode }</text>
+
+  <!-- Error path -->
+  <line x1="765" y1="250" x2="765" y2="285" stroke="#f87171" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr-r)"/>
+  <rect x="660" y="287" width="210" height="40" rx="6" fill="#7f1d1d"/>
+  <text x="765" y="305" text-anchor="middle" font-size="10" font-weight="600" fill="#fca5a5">오류 응답 / JSON 파싱 실패</text>
+  <text x="765" y="320" text-anchor="middle" font-size="9" fill="#f87171">outputBox에 오류 표시, applyBtn 비활성</text>
+
+  <!-- Success path down -->
+  <line x1="650" y1="210" x2="490" y2="210" stroke="#6b7280" stroke-width="1.5"/>
+  <line x1="490" y1="210" x2="490" y2="285" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 6: AiTreeService.Validate -->
+  <rect x="300" y="287" width="370" height="75" rx="8" fill="#1a2744" stroke="#10b981" stroke-width="1.5"/>
+  <text x="485" y="309" text-anchor="middle" font-size="11" font-weight="700" fill="#34d399">⑥ AiTreeService.Validate()</text>
+  <text x="485" y="325" text-anchor="middle" font-size="9" fill="#6ee7b7">각 노드 type 검사 (KnownNodeTypes)</text>
+  <text x="485" y="340" text-anchor="middle" font-size="9" fill="#6ee7b7">재귀: next, true_branch, false_branch ... 모든 자식</text>
+  <text x="485" y="354" text-anchor="middle" font-size="9" fill="#34d399">AiTreeValidationResult { IsValid, Errors[] }</text>
+
+  <!-- Validate fail -->
+  <line x1="300" y1="325" x2="260" y2="325" stroke="#f87171" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr-r)"/>
+  <rect x="60" y="308" width="196" height="40" rx="6" fill="#7f1d1d"/>
+  <text x="158" y="326" text-anchor="middle" font-size="10" font-weight="600" fill="#fca5a5">검증 실패</text>
+  <text x="158" y="341" text-anchor="middle" font-size="9" fill="#f87171">오류 목록 표시, applyBtn 비활성</text>
+
+  <!-- Validate pass → Apply -->
+  <line x1="485" y1="362" x2="485" y2="398" stroke="#34d399" stroke-width="2" marker-end="url(#arr-g)"/>
+
+  <!-- Step 7: HandleApply / AiNodeFactory -->
+  <rect x="200" y="400" width="560" height="80" rx="8" fill="#065f46" stroke="#34d399" stroke-width="1.5"/>
+  <text x="480" y="422" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">⑦ HandleApply() → AiNodeFactory.CreateFromJson()</text>
+  <text x="480" y="438" text-anchor="middle" font-size="9" fill="#a7f3d0">ClearAllNodesExceptRoot() → JSON 재귀 파싱</text>
+  <text x="480" y="452" text-anchor="middle" font-size="9" fill="#a7f3d0">각 노드: Type.GetType() → NodeVisual 생성 → Configure() → 캔버스 배치</text>
+  <text x="480" y="466" text-anchor="middle" font-size="9" fill="#4ade80">rootVisual.Next = firstNode → renderer.RedrawConnections()</text>
+
+  <!-- Labels for error/success -->
+  <text x="690" y="277" font-size="8" fill="#f87171">IsError=true</text>
+  <text x="400" y="277" font-size="8" fill="#34d399">IsError=false →</text>
+  <text x="212" y="319" font-size="8" fill="#f87171">IsValid=false</text>
+  <text x="380" y="395" font-size="8" fill="#34d399">IsValid=true →</text>
+</svg>

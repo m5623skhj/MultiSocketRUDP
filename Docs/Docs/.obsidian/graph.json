@@ -1,0 +1,47 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:Server",
+      "color": { "a": 1, "rgb": 5767168 }
+    },
+    {
+      "query": "path:Client",
+      "color": { "a": 1, "rgb": 2109609 }
+    },
+    {
+      "query": "path:Common",
+      "color": { "a": 1, "rgb": 14899706 }
+    },
+    {
+      "query": "path:Logger",
+      "color": { "a": 1, "rgb": 9109504 }
+    },
+    {
+      "query": "path:Tools",
+      "color": { "a": 1, "rgb": 6697728 }
+    },
+    {
+      "query": "path:Diagrams",
+      "color": { "a": 1, "rgb": 6710886 }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1,
+  "close": false
+}

@@ -1,0 +1,140 @@
+<svg viewBox="0 0 860 560" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#6b7280"/>
+    </marker>
+    <marker id="arr-b" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#60a5fa"/>
+    </marker>
+    <marker id="arr-g" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#34d399"/>
+    </marker>
+    <marker id="arr-y" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="860" height="560" fill="#0f172a" rx="12"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#f1f5f9">스레드 모델 (Thread Model)</text>
+
+  <!-- ========= IO Layer ========= -->
+  <rect x="20" y="55" width="820" height="100" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="40" y="75" font-size="11" font-weight="700" fill="#60a5fa">IO Worker Thread × N</text>
+  <text x="40" y="93" font-size="10" fill="#93c5fd">RIO 완료 큐 폴링 (RIODequeueCompletion)</text>
+
+  <!-- Thread boxes in IO layer -->
+  <rect x="40" y="100" width="148" height="42" rx="6" fill="#1d4ed8"/>
+  <text x="114" y="117" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">OP_RECV 완료</text>
+  <text x="114" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">버퍼 복사 + Context Enqueue</text>
+
+  <rect x="204" y="100" width="148" height="42" rx="6" fill="#1d4ed8"/>
+  <text x="278" y="117" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">OP_SEND 완료</text>
+  <text x="278" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">IO_NONE_SENDING 복원</text>
+
+  <rect x="368" y="100" width="148" height="42" rx="6" fill="#1d4ed8"/>
+  <text x="442" y="117" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">GetIOCompletedContext</text>
+  <text x="442" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">GetUsingSession(ownerId)</text>
+
+  <rect x="532" y="100" width="150" height="42" rx="6" fill="#1e3a5f"/>
+  <text x="607" y="117" text-anchor="middle" font-size="10" fill="#93c5fd">workerThreadOneFrameMs</text>
+  <text x="607" y="133" text-anchor="middle" font-size="9" fill="#6b8db5">프레임 기반 sleep (옵션)</text>
+
+  <!-- ========= Logic Layer ========= -->
+  <rect x="20" y="170" width="380" height="100" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="40" y="190" font-size="11" font-weight="700" fill="#34d399">RecvLogic Worker Thread × N</text>
+  <rect x="40" y="200" width="160" height="56" rx="6" fill="#065f46"/>
+  <text x="120" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Semaphore 대기</text>
+  <text x="120" y="234" text-anchor="middle" font-size="9" fill="#a7f3d0">recvLogicThreadEvent[id]</text>
+  <text x="120" y="248" text-anchor="middle" font-size="9" fill="#6ee7b7">WaitForMultipleObjects</text>
+
+  <rect x="216" y="200" width="160" height="56" rx="6" fill="#065f46"/>
+  <text x="296" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">PacketProcessor</text>
+  <text x="296" y="234" text-anchor="middle" font-size="9" fill="#a7f3d0">::OnRecvPacket()</text>
+  <text x="296" y="248" text-anchor="middle" font-size="9" fill="#6ee7b7">타입별 분기 처리</text>
+
+  <!-- ========= Retransmission Layer ========= -->
+  <rect x="420" y="170" width="420" height="100" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="440" y="190" font-size="11" font-weight="700" fill="#fbbf24">Retransmission Thread × N</text>
+  <rect x="440" y="200" width="160" height="56" rx="6" fill="#78350f"/>
+  <text x="520" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">타임아웃 스캔</text>
+  <text x="520" y="234" text-anchor="middle" font-size="9" fill="#fde68a">sendPacketInfoList[id]</text>
+  <text x="520" y="248" text-anchor="middle" font-size="9" fill="#fcd34d">retransmissionTimeStamp 비교</text>
+
+  <rect x="616" y="200" width="204" height="56" rx="6" fill="#78350f"/>
+  <text x="718" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">재전송 / 연결 해제</text>
+  <text x="718" y="234" text-anchor="middle" font-size="9" fill="#fde68a">core.SendPacket(info)</text>
+  <text x="718" y="248" text-anchor="middle" font-size="9" fill="#fcd34d">count ≥ max → DoDisconnect()</text>
+
+  <!-- ========= Auxiliary Threads ========= -->
+  <rect x="20" y="285" width="230" height="100" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="40" y="305" font-size="11" font-weight="700" fill="#a78bfa">Session Release Thread × 1</text>
+  <rect x="40" y="315" width="190" height="56" rx="6" fill="#4c1d95"/>
+  <text x="135" y="333" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">releaseEventHandle 대기</text>
+  <text x="135" y="349" text-anchor="middle" font-size="9" fill="#ddd6fe">IO_SENDING 아닐 때</text>
+  <text x="135" y="363" text-anchor="middle" font-size="9" fill="#c4b5fd">session→Disconnect()</text>
+
+  <rect x="270" y="285" width="220" height="100" rx="8" fill="#1e293b" stroke="#ec4899" stroke-width="1.5"/>
+  <text x="290" y="305" font-size="11" font-weight="700" fill="#f472b6">Heartbeat Thread × 1</text>
+  <rect x="290" y="315" width="180" height="56" rx="6" fill="#831843"/>
+  <text x="380" y="333" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">전체 세션 순회</text>
+  <text x="380" y="349" text-anchor="middle" font-size="9" fill="#fbcfe8">CONNECTED → SendHeartbeat</text>
+  <text x="380" y="363" text-anchor="middle" font-size="9" fill="#f9a8d4">RESERVED 30s → Abort</text>
+
+  <rect x="510" y="285" width="170" height="100" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="530" y="305" font-size="11" font-weight="700" fill="#22d3ee">Ticker × 1</text>
+  <rect x="530" y="315" width="130" height="56" rx="6" fill="#164e63"/>
+  <text x="595" y="333" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">timerTickMs 간격</text>
+  <text x="595" y="349" text-anchor="middle" font-size="9" fill="#a5f3fc">TimerEvent::Fire()</text>
+  <text x="595" y="363" text-anchor="middle" font-size="9" fill="#67e8f9">ShouldFire 확인</text>
+
+  <rect x="700" y="285" width="140" height="100" rx="8" fill="#1e293b" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="720" y="305" font-size="11" font-weight="700" fill="#4ade80">Logger × 1</text>
+  <rect x="720" y="315" width="100" height="56" rx="6" fill="#14532d"/>
+  <text x="770" y="333" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">이벤트 대기</text>
+  <text x="770" y="349" text-anchor="middle" font-size="9" fill="#86efac">큐 swap</text>
+  <text x="770" y="363" text-anchor="middle" font-size="9" fill="#4ade80">JSON → 파일</text>
+
+  <!-- ========= Shared Data Layer ========= -->
+  <rect x="20" y="400" width="820" height="140" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <text x="40" y="420" font-size="11" font-weight="700" fill="#94a3b8">공유 데이터 / 동기화 객체</text>
+
+  <rect x="40" y="430" width="175" height="96" rx="6" fill="#1a2744"/>
+  <text x="127" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">recvIOCompletedContexts</text>
+  <text x="127" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">CListBaseQueue[N]</text>
+  <text x="127" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">IO Worker → LogicWorker</text>
+  <text x="127" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">Semaphore[N] 시그널</text>
+  <text x="127" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">스레드 ID별 분리</text>
+
+  <rect x="230" y="430" width="175" height="96" rx="6" fill="#1a2744"/>
+  <text x="317" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">sendPacketInfoList</text>
+  <text x="317" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">list[N] + mutex[N]</text>
+  <text x="317" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">IOHandler ↔ Retrans</text>
+  <text x="317" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">재전송 타임스탬프 관리</text>
+  <text x="317" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">isErasedPacketInfo(atomic)</text>
+
+  <rect x="420" y="430" width="175" height="96" rx="6" fill="#1a2744"/>
+  <text x="507" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">releaseSessionIdList</text>
+  <text x="507" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">vector + mutex</text>
+  <text x="507" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">IoHandler → Release</text>
+  <text x="507" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">nowInReleaseThread(atomic)</text>
+  <text x="507" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">sessionReleaseEvent(auto)</text>
+
+  <rect x="610" y="430" width="210" height="96" rx="6" fill="#1a2744"/>
+  <text x="715" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">SessionStateMachine</text>
+  <text x="715" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">atomic SESSION_STATE</text>
+  <text x="715" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">compare_exchange_strong</text>
+  <text x="715" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">nowInProcessingRecvPacket</text>
+  <text x="715" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">(atomic_bool)</text>
+
+  <!-- Arrows: IO Worker → recvIOCompletedContexts -->
+  <line x1="114" y1="142" x2="114" y2="398" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-b)"/>
+
+  <!-- recvIOCompletedContexts → Logic Worker -->
+  <line x1="127" y1="400" x2="170" y2="268" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-g)"/>
+
+  <!-- Arrows: IOHandler → sendPacketInfoList -->
+  <line x1="317" y1="283" x2="317" y2="428" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-y)"/>
+
+  <!-- Retrans → sendPacketInfoList -->
+  <line x1="520" y1="270" x2="340" y2="428" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-y)"/>
+</svg>

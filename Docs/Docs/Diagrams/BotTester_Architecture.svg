@@ -1,0 +1,157 @@
+<svg viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#6b7280"/>
+    </marker>
+    <marker id="arr-b" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#60a5fa"/>
+    </marker>
+    <marker id="arr-g" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#34d399"/>
+    </marker>
+    <marker id="arr-p" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#a78bfa"/>
+    </marker>
+    <marker id="arr-y" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 9 3, 0 6" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="580" fill="#0f172a" rx="12"/>
+  <text x="450" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#f1f5f9">MultiSocketRUDPBotTester — 전체 아키텍처</text>
+
+  <!-- WPF UI Layer -->
+  <rect x="20" y="50" width="540" height="160" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="40" y="70" font-size="11" font-weight="700" fill="#60a5fa">WPF UI Layer</text>
+
+  <rect x="30" y="78" width="130" height="48" rx="6" fill="#1d4ed8"/>
+  <text x="95" y="97" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">MainWindow</text>
+  <text x="95" y="113" text-anchor="middle" font-size="9" fill="#bfdbfe">IP / Port / BotCount</text>
+  <text x="95" y="125" text-anchor="middle" font-size="9" fill="#bfdbfe">Start / Stop</text>
+
+  <rect x="175" y="78" width="165" height="48" rx="6" fill="#1d4ed8"/>
+  <text x="257" y="97" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">BotActionGraphWindow</text>
+  <text x="257" y="113" text-anchor="middle" font-size="9" fill="#bfdbfe">비주얼 노드 에디터</text>
+  <text x="257" y="125" text-anchor="middle" font-size="9" fill="#bfdbfe">Build / Validate / Apply</text>
+
+  <rect x="355" y="78" width="130" height="48" rx="6" fill="#4c1d95"/>
+  <text x="420" y="97" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">AI Tree Generator</text>
+  <text x="420" y="113" text-anchor="middle" font-size="9" fill="#ddd6fe">자연어 → JSON</text>
+  <text x="420" y="125" text-anchor="middle" font-size="9" fill="#ddd6fe">Gemini API</text>
+
+  <!-- NodeConfigPanels -->
+  <rect x="30" y="140" width="455" height="60" rx="6" fill="#172032"/>
+  <text x="257" y="158" text-anchor="middle" font-size="10" font-weight="600" fill="#60a5fa">Canvas Renderer + Interaction Handler + Node Config Panels</text>
+  <text x="257" y="174" text-anchor="middle" font-size="9" fill="#6b7280">NodeCanvasRenderer · NodeInteractionHandler · NodeConfigPanelRegistry</text>
+  <text x="257" y="188" text-anchor="middle" font-size="9" fill="#6b7280">포트 연결 · 드래그 · 순환 감지 · 설정 다이얼로그</text>
+
+  <!-- AI Layer -->
+  <rect x="580" y="50" width="300" height="160" rx="8" fill="#1e293b" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="600" y="70" font-size="11" font-weight="700" fill="#a78bfa">AI Layer (Google Gemini)</text>
+  <rect x="590" y="78" width="280" height="48" rx="6" fill="#3b0764"/>
+  <text x="730" y="97" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">GeminiClient</text>
+  <text x="730" y="113" text-anchor="middle" font-size="9" fill="#ddd6fe">AskAsync(prompt)</text>
+  <text x="730" y="125" text-anchor="middle" font-size="9" fill="#ddd6fe">gemini-2.5-flash</text>
+  <rect x="590" y="140" width="280" height="60" rx="6" fill="#172032"/>
+  <text x="730" y="158" text-anchor="middle" font-size="10" font-weight="600" fill="#a78bfa">AiTreeService + AiNodeFactory</text>
+  <text x="730" y="174" text-anchor="middle" font-size="9" fill="#6b7280">JSON 파싱 · 유효성 검사</text>
+  <text x="730" y="188" text-anchor="middle" font-size="9" fill="#6b7280">JSON → NodeVisual 트리 생성</text>
+
+  <!-- Bot Engine Layer -->
+  <rect x="20" y="228" width="540" height="175" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="40" y="248" font-size="11" font-weight="700" fill="#34d399">Bot Engine Layer</text>
+
+  <rect x="30" y="256" width="160" height="134" rx="6" fill="#064e3b"/>
+  <text x="110" y="274" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">ActionGraph</text>
+  <text x="110" y="290" text-anchor="middle" font-size="9" fill="#a7f3d0">TriggerEvent()</text>
+  <text x="110" y="305" text-anchor="middle" font-size="9" fill="#6ee7b7">OnConnected</text>
+  <text x="110" y="319" text-anchor="middle" font-size="9" fill="#6ee7b7">OnDisconnected</text>
+  <text x="110" y="333" text-anchor="middle" font-size="9" fill="#6ee7b7">OnPacketReceived</text>
+  <text x="110" y="348" text-anchor="middle" font-size="9" fill="#6ee7b7">NodeExecutionHelper</text>
+  <text x="110" y="362" text-anchor="middle" font-size="9" fill="#34d399">ExecuteChainWithStats</text>
+  <text x="110" y="376" text-anchor="middle" font-size="9" fill="#4ade80">+ NodeExecutionStats</text>
+
+  <rect x="205" y="256" width="160" height="134" rx="6" fill="#064e3b"/>
+  <text x="285" y="274" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Node Types</text>
+  <text x="285" y="292" text-anchor="middle" font-size="9" fill="#a7f3d0">Action (DimGray)</text>
+  <text x="285" y="306" text-anchor="middle" font-size="9" fill="#6ee7b7">Send / Delay / Log</text>
+  <text x="285" y="320" text-anchor="middle" font-size="9" fill="#6ee7b7">Disconnect / Variable</text>
+  <text x="285" y="336" text-anchor="middle" font-size="9" fill="#fbbf24">Condition (DarkOrange)</text>
+  <text x="285" y="350" text-anchor="middle" font-size="9" fill="#fde68a">ConditionalNode</text>
+  <text x="285" y="366" text-anchor="middle" font-size="9" fill="#a78bfa">Loop (DarkMagenta)</text>
+  <text x="285" y="380" text-anchor="middle" font-size="9" fill="#ddd6fe">Loop/Repeat/Wait/Retry</text>
+
+  <rect x="380" y="256" width="168" height="134" rx="6" fill="#064e3b"/>
+  <text x="464" y="274" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">RuntimeContext</text>
+  <text x="464" y="292" text-anchor="middle" font-size="9" fill="#a7f3d0">ConcurrentDictionary</text>
+  <text x="464" y="308" text-anchor="middle" font-size="9" fill="#6ee7b7">__received_{PacketId}</text>
+  <text x="464" y="322" text-anchor="middle" font-size="9" fill="#6ee7b7">__loop_iteration</text>
+  <text x="464" y="338" text-anchor="middle" font-size="9" fill="#6ee7b7">타이머 / 메트릭</text>
+  <text x="464" y="354" text-anchor="middle" font-size="9" fill="#6ee7b7">AtomicIncrement</text>
+  <text x="464" y="370" text-anchor="middle" font-size="9" fill="#34d399">GraphValidator</text>
+  <text x="464" y="385" text-anchor="middle" font-size="9" fill="#4ade80">구조·순환·설정 검증</text>
+
+  <!-- Client Core Layer -->
+  <rect x="580" y="228" width="300" height="175" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="600" y="248" font-size="11" font-weight="700" fill="#fbbf24">Client Core (C# RUDP)</text>
+
+  <rect x="590" y="256" width="280" height="56" rx="6" fill="#78350f"/>
+  <text x="730" y="276" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">BotTesterCore (Singleton)</text>
+  <text x="730" y="292" text-anchor="middle" font-size="9" fill="#fde68a">세션 딕셔너리 관리</text>
+  <text x="730" y="306" text-anchor="middle" font-size="9" fill="#fcd34d">StartBotTest / StopBotTest</text>
+
+  <rect x="590" y="324" width="130" height="68" rx="6" fill="#451a03"/>
+  <text x="655" y="342" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">RudpSession</text>
+  <text x="655" y="358" text-anchor="middle" font-size="9" fill="#fed7aa">UdpClient</text>
+  <text x="655" y="372" text-anchor="middle" font-size="9" fill="#fed7aa">AES-GCM 암복호화</text>
+  <text x="655" y="386" text-anchor="middle" font-size="9" fill="#fcd34d">재전송 30ms 주기</text>
+
+  <rect x="734" y="324" width="136" height="68" rx="6" fill="#451a03"/>
+  <text x="802" y="342" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">SessionGetter</text>
+  <text x="802" y="358" text-anchor="middle" font-size="9" fill="#fed7aa">TLS 1.2 (SslStream)</text>
+  <text x="802" y="372" text-anchor="middle" font-size="9" fill="#fed7aa">세션 정보 수신</text>
+  <text x="802" y="386" text-anchor="middle" font-size="9" fill="#fcd34d">인증서 핀닝 지원</text>
+
+  <!-- Server reference -->
+  <rect x="20" y="420" width="860" height="50" rx="8" fill="#1a2744" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="450" y="440" text-anchor="middle" font-size="11" font-weight="600" fill="#60a5fa">↕  MultiSocketRUDP Server (C++)  ↕</text>
+  <text x="450" y="458" text-anchor="middle" font-size="9" fill="#6b7280">SessionBroker (TCP+TLS) ← 세션 정보 발급 · RUDPSession (UDP+RIO) ← 패킷 송수신 (AES-GCM)</text>
+
+  <!-- Arrows -->
+  <line x1="175" y1="102" x2="175" y2="102" stroke="transparent"/>
+  <!-- MainWindow → BotTesterCore -->
+  <line x1="95" y1="126" x2="650" y2="256" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-y)"/>
+  <!-- BotActionGraphWindow → ActionGraph -->
+  <line x1="257" y1="126" x2="180" y2="256" stroke="#34d399" stroke-width="2" marker-end="url(#arr-g)"/>
+  <!-- AI → BotActionGraphWindow -->
+  <line x1="580" y1="168" x2="490" y2="168" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr-p)"/>
+  <!-- BotTesterCore → RudpSession -->
+  <line x1="700" y1="312" x2="665" y2="322" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <!-- BotTesterCore → SessionGetter -->
+  <line x1="760" y1="312" x2="805" y2="322" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <!-- RudpSession ↔ Server -->
+  <line x1="655" y1="392" x2="655" y2="418" stroke="#3b82f6" stroke-width="2" marker-end="url(#arr-b)"/>
+  <!-- SessionGetter ↔ Server -->
+  <line x1="802" y1="392" x2="802" y2="418" stroke="#fbbf24" stroke-width="2" marker-end="url(#arr-y)"/>
+  <!-- ActionGraph → RuntimeContext -->
+  <line x1="192" y1="323" x2="378" y2="323" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Legend -->
+  <rect x="20" y="485" width="860" height="82" rx="6" fill="#1e293b"/>
+  <text x="40" y="503" font-size="10" font-weight="700" fill="#94a3b8">범례</text>
+  <rect x="40" y="512" width="12" height="12" rx="2" fill="#1d4ed8"/>
+  <text x="58" y="522" font-size="9" fill="#d1d5db">WPF UI</text>
+  <rect x="130" y="512" width="12" height="12" rx="2" fill="#064e3b"/>
+  <text x="148" y="522" font-size="9" fill="#d1d5db">Bot Engine</text>
+  <rect x="240" y="512" width="12" height="12" rx="2" fill="#78350f"/>
+  <text x="258" y="522" font-size="9" fill="#d1d5db">Client Core</text>
+  <rect x="350" y="512" width="12" height="12" rx="2" fill="#3b0764"/>
+  <text x="368" y="522" font-size="9" fill="#d1d5db">AI (Gemini)</text>
+  <line x1="460" y1="518" x2="490" y2="518" stroke="#34d399" stroke-width="2"/>
+  <text x="498" y="522" font-size="9" fill="#d1d5db">Build/Apply 흐름</text>
+  <line x1="600" y1="518" x2="630" y2="518" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="638" y="522" font-size="9" fill="#d1d5db">UDP 통신</text>
+  <line x1="720" y1="518" x2="750" y2="518" stroke="#fbbf24" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="758" y="522" font-size="9" fill="#d1d5db">TLS 세션 발급</text>
+  <text x="40" y="552" font-size="9" fill="#6b7280">* 모든 봇 Client는 독립 UDP 소켓 + AES-GCM 세션키를 보유하며, ActionGraph를 공유 (읽기 전용)</text>
+</svg>
