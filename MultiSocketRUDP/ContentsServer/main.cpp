@@ -6,6 +6,8 @@
 
 int main()
 {
+	ContentsPacketRegister::Init();
+
 	if (not TestServer::GetInst().Start(L"ServerOptionFile/CoreOption.txt", L"ServerOptionFile/SessionBrokerOption.txt"))
 	{
 		std::cout << "StartServer() failed" << '\n';
@@ -27,8 +29,6 @@ int main()
 			}
 		});
 
-	ContentsPacketRegister::Init();
-
 	while (true)
 	{
 		Sleep(1000);
@@ -45,6 +45,7 @@ int main()
 		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
 		serverStats.tps = TestServer::GetInst().GetTPS();
 		serverStats.error = TestServer::GetInst().GetNumOfError();
+
 
 		TestServer::GetInst().ResetTPS();
 	}
