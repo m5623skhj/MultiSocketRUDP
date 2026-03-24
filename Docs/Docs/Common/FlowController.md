@@ -50,12 +50,11 @@ class RUDPFlowController {
     uint8_t cwnd;                    // 혼잡 윈도우 크기 (패킷 수)
     bool inRecovery;                 // 혼잡 복구 중 여부
     PacketSequence lastReplySequence; // 마지막 수신 ACK 시퀀스
-    PacketSequence initialSequence;   // 세션 시작 시 기준 시퀀스
 
     // 상수 (소스 직접 수정)
-    static constexpr uint8_t INITIAL_CWND = 8;
-    static constexpr uint8_t MAX_CWND = 64;
-    static constexpr int32_t GAP_THRESHOLD = 5;  // 혼잡 감지 임계값
+    static constexpr uint8_t INITIAL_CWND = 4;
+    static constexpr uint8_t MAX_CWND = 250;
+    // GAP_THRESHOLD = 5 → OnReplyReceived 함수 내 local static 상수
 };
 ```
 
@@ -92,24 +91,29 @@ nextSend=15: outstanding=3  → ✅ PendingQueue에서 꺼내 전송
 ```cpp
 void OnReplyReceived(PacketSequence replySequence)
 {
-    if (replySequence <= lastReplySequence) return;  // 중복 ACK
+    static constexpr int32_t GAP_THRESHOLD = 5;
+
+    const int32_t diff = SeqDiff(replySequence, lastReplySequence);
+    if (diff <= 0) return;  // 중복 ACK
 
     // Gap 계산: 몇 개의 시퀀스를 건너뛰었는가
-    int32_t gap = static_cast<int32_t>(replySequence - lastReplySequence) - 1;
-
-    if (gap >= GAP_THRESHOLD) {
+    if (const int32_t sequenceGap = diff - 1; sequenceGap >= GAP_THRESHOLD) {
         // 패킷 유실 추정 → 혼잡 이벤트
         OnCongestionEvent();
         // cwnd = max(cwnd / 2, 1)
         // inRecovery = true
-    } else if (!inRecovery) {
-        // 정상: CWND 증가
-        cwnd = static_cast<uint8_t>(std::min(
-            static_cast<int>(cwnd) + 1,
-            static_cast<int>(MAX_CWND)));
     }
 
     lastReplySequence = replySequence;
+
+    if (not inRecovery) {
+        // 정상: CWND 증가
+        cwnd = std::min<uint8_t>(cwnd + 1, MAX_CWND);
+    } else {
+        // inRecovery 상태에서 첫 정상 ACK → 복구 완료
+        inRecovery = false;
+        // (이번 ACK에서는 CWND 증가 안 함, 다음 ACK부터 증가)
+    }
 }
 ```
 
@@ -148,17 +152,10 @@ void OnTimeout() noexcept {
 }
 ```
 
-**`inRecovery` 플래그:**  
-복구 중에는 추가 혼잡 이벤트로 CWND가 0이 되는 것을 방지한다.  
-다음 정상 ACK 수신 시 `inRecovery = false`로 초기화해 CWND 증가를 재개한다.
-
-```cpp
-} else {
-    // inRecovery 상태에서 첫 정상 ACK → 복구 완료
-    inRecovery = false;
-    // (이번 ACK에서는 CWND 증가 안 함, 다음 ACK부터 증가)
-}
-```
+**`inRecovery` 플래그:**
+혼잡 이벤트 발생 시 `inRecovery = true`로 설정되어, 같은 ACK에서 CWND가 동시에 증가하는 것을 막는다.
+혼잡 이벤트가 발생한 동일 ACK에서 `inRecovery`는 즉시 `false`로 리셋된다.
+따라서 다음 ACK부터 다시 CWND가 증가하기 시작한다.
 
 ---
 
@@ -170,10 +167,11 @@ void OnTimeout() noexcept {
 
 ```cpp
 class RUDPReceiveWindow {
-    PacketSequence windowStart;     // 현재 기대하는 최소 시퀀스
-    uint8_t windowSize;             // 윈도우 크기 (옵션 MAX_HOLDING_PACKET_QUEUE_SIZE)
-    std::vector<bool> receivedMask; // [i] = (windowStart + i)를 수신했는가
-    uint8_t receivedCount;          // 수신된 시퀀스 수
+    PacketSequence windowStart;          // 현재 기대하는 최소 시퀀스
+    BYTE windowSize;                     // 윈도우 크기 (옵션 MAX_HOLDING_PACKET_QUEUE_SIZE)
+    std::vector<uint8_t> receivedFlags;  // [idx] = 수신 여부 (원형 버퍼)
+    BYTE usedCount;                      // 수신 마킹된 슬롯 수
+    size_t startIndex;                   // 원형 버퍼의 현재 시작 인덱스
 };
 ```
 
@@ -198,22 +196,27 @@ sequence=9:  diff=-1 → ❌ (이미 지난 시퀀스)
 
 ### `MarkReceived` — 수신 마킹 + 슬라이딩
 
-```cpp
-void MarkReceived(PacketSequence sequence)
-{
-    uint8_t idx = static_cast<uint8_t>(sequence - windowStart);
-    if (receivedMask[idx]) return;  // 이미 마킹됨
+`startIndex` 기반 원형 버퍼(circular buffer)로 슬라이딩을 구현한다.
 
-    receivedMask[idx] = true;
-    ++receivedCount;
+```cpp
+void MarkReceived(PacketSequence inSequence) noexcept
+{
+    if (not CanReceive(inSequence)) return;
+
+    const int32_t offset = SeqDiff(inSequence, windowStart);
+    if (const size_t idx = (startIndex + static_cast<size_t>(offset)) % windowSize;
+        not receivedFlags[idx])
+    {
+        receivedFlags[idx] = 1;
+        ++usedCount;
+    }
 
     // 앞부분이 연속으로 수신됐으면 윈도우 슬라이딩
-    while (receivedMask[0]) {
-        // 원형 버퍼 방식으로 슬라이딩
-        receivedMask[0] = false;
-        std::rotate(receivedMask.begin(), receivedMask.begin() + 1, receivedMask.end());
+    while (receivedFlags[startIndex]) {
+        receivedFlags[startIndex] = 0;
+        startIndex = (startIndex + 1) % windowSize;
         ++windowStart;
-        --receivedCount;
+        --usedCount;
     }
 }
 ```
@@ -221,24 +224,24 @@ void MarkReceived(PacketSequence sequence)
 **슬라이딩 예시:**
 
 ```
-초기: windowStart=10, receivedMask=[0,0,0,0,0,0,0,0]
+초기: windowStart=10, startIndex=0, receivedFlags=[0,0,0,0,0,0,0,0]
 
-MarkReceived(10): mask=[1,0,0,0,0,0,0,0]
-  → 앞이 1이므로 슬라이딩: windowStart=11, mask=[0,0,0,0,0,0,0,0]
+MarkReceived(10): idx=(0+0)%8=0 → flags=[1,0,0,0,0,0,0,0]
+  → flags[startIndex=0]=1 → 슬라이딩: startIndex=1, windowStart=11
+  → flags[startIndex=1]=0 → 중단
 
-MarkReceived(12): mask=[0,1,0,0,0,0,0,0]
-  → 앞이 0이므로 슬라이딩 안 함
+MarkReceived(12): idx=(1+2)%8=3 → flags=[0,0,0,1,0,0,0,0]
+  → flags[startIndex=1]=0 → 슬라이딩 안 함
 
-MarkReceived(11): mask=[1,1,0,0,0,0,0,0]
-  → 앞이 1이므로 슬라이딩: windowStart=12, mask=[1,0,0,0,0,0,0,0]
-  → 앞이 1이므로 슬라이딩: windowStart=13, mask=[0,0,0,0,0,0,0,0]
+MarkReceived(11): idx=(1+1)%8=2 → flags=[0,0,1,1,0,0,0,0]
+  → flags[startIndex=1]=0 → 슬라이딩 안 함
 ```
 
-### `GetAdvertisableWindow` — 광고 윈도우 크기
+### `GetAdvertiseWindow` — 광고 윈도우 크기
 
 ```cpp
-uint8_t GetAdvertisableWindow() const noexcept {
-    return windowSize - receivedCount;
+BYTE GetAdvertiseWindow() const noexcept {
+    return windowSize - usedCount;
     // 수신 가능한 슬롯 수 = 윈도우 크기 - 이미 채워진 슬롯
 }
 ```
@@ -251,52 +254,49 @@ uint8_t GetAdvertisableWindow() const noexcept {
 
 ```cpp
 class RUDPFlowManager {
-    RUDPFlowController sendController;      // 송신 CWND 관리
-    RUDPReceiveWindow  receiveWindow;        // 수신 윈도우 관리
-    PacketSequence     lastSendAckedSeq;     // sendController에 전달할 lastAcked
+    RUDPFlowController flowController;  // 송신 CWND 관리
+    RUDPReceiveWindow  receiveWindow;   // 수신 윈도우 관리
+    // lastAckedSequence는 RUDPFlowController 내부에서 관리 (GetLastAckedSequence())
 public:
     // 초기화
-    void Reset(PacketSequence initialSeq);
+    void Reset(PacketSequence recvStartSequence) noexcept;
 
     // 송신 제어
-    bool CanSend(PacketSequence nextSeq) const noexcept;
-    void OnAckReceived(PacketSequence ackedSeq);
-    void OnCongestionEvent() noexcept;
+    bool CanSend(PacketSequence nextSeq) noexcept;
+    void OnAckReceived(PacketSequence ackedSeq) noexcept;
     void OnTimeout() noexcept;
 
     // 수신 제어
     bool CanAccept(PacketSequence sequence) const noexcept;
-    void MarkReceived(PacketSequence sequence);
-    uint8_t GetAdvertisableWindow() const noexcept;
+    void MarkReceived(PacketSequence sequence) noexcept;
+    BYTE GetAdvertisableWindow() const noexcept;
 };
 ```
 
 ### `Reset` — 세션 연결 시 초기화
 
 ```cpp
-void Reset(PacketSequence initialSeq) {
-    sendController.Reset(initialSeq);
-    receiveWindow.Reset(initialSeq + 1, windowSize);
-    lastSendAckedSeq = initialSeq;
+void Reset(const PacketSequence recvStartSequence) noexcept {
+    flowController.Reset();                     // cwnd/lastReply/inRecovery 초기화
+    receiveWindow.Reset(recvStartSequence);     // windowStart = recvStartSequence
 }
 ```
 
-`TryConnect()` 내에서 `LOGIN_PACKET_SEQUENCE(=0)` + 1로 초기화.
+`TryConnect()` 내에서 `LOGIN_PACKET_SEQUENCE(=0)` 전달, `receiveWindow`는 0부터 시작.
 
 ### `CanSend`
 
 ```cpp
-bool CanSend(PacketSequence nextSeq) const noexcept {
-    return sendController.CanSendPacket(nextSeq, lastSendAckedSeq);
+bool CanSend(PacketSequence nextSeq) noexcept {
+    return flowController.CanSendPacket(nextSeq, flowController.GetLastAckedSequence());
 }
 ```
 
 ### `OnAckReceived`
 
 ```cpp
-void OnAckReceived(PacketSequence ackedSeq) {
-    lastSendAckedSeq = ackedSeq;
-    sendController.OnReplyReceived(ackedSeq);
+void OnAckReceived(PacketSequence ackedSeq) noexcept {
+    flowController.OnReplyReceived(ackedSeq);  // lastAcked는 flowController 내부에서 갱신
 }
 ```
 
@@ -395,18 +395,20 @@ bool CanSendMore() {
 ### CWND 상수 (소스 직접 수정)
 
 ```cpp
-// FlowController.h 또는 RUDPFlowController.cpp
-constexpr uint8_t INITIAL_CWND  = 8;   // 세션 연결 시 초기 윈도우
-constexpr uint8_t MAX_CWND      = 64;  // 최대 윈도우
-constexpr int32_t GAP_THRESHOLD = 5;   // 혼잡 감지 갭 임계값
+// RUDPFlowController.h (클래스 멤버 상수)
+static constexpr uint8_t INITIAL_CWND = 4;   // 세션 연결 시 초기 윈도우
+static constexpr uint8_t MAX_CWND     = 250; // 최대 윈도우
+
+// RUDPFlowController.cpp OnReplyReceived 함수 내 local static
+static constexpr int32_t GAP_THRESHOLD = 5;  // 혼잡 감지 갭 임계값
 ```
 
 | 시나리오 | INITIAL_CWND | MAX_CWND | GAP_THRESHOLD |
 |----------|-------------|----------|---------------|
-| LAN 환경 (저레이턴시) | 16 | 128 | 3 |
-| 일반 인터넷 | 8 | 64 | 5 |
-| 불안정 네트워크 | 4 | 32 | 3 |
-| 대용량 데이터 전송 | 8 | 256 | 8 |
+| LAN 환경 (저레이턴시) | 16 | 200 | 3 |
+| 일반 인터넷 | 4 | 250 | 5 |
+| 불안정 네트워크 | 2 | 100 | 3 |
+| 대용량 데이터 전송 | 8 | 250 | 8 |
 
 ### 수신 윈도우 크기 (옵션 파일)
 

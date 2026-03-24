@@ -23,11 +23,11 @@
 
 ```cpp
 class RUDPSession {
-    // ─── 6개 서브 컴포넌트 ───────────────────────────────────────────
+    // ─── 서브 컴포넌트 ──────────────────────────────────────────────
     SessionStateMachine   stateMachine;      // 세션 상태 (DISCONNECTED/RESERVED/CONNECTED/RELEASING)
     SessionCryptoContext  cryptoContext;     // AES-GCM 키/솔트/핸들
-    SessionSocketContext  socketContext;     // 소켓 핸들, 클라이언트 주소, 락
-    SessionRIOContext     rioContext;        // RIO 버퍼/컨텍스트 (Recv + Send)
+    SessionSocketContext  socketContext;     // 소켓 핸들, 클라이언트 주소, 락 (RUDPSession 미포함)
+    SessionRIOContext     rioContext;        // RIO 버퍼/컨텍스트 (Recv + Send, 시퀀스 포함)
     RUDPFlowManager       flowManager;      // CWND + 수신 윈도우
     SessionPacketOrderer  sessionPacketOrderer;  // 순서 보장 홀딩 큐
 
@@ -36,10 +36,15 @@ class RUDPSession {
     std::atomic_bool nowInProcessingRecvPacket{ false };
 
     // ─── 패킷 핸들러 맵 ──────────────────────────────────────────────
-    std::unordered_map<PacketId, PacketHandlerFunc> packetFactoryMap;
+    std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
 
-    // ─── 시퀀스 추적 ─────────────────────────────────────────────────
-    std::atomic<PacketSequence> lastSendPacketSequence{ 0 };
+    // ─── 기타 멤버 ───────────────────────────────────────────────────
+    SessionIdType sessionId;
+    sockaddr_in clientAddr{};
+    SOCKADDR_INET clientSockAddrInet{};
+    ThreadIdType threadId{};
+    unsigned long long sessionReservedTime{};
+    // lastSendPacketSequence는 SessionSendContext (rioContext) 내부에서 관리
 };
 ```
 
@@ -60,7 +65,7 @@ public:
     bool IsReserved()     const noexcept;   // state == RESERVED
     bool IsReleasing()    const noexcept;   // state == RELEASING
     bool IsUsingSession() const noexcept;   // RESERVED || CONNECTED
-    bool IsDisconnected() const noexcept;   // state == DISCONNECTED
+    // IsDisconnected()는 없음 — state == DISCONNECTED 확인 시 !IsUsingSession() && !IsReleasing() 사용
 
     // ─── 전이 (단순 store) ────────────────────────────────────────────
     void SetReserved();      // any → RESERVED (InitReserveSession에서)
@@ -120,11 +125,16 @@ public:
 ```cpp
 // Session Release Thread → Disconnect() → InitializeSession()
 void RUDPSession::InitializeSession() {
-    cryptoContext.Initialize();     // ← 여기서 키 핸들 파괴 + 버퍼 해제
-    flowManager.Reset(0);
-    sessionPacketOrderer.Reset();
-    lastSendPacketSequence.store(0);
-    nowInReleaseThread.store(false);
+    sessionId = INVALID_SESSION_ID;
+    cryptoContext.Initialize();                              // ← 키 핸들 파괴 + 버퍼 해제
+    clientAddr = {};
+    clientSockAddrInet = {};
+    nowInReleaseThread.store(false, std::memory_order_release);
+    sessionReservedTime = {};
+
+    flowManager.Initialize(maximumHoldingPacketQueueSize);  // CWND/윈도우 재초기화
+    rioContext.GetSendContext().Reset();                     // sendPacketInfoMap 정리
+    sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
 }
 ```
 
@@ -388,23 +398,22 @@ SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq) {
 
 ```cpp
 class RUDPFlowManager {
-    RUDPFlowController sendController;    // CWND 관리
-    RUDPReceiveWindow  receiveWindow;     // 수신 윈도우 관리
-    PacketSequence     lastSendAckedSeq;  // 마지막 ACK 시퀀스
+    RUDPFlowController flowController;  // CWND 관리
+    RUDPReceiveWindow  receiveWindow;   // 수신 윈도우 관리
+    // lastAckedSequence는 flowController 내부에서 관리
 
 public:
-    void Reset(PacketSequence initialSeq);
+    void Reset(PacketSequence recvStartSequence) noexcept;
 
     // 송신 제어
-    bool CanSend(PacketSequence nextSeq) const noexcept;
-    void OnAckReceived(PacketSequence ackedSeq);
-    void OnCongestionEvent() noexcept;
+    bool CanSend(PacketSequence nextSeq) noexcept;
+    void OnAckReceived(PacketSequence ackedSeq) noexcept;
     void OnTimeout() noexcept;
 
     // 수신 제어
     bool CanAccept(PacketSequence sequence) const noexcept;
-    void MarkReceived(PacketSequence sequence);
-    uint8_t GetAdvertisableWindow() const noexcept;
+    void MarkReceived(PacketSequence sequence) noexcept;
+    BYTE GetAdvertisableWindow() const noexcept;  // receiveWindow.GetAdvertiseWindow() 위임
 };
 ```
 
@@ -417,12 +426,12 @@ public:
 flowManager.Reset(LOGIN_PACKET_SEQUENCE);  // = 0
 
 // Reset 내부:
-// sendController.Reset(0):
-//   cwnd = INITIAL_CWND, lastReplySequence = 0, inRecovery = false
-// receiveWindow.Reset(1, windowSize):
-//   windowStart = 1 (seq=0는 CONNECT, 첫 데이터는 1부터)
-//   receivedMask.assign(windowSize, false)
-// lastSendAckedSeq = 0
+// flowController.Reset():
+//   cwnd = INITIAL_CWND(4), lastReplySequence = 0, inRecovery = false
+// receiveWindow.Reset(0):
+//   windowStart = 0, startIndex = 0, usedCount = 0
+//   receivedFlags.fill(0)
+// (lastAckedSequence は flowController 내부에서 관리)
 ```
 
 ---
@@ -467,19 +476,33 @@ sessionPacketOrderer
 6. stateMachine.SetReserved()
 ```
 
-**해제 순서 (Disconnect / AbortReservedSession):**
+**해제 순서 (Disconnect — Session Release Thread 경유):**
 
 ```
-1. socketContext.CloseSocket()        ← 소켓 먼저 닫기
-2. sendContext.ForEachAndClearSendPacketInfoMap()  ← SendPacketInfo 정리
+1. CloseSocket()                     ← 소켓 먼저 닫기
+2. rioContext.GetSendContext()
+   .ForEachAndClearSendPacketInfoMap()  ← SendPacketInfo 정리
 3. OnReleased() 콘텐츠 훅
 4. InitializeSession()
-   ├─ cryptoContext.Initialize()     ← 키 핸들 파괴
-   ├─ flowManager.Reset(0)
-   ├─ sessionPacketOrderer.Reset()
-   └─ lastSendPacketSequence = 0
+   ├─ sessionId = INVALID_SESSION_ID
+   ├─ cryptoContext.Initialize()        ← 키 핸들 파괴
+   ├─ clientAddr/clientSockAddrInet/sessionReservedTime 초기화
+   ├─ nowInReleaseThread = false
+   ├─ flowManager.Initialize(maxHoldingQueueSize)
+   ├─ rioContext.GetSendContext().Reset()
+   └─ sessionPacketOrderer.Initialize(maxHoldingQueueSize)
 5. stateMachine.SetDisconnected()
-6. unusedSessionIdList.push_back(id)
+6. DisconnectSession(id) → unusedSessionIdList.push_back(id)
+```
+
+**해제 순서 (AbortReservedSession — HeartbeatThread 직접 처리):**
+
+```
+1. nowInReleaseThread = true
+2. CloseSocket()           ← rioContext.Cleanup() + socketContext.CloseSocket()
+3. InitializeSession()     ← OnReleased() 없이 바로 초기화
+4. DisconnectSession(id)   ← SetDisconnected() 없이 바로 풀 반환
+   (다음 AcquireSession → SetReserved()에서 상태 갱신됨)
 ```
 
 ---

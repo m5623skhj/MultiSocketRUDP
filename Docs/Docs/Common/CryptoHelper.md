@@ -101,16 +101,17 @@ CryptoHelper::CryptoHelper()
         0
     );
     if (!BCRYPT_SUCCESS(status)) {
-        LOG_ERROR("BCryptGetProperty OBJECT_LENGTH failed");
-        return;
+        throw std::runtime_error("BCryptGetProperty(OBJECT_LENGTH) failed");
     }
-
-    initialized = true;
+    // 초기화 성공 시 keyObjectSize > 0 보장
 }
 
 CryptoHelper::~CryptoHelper()
 {
-    if (aesAlg) BCryptCloseAlgorithmProvider(aesAlg, 0);
+    if (aesAlg) {
+        std::ignore = BCryptCloseAlgorithmProvider(aesAlg, 0);
+        aesAlg = nullptr;
+    }
 }
 ```
 
@@ -134,7 +135,7 @@ BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(
 
 ```cpp
 {
-    if (!initialized) return nullptr;
+    if (keyObjectSize == 0) return nullptr;  // 생성자에서 초기화 실패 시
 
     BCRYPT_KEY_HANDLE keyHandle = nullptr;
     NTSTATUS status = BCryptGenerateSymmetricKey(

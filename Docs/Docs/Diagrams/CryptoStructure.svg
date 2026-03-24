@@ -105,7 +105,7 @@
   <text x="480" y="322" font-size="8" fill="#c4b5fd">0b10 = S→C  0b11 = S→C_REPLY</text>
 
   <!-- AES-GCM flow -->
-  <text x="40" y="358" font-size="12" font-weight="700" fill="#94a3b8">AES-256-GCM 처리 흐름</text>
+  <text x="40" y="358" font-size="12" font-weight="700" fill="#94a3b8">AES-128-GCM 처리 흐름</text>
 
   <rect x="40" y="368" width="120" height="72" rx="6" fill="#1a2744"/>
   <text x="100" y="386" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">입력</text>
@@ -121,7 +121,7 @@
   <text x="264" y="400" text-anchor="middle" font-size="8" fill="#a7f3d0">BCRYPT_AUTH_MODE_INFO</text>
   <text x="264" y="413" text-anchor="middle" font-size="8" fill="#a7f3d0">pbNonce, pbAuthData</text>
   <text x="264" y="426" text-anchor="middle" font-size="8" fill="#a7f3d0">pbTag (출력)</text>
-  <text x="264" y="439" text-anchor="middle" font-size="8" fill="#86efac">AES-256-GCM</text>
+  <text x="264" y="439" text-anchor="middle" font-size="8" fill="#86efac">AES-128-GCM</text>
 
   <line x1="346" y1="404" x2="366" y2="404" stroke="#6b7280" stroke-width="2" marker-end="url(#arr)"/>
 

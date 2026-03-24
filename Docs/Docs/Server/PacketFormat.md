@@ -88,28 +88,28 @@ static void PacketCryptoHelper::SetHeader(OUT NetBuffer& buf, int extraSize = 0)
 
 ```
 Byte
- 0    ┌──────────────┐
-      │ HeaderCode   │  1 B  (옵션 파일 설정값)
- 1    ├──────────────┤
-      │ PayloadLen   │  2 B  (uint16_t, little-endian)
- 3    ├──────────────┤
-      │ PacketType   │  1 B  (PACKET_TYPE enum)
- 4    ├──────────────┤
-      │              │
-      │ PacketSeq    │  8 B  (uint64_t)
-      │              │
-12    ├──────────────┤  ← AES-GCM 암호화 시작
-      │              │
-      │ PacketId     │  4 B  (uint32_t)
-      │              │
-16    ├──────────────┤
-      │              │
-      │ Payload      │  N B  (콘텐츠 데이터)
-      │              │
-16+N  ├──────────────┤
-      │              │
-      │ AuthTag      │  16 B  (GCM 인증 태그)
-      │              │
+ 0      ┌──────────────┐
+        │ HeaderCode   │  1 B  (옵션 파일 설정값)
+ 1      ├──────────────┤
+        │ PayloadLen   │  2 B  (uint16_t, little-endian)
+ 3      ├──────────────┤
+        │ PacketType   │  1 B  (PACKET_TYPE enum)
+ 4      ├──────────────┤
+        │              │
+        │ PacketSeq    │  8 B  (uint64_t)
+        │              │
+12      ├──────────────┤  ← AES-GCM 암호화 시작
+        │              │
+        │ PacketId     │  4 B  (uint32_t)
+        │              │
+16      ├──────────────┤
+        │              │
+        │ Payload      │  N B  (콘텐츠 데이터)
+        │              │
+16+N    ├──────────────┤
+        │              │
+        │ AuthTag      │  16 B  (GCM 인증 태그)
+        │              │
 16+N+16 └──────────────┘
 
 ← AAD 범위: [0 .. 11] (Header 3B + PacketType 1B + Sequence 8B) →

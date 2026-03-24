@@ -179,32 +179,29 @@ bool RUDPSession::TryConnect(
 **코드 경로:**
 
 ```cpp
-// MultiSocketRUDPCore::RunHeartbeatThread
-void CheckReservedSessionTimeout(RUDPSession& session, uint64_t now) {
-    if (now - session.GetReservedTimestamp() < RESERVED_SESSION_TIMEOUT_MS) return;
-
-    AbortReservedSession(session);
+// RUDPSession::CheckReservedSessionTimeout (세션 멤버 함수)
+bool CheckReservedSessionTimeout(unsigned long long now) const {
+    return stateMachine.IsReserved()
+        && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);  // 30000ms
 }
 
-// AbortReservedSession
-void AbortReservedSession(RUDPSession& session) {
+// RUDPSession::AbortReservedSession (세션 멤버 함수)
+void AbortReservedSession() {
     // CAS: RESERVED → RELEASING
-    if (!session.stateMachine.TryAbortReserved()) return;
+    if (!stateMachine.TryAbortReserved()) return;
     // → 이미 CONNECTED이면 실패 → 정상 연결 흐름으로
 
-    // 소켓 닫기
-    sessionDelegate.CloseSocket(session);
-    // → unique_lock(socketLock) → closesocket()
+    const SessionIdType disconnectTargetSessionId = sessionId;
+    nowInReleaseThread.store(true, std::memory_order_seq_cst);
 
-    // 세션 초기화
-    sessionDelegate.InitializeSession(session);
-    // → 암호화 컨텍스트 해제, RIO 버퍼 해제
+    // 소켓 닫기 (RIO Cleanup + socketContext.CloseSocket())
+    CloseSocket();
 
-    // 상태 전이 완료
-    session.stateMachine.SetDisconnected();
-
-    // 풀 반환
-    DisconnectSession(session.GetSessionId());
+    // 세션 내부 상태 초기화
+    // (DoDisconnect 경로와 달리 Session Release Thread를 거치지 않고 즉시 처리)
+    // SetDisconnected() 호출 없음 — 다음 AcquireSession() 시 SetReserved()로 덮어씀
+    InitializeSession();
+    MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
     // → unusedSessionIdList.push_back(id)
 }
 ```
@@ -302,10 +299,9 @@ void RUDPSession::Disconnect()
     // → unique_lock(socketLock) → closesocket() → INVALID_SOCKET
 
     // ② 미처리 sendPacketInfo 전체 정리
-    ForEachAndClearSendPacketInfoMap([](SendPacketInfo* info) {
-        info->isErasedPacketInfo.store(true);
-        core.EraseSendPacketInfo(*info, threadId);
-        // → sendPacketInfoList[threadId].erase(listItor)
+    rioContext.GetSendContext().ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info) {
+        core.EraseSendPacketInfo(info, threadId);
+        // → sendPacketInfoList[threadId]에서 제거
         // → SendPacketInfo::Free(info)
     });
 
@@ -314,11 +310,13 @@ void RUDPSession::Disconnect()
 
     // ④ 세션 내부 상태 초기화
     InitializeSession();
-    // → stateMachine 초기화 (DISCONNECTED는 아직)
-    // → flowManager.Reset()
-    // → sessionPacketOrderer.Reset()
-    // → lastSendPacketSequence = 0
+    // → sessionId = INVALID_SESSION_ID
+    // → cryptoContext.Initialize() (키 핸들 파괴)
+    // → clientAddr/clientSockAddrInet/sessionReservedTime 초기화
     // → nowInReleaseThread = false
+    // → flowManager.Initialize(maximumHoldingPacketQueueSize)
+    // → rioContext.GetSendContext().Reset()
+    // → sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize)
 
     // ⑤ 상태 전이 완료
     stateMachine.SetDisconnected();

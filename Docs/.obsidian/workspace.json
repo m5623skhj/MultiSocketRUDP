@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "MultiSocketRUDP-Docs/BotTester/00_BotTester_Overview.md",
+                "file": "Docs/Tools/PacketGenerator.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "00_BotTester_Overview"
+              "title": "PacketGenerator"
             }
           }
         ]
@@ -182,6 +182,21 @@
   },
   "active": "2923850d16653fd7",
   "lastOpenFiles": [
+    "Docs/Logger/Logger.md",
+    "Docs/Diagrams/ThreadModel.svg",
+    "Docs/Diagrams/SessionStateMachine.svg",
+    "Docs/Diagrams/NodeHierarchy.svg",
+    "Docs/Diagrams/PacketFlow.svg",
+    "Docs/Diagrams/README.md",
+    "Docs/Diagrams/GraphEditor_Layout.svg",
+    "Docs/Diagrams/CryptoStructure.svg",
+    "Docs/Diagrams/Connection_Sequence.svg",
+    "Docs/Diagrams/BotTester_Architecture.svg",
+    "Docs/Diagrams/AiTreeFlow.svg",
+    "Docs/Diagrams/Architecture_Overview.svg",
+    "Docs/BotTester/Bot/ActionNodes.md",
+    "Docs/BotTester/AI/GeminiClient.md",
+    "Docs/BotTester/AI/AiTreeGenerator.md",
     "MultiSocketRUDP-Docs/BotTester/ClientCore/BotTesterCore.md",
     "MultiSocketRUDP-Docs/BotTester/Bot/GraphValidator.md",
     "MultiSocketRUDP-Docs/BotTester/Bot/ActionNodes.md",
@@ -203,21 +218,6 @@
     "MultiSocketRUDP-Docs/Server/ThreadModel.md",
     "MultiSocketRUDP-Docs/Server/SessionLifecycle.md",
     "MultiSocketRUDP-Docs/Server/SessionComponents.md",
-    "MultiSocketRUDP-Docs/Server/SendPacketInfo.md",
-    "MultiSocketRUDP-Docs/Server/RUDPThreadManager.md",
-    "MultiSocketRUDP-Docs/Server/RUDPSessionManager.md",
-    "MultiSocketRUDP-Docs/Server/RUDPSessionBroker.md",
-    "MultiSocketRUDP-Docs/Server/RUDPSession.md",
-    "MultiSocketRUDP-Docs/Diagrams/ThreadModel.svg",
-    "MultiSocketRUDP-Docs/Diagrams/SessionStateMachine.svg",
-    "MultiSocketRUDP-Docs/Diagrams/PacketFlow.svg",
-    "MultiSocketRUDP-Docs/Diagrams/NodeHierarchy.svg",
-    "MultiSocketRUDP-Docs/Diagrams/GraphEditor_Layout.svg",
-    "MultiSocketRUDP-Docs/Diagrams/CryptoStructure.svg",
-    "MultiSocketRUDP-Docs/Diagrams/Connection_Sequence.svg",
-    "MultiSocketRUDP-Docs/Diagrams/BotTester_Architecture.svg",
-    "MultiSocketRUDP-Docs/Diagrams/Architecture_Overview.svg",
-    "MultiSocketRUDP-Docs/Diagrams/AiTreeFlow.svg",
     "MultiSocketRUDP-Docs/BotTester/{Bot,AI,ClientCore,UI,Diagrams}",
     "MultiSocketRUDP-Docs/BotTester/UI",
     "MultiSocketRUDP-Docs/BotTester/ClientCore",

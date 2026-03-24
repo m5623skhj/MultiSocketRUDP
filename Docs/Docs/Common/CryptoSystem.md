@@ -1,6 +1,6 @@
 # 암호화 시스템 (Crypto System)
 
-> **패킷 1개를 전송할 때 적용되는 AES-256-GCM 기반 암호화 전체 설계를 다룬다.**  
+> **패킷 1개를 전송할 때 적용되는 AES-128-GCM 기반 암호화 전체 설계를 다룬다.**  
 > 서버가 키/솔트를 생성하는 방법, Nonce를 구성하는 방법,  
 > 패킷 버퍼 어디부터 어디까지 암호화하는지, 위변조 감지가 어떻게 동작하는지를 한 곳에서 파악할 수 있다.
 
@@ -47,9 +47,11 @@
 ```
 Common/
  ├── CryptoHelper.h / .cpp        ← BCrypt 래퍼, thread_local 인스턴스
- ├── PacketCryptoHelper.h / .cpp  ← 패킷 버퍼 기반 암복호화
- └── CryptoType.h                 ← AUTH_TAG_SIZE, SESSION_KEY_SIZE 등 상수
+ │                                   AUTH_TAG_SIZE 상수 정의
+ └── PacketCryptoHelper.h         ← 패킷 버퍼 기반 암복호화
+                                     bodyOffsetWithHeader 등 오프셋 상수 정의
 ```
+> `CryptoType.h`는 별도로 존재하지 않는다. 관련 상수는 `CryptoHelper.h`와 `PacketCryptoHelper.h`에 분산 정의되어 있다.
 
 ---
 
@@ -330,7 +332,8 @@ Step 2. AAD 추출
   aad = buffer[0..11]
 
 Step 3. Nonce 생성
-  nonce = CryptoHelper::GenerateNonce(sessionSalt, 4, packetSequence, direction)
+  nonce = CryptoHelper::GenerateNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction)
+  // SESSION_SALT_SIZE = 16. GenerateNonce 내부에서 sessionSaltSize != SESSION_SALT_SIZE 이면 빈 벡터 반환
   // 12 bytes
 
 Step 4. 암호화 범위 결정
@@ -395,7 +398,8 @@ Step 5. AAD 추출
   aad = buffer[0..11]
 
 Step 6. Nonce 생성 (수신 측에서 동일하게 재현)
-  nonce = CryptoHelper::GenerateNonce(sessionSalt, 4, packetSequence, direction)
+  nonce = CryptoHelper::GenerateNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction)
+  // SESSION_SALT_SIZE = 16. GenerateNonce 내부에서 sessionSaltSize != SESSION_SALT_SIZE 이면 빈 벡터 반환
 
 Step 7. AES-GCM 복호화 + 태그 검증 (in-place)
   ok = CryptoHelper::DecryptAESGCM(

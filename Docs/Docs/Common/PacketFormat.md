@@ -29,14 +29,14 @@ Offset  Size  Field          암호화  설명
   3      1B   PacketType     ─ AAD  PACKET_TYPE::SEND_TYPE (0x03)
   4      8B   Sequence       ─ AAD  uint64, 단조 증가. Nonce 생성에도 사용.
  12      4B   PacketId       ← ENC  uint32. PACKET_ID enum 값.
- 16     NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
- 16+N  16B   AuthTag        (후미)  AES-GCM 인증 태그. 암호화 성공 시 버퍼 끝에 추가.
+ 16      NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
+ 16+N   16B   AuthTag        (후미)  AES-GCM 인증 태그. 암호화 성공 시 버퍼 끝에 추가.
 ─────────────────────────────────────────────────────────────────────
 
 AAD (Additional Authenticated Data) = Offset 0 ~ 11 (12 bytes)
   → 암호화되지 않지만 AuthTag 계산에 포함 → 위변조 감지
 ENC (Encrypted) = Offset 12 ~ 16+N-1 (PacketId + Payload)
-  → AES-256-GCM으로 in-place 암호화
+  → AES-128-GCM으로 in-place 암호화
 ```
 
 ---

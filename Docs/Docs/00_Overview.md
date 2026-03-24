@@ -60,7 +60,7 @@
 
 | 문서 | 핵심 내용 |
 |------|-----------|
-| [[CryptoSystem]] | AES-256-GCM 전체 구조, Nonce 레이아웃 |
+| [[CryptoSystem]] | AES-128-GCM 전체 구조, Nonce 레이아웃 |
 | [[CryptoHelper]] | BCrypt 래퍼, thread_local 인스턴스 |
 | [[PacketCryptoHelper]] | EncodePacket/DecodePacket, AAD 범위 |
 | [[TLSHelper]] | SChannel TLS 1.2 핸드셰이크 |
