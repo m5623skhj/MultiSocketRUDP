@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Docs/Tools/PacketGenerator.md",
+                "file": "Docs/Client/RUDPClientCore.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "PacketGenerator"
+              "title": "RUDPClientCore"
             }
           }
         ]
@@ -183,17 +183,27 @@
   "active": "2923850d16653fd7",
   "lastOpenFiles": [
     "Docs/Logger/Logger.md",
+    "Docs/Server/MultiSocketRUDPCore.md",
     "Docs/Diagrams/ThreadModel.svg",
     "Docs/Diagrams/SessionStateMachine.svg",
-    "Docs/Diagrams/NodeHierarchy.svg",
-    "Docs/Diagrams/PacketFlow.svg",
+    "Docs/BotTester/00_BotTester_Overview.md",
     "Docs/Diagrams/README.md",
+    "Docs/Diagrams/PacketFlow.svg",
+    "Docs/Diagrams/NodeHierarchy.svg",
     "Docs/Diagrams/GraphEditor_Layout.svg",
     "Docs/Diagrams/CryptoStructure.svg",
     "Docs/Diagrams/Connection_Sequence.svg",
     "Docs/Diagrams/BotTester_Architecture.svg",
-    "Docs/Diagrams/AiTreeFlow.svg",
     "Docs/Diagrams/Architecture_Overview.svg",
+    "Docs/Diagrams/AiTreeFlow.svg",
+    "Docs/Server/PacketFormat.md",
+    "Docs/Server/RUDPPacketProcessor.md",
+    "Docs/Server/RUDPSessionBroker.md",
+    "Docs/Server/SendPacketInfo.md",
+    "Docs/Server/SessionLifecycle.md",
+    "Docs/Server/ThreadModel.md",
+    "Docs/GettingStarted.md",
+    "Docs/Tools/PacketGenerator.md",
     "Docs/BotTester/Bot/ActionNodes.md",
     "Docs/BotTester/AI/GeminiClient.md",
     "Docs/BotTester/AI/AiTreeGenerator.md",
@@ -208,16 +218,6 @@
     "MultiSocketRUDP-Docs/00_Overview.md",
     "새 폴더/MultiSocketRUDP-Docs/MultiSocketRUDP-Docs/Troubleshooting.md",
     "MultiSocketRUDP-Docs/BotTester/UI/NodeConfigPanels.md",
-    "MultiSocketRUDP-Docs/BotTester/UI/CanvasRenderer.md",
-    "MultiSocketRUDP-Docs/BotTester/UI/BotActionGraphWindow.md",
-    "MultiSocketRUDP-Docs/BotTester/ClientCore/SessionGetter_CS.md",
-    "MultiSocketRUDP-Docs/BotTester/ClientCore/RudpSession_CS.md",
-    "MultiSocketRUDP-Docs/BotTester/AI/AiTreeGenerator.md",
-    "MultiSocketRUDP-Docs/Tools/PacketGenerator.md",
-    "MultiSocketRUDP-Docs/Server/Ticker.md",
-    "MultiSocketRUDP-Docs/Server/ThreadModel.md",
-    "MultiSocketRUDP-Docs/Server/SessionLifecycle.md",
-    "MultiSocketRUDP-Docs/Server/SessionComponents.md",
     "MultiSocketRUDP-Docs/BotTester/{Bot,AI,ClientCore,UI,Diagrams}",
     "MultiSocketRUDP-Docs/BotTester/UI",
     "MultiSocketRUDP-Docs/BotTester/ClientCore",
