@@ -48,6 +48,7 @@ private:
 	void SendHeartbeatPacket(RUDPSession& session) override;
 	bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) override;
 	void AbortReservedSession(RUDPSession& session) override;
+	void InitializeSession(RUDPSession& session) override;
 #pragma endregion For SessionManager
 
 #pragma region For RUDPPacketProcessor

@@ -43,6 +43,11 @@ void RUDPSessionFunctionDelegate::AbortReservedSession(RUDPSession& session)
 	session.AbortReservedSession();
 }
 
+void RUDPSessionFunctionDelegate::InitializeSession(RUDPSession& session)
+{
+	session.InitializeSession();
+}
+
 bool RUDPSessionFunctionDelegate::TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr)
 {
 	return session.TryConnect(recvPacket, clientAddr);

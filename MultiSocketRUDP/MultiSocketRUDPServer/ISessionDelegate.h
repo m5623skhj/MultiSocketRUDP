@@ -82,6 +82,7 @@ public:
 	[[nodiscard]]
 	virtual bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) = 0;
 	virtual void AbortReservedSession(RUDPSession& session) = 0;
+	virtual void InitializeSession(RUDPSession& session) = 0;
 	virtual void SetSessionReservedTime(RUDPSession& session, unsigned long long now) = 0;
 
 	[[nodiscard]]

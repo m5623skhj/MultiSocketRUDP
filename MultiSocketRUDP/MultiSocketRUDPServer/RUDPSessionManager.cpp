@@ -84,6 +84,8 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		LOG_ERROR("Session is not in RELEASING state in ReleaseSession");
 		return false;
 	}
+	const auto disconnectedReason = sessionList[sessionId]->GetDisconnectedReason();
+	sessionDelegate.InitializeSession(*sessionList[sessionId]);
 
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
@@ -97,7 +99,7 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		unusedSessionIdSet.emplace(sessionId);
 	}
 
-	DecrementConnectedCount();
+	DecrementConnectedCount(disconnectedReason);
 	return true;
 }
 
@@ -196,8 +198,36 @@ void RUDPSessionManager::IncrementConnectedCount()
 	allConnectedCount.fetch_add(1, std::memory_order_relaxed);
 }
 
-void RUDPSessionManager::DecrementConnectedCount()
+void RUDPSessionManager::DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason)
 {
+	switch (disconnectedReason)
+	{
+	case DISCONNECT_REASON::BY_ABORT_RESERVED:
+	{
+		return;
+	}
+	case DISCONNECT_REASON::BY_RETRANSMISSION:
+	{
+		allDisconnectedByRetransmissionCount.fetch_add(1, std::memory_order_relaxed);
+		break;
+	}
+	case DISCONNECT_REASON::NORMAL:
+	case DISCONNECT_REASON::BY_ERROR:
+	{
+		break;
+	}
+	case DISCONNECT_REASON::NOT_DISCONNECTED:
+	{
+		LOG_ERROR(std::format("Call DecrementConnectedCount with NOT_DISCONNECTED"));
+		return;
+	}
+	default:
+	{
+		LOG_ERROR(std::format("Invalid type in DecrementConnectedCount {}", static_cast<uint8_t>(disconnectedReason)));
+		return;
+	}
+	}
+
 	--connectedUserCount;
 	allDisconnectedCount.fetch_add(1, std::memory_order_relaxed);
 }
@@ -233,20 +263,20 @@ bool RUDPSessionManager::CreateSessionPool()
 	{
 		sessionList.reserve(maxSessionSize);
 
-		for (size_t i = 0; i < maxSessionSize; ++i)
+		for (size_t sessionIndex = 0; sessionIndex < maxSessionSize; ++sessionIndex)
 		{
 			RUDPSession* session = sessionFactory(core);
 			if (session == nullptr)
 			{
-				LOG_ERROR(std::format("Failed to create session {}", i));
+				LOG_ERROR(std::format("Failed to create session {}", sessionIndex));
 				return false;
 			}
 
-			sessionDelegate.SetSessionId(*session, static_cast<SessionIdType>(i));
-			sessionDelegate.SetThreadId(*session, i % numOfWorkerThreads);
+			sessionDelegate.SetSessionId(*session, static_cast<SessionIdType>(sessionIndex));
+			sessionDelegate.SetThreadId(*session, sessionIndex % numOfWorkerThreads);
 			sessionList.emplace_back(session);
-			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(i));
-			unusedSessionIdSet.emplace(static_cast<SessionIdType>(i));
+			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(sessionIndex));
+			unusedSessionIdSet.emplace(static_cast<SessionIdType>(sessionIndex));
 		}
 
 		return true;

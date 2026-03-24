@@ -44,6 +44,9 @@ void RUDPSession::InitializeSession()
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
 	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
+	disconnectedReason = DISCONNECT_REASON::NOT_DISCONNECTED;
+
+	stateMachine.SetDisconnected();
 }
 
 void RUDPSession::SetSessionId(const SessionIdType inSessionId)
@@ -56,19 +59,20 @@ void RUDPSession::SetThreadId(const ThreadIdType inThreadId)
 	threadId = inThreadId;
 }
 
-void RUDPSession::DoDisconnect()
+void RUDPSession::DoDisconnect(const DISCONNECT_REASON inDisconnectSession)
 {
 	if (not stateMachine.TryTransitionToReleasing())
 	{
 		return;
 	}
 
+	disconnectedReason = inDisconnectSession;
 	nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	OnDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
-void RUDPSession::Disconnect(bool disconnectedByRetransmission)
+void RUDPSession::Disconnect()
 {
 	if (not stateMachine.IsReleasing())
 	{
@@ -85,8 +89,6 @@ void RUDPSession::Disconnect(bool disconnectedByRetransmission)
 	OnReleased();
 
 	const SessionIdType disconnectTargetSessionId = sessionId;
-	InitializeSession();
-	stateMachine.SetDisconnected();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
 }
 
@@ -101,7 +103,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("Buffer is nullptr in RUDPSession::SendPacket()");
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return false;
 	}
 
@@ -112,7 +114,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 
 	if (not SendPacket(*buffer, packetSequence, false, false))
 	{
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return false;
 	}
 
@@ -232,7 +234,7 @@ void RUDPSession::TryFlushPendingQueue()
 		auto& [packetSequence, buffer] = sendBuffers[bufferIndex];
 		if (not SendPacketImmediate(*buffer, packetSequence, false, false))
 		{
-			DoDisconnect();
+			DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			++bufferIndex;
 			break;
 		}
@@ -260,7 +262,7 @@ void RUDPSession::SendHeartbeatPacket()
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("Buffer is nullptr in RUDPSession::SendHeartbeatPacket()");
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return;
 	}
 
@@ -270,7 +272,7 @@ void RUDPSession::SendHeartbeatPacket()
 
 	if (not SendPacket(*buffer, packetSequence, false, true))
 	{
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}
 }
 
@@ -288,8 +290,8 @@ void RUDPSession::AbortReservedSession()
 
 	const SessionIdType disconnectTargetSessionId = sessionId;
 	nowInReleaseThread.store(true, std::memory_order_seq_cst);
+	disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
 	CloseSocket();
-	InitializeSession();
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
 }
 
@@ -366,7 +368,7 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
-	DoDisconnect();
+	DoDisconnect(DISCONNECT_REASON::NORMAL);
 }
 
 bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
@@ -438,7 +440,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("Buffer is nullptr in RUDPSession::SendReplyToClient()");
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return;
 	}
 
@@ -448,7 +450,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 
 	if (not SendPacket(*buffer, recvPacketSequence, true, true))
 	{
-		DoDisconnect();
+		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}
 }
 
@@ -543,6 +545,16 @@ bool RUDPSession::CheckMyClient(const sockaddr_in& targetClientAddr) const
 	}
 
 	return true;
+}
+
+void RUDPSession::SetStateMachineToDisconnect()
+{
+	stateMachine.SetDisconnected();
+}
+
+DISCONNECT_REASON RUDPSession::GetDisconnectedReason() const
+{
+	return disconnectedReason;
 }
 
 SessionCryptoContext& RUDPSession::GetCryptoContext()

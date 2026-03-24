@@ -269,7 +269,7 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	{
 		if (session != nullptr)
 		{
-			session->DoDisconnect();
+			session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		}
 	}
 

@@ -3,7 +3,6 @@
 #include <list>
 #include <thread>
 #include <MSWSock.h>
-#include "NetServer.h"
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
@@ -48,6 +47,8 @@ public:
 	unsigned int GetAllConnectedCount() const;
 	[[nodiscard]]
 	unsigned int GetAllDisconnectedCount() const;
+	[[nodiscard]]
+	unsigned int GetAllDisconnectedByRetransmissionCount() const;
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
@@ -164,11 +165,4 @@ private:
 	std::unique_ptr<RUDPSessionBroker> sessionBroker;
 	std::unique_ptr<RUDPSessionManager> sessionManager;
 	RUDPSessionFunctionDelegate sessionDelegate;
-
-
-public:
-	int32_t GetNumOfTimeoutSession() const;
-
-private:
-	int32_t numOfTimeoutSession{};
 };

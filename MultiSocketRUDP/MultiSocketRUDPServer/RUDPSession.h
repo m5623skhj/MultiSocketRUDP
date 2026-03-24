@@ -49,7 +49,7 @@ public:
 	// @brief 현재 세션을 RELEASING 상태로 전이시키고 연결 해제 프로세스를 시작합니다.
 	// @details 예약 상태 또는 연결 상태에서만 RELEASING 상태로 전이할 수 있습니다.
 	// ----------------------------------------
-	void DoDisconnect();
+	void DoDisconnect(const DISCONNECT_REASON disconnectSession);
 	bool SendPacket(IPacket& packet);
 
 	ThreadIdType GetThreadId() const;
@@ -107,7 +107,7 @@ private:
 	// @brief RELEASING 상태의 세션을 최종적으로 해제하고 DISCONNECTED 상태로 전환합니다.
 	// @details 세션의 소켓을 닫고 리소스 풀로 반환합니다.
 	// ----------------------------------------
-	void Disconnect(bool disconnectedByRetransmission = false);
+	void Disconnect();
 	// Call this function when the client sends a disconnect packet
 	void Disconnect(NetBuffer& recvPacket);
 	[[nodiscard]]
@@ -215,6 +215,13 @@ private:
 
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
+
+public:
+	void SetStateMachineToDisconnect();
+	DISCONNECT_REASON GetDisconnectedReason() const;
+
+private:
+	DISCONNECT_REASON disconnectedReason{ DISCONNECT_REASON::NOT_DISCONNECTED };
 
 private:
 	SessionCryptoContext& GetCryptoContext();

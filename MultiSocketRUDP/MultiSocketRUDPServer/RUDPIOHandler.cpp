@@ -41,7 +41,7 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 	{
 		if (not RecvIOCompleted(context, transferred, threadId))
 		{
-			context->session->DoDisconnect();
+			context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			break;
 		}
 
@@ -51,7 +51,7 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 	{
 		if (not SendIOCompleted(context, threadId))
 		{
-			context->session->DoDisconnect();
+			context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			break;
 		}
 
@@ -323,11 +323,16 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session
 SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
 	SendPacketInfo* sendPacketInfo = sessionDelegate.GetReservedSendPacketInfo(session);
+	if (sendPacketInfo == nullptr)
+	{
+		return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
+	}
+
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
 	if (useSize >= MAX_SEND_BUFFER_SIZE)
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
-		session.DoDisconnect();
+		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
 		sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
@@ -371,7 +376,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	if (useSize > MAX_SEND_BUFFER_SIZE || useSize == 0)
 	{
 		LOG_ERROR(std::format("MakeSendStream() : useSize is invalid. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
-		session.DoDisconnect();
+		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}

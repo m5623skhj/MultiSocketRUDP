@@ -91,6 +91,8 @@ public:
 	[[nodiscard]]
 	unsigned int GetAllDisconnectedCount() const { return allDisconnectedCount.load(std::memory_order_relaxed); }
 	[[nodiscard]]
+	unsigned int GetAllDisconnectedByRetransmissionCount() const { return allDisconnectedByRetransmissionCount.load(std::memory_order_relaxed); }
+	[[nodiscard]]
 	unsigned short GetMaxSessions() const { return maxSessionSize; }
 	// ----------------------------------------
 	// @brief 현재 사용 가능한(재사용 대기 중인) 세션의 수를 반환합니다.
@@ -123,7 +125,7 @@ public:
 	// ----------------------------------------
 	// @brief 연결된 사용자 수를 1 감소시킵니다.
 	// ----------------------------------------
-	void DecrementConnectedCount();
+	void DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason);
 
 public:
 	// ----------------------------------------
@@ -157,6 +159,7 @@ private:
 	std::atomic_uint16_t connectedUserCount{};
 	std::atomic_uint32_t allConnectedCount{};
 	std::atomic_uint32_t allDisconnectedCount{};
+	std::atomic_uint32_t allDisconnectedByRetransmissionCount{};
 
 	std::list<SessionIdType> unusedSessionIdList;
 	mutable std::recursive_mutex unusedSessionIdListLock;

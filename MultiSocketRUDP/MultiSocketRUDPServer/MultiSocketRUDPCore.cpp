@@ -167,6 +167,11 @@ unsigned int MultiSocketRUDPCore::GetAllDisconnectedCount() const
 	return sessionManager->GetAllDisconnectedCount();
 }
 
+unsigned int MultiSocketRUDPCore::GetAllDisconnectedByRetransmissionCount() const
+{
+	return sessionManager->GetAllDisconnectedByRetransmissionCount();
+}
+
 bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 {
 	if (sendPacketInfo == nullptr || sendPacketInfo->owner == nullptr || sendPacketInfo->GetBuffer() == nullptr)
@@ -212,16 +217,18 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 			break;
 		}
 
-		if (eraseTarget->isInSendPacketInfoList)
 		{
 			std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
 			if (eraseTarget->isInSendPacketInfoList)
 			{
-				sendPacketInfoList[threadId].erase(eraseTarget->listItor);
-				eraseTarget->isInSendPacketInfoList = false;
+				if (eraseTarget->isInSendPacketInfoList)
+				{
+					sendPacketInfoList[threadId].erase(eraseTarget->listItor);
+					eraseTarget->isInSendPacketInfoList = false;
+				}
 			}
+			eraseTarget->isErasedPacketInfo = true;
 		}
-		eraseTarget->isErasedPacketInfo = true;
 	} while (false);
 
 	SendPacketInfo::Free(eraseTarget);
@@ -570,21 +577,20 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 
 			if (shouldDisconnect == true)
 			{
-				if (sendPacketInfo->owner == nullptr || sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire) == true)
+				if (sendPacketInfo->owner == nullptr)
 				{
 					SendPacketInfo::Free(sendPacketInfo);
 					continue;
 				}
 
-				sendPacketInfo->owner->DoDisconnect();
+				sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
 				SendPacketInfo::Free(sendPacketInfo);
-				++numOfTimeoutSession;
 				continue;
 			}
 
-			if (not SendPacket(sendPacketInfo))
+			if (not SendPacket(sendPacketInfo) && sendPacketInfo->owner != nullptr)
 			{
-				sendPacketInfo->owner->DoDisconnect();
+				sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			}
 
 			SendPacketInfo::Free(sendPacketInfo);
@@ -684,7 +690,15 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult
 
 	if (rioResult.Status != 0)
 	{
-		context->session->DoDisconnect();
+		DISCONNECT_REASON reason = rioResult.Status == WSAECONNRESET ?
+			DISCONNECT_REASON::NORMAL : DISCONNECT_REASON::BY_ERROR;
+
+		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+		{
+			context->session->GetSendContext().GetIOMode().exchange(IO_MODE::IO_NONE_SENDING);
+		}
+
+		context->session->DoDisconnect(reason);
 		LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
 		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
 		{
@@ -736,9 +750,4 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		}
 		recvIOCompletedContextPool.Free(context);
 	}
-}
-
-int32_t MultiSocketRUDPCore::GetNumOfTimeoutSession() const
-{
-	return numOfTimeoutSession;
 }

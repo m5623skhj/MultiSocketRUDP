@@ -74,7 +74,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
         }
         else
         {
-            session.DoDisconnect();
+            session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
         }
         break;
     }
