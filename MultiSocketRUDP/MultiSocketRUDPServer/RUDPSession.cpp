@@ -34,6 +34,8 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 void RUDPSession::InitializeSession()
 {
+	sessionGeneration.fetch_add(1, std::memory_order_release);
+
 	sessionId = INVALID_SESSION_ID;
 	cryptoContext.Initialize();
 	clientAddr = {};
@@ -169,7 +171,7 @@ bool RUDPSession::SendPacketImmediate(
 		return false;
 	}
 
-	sendPacketInfo->Initialize(this, &buffer, inSendPacketSequence, isReplyType);
+	sendPacketInfo->Initialize(this, sessionGeneration.load(std::memory_order_acquire), &buffer, inSendPacketSequence, isReplyType);
 	if (not isReplyType)
 	{
 		rioContext.GetSendContext().InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
@@ -476,6 +478,11 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	TryFlushPendingQueue();
 }
 
+void RUDPSession::OnRetransmissionTimeout() noexcept
+{
+	flowManager.OnTimeout();
+}
+
 std::shared_mutex& RUDPSession::GetSocketMutex() const
 {
 	return socketContext.GetSocketMutex();
@@ -529,6 +536,11 @@ SESSION_STATE RUDPSession::GetSessionState() const
 bool RUDPSession::IsReleasing() const
 {
 	return nowInReleaseThread.load(std::memory_order_seq_cst);
+}
+
+uint32_t RUDPSession::GetSessionGeneration() const
+{
+	return sessionGeneration.load(std::memory_order_acquire);
 }
 
 bool RUDPSession::CanProcessPacket(const sockaddr_in& targetClientAddr) const

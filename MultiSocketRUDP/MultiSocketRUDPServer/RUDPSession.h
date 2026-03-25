@@ -116,6 +116,7 @@ private:
 	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence);
 	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
+	void OnRetransmissionTimeout() noexcept;
 
 private:
 	[[nodiscard]]
@@ -163,6 +164,8 @@ public:
 	SESSION_STATE GetSessionState() const;
 	[[nodiscard]]
 	bool IsReleasing() const;
+	[[nodiscard]]
+	uint32_t GetSessionGeneration() const;
 
 protected:
 	using PacketFactory = std::function<std::function<bool()>(RUDPSession*, NetBuffer*)>;
@@ -210,6 +213,7 @@ private:
 	std::atomic_bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
 	ThreadIdType threadId{};
+	std::atomic_uint32_t sessionGeneration{};
 
 	static BYTE maximumHoldingPacketQueueSize;
 

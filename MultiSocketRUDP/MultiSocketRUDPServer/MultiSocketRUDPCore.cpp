@@ -180,6 +180,12 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 		return false;
 	}
 
+	if (not sendPacketInfo->IsOwnerValid())
+	{
+		LOG_ERROR("SendPacketInfo owner is invalid with generation mismatch in MultiSocketRUDPCore::SendPacket()");
+		return false;
+	}
+
 	if (sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire))
 	{
 		return false;
@@ -212,7 +218,7 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 
 	do
 	{
-		if (eraseTarget->owner == nullptr)
+		if (not eraseTarget->IsOwnerValid())
 		{
 			break;
 		}
@@ -567,6 +573,10 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 				{
 					shouldDisconnect = true;
 				}
+				else
+				{
+					sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
+				}
 			}
 
 			if (shouldSkip == true)
@@ -577,7 +587,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 
 			if (shouldDisconnect == true)
 			{
-				if (sendPacketInfo->owner == nullptr)
+				if (not sendPacketInfo->IsOwnerValid())
 				{
 					SendPacketInfo::Free(sendPacketInfo);
 					continue;
@@ -588,7 +598,12 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 				continue;
 			}
 
-			if (not SendPacket(sendPacketInfo) && sendPacketInfo->owner != nullptr)
+			if (sendPacketInfo->IsOwnerValid())
+			{
+				sendPacketInfo->owner->OnRetransmissionTimeout();
+			}
+
+			if (not SendPacket(sendPacketInfo) && sendPacketInfo->IsOwnerValid())
 			{
 				sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			}

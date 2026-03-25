@@ -1,11 +1,13 @@
 #include "PreCompile.h"
 #include "SendPacketInfo.h"
+#include "RUDPSession.h"
 
 CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);
 
 SendPacketInfo::~SendPacketInfo()
 {
 	owner = {};
+	ownerGeneration = {};
 	retransmissionCount = {};
 	sendPacketSequence = {};
 	retransmissionTimeStamp = {};
@@ -15,11 +17,13 @@ SendPacketInfo::~SendPacketInfo()
 }
 
 void SendPacketInfo::Initialize(RUDPSession* inOwner
+	, const uint32_t inOwnerGeneration
 	, NetBuffer* inBuffer
 	, const PacketSequence inSendPacketSequence
 	, const bool inIsReplyType)
 {
 	owner = inOwner;
+	ownerGeneration = inOwnerGeneration;
 	buffer = inBuffer;
 	sendPacketSequence = inSendPacketSequence;
 	isReplyType = inIsReplyType;
@@ -30,6 +34,11 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	isInSendPacketInfoList = {};
 
 	refCount = 1;
+}
+
+bool SendPacketInfo::IsOwnerValid() const
+{
+	return owner != nullptr && owner->GetSessionGeneration() == ownerGeneration;
 }
 
 void SendPacketInfo::AddRefCount()

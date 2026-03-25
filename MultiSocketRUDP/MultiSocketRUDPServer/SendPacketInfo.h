@@ -14,6 +14,7 @@ struct SendPacketInfo
 {
 	NetBuffer* buffer{};
 	RUDPSession* owner{};
+	uint32_t ownerGeneration{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
 	unsigned long long retransmissionTimeStamp{};
@@ -26,7 +27,9 @@ struct SendPacketInfo
 	SendPacketInfo() = default;
 	~SendPacketInfo();
 
-	void Initialize(RUDPSession* inOwner, NetBuffer* inBuffer, PacketSequence inSendPacketSequence, bool inIsReplyType);
+	void Initialize(RUDPSession* inOwner, uint32_t inOwnerGeneartion, NetBuffer* inBuffer, PacketSequence inSendPacketSequence, bool inIsReplyType);
+	[[nodiscard]]
+	bool IsOwnerValid() const;
 
 	void AddRefCount();
 

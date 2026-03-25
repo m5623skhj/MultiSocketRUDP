@@ -57,7 +57,7 @@ void RUDPFlowController::OnCongestionEvent() noexcept
 
 void RUDPFlowController::OnTimeout() noexcept
 {
-	cwnd = 1;
+	cwnd = std::max<uint8_t>(cwnd / 2, 1);
 	inRecovery = true;
 }
 
