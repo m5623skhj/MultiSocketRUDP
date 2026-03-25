@@ -51,23 +51,24 @@ namespace MultiSocketRUDPBotTester.ClientCore
             return true;
         }
 
-        public static byte[] GenerateNonce(byte[] sessionSalt, PacketSequence packetSequence, PacketDirection direction)
+        public static byte[] GenerateNonce(byte[] sessionSalt, ulong packetSequence, PacketDirection direction)
         {
-            if (sessionSalt.Length != SessionSaltSize)
-            {
-                return [];
-            }
-
             var nonce = new byte[NonceSize];
-            Array.Copy(sessionSalt, 0, nonce, 0, SessionSaltSize);
 
-            nonce[8] = (byte)((packetSequence >> 24) & 0x3F);
+            var directionBits = (byte)((byte)direction << 6);
+            nonce[0] = (byte)(directionBits | (sessionSalt[0] & 0x3F));
+            nonce[1] = sessionSalt[1];
+            nonce[2] = sessionSalt[2];
+            nonce[3] = sessionSalt[3];
+
+            nonce[4] = (byte)((packetSequence >> 56) & 0xFF);
+            nonce[5] = (byte)((packetSequence >> 48) & 0xFF);
+            nonce[6] = (byte)((packetSequence >> 40) & 0xFF);
+            nonce[7] = (byte)((packetSequence >> 32) & 0xFF);
+            nonce[8] = (byte)((packetSequence >> 24) & 0xFF);
             nonce[9] = (byte)((packetSequence >> 16) & 0xFF);
             nonce[10] = (byte)((packetSequence >> 8) & 0xFF);
             nonce[11] = (byte)(packetSequence & 0xFF);
-
-            var directionBits = (byte)((byte)direction << 6);
-            nonce[8] |= directionBits;
 
             return nonce;
         }
