@@ -84,7 +84,7 @@ private:
 private:
 	bool isStopped{};
 	std::atomic_bool threadStopFlag{};
-	bool isConnected{};
+	std::atomic_bool isConnected{};
 
 #pragma region SessionGetter
 #if USE_IOCP_SESSION_GETTER
@@ -239,6 +239,10 @@ private:
 
 private:
 	ServerAliveChecker serverAliveChecker;
+
+private:
+	static inline unsigned short clientCountInThisProcess{};
+	std::mutex clientCountInThisProcessLock;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

@@ -29,11 +29,28 @@ RUDPClientCore::RUDPClientCore()
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
+	threadStopFlag = false;
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
 	if (not ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath))
 	{
 		return false;
+	}
+
+	{
+		std::scoped_lock lock(clientCountInThisProcessLock);
+		if (clientCountInThisProcess == 0)
+		{
+			WSADATA wsaData;
+			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+			{
+				LOG_ERROR(std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError()));
+				WSACleanup();
+				return false;
+			}
+		}
+
+		++clientCountInThisProcess;
 	}
 
 #if USE_IOCP_SESSION_GETTER
@@ -109,7 +126,14 @@ void RUDPClientCore::Stop()
 		}
 	}
 	
-	WSACleanup();
+	{
+		std::scoped_lock lock(clientCountInThisProcessLock);
+		--clientCountInThisProcess;
+		if (clientCountInThisProcess == 0)
+		{
+			WSACleanup();
+		}
+	}
 	isStopped = true;
 
 	if (sessionKeyHandle != nullptr)
@@ -270,7 +294,7 @@ void RUDPClientCore::RunRetransmissionThread()
 			retransmitTargets.clear();
 			for (auto& [sequence, info] : sendPacketInfoMap)
 			{
-				if (info->retransmissionTimeStamp > tickSet.nowTick)
+				if (info->retransmissionTimeStamp >= tickSet.nowTick)
 				{
 					continue;
 				}

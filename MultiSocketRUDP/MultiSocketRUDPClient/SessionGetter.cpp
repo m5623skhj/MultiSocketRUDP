@@ -99,14 +99,6 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 
 bool RUDPClientCore::GetSessionFromServer()
 {
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		LOG_ERROR(std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError()));
-		WSACleanup();
-		return false;
-	}
-
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
