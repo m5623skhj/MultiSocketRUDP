@@ -173,6 +173,15 @@ namespace MultiSocketRUDPBotTester.Buffer
             WriteUShort(sessionId);
         }
 
+        public void BuildCorePacket(PacketType packetType, ulong sequence)
+        {
+            _readPos = HeaderSize;
+            _writePos = HeaderSize;
+
+            WriteByte((byte)packetType);
+            WriteULong(sequence);
+        }
+        
         private void SetHeader()
         {
             _buffer[0] = HeaderCode;
@@ -193,18 +202,21 @@ namespace MultiSocketRUDPBotTester.Buffer
         private static byte[] GenerateNonce(byte[] sessionSalt, ulong packetSequence, PacketDirection direction)
         {
             var nonce = new byte[12];
-            Array.Copy(sessionSalt, nonce, 4);
+            var directionBits = (byte)((byte)direction << 6);
+            nonce[0] = (byte)(directionBits | (sessionSalt[0] & 0x3F));
+            nonce[1] = sessionSalt[1];
+            nonce[2] = sessionSalt[2];
+            nonce[3] = sessionSalt[3];
 
-            nonce[4] = (byte)((packetSequence >> 56) & 0x3F);
-            nonce[5] = (byte)((packetSequence >> 48) & 0x3F);
-            nonce[6] = (byte)((packetSequence >> 40) & 0x3F);
-            nonce[7] = (byte)((packetSequence >> 32) & 0x3F);
-            nonce[8] = (byte)((packetSequence >> 24) & 0x3F);
-            nonce[9] = (byte)((packetSequence >> 16) & 0xFF);
+            nonce[4]  = (byte)((packetSequence >> 56) & 0xFF);
+            nonce[5]  = (byte)((packetSequence >> 48) & 0xFF);
+            nonce[6]  = (byte)((packetSequence >> 40) & 0xFF);
+            nonce[7]  = (byte)((packetSequence >> 32) & 0xFF);
+            nonce[8]  = (byte)((packetSequence >> 24) & 0xFF);
+            nonce[9]  = (byte)((packetSequence >> 16) & 0xFF);
             nonce[10] = (byte)((packetSequence >> 8) & 0xFF);
             nonce[11] = (byte)(packetSequence & 0xFF);
 
-            nonce[4] |= (byte)(nonce[4] & 0x3F | ((byte)direction << 6));
             return nonce;
         }
 
@@ -218,26 +230,26 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             var bodyOffset = isCorePacket ? BodyOffsetCorePacket : BodyOffsetFullPacket;
             var bodySize = packet._writePos - bodyOffset;
-
-            if (bodySize <= 0)
+            if (bodySize < 0)
             {
-                packet.SetHeader();
-                return;
+                bodySize = 0;
             }
 
             var nonce = GenerateNonce(sessionSalt, packetSequence, direction);
             var tag = new byte[AuthTagSize];
 
+            packet.SetHeader(AuthTagSize);
+
+            const int aadSize = HeaderSize + PacketTypeSize + PacketSequenceSize;
             aesGcm.Encrypt(
                 nonce,
                 plaintext: packet._buffer.AsSpan(bodyOffset, bodySize),
                 ciphertext: packet._buffer.AsSpan(bodyOffset, bodySize),
-                tag: tag);
+                tag: tag,
+                associatedData: packet._buffer.AsSpan(0, aadSize));
 
             tag.CopyTo(packet._buffer, packet._writePos);
             packet._writePos += AuthTagSize;
-
-            packet.SetHeader();
         }
 
         public static bool DecodePacket(
@@ -265,11 +277,13 @@ namespace MultiSocketRUDPBotTester.Buffer
 
             try
             {
+                const int aadSize = HeaderSize + PacketTypeSize + PacketSequenceSize;
                 aesGcm.Decrypt(
                     nonce,
                     ciphertext: packet._buffer.AsSpan(bodyOffset, bodySize),
                     tag: tag,
-                    plaintext: packet._buffer.AsSpan(bodyOffset, bodySize));
+                    plaintext: packet._buffer.AsSpan(bodyOffset, bodySize),
+                    associatedData: packet._buffer.AsSpan(0, aadSize));
 
                 packet._writePos -= AuthTagSize;
                 return true;
