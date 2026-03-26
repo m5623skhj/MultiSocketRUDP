@@ -30,7 +30,6 @@ namespace MultiSocketRUDPBotTester.Graph
         public ActionNodeBase? TryBuild(NodeVisual visual)
         {
             var builder = builders.FirstOrDefault(b => b.CanBuild(visual));
-
             if (builder != null)
             {
                 return builder.Build(visual);

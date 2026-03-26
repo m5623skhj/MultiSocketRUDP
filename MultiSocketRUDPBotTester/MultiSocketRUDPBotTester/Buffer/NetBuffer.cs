@@ -130,7 +130,9 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             var bodyLen = _writePos - HeaderSize;
             if (bodyLen > 0)
+            {
                 Array.Copy(_buffer, HeaderSize, _buffer, HeaderSize + PacketTypeSize, bodyLen);
+            }
 
             _buffer[HeaderSize] = (byte)type;
             _writePos += PacketTypeSize;
@@ -141,10 +143,14 @@ namespace MultiSocketRUDPBotTester.Buffer
             var afterType = HeaderSize + PacketTypeSize;
             var bodyLen = _writePos - afterType;
             if (bodyLen > 0)
+            {
                 Array.Copy(_buffer, afterType, _buffer, afterType + PacketSequenceSize, bodyLen);
+            }
 
             for (var i = 0; i < PacketSequenceSize; i++)
+            {
                 _buffer[afterType + i] = (byte)((sequence >> (i * 8)) & 0xFF);
+            }
 
             _writePos += PacketSequenceSize;
         }
@@ -154,11 +160,15 @@ namespace MultiSocketRUDPBotTester.Buffer
             var afterSeq = HeaderSize + PacketTypeSize + PacketSequenceSize;
             var bodyLen = _writePos - afterSeq;
             if (bodyLen > 0)
+            {
                 Array.Copy(_buffer, afterSeq, _buffer, afterSeq + PacketIdSize, bodyLen);
+            }
 
             var id = (uint)packetId;
             for (var i = 0; i < PacketIdSize; i++)
+            {
                 _buffer[afterSeq + i] = (byte)((id >> (i * 8)) & 0xFF);
+            }
 
             _writePos += PacketIdSize;
         }
@@ -182,7 +192,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             WriteULong(sequence);
         }
         
-        private void SetHeader()
+        private void SetHeader(int extraSize = 0)
         {
             _buffer[0] = HeaderCode;
             var payloadSize = (ushort)(_writePos - HeaderSize + extraSize);
@@ -261,7 +271,9 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             ulong packetSequence = 0;
             for (var i = 0; i < PacketSequenceSize; i++)
+            {
                 packetSequence |= ((ulong)packet._buffer[PacketSequenceOffset + i]) << (i * 8);
+            }
 
             var bodyOffset = isCorePacket ? BodyOffsetCorePacket : BodyOffsetFullPacket;
             var authTagOffset = packet._writePos - AuthTagSize;

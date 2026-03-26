@@ -1,6 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
-using MultiSocketRUDPBotTester.Contents.Client;
-using Serilog;
+﻿using Serilog;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -73,7 +71,9 @@ namespace MultiSocketRUDPBotTester.Bot
                 }
 
                 if (StopOnFailure)
+                {
                     throw;
+                }
             }
         }
     }

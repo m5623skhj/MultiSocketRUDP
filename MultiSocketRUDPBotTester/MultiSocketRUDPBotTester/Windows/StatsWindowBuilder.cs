@@ -1,7 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using MultiSocketRUDPBotTester.Bot;
 using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
 
 namespace MultiSocketRUDPBotTester.Windows
@@ -85,13 +84,17 @@ namespace MultiSocketRUDPBotTester.Windows
             resetBtn.Click += (_, _) =>
             {
                 if (MessageBox.Show("Reset all?", "Confirm", MessageBoxButton.YesNo)
-                    != MessageBoxResult.Yes) return;
+                    != MessageBoxResult.Yes)
+                {
+                    return;
+                }
 
                 statsTracker.Reset();
                 dataGrid.ItemsSource = null;
             };
 
             panel.Children.Add(refreshBtn);
+
             panel.Children.Add(resetBtn);
             return panel;
         }

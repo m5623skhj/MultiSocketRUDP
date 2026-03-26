@@ -24,13 +24,17 @@ namespace MultiSocketRUDPBotTester.Bot
             if (!visited.Add(node))
             {
                 Log.Warning("Circular reference detected in node: {NodeName}", node.Name);
-                return;
+                {
+                    return;
+                }
             }
 
             node.Execute(context.Client, context.GetPacket());
 
             if (IsAsyncNode(node))
+            {
                 return;
+            }
 
             foreach (var next in node.NextNodes)
             {

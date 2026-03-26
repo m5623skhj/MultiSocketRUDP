@@ -1,5 +1,4 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
-using MultiSocketRUDPBotTester.Contents.Client;
 using Serilog;
 using System.Globalization;
 
@@ -31,6 +30,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                 }
+
                 return;
             }
 
@@ -64,6 +64,7 @@ namespace MultiSocketRUDPBotTester.Bot
                             {
                                 NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                             }
+
                             return;
                         }
 
@@ -77,6 +78,7 @@ namespace MultiSocketRUDPBotTester.Bot
                             {
                                 NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
                             }
+
                             return;
                         }
 

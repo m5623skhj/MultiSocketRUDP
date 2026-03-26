@@ -198,6 +198,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             await udpClient.SendAsync(
                 sendPacketInfo.SentBuffer.GetPacketBuffer(),
                 sendPacketInfo.SentBuffer.GetLength());
+
             return true;
         }
 
@@ -216,9 +217,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     sessionSalt: SessionInfo.SessionSalt,
                     isCorePacket: true);
 
-                var success = await SendPacketInternal(new SendPacketInfo(buffer, LoginPacketSequence));
-                if (!success)
+                if (!await SendPacketInternal(new SendPacketInfo(buffer, LoginPacketSequence)))
+                {
                     Log.Error("SendConnectPacketAsync() failed. SessionId {Id}", SessionInfo.SessionId);
+                }
             }
             catch (Exception ex)
             {
@@ -230,6 +232,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             var buffer = new NetBuffer();
             buffer.BuildConnectPacket(SessionInfo.SessionId);
+
             return buffer;
         }
 
@@ -248,7 +251,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
             catch (Exception ex)
             {
                 if (!CancellationToken.Token.IsCancellationRequested)
+                {
                     Log.Error("ReceiveAsync failed: {Error}", ex.ToString());
+                }
             }
         }
 
@@ -297,37 +302,47 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             var packetId = PacketId.InvalidPacketId;
             if (!isCorePacket)
+            {
                 packetId = (PacketId)buffer.ReadUInt();
+            }
 
             switch (packetType)
             {
                 case PacketType.HeartbeatType:
-                    SendReplyToServer(packetSequence);
+                    {
+                        SendReplyToServer(packetSequence);
+                    }
                     break;
 
                 case PacketType.SendType:
-                    SendReplyToServer(packetSequence);
-                    lock (expectedRecvSequenceLock)
                     {
-                        if (packetSequence <= expectedRecvSequence)
-                            return;
+                        SendReplyToServer(packetSequence);
+                        lock (expectedRecvSequenceLock)
+                        {
+                            if (packetSequence <= expectedRecvSequence)
+                            {
+                                return;
+                            }
 
-                        if (packetSequence == expectedRecvSequence + 1)
-                        {
-                            expectedRecvSequence = packetSequence;
-                            OnRecvPacket(packetId, buffer);
-                            ProcessHoldingPackets();
-                        }
-                        else
-                        {
-                            holdingPacketStore.Add(packetSequence,
-                                new HeldPacket { PacketId = packetId, Buffer = buffer });
+                            if (packetSequence == expectedRecvSequence + 1)
+                            {
+                                expectedRecvSequence = packetSequence;
+                                OnRecvPacket(packetId, buffer);
+                                ProcessHoldingPackets();
+                            }
+                            else
+                            {
+                                holdingPacketStore.Add(packetSequence,
+                                    new HeldPacket { PacketId = packetId, Buffer = buffer });
+                            }
                         }
                     }
                     break;
 
                 case PacketType.SendReplyType:
-                    OnSendReply(packetSequence);
+                    {
+                        OnSendReply(packetSequence);
+                    }
                     break;
             }
         }
@@ -337,7 +352,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
             while (holdingPacketStore.TryGetFirst(out var nextSequence, out var heldPacket))
             {
                 if (nextSequence != expectedRecvSequence + 1)
+                {
                     break;
+                }
 
                 expectedRecvSequence = nextSequence;
                 holdingPacketStore.Remove(nextSequence);
@@ -388,7 +405,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 while (await timer.WaitForNextTickAsync(CancellationToken.Token))
                 {
-                    if (bufferStore.GetSendBufferCount() == 0) continue;
+                    if (bufferStore.GetSendBufferCount() == 0)
+                    {
+                        continue;
+                    }
 
                     var nowMs = CommonFunc.GetNowMs();
                     var sendPacketInfos = bufferStore.GetAllSendPacketInfos();
@@ -456,12 +476,18 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 while (await timer.WaitForNextTickAsync(CancellationToken.Token))
                 {
-                    if (!isConnected) break;
+                    if (!isConnected)
+                    {
+                        break;
+                    }
 
                     PacketSequence curr;
                     lock (expectedRecvSequenceLock) { curr = expectedRecvSequence; }
 
-                    if (prev != curr) { prev = curr; continue; }
+                    if (prev != curr) 
+                    { 
+                        prev = curr; continue; 
+                    }
 
                     Log.Warning("No response from server, disconnecting...");
                     await DisconnectAsync();

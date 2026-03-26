@@ -43,7 +43,10 @@ namespace MultiSocketRUDPBotTester.Bot
         public static TimeSpan? GetElapsed(this RuntimeContext ctx, string name)
         {
             if (ctx.TryGet<DateTime>($"__timer_{name}", out var start))
+            {
                 return DateTime.Now - start;
+            }
+
             return null;
         }
 
@@ -73,21 +76,30 @@ namespace MultiSocketRUDPBotTester.Bot
         public static double GetAverageMetric(this RuntimeContext ctx, string name)
         {
             if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            {
                 return list.Average();
+            }
+
             return 0;
         }
 
         public static double GetMinMetric(this RuntimeContext ctx, string name)
         {
             if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            {
                 return list.Min();
+            }
+
             return 0;
         }
 
         public static double GetMaxMetric(this RuntimeContext ctx, string name)
         {
             if (ctx.TryGet<ConcurrentBag<double>>($"__metric_{name}", out var list) && list != null && list.Count > 0)
+            {
                 return list.Max();
+            }
+
             return 0;
         }
 

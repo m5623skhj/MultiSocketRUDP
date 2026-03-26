@@ -252,7 +252,9 @@
         private static void CollectReachable(ActionNodeBase node, HashSet<ActionNodeBase> reachable)
         {
             if (!reachable.Add(node))
+            {
                 return;
+            }
 
             foreach (var next in GetAllNextNodes(node))
             {

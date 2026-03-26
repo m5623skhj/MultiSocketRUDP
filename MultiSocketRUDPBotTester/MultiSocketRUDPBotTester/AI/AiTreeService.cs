@@ -36,9 +36,11 @@ namespace MultiSocketRUDPBotTester.AI
                 var root = doc.RootElement;
 
                 if (root.TryGetProperty("error", out var errorEl))
+                {
                     return AiTreeResponse.Fail(
                         errorEl.GetProperty("reason").GetString() ?? "Unknown error",
                         errorEl.GetProperty("details").GetString() ?? "");
+                }
 
                 var description = root.TryGetProperty("description", out var desc)
                     ? desc.GetString() ?? "" : "";

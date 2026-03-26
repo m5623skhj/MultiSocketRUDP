@@ -61,9 +61,13 @@ namespace MultiSocketRUDPBotTester
 
             var savedVisuals = BotTesterCore.Instance.GetSavedGraphVisuals();
             if (savedVisuals is { Count: > 0 })
+            {
                 RestoreSavedGraph(savedVisuals);
+            }
             else
+            {
                 CreateRootNode();
+            }
         }
 
         private void InitializeGeminiClient()
@@ -75,13 +79,17 @@ namespace MultiSocketRUDPBotTester
 
                 var configPath = Path.Combine(baseDirectory, configFileName);
                 if (!File.Exists(configPath))
+                {
                     configPath = Path.Combine(baseDirectory, "WithGeminiClient", configFileName);
+                }
 
                 if (!File.Exists(configPath))
+                {
                     throw new FileNotFoundException(
                         $"Configuration file not found in:\n" +
                         $"1. {Path.Combine(baseDirectory, configFileName)}\n" +
                         $"2. {Path.Combine(baseDirectory, "WithGeminiClient", configFileName)}");
+                }
 
                 var geminiApiConfig = new ConfigurationBuilder()
                     .SetBasePath(Path.GetDirectoryName(configPath)!)
@@ -170,10 +178,16 @@ namespace MultiSocketRUDPBotTester
 
         private void Border_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount != 2) return;
+            if (e.ClickCount != 2)
+            {
+                return;
+            }
+
             e.Handled = true;
             if (sender is Border border)
+            {
                 ShowNodeConfigurationDialog(FindNode(border)!);
+            }
         }
 
         private void AddNodeToCanvas(NodeVisual node)
@@ -182,9 +196,18 @@ namespace MultiSocketRUDPBotTester
 
             GraphCanvas.Children.Add(node.Border);
             GraphCanvas.Children.Add(node.InputPort);
-            if (node.OutputPort != null) GraphCanvas.Children.Add(node.OutputPort);
-            if (node.OutputPortTrue != null) GraphCanvas.Children.Add(node.OutputPortTrue);
-            if (node.OutputPortFalse != null) GraphCanvas.Children.Add(node.OutputPortFalse);
+            if (node.OutputPort != null)
+            {
+                GraphCanvas.Children.Add(node.OutputPort);
+            }
+            if (node.OutputPortTrue != null)
+            {
+                GraphCanvas.Children.Add(node.OutputPortTrue);
+            }
+            if (node.OutputPortFalse != null)
+            {
+                GraphCanvas.Children.Add(node.OutputPortFalse);
+            }
 
             allNodes.Add(node);
             renderer.UpdatePortPositions(node);
@@ -225,6 +248,7 @@ namespace MultiSocketRUDPBotTester
                 StrokeThickness = 3,
                 IsHitTestVisible = false
             };
+
             hit.Children.Add(circle);
             Panel.SetZIndex(hit, 1000);
             hit.MouseLeftButtonUp += InputPort_MouseUp;
@@ -249,6 +273,7 @@ namespace MultiSocketRUDPBotTester
                 StrokeThickness = 3,
                 IsHitTestVisible = false
             };
+
             hit.Children.Add(circle);
             Panel.SetZIndex(hit, 1000);
             hit.MouseLeftButtonDown += (_, _) => interaction.StartConnection(hit, type);
@@ -259,12 +284,17 @@ namespace MultiSocketRUDPBotTester
         {
             e.Handled = true;
             if (sender is FrameworkElement port)
+            {
                 interaction.TryFinishConnection(port);
+            }
         }
 
         private void AddNode_Click(object sender, RoutedEventArgs e)
         {
-            if (ActionNodeListBox.SelectedItem is not Type t) return;
+            if (ActionNodeListBox.SelectedItem is not Type t)
+            {
+                return;
+            }
 
             var category = t.Name switch
             {
@@ -311,7 +341,9 @@ namespace MultiSocketRUDPBotTester
         private void CreateDynamicPorts(NodeVisual node, int count)
         {
             foreach (var port in node.DynamicOutputPorts)
+            {
                 GraphCanvas.Children.Remove(port);
+            }
 
             node.DynamicOutputPorts.Clear();
             node.DynamicPortTypes.Clear();
@@ -333,30 +365,54 @@ namespace MultiSocketRUDPBotTester
         private void SelectNodeByBorder(Border b)
         {
             var found = allNodes.FirstOrDefault(n => ReferenceEquals(n.Border, b));
-            if (found != null) SelectNode(found);
+            if (found != null)
+            {
+                SelectNode(found);
+            }
         }
 
         private void SelectNode(NodeVisual node)
         {
-            if (ReferenceEquals(selectedNode, node)) return;
-            if (selectedNode != null) NodeCanvasRenderer.Unhighlight(selectedNode);
+            if (ReferenceEquals(selectedNode, node))
+            {
+                return;
+            }
+            if (selectedNode != null)
+            {
+                NodeCanvasRenderer.Unhighlight(selectedNode);
+            }
+
             selectedNode = node;
             NodeCanvasRenderer.Highlight(node);
         }
 
         private void DeleteNode(NodeVisual node)
         {
-            if (node.IsRoot) { Log("Root node cannot be deleted."); return; }
+            if (node.IsRoot) 
+            {
+                Log("Root node cannot be deleted."); return; 
+            }
 
             DisconnectIncoming(node);
 
             GraphCanvas.Children.Remove(node.Border);
             GraphCanvas.Children.Remove(node.InputPort);
-            if (node.OutputPort != null) GraphCanvas.Children.Remove(node.OutputPort);
-            if (node.OutputPortTrue != null) GraphCanvas.Children.Remove(node.OutputPortTrue);
-            if (node.OutputPortFalse != null) GraphCanvas.Children.Remove(node.OutputPortFalse);
+            if (node.OutputPort != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPort);
+            }
+            if (node.OutputPortTrue != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPortTrue);
+            }
+            if (node.OutputPortFalse != null)
+            {
+                GraphCanvas.Children.Remove(node.OutputPortFalse);
+            }
             foreach (var port in node.DynamicOutputPorts)
+            {
                 GraphCanvas.Children.Remove(port);
+            }
 
             allNodes.Remove(node);
             renderer.RedrawConnections();
@@ -367,14 +423,25 @@ namespace MultiSocketRUDPBotTester
         {
             foreach (var n in allNodes)
             {
-                if (n.Next == node) n.Next = null;
-                if (n.TrueChild == node) n.TrueChild = null;
-                if (n.FalseChild == node) n.FalseChild = null;
+                if (n.Next == node)
+                {
+                    n.Next = null;
+                }
+                if (n.TrueChild == node)
+                {
+                    n.TrueChild = null;
+                }
+                if (n.FalseChild == node)
+                {
+                    n.FalseChild = null;
+                }
 
                 for (var i = 0; i < n.DynamicChildren.Count; i++)
                 {
                     if (n.DynamicChildren[i] == node)
+                    {
                         n.DynamicChildren[i] = null;
+                    }
                 }
             }
         }
@@ -388,8 +455,10 @@ namespace MultiSocketRUDPBotTester
             var positionMapping = new Dictionary<NodeVisual, (double left, double top)>();
 
             foreach (var saved in savedVisuals)
+            {
                 positionMapping[saved] = (WpfCanvas.GetLeft(saved.Border),
-                                          WpfCanvas.GetTop(saved.Border));
+                WpfCanvas.GetTop(saved.Border));
+            }
 
             foreach (var saved in savedVisuals)
             {
@@ -399,9 +468,18 @@ namespace MultiSocketRUDPBotTester
                 AttachNodeContextMenu(newNode);
                 GraphCanvas.Children.Add(newNode.Border);
                 GraphCanvas.Children.Add(newNode.InputPort);
-                if (newNode.OutputPort != null) GraphCanvas.Children.Add(newNode.OutputPort);
-                if (newNode.OutputPortTrue != null) GraphCanvas.Children.Add(newNode.OutputPortTrue);
-                if (newNode.OutputPortFalse != null) GraphCanvas.Children.Add(newNode.OutputPortFalse);
+                if (newNode.OutputPort != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPort);
+                }
+                if (newNode.OutputPortTrue != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPortTrue);
+                }
+                if (newNode.OutputPortFalse != null)
+                {
+                    GraphCanvas.Children.Add(newNode.OutputPortFalse);
+                }
 
                 allNodes.Add(newNode);
 
@@ -437,14 +515,23 @@ namespace MultiSocketRUDPBotTester
 
             foreach (var saved in savedVisuals)
             {
-                if (!nodeMapping.TryGetValue(saved, out var newNode)) continue;
+                if (!nodeMapping.TryGetValue(saved, out var newNode))
+                {
+                    continue;
+                }
 
                 if (saved.Next != null && nodeMapping.TryGetValue(saved.Next, out var next))
+                {
                     newNode.Next = next;
+                }
                 if (saved.TrueChild != null && nodeMapping.TryGetValue(saved.TrueChild, out var trueN))
+                {
                     newNode.TrueChild = trueN;
+                }
                 if (saved.FalseChild != null && nodeMapping.TryGetValue(saved.FalseChild, out var falseN))
+                {
                     newNode.FalseChild = falseN;
+                }
 
                 for (var i = 0; i < saved.DynamicChildren.Count; i++)
                 {
@@ -495,7 +582,9 @@ namespace MultiSocketRUDPBotTester
             if (original.NodeType != typeof(RandomChoiceNode))
             {
                 if (original.Category == NodeCategory.Action)
+                {
                     newNode.OutputPort = CreateOutputPort("default");
+                }
                 else
                 {
                     newNode.OutputPortTrue = CreateOutputPort(
@@ -512,7 +601,11 @@ namespace MultiSocketRUDPBotTester
 
         private static NodeConfiguration? CloneConfiguration(NodeConfiguration? original)
         {
-            if (original == null) return null;
+            if (original == null)
+            {
+                return null;
+            }
+
             return new NodeConfiguration
             {
                 PacketId = original.PacketId,
@@ -524,14 +617,22 @@ namespace MultiSocketRUDPBotTester
 
         private void BotActionGraphWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Delete || selectedNode == null) return;
+            if (e.Key != Key.Delete || selectedNode == null)
+            {
+                return;
+            }
+
             DeleteNode(selectedNode);
             selectedNode = null;
         }
 
         private void ShowStatsWindow_Click(object sender, RoutedEventArgs e)
         {
-            if (statsWindow?.IsVisible == true) { statsWindow.Activate(); return; }
+            if (statsWindow?.IsVisible == true) 
+            { 
+                statsWindow.Activate(); return; 
+            }
+            
             statsWindow = StatsWindowBuilder.Build(this, statsTracker);
             statsWindow.Closed += (_, _) => statsWindow = null;
             statsWindow.Show();
@@ -608,7 +709,11 @@ namespace MultiSocketRUDPBotTester
 
         private void SetStatusText(string text, Brush color)
         {
-            if (FindName("StatusText") is not TextBlock tb) return;
+            if (FindName("StatusText") is not TextBlock tb)
+            {
+                return;
+            }
+
             tb.Text = text;
             tb.Foreground = color;
         }
@@ -627,7 +732,11 @@ namespace MultiSocketRUDPBotTester
 
             foreach (var node in allNodes)
             {
-                if (node.Border.ContextMenu == null) continue;
+                if (node.Border.ContextMenu == null)
+                {
+                    continue;
+                }
+
                 node.Border.ContextMenu.Items.Clear();
                 node.Border.ContextMenu = null;
             }

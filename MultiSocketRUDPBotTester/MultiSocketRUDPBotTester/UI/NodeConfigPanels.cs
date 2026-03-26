@@ -442,7 +442,9 @@ namespace MultiSocketRUDPBotTester.UI
 
             var saved = node.Configuration?.Properties.GetValueOrDefault("SetterMethod")?.ToString();
             if (saved != null)
+            {
                 setterCombo.SelectedValue = saved;
+            }
 
             stack.Children.Add(setterCombo);
             stack.Children.Add(ConfigUi.Hint("Reads data from the incoming packet and stores it via the selected setter."));
@@ -573,13 +575,17 @@ namespace MultiSocketRUDPBotTester.UI
             stack.Children.Add(panel);
 
             if (cfg?.Properties.GetValueOrDefault(typeKey)?.ToString() != "Getter Function")
+            {
                 return (typeCombo, getterCombo, constBox);
+            }
 
             getterCombo.Visibility = Visibility.Visible;
             constBox.Visibility = Visibility.Collapsed;
             var saved = cfg.Properties.GetValueOrDefault(valueKey)?.ToString();
             if (saved != null)
+            {
                 getterCombo.SelectedValue = saved;
+            }
 
             return (typeCombo, getterCombo, constBox);
         }

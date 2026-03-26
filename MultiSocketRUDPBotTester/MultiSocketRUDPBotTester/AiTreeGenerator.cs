@@ -118,7 +118,10 @@ namespace MultiSocketRUDPBotTester
 
         private void HandleApply(AiTreeResponse? lastTree, Window window)
         {
-            if (lastTree == null) return;
+            if (lastTree == null)
+            {
+                return;
+            }
 
             try
             {
@@ -178,17 +181,26 @@ namespace MultiSocketRUDPBotTester
             {
                 GraphCanvas.Children.Remove(node.Border);
                 GraphCanvas.Children.Remove(node.InputPort);
-                if (node.OutputPort != null) GraphCanvas.Children.Remove(node.OutputPort);
-                if (node.OutputPortTrue != null) GraphCanvas.Children.Remove(node.OutputPortTrue);
-                if (node.OutputPortFalse != null) GraphCanvas.Children.Remove(node.OutputPortFalse);
-                foreach (var port in node.DynamicOutputPorts)
-                    GraphCanvas.Children.Remove(port);
-
-                if (node.Border.ContextMenu != null)
+                if (node.OutputPort != null)
                 {
-                    node.Border.ContextMenu.Items.Clear();
-                    node.Border.ContextMenu = null;
+                    GraphCanvas.Children.Remove(node.OutputPort);
                 }
+                if (node.OutputPortTrue != null)
+                {
+                    GraphCanvas.Children.Remove(node.OutputPortTrue);
+                }
+                if (node.OutputPortFalse != null)
+                {
+                    GraphCanvas.Children.Remove(node.OutputPortFalse);
+                }
+
+                foreach (var port in node.DynamicOutputPorts)
+                { 
+                    GraphCanvas.Children.Remove(port);
+                }
+
+                node.Border.ContextMenu?.Items.Clear();
+                node.Border.ContextMenu = null;
             }
 
             allNodes.RemoveAll(n => !n.IsRoot);
