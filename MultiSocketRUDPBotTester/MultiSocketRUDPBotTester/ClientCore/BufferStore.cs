@@ -7,7 +7,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public void RefreshSendPacketInfo(ulong now)
         {
             SendTimeStamp = now;
-            ++retransmissionCount;
+            Interlocked.Increment(ref retransmissionCount);
         }
 
         public bool IsRetransmissionTime(ulong now)
@@ -17,16 +17,16 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public bool IsExceedMaxRetransmissionCount()
         {
-            return retransmissionCount >= RetransmissionMaxCount;
+            return Interlocked.Read(ref retransmissionCount) >= RetransmissionMaxCount;
         }
 
         public NetBuffer SentBuffer { get; } = inSentBuffer;
         public PacketSequence PacketSequence { get; } = inPacketSequence;
-        private ulong SendTimeStamp { get; set; }
-        private PacketRetransmissionCount retransmissionCount;
+        private ulong SendTimeStamp;
+        private long retransmissionCount;
 
         private const ulong RetransmissionTimeoutMs = 32;
-        private const ulong RetransmissionMaxCount = 16;
+        private const long RetransmissionMaxCount = 16;
     }
 
     public class BufferStore
