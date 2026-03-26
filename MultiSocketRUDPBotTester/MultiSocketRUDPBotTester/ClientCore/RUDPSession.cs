@@ -141,8 +141,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var buffer = new NetBuffer();
             buffer.WriteBytes(data);
 
-            buffer.SkipBytes(HeaderSize);
-
             var resultCode = (ConnectResultCode)buffer.ReadByte();
             if (resultCode != ConnectResultCode.Success)
                 throw new Exception($"Session broker response error: {resultCode}");
@@ -263,6 +261,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var buffer = new NetBuffer();
             buffer.WriteBytes(data);
 
+            buffer.SkipBytes(HeaderSize);
             var packetType = (PacketType)buffer.ReadByte();
             var isCorePacket = packetType != PacketType.SendType;
             PacketDirection direction;
@@ -347,8 +346,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private void SendReplyToServer(PacketSequence packetSequence)
         {
             var replyBuffer = new NetBuffer();
-            replyBuffer.WriteByte((byte)PacketType.SendReplyType);
-            replyBuffer.WriteULong(packetSequence);
+            replyBuffer.BuildCorePacket(PacketType.SendReplyType, packetSequence);
 
             Debug.Assert(SessionInfo.AesGcm != null);
             NetBuffer.EncodePacket(
@@ -434,8 +432,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             var seq = Interlocked.Increment(ref lastSendSequence);
             var buffer = new NetBuffer();
-            buffer.WriteByte((byte)PacketType.DisconnectType);
-            buffer.WriteULong(seq);
+            buffer.BuildCorePacket(PacketType.DisconnectType, seq);
 
             Debug.Assert(SessionInfo.AesGcm != null);
             NetBuffer.EncodePacket(
