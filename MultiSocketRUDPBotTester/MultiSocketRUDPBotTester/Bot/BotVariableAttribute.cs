@@ -65,14 +65,19 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public static void Initialize()
         {
-            if (_isInitialized) return;
+            if (_isInitialized)
+            {
+                return;
+            }
 
             var methods = typeof(BotVariables).GetMethods(BindingFlags.Public | BindingFlags.Static);
-
             foreach (var method in methods)
             {
                 var attr = method.GetCustomAttribute<BotVariableAttribute>();
-                if (attr == null) continue;
+                if (attr == null)
+                {
+                    continue;
+                }
 
                 var accessor = new VariableAccessor
                 {

@@ -50,16 +50,28 @@ namespace MultiSocketRUDPBotTester.Evaluation
         private static object ResolveValue(RuntimeContext ctx, string? type, string value)
         {
             if (type == "Getter Function")
+            {
                 return VariableAccessorRegistry.InvokeGetter(value, ctx) ?? 0;
+            }
 
             return ParseConstant(value);
         }
 
         private static object ParseConstant(string value)
         {
-            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal)) return intVal;
-            if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var dblVal)) return dblVal;
-            if (bool.TryParse(value, out var boolVal)) return boolVal;
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal))
+            {
+                return intVal;
+            }
+            if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var dblVal))
+            {
+                return dblVal;
+            }
+            if (bool.TryParse(value, out var boolVal))
+            {
+                return boolVal;
+            }
+
             return value;
         }
 

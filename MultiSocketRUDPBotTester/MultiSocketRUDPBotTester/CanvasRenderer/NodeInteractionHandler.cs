@@ -62,7 +62,10 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
                 tempConnectionLine.Y2 = p.Y;
             }
 
-            if (!isPanning) return;
+            if (!isPanning)
+            {
+                return;
+            }
 
             var pos = e.GetPosition(scrollViewer);
             scrollViewer.ScrollToHorizontalOffset(scrollViewer.HorizontalOffset - (pos.X - panStart.X));
@@ -72,7 +75,11 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
 
         private void OnCanvasLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (!Equals(e.Source, canvas)) return;
+            if (!Equals(e.Source, canvas))
+            {
+                return;
+            }
+
             isPanning = true;
             panStart = e.GetPosition(scrollViewer);
             canvas.CaptureMouse();
@@ -82,7 +89,11 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
         {
             element.MouseLeftButtonDown += (_, ev) =>
             {
-                if (IsConnecting) return;
+                if (IsConnecting)
+                {
+                    return;
+                }
+
                 isDragging = true;
                 dragStart = ev.GetPosition(canvas);
                 element.CaptureMouse();
@@ -90,14 +101,21 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
 
             element.MouseMove += (_, ev) =>
             {
-                if (!isDragging) return;
+                if (!isDragging)
+                {
+                    return;
+                }
+
                 var p = ev.GetPosition(canvas);
                 WpfCanvas.SetLeft(element, WpfCanvas.GetLeft(element) + p.X - dragStart.X);
                 WpfCanvas.SetTop(element, WpfCanvas.GetTop(element) + p.Y - dragStart.Y);
                 dragStart = p;
 
                 var node = nodes.FirstOrDefault(x => x.Border == element);
-                if (node != null) renderer.UpdatePortPositions(node);
+                if (node != null)
+                {
+                    renderer.UpdatePortPositions(node);
+                }
             };
 
             element.MouseLeftButtonUp += (_, _) =>
@@ -140,7 +158,10 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
 
         public void TryFinishConnection(FrameworkElement port)
         {
-            if (!IsConnecting || port.Tag as string != "input") return;
+            if (!IsConnecting || port.Tag as string != "input")
+            {
+                return;
+            }
 
             var to = nodes.FirstOrDefault(n => n.InputPort == port);
             if (to == null || to == connectingFromNode)
@@ -191,7 +212,9 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
         public void CleanupConnection()
         {
             if (tempConnectionLine != null)
+            {
                 canvas.Children.Remove(tempConnectionLine);
+            }
 
             tempConnectionLine = null;
             connectingFromNode = null;
@@ -208,16 +231,35 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
             while (stack.Count > 0)
             {
                 var n = stack.Pop();
-                if (!visited.Add(n)) continue;
-                if (n == from) return true;
+                if (!visited.Add(n))
+                {
+                    continue;
+                }
 
-                if (n.Next != null) stack.Push(n.Next);
-                if (n.TrueChild != null) stack.Push(n.TrueChild);
-                if (n.FalseChild != null) stack.Push(n.FalseChild);
+                if (n == from)
+                {
+                    return true;
+                }
+
+                if (n.Next != null)
+                {
+                    stack.Push(n.Next);
+                }
+                if (n.TrueChild != null)
+                {
+                    stack.Push(n.TrueChild);
+                }
+                if (n.FalseChild != null)
+                {
+                    stack.Push(n.FalseChild);
+                }
 
                 foreach (var child in n.DynamicChildren)
                 {
-                    if (child != null) stack.Push(child);
+                    if (child != null)
+                    {
+                        stack.Push(child);
+                    }
                 }
             }
 
