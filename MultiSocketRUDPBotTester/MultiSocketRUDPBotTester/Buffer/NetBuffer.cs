@@ -176,7 +176,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         private void SetHeader()
         {
             _buffer[0] = HeaderCode;
-            var payloadSize = (ushort)(_writePos - HeaderSize);
+            var payloadSize = (ushort)(_writePos - HeaderSize + extraSize);
             _buffer[1] = (byte)(payloadSize & 0xFF);
             _buffer[2] = (byte)((payloadSize >> 8) & 0xFF);
         }
