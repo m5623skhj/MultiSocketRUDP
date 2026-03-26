@@ -23,7 +23,7 @@ namespace MultiSocketRUDPBotTester.Graph
             new RepeatTimerNodeBuilder(),
             new PacketParserNodeBuilder(),
             new RandomChoiceNodeBuilder(),
-            new AssertNodeBuilder(),
+            new AssertNodeBuilder(conditionEvaluator),
             new RetryNodeBuilder()
         ];
 
