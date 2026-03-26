@@ -22,7 +22,7 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
             {
                 Name = visual.NodeType!.Name,
                 PacketId = packetId,
-                PacketBuilder = _ => new NetBuffer()
+                PacketBuilder = null
             };
         }
     }
