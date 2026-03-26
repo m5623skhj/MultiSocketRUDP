@@ -14,7 +14,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
             int bodyOffset,
             int bodySize,
             ReadOnlySpan<byte> nonce,
-            Span<byte> authTag)
+            Span<byte> authTag,
+            ReadOnlySpan<byte> aad = default)
         {
             var bodySpan = buffer.AsSpan(bodyOffset, bodySize);
 
@@ -22,7 +23,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 nonce,
                 bodySpan,
                 bodySpan,
-                authTag
+                authTag,
+                aad
             );
         }
 
