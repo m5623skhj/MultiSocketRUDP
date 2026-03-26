@@ -38,22 +38,22 @@ namespace MultiSocketRUDPBotTester.Bot
                     {
                         LastError = error;
                     }
-
-                    TotalExecutionTimeMs += executionTimeMs;
-
-                    if (ExecutionCount == 1)
-                    {
-                        MinExecutionTimeMs = executionTimeMs;
-                        MaxExecutionTimeMs = executionTimeMs;
-                    }
-                    else
-                    {
-                        MinExecutionTimeMs = Math.Min(MinExecutionTimeMs, executionTimeMs);
-                        MaxExecutionTimeMs = Math.Max(MaxExecutionTimeMs, executionTimeMs);
-                    }
-
-                    LastExecutionTime = DateTime.Now;
                 }
+
+                TotalExecutionTimeMs += executionTimeMs;
+
+                if (ExecutionCount == 1)
+                {
+                    MinExecutionTimeMs = executionTimeMs;
+                    MaxExecutionTimeMs = executionTimeMs;
+                }
+                else
+                {
+                    MinExecutionTimeMs = Math.Min(MinExecutionTimeMs, executionTimeMs);
+                    MaxExecutionTimeMs = Math.Max(MaxExecutionTimeMs, executionTimeMs);
+                }
+
+                LastExecutionTime = DateTime.Now;
             }
         }
 
