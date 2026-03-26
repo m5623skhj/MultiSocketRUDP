@@ -143,7 +143,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             var resultCode = (ConnectResultCode)buffer.ReadByte();
             if (resultCode != ConnectResultCode.Success)
+            {
                 throw new Exception($"Session broker response error: {resultCode}");
+            }
 
             TargetServerInfo.ServerIp = buffer.ReadString();
             TargetServerInfo.ServerPort = buffer.ReadUShort();

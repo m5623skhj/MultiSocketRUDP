@@ -135,6 +135,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 throw new InvalidOperationException("Failed to get session info from session broker. Check connection settings.", e);
             }
 
+            Log.Debug("Received {N} bytes: {Hex}",
+                totalBytes,
+                BitConverter.ToString(buffer, 0, totalBytes));
+
             return new Client(buffer[GlobalConstants.PacketHeaderSize..totalBytes]);
         }
     }
