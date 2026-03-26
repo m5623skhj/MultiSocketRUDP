@@ -88,17 +88,27 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
         }
     }
 
-    public class AssertNodeBuilder : INodeBuilder
+    public class AssertNodeBuilder(Func<RuntimeContext, string?, string, string, string?, string, bool> evaluator)
+        : INodeBuilder
     {
         public bool CanBuild(NodeVisual visual) => visual.NodeType == typeof(AssertNode);
 
-        public ActionNodeBase Build(NodeVisual visual) => new AssertNode
+        public ActionNodeBase Build(NodeVisual visual)
         {
-            Name = visual.NodeType!.Name,
-            ErrorMessage = visual.Configuration?.StringValue ?? "Assertion failed",
-            StopOnFailure = visual.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true,
-            Condition = _ => true
-        };
+            var leftType = visual.Configuration?.Properties.GetValueOrDefault("LeftType")?.ToString();
+            var left = visual.Configuration?.Properties.GetValueOrDefault("Left")?.ToString() ?? "";
+            var op = visual.Configuration?.Properties.GetValueOrDefault("Op")?.ToString() ?? "==";
+            var rightType = visual.Configuration?.Properties.GetValueOrDefault("RightType")?.ToString();
+            var right = visual.Configuration?.Properties.GetValueOrDefault("Right")?.ToString() ?? "";
+
+            return new AssertNode
+            {
+                Name = visual.NodeType!.Name,
+                ErrorMessage = visual.Configuration?.StringValue ?? "Assertion failed",
+                StopOnFailure = visual.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true,
+                Condition = ctx => evaluator(ctx, leftType, left, op, rightType, right)
+            };
+        }
     }
 
     public class RetryNodeBuilder : INodeBuilder
