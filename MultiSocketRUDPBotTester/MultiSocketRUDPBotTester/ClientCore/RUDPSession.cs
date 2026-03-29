@@ -102,7 +102,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
     {
         private const ulong LoginPacketSequence = 0;
 
-        private const int HeaderSize = 3;
+        private const int HeaderSize = 5;
 
         private const int RetransmissionWakeUpMs = 30;
 

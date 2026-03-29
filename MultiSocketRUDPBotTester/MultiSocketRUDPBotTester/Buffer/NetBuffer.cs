@@ -6,7 +6,7 @@ namespace MultiSocketRUDPBotTester.Buffer
     {
         public static byte HeaderCode { get; set; } = 0xCC;
 
-        private const int HeaderSize = 3;
+        private const int HeaderSize = 5;
         private const int PacketTypeSize = 1;
         private const int PacketSequenceSize = 8;
         private const int PacketIdSize = 4;

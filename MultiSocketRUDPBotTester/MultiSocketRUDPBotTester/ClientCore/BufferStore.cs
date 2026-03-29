@@ -25,7 +25,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private ulong SendTimeStamp;
         private long retransmissionCount;
 
-        private const ulong RetransmissionTimeoutMs = 32;
+        private const ulong RetransmissionTimeoutMs = 50;
         private const long RetransmissionMaxCount = 16;
     }
 
