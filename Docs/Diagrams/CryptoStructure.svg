@@ -45,40 +45,40 @@
   <text x="535" y="110" text-anchor="middle" font-size="9" fill="#fca5a5">16 bytes</text>
   <text x="535" y="120" text-anchor="middle" font-size="8" fill="#f87171">GCM Tag</text>
 
-  <!-- AAD brace -->
-  <line x1="40" y1="132" x2="248" y2="132" stroke="#fbbf24" stroke-width="1.5"/>
-  <line x1="40" y1="128" x2="40" y2="136" stroke="#fbbf24" stroke-width="1.5"/>
-  <line x1="248" y1="128" x2="248" y2="136" stroke="#fbbf24" stroke-width="1.5"/>
-  <line x1="144" y1="136" x2="144" y2="148" stroke="#fbbf24" stroke-width="1.5"/>
-  <rect x="72" y="149" width="148" height="22" rx="4" fill="#1a1500"/>
-  <text x="146" y="163" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="600">AAD = 12 bytes (위변조 감지)</text>
+  <!-- AAD brace (8px below packet boxes) -->
+  <line x1="40" y1="140" x2="248" y2="140" stroke="#fbbf24" stroke-width="1.5"/>
+  <line x1="40" y1="136" x2="40" y2="144" stroke="#fbbf24" stroke-width="1.5"/>
+  <line x1="248" y1="136" x2="248" y2="144" stroke="#fbbf24" stroke-width="1.5"/>
+  <line x1="144" y1="144" x2="144" y2="155" stroke="#fbbf24" stroke-width="1.5"/>
+  <rect x="72" y="156" width="148" height="22" rx="4" fill="#1a1500"/>
+  <text x="146" y="170" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="600">AAD = 12 bytes (위변조 감지)</text>
 
   <!-- Encrypted range brace -->
-  <line x1="252" y1="132" x2="580" y2="132" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,2"/>
-  <line x1="252" y1="128" x2="252" y2="136" stroke="#22c55e" stroke-width="1.5"/>
-  <line x1="580" y1="128" x2="580" y2="136" stroke="#22c55e" stroke-width="1.5"/>
-  <line x1="416" y1="136" x2="416" y2="148" stroke="#22c55e" stroke-width="1.5"/>
-  <rect x="328" y="149" width="178" height="22" rx="4" fill="#0a1f14"/>
-  <text x="417" y="163" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">AES-GCM 암호화 범위</text>
+  <line x1="252" y1="140" x2="580" y2="140" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <line x1="252" y1="136" x2="252" y2="144" stroke="#22c55e" stroke-width="1.5"/>
+  <line x1="580" y1="136" x2="580" y2="144" stroke="#22c55e" stroke-width="1.5"/>
+  <line x1="416" y1="144" x2="416" y2="155" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="328" y="156" width="178" height="22" rx="4" fill="#0a1f14"/>
+  <text x="417" y="170" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">AES-GCM 암호화 범위</text>
 
   <!-- CORE packet variant -->
-  <text x="40" y="195" font-size="11" font-weight="700" fill="#94a3b8">코어 패킷 (isCorePacket=true, PacketId 없음)</text>
-  <rect x="40" y="205" width="60" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="70" y="222" text-anchor="middle" font-size="9" fill="#bfdbfe">Header</text>
-  <text x="70" y="235" text-anchor="middle" font-size="8" fill="#93c5fd">3B</text>
-  <rect x="104" y="205" width="50" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="129" y="222" text-anchor="middle" font-size="9" fill="#bfdbfe">Type</text>
-  <text x="129" y="235" text-anchor="middle" font-size="8" fill="#93c5fd">1B</text>
-  <rect x="158" y="205" width="90" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="203" y="222" text-anchor="middle" font-size="9" fill="#bfdbfe">Sequence</text>
-  <text x="203" y="235" text-anchor="middle" font-size="8" fill="#93c5fd">8B</text>
-  <rect x="252" y="205" width="110" height="40" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="1"/>
-  <text x="307" y="222" text-anchor="middle" font-size="9" fill="#86efac">Payload</text>
-  <text x="307" y="235" text-anchor="middle" font-size="8" fill="#4ade80">N bytes</text>
-  <rect x="366" y="205" width="90" height="40" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1"/>
-  <text x="411" y="222" text-anchor="middle" font-size="9" fill="#fca5a5">AuthTag</text>
-  <text x="411" y="235" text-anchor="middle" font-size="8" fill="#f87171">16B</text>
-  <text x="510" y="228" font-size="9" fill="#64748b">예: CONNECT, HEARTBEAT, SEND_REPLY, DISCONNECT</text>
+  <text x="40" y="203" font-size="11" font-weight="700" fill="#94a3b8">코어 패킷 (isCorePacket=true, PacketId 없음)</text>
+  <rect x="40" y="213" width="60" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
+  <text x="70" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Header</text>
+  <text x="70" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">3B</text>
+  <rect x="104" y="213" width="50" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
+  <text x="129" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Type</text>
+  <text x="129" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">1B</text>
+  <rect x="158" y="213" width="90" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
+  <text x="203" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Sequence</text>
+  <text x="203" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">8B</text>
+  <rect x="252" y="213" width="110" height="40" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="1"/>
+  <text x="307" y="230" text-anchor="middle" font-size="9" fill="#86efac">Payload</text>
+  <text x="307" y="243" text-anchor="middle" font-size="8" fill="#4ade80">N bytes</text>
+  <rect x="366" y="213" width="90" height="40" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1"/>
+  <text x="411" y="230" text-anchor="middle" font-size="9" fill="#fca5a5">AuthTag</text>
+  <text x="411" y="243" text-anchor="middle" font-size="8" fill="#f87171">16B</text>
+  <text x="510" y="236" font-size="9" fill="#64748b">예: CONNECT, HEARTBEAT, SEND_REPLY, DISCONNECT</text>
 
   <!-- Nonce construction -->
   <text x="40" y="265" font-size="12" font-weight="700" fill="#94a3b8">Nonce 구조 (12 bytes)</text>

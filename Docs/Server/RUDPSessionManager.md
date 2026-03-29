@@ -254,10 +254,10 @@ DecrementConnectedCount():
   → (pool 반환 시 연결 수 감소)
 ```
 
-**`MultiSocketRUDPCore::GetConnectedUserCount()`:**
+**`MultiSocketRUDPCore::GetNowSessionCount()`:**
 
 ```cpp
-unsigned short MultiSocketRUDPCore::GetConnectedUserCount() const {
+unsigned short MultiSocketRUDPCore::GetNowSessionCount() const {
     return sessionManager->GetConnectedCount();
 }
 ```

@@ -10,7 +10,7 @@
 
 **체크리스트:**
 ```
-□ SessionBrokerOption.ini의 SESSION_BROKER_PORT가 방화벽에서 열려 있는가?
+□ SessionBrokerOption.txt의 SESSION_BROKER_PORT가 방화벽에서 열려 있는가?
 □ 서버 프로세스가 실행 중이고 포트에 바인딩되어 있는가?
   → netstat -ano | findstr :10000
 □ TLS 인증서가 올바르게 설치되어 있는가?
@@ -104,7 +104,7 @@ void Player::OnMove(const MovePacket& packet) {
   → bodyOffset 계산이 달라져 암호화된 영역이 어긋남
 
 원인 4: PACKET_CODE(헤더 코드)가 다름
-  → CoreOption.ini의 PACKET_CODE와 클라이언트 설정값 일치 확인
+  → CoreOption.txt의 PACKET_CODE와 클라이언트 설정값 일치 확인
 ```
 
 ---
@@ -164,7 +164,7 @@ void Player::OnMove(const MovePacket& packet) {
 ```
 원인 1: IO Worker가 Sleep 없이 폴링 중
   → BuildConfig.h: USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=1 설정
-  → CoreOption.ini: WORKER_THREAD_ONE_FRAME_MS=1 (또는 그 이상)
+  → CoreOption.txt: WORKER_THREAD_ONE_FRAME_MS=1 (또는 그 이상)
 
 원인 2: Retransmission Thread 슬립이 너무 짧음
   → RETRANSMISSION_THREAD_SLEEP_MS 증가 (100 → 200)

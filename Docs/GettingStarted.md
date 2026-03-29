@@ -73,13 +73,13 @@ void Player::OnMyRequest(const MyRequest& packet) {
 
 ```cpp
 MultiSocketRUDPCore core(L"MY", L"DevServerCert");
+ContentsPacketRegister::Init();  // 패킷 팩토리 등록 (StartServer 이전에 호출)
 core.StartServer(
-    L"CoreOption.ini",
-    L"SessionBrokerOption.ini",
+    L"ServerOptionFile/CoreOption.txt",
+    L"ServerOptionFile/SessionBrokerOption.txt",
     [](MultiSocketRUDPCore& c) { return new Player(c); },
     true  // 콘솔 출력
 );
-ContentsPacketRegister::Init();  // 패킷 팩토리 등록
 
 // ... 메인 루프
 core.StopServer();

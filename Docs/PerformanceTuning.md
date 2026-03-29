@@ -275,7 +275,7 @@ Ticker::GetInstance().RegisterTimerEvent(timer);
 
 ```cpp
 // 연결 수 추이
-unsigned short connected = core.GetConnectedUserCount();
+unsigned short connected = core.GetNowSessionCount();
 
 // 풀 현황 (미사용 세션 수)
 // → RUDPSessionManager::GetUnusedSessionCount() 추가 구현 필요

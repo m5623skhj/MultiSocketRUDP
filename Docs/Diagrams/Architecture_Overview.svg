@@ -1,4 +1,4 @@
-<svg viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+<svg viewBox="0 0 900 640" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
@@ -15,7 +15,7 @@
   </defs>
 
   <!-- Background -->
-  <rect width="900" height="620" fill="#0f172a" rx="12"/>
+  <rect width="900" height="640" fill="#0f172a" rx="12"/>
 
   <!-- Title -->
   <text x="450" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="#f1f5f9">MultiSocketRUDP — 전체 아키텍처</text>
@@ -156,14 +156,18 @@
   <line x1="628" y1="119" x2="552" y2="300" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
 
   <!-- Legend -->
-  <rect x="30" y="385" width="240" height="100" rx="8" fill="#0f172a" stroke="#374151" stroke-width="1"/>
-  <text x="150" y="403" text-anchor="middle" font-size="11" font-weight="600" fill="#9ca3af">범례</text>
-  <line x1="50" y1="420" x2="80" y2="420" stroke="#f59e0b" stroke-width="2"/>
-  <text x="88" y="424" font-size="10" fill="#d1d5db">TCP + TLS (세션 발급)</text>
-  <line x1="50" y1="438" x2="80" y2="438" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>
-  <text x="88" y="442" font-size="10" fill="#d1d5db">UDP / RUDP (데이터)</text>
-  <line x1="50" y1="456" x2="80" y2="456" stroke="#6b7280" stroke-width="1.5"/>
-  <text x="88" y="460" font-size="10" fill="#d1d5db">내부 참조</text>
-  <line x1="50" y1="474" x2="80" y2="474" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3"/>
-  <text x="88" y="478" font-size="10" fill="#d1d5db">로깅</text>
+  <rect x="30" y="385" width="245" height="110" rx="8" fill="#0f172a" stroke="#374151" stroke-width="1"/>
+  <text x="152" y="404" text-anchor="middle" font-size="11" font-weight="600" fill="#9ca3af">범례</text>
+  <!-- row 1 -->
+  <line x1="46" y1="420" x2="74" y2="420" stroke="#f59e0b" stroke-width="2"/>
+  <text x="82" y="424" font-size="10" fill="#d1d5db">TCP + TLS (세션 발급)</text>
+  <!-- row 2 -->
+  <line x1="46" y1="438" x2="74" y2="438" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="82" y="442" font-size="10" fill="#d1d5db">UDP / RUDP (데이터)</text>
+  <!-- row 3 -->
+  <line x1="46" y1="456" x2="74" y2="456" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="82" y="460" font-size="10" fill="#d1d5db">내부 참조</text>
+  <!-- row 4 -->
+  <line x1="46" y1="474" x2="74" y2="474" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="82" y="478" font-size="10" fill="#d1d5db">로깅</text>
 </svg>

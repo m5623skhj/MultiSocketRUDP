@@ -32,8 +32,8 @@ ContentsServer/
 ├── PacketIdType.h          ← PACKET_ID enum (PacketGenerator 자동 생성)
 ├── PlayerPacketHandlerRegister.h / .cpp  ← Init() (PacketGenerator 자동 생성)
 ├── ServerOption/
-│   ├── CoreOption.ini
-│   └── SessionBrokerOption.ini
+│   ├── CoreOption.txt
+│   └── SessionBrokerOption.txt
 └── WithGeminiClient/       ← AI (선택, BotTester용)
     └── GeminiClientConfiguration.json
 ```
@@ -149,17 +149,17 @@ void Player::OnPing(const Ping& /*packet*/) {
 int main() {
     MultiSocketRUDPCore core(L"MY", L"DevServerCert");
 
+    ContentsPacketRegister::Init();  // StartServer 이전에 반드시 호출
+
     if (!core.StartServer(
-        L"ServerOption/CoreOption.ini",
-        L"ServerOption/SessionBrokerOption.ini",
+        L"ServerOptionFile/CoreOption.txt",
+        L"ServerOptionFile/SessionBrokerOption.txt",
         [](MultiSocketRUDPCore& c) -> RUDPSession* { return new Player(c); },
         true))
     {
         core.StopServer();
         return -1;
     }
-
-    ContentsPacketRegister::Init();
 
     std::cout << "Echo server running. Press Enter to stop.\n";
     std::cin.get();

@@ -36,7 +36,7 @@ DISCONNECTED ──────────────────► RESERVED
     │                   ▼                           │
     │               CONNECTED                       │
     │                   │                           │
-    │           DoDisconnect() 호출                 │
+    │         DoDisconnect(reason) 호출             │
     │     (오류/재전송초과/클라이언트종료)           │
     │                   │                           │
     │                   └──────────┬────────────────┘
@@ -210,7 +210,7 @@ void AbortReservedSession() {
 
 ## 6. 전이 4: CONNECTED → RELEASING
 
-**트리거:** `DoDisconnect()` 호출
+**트리거:** `DoDisconnect(reason)` 호출
 
 **호출 원인:**
 
@@ -225,7 +225,7 @@ void AbortReservedSession() {
 **코드 경로:**
 
 ```cpp
-void RUDPSession::DoDisconnect()
+void RUDPSession::DoDisconnect(const DISCONNECT_REASON reason)
 {
     // ① CAS: RESERVED 또는 CONNECTED → RELEASING
     if (!stateMachine.TryTransitionToReleasing()) return;

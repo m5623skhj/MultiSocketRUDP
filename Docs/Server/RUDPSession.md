@@ -115,15 +115,15 @@ void Player::OnChat(const ChatReq& packet) {
 ```cpp
 // 서버 진입점
 MultiSocketRUDPCore core(L"MY", L"DevServerCert");
+ContentsPacketRegister::Init();  // PacketGenerator 자동 생성 등록 코드 (StartServer 이전)
 core.StartServer(
-    L"CoreOption.ini",
-    L"SessionBrokerOption.ini",
+    L"ServerOptionFile/CoreOption.txt",
+    L"ServerOptionFile/SessionBrokerOption.txt",
     [](MultiSocketRUDPCore& c) -> RUDPSession* {
         return new Player(c);   // ← 팩토리: Player 인스턴스 반환
     },
     true
 );
-ContentsPacketRegister::Init();  // PacketGenerator 자동 생성 등록 코드
 ```
 
 ---

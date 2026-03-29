@@ -130,9 +130,12 @@ int main() {
     // 인증서 저장소 이름, 인증서 Subject Name
     MultiSocketRUDPCore core(L"MY", L"DevServerCert");
 
+    // PacketManager에 패킷 팩토리 등록 (StartServer 이전에 반드시 호출)
+    ContentsPacketRegister::Init();
+
     bool ok = core.StartServer(
-        L"ServerOption/CoreOption.ini",
-        L"ServerOption/SessionBrokerOption.ini",
+        L"ServerOptionFile/CoreOption.txt",
+        L"ServerOptionFile/SessionBrokerOption.txt",
         [](MultiSocketRUDPCore& c) -> RUDPSession* {
             return new Player(c);
         },
@@ -144,9 +147,6 @@ int main() {
         core.StopServer();
         return -1;
     }
-
-    // PacketManager에 패킷 팩토리 등록 (PacketGenerator 자동 생성)
-    ContentsPacketRegister::Init();
 
     std::cout << "Server started. Press Enter to stop.\n";
     std::cin.get();
@@ -224,7 +224,7 @@ bool IsServerStopped() const;
 // → isServerStopped atomic 값 반환
 
 // 현재 연결된 세션 수 (CONNECTED 상태)
-unsigned short GetConnectedUserCount() const;
+unsigned short GetNowSessionCount() const;
 // → sessionManager->GetConnectedCount() → connectedUserCount.load()
 ```
 
@@ -249,7 +249,7 @@ std::thread monitorThread([&]() {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         int32_t tps = core.GetTPS();
         core.ResetTPS();
-        int sessions = core.GetConnectedUserCount();
+        int sessions = core.GetNowSessionCount();
         LOG_DEBUG(std::format("TPS: {}, Sessions: {}", tps, sessions));
     }
 });
@@ -288,9 +288,11 @@ void GameRoom::NotifyPlayerLeft(SessionIdType leaveId) {
 > `DoDisconnect()`를 호출할 수 있다. `IsConnected()`로 상태를 재확인하거나,  
 > `SendPacket()`의 반환값으로 처리 성공 여부를 확인해야 한다.
 
-### 특정 세션 강제 종료
+### 특정 세션 강제 종료 (내부 API — `private`)
 
 ```cpp
+// private: 외부에서 직접 호출 불가
+// session->DoDisconnect(reason) 을 호출하면 Session Release Thread가 자동 처리
 void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
 ```
 
@@ -305,9 +307,9 @@ void MultiSocketRUDPCore::DisconnectSession(SessionIdType id) const {
 }
 ```
 
-> **일반적으로 직접 호출하지 않는다.** `session->DoDisconnect()`를 호출하면  
-> Session Release Thread가 자동으로 이 함수를 호출한다.  
-> 관리 목적으로 외부에서 강제 종료할 때 사용한다.
+> **외부에서 직접 호출할 수 없다.** `DisconnectSession`은 `private` 멤버이며,  
+> `session->DoDisconnect(reason)`을 호출하면 Session Release Thread가  
+> 내부적으로 이 함수를 자동 호출한다.
 
 ### RIO 함수 테이블 접근
 

@@ -1,1 +1,8 @@
-{}
+{
+  "legacyEditor": false,
+  "livePreview": true,
+  "defaultViewMode": "preview",
+  "attachmentFolderPath": "Diagrams",
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false
+}
