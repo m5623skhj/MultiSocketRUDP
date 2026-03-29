@@ -46,7 +46,6 @@ int main()
 		serverStats.tps = TestServer::GetInst().GetTPS();
 		serverStats.error = TestServer::GetInst().GetNumOfError();
 
-
 		TestServer::GetInst().ResetTPS();
 	}
 
@@ -54,10 +53,10 @@ int main()
 	{
 		Sleep(1000);
 	}
+	uiThread.join();
+
 	system("cls");
 	std::cout << "Server stopped" << '\n';
-
-	uiThread.join();
 
 	return 0;
 }
