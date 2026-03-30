@@ -27,6 +27,8 @@ namespace MultiSocketRUDPBotTester.Buffer
             _writePos = 0;
         }
 
+        public void ReserveHeader() => _writePos = HeaderSize;
+
         public void WriteByte(byte value) => _buffer[_writePos++] = value;
 
         public void WriteUShort(ushort value)
@@ -36,6 +38,14 @@ namespace MultiSocketRUDPBotTester.Buffer
         }
 
         public void WriteUInt(uint value)
+        {
+            _buffer[_writePos++] = (byte)(value & 0xFF);
+            _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
+            _buffer[_writePos++] = (byte)((value >> 16) & 0xFF);
+            _buffer[_writePos++] = (byte)((value >> 24) & 0xFF);
+        }
+
+        public void WriteInt(int value)
         {
             _buffer[_writePos++] = (byte)(value & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
@@ -87,6 +97,16 @@ namespace MultiSocketRUDPBotTester.Buffer
         public uint ReadUInt()
         {
             var v = (uint)(_buffer[_readPos]
+                | (_buffer[_readPos + 1] << 8)
+                | (_buffer[_readPos + 2] << 16)
+                | (_buffer[_readPos + 3] << 24));
+            _readPos += 4;
+            return v;
+        }
+
+        public int ReadInt()
+        {
+            var v = (int)(_buffer[_readPos]
                 | (_buffer[_readPos + 1] << 8)
                 | (_buffer[_readPos + 2] << 16)
                 | (_buffer[_readPos + 3] << 24));

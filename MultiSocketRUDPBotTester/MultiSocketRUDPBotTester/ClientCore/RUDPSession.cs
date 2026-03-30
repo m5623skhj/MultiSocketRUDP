@@ -111,7 +111,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private UdpClient udpClient = null!;
 
-        private PacketSequence lastSendSequence = 1;
+        private PacketSequence lastSendSequence = 0;
 
         private readonly Lock expectedRecvSequenceLock = new();
         private PacketSequence expectedRecvSequence;
