@@ -8,18 +8,15 @@ namespace MultiSocketRUDPBotTester.Bot
     {
         public PacketId PacketId { get; set; }
         public Func<Client, NetBuffer>? PacketBuilder { get; set; }
+        public Dictionary<string, object> FieldValues { get; set; } = new();
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            if (PacketBuilder == null)
-            {
-                Log.Warning("SendPacketNodeBase has no packet builder");
-                return;
-            }
-
             try
             {
-                var buffer = PacketBuilder(client);
+                var buffer = (PacketBuilder != null ?
+                    PacketBuilder(client) : BuildFromSchema()) ?? throw new Exception($"Failed to build packet buffer for PacketId: ${PacketId}");
+
                 _ = Task.Run(async () => await client.SendPacket(buffer, PacketId))
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),
@@ -30,6 +27,58 @@ namespace MultiSocketRUDPBotTester.Bot
             {
                 Log.Error("Failed to send packet: {Message}", ex.Message);
             }
+        }
+
+        private NetBuffer? BuildFromSchema()
+        {
+            var schema = PacketSchema.Get(PacketId);
+            if (schema == null)
+            {
+                return null;
+            }
+
+            var buf = new NetBuffer();
+            buf.ReserveHeader();
+            foreach (var field in schema)
+            {
+                var value = FieldValues.TryGetValue(field.Name, out var v) ?
+                    v : field.DefaultValue;
+                switch (field.Type)
+                {
+                    case FieldType.Byte:
+                        {
+                            buf.WriteByte(Convert.ToByte(value));
+                            break;
+                        }
+                    case FieldType.Ushort:
+                        {
+                            buf.WriteUShort(Convert.ToUInt16(value));
+                            break;
+                        }
+                    case FieldType.Int:
+                        {
+                            buf.WriteInt(Convert.ToInt32(value));
+                            break;
+                        }
+                    case FieldType.Uint:
+                        {
+                            buf.WriteUInt(Convert.ToUInt32(value));
+                            break;
+                        }
+                    case FieldType.Ulong:
+                        {
+                            buf.WriteULong(Convert.ToUInt64(value));
+                            break;
+                        }
+                    case FieldType.String:
+                        {
+                            buf.WriteString(Convert.ToString(value) ?? string.Empty);
+                            break;
+                        }
+                }
+            }
+
+            return buf;
         }
     }
 

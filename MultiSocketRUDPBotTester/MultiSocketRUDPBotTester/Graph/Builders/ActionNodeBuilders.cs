@@ -1,5 +1,4 @@
 ﻿using MultiSocketRUDPBotTester.Bot;
-using MultiSocketRUDPBotTester.Buffer;
 using Serilog;
 
 namespace MultiSocketRUDPBotTester.Graph.Builders
@@ -18,11 +17,34 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
                     "Please double-click the node to configure it.");
             }
 
+            var fieldValues = new Dictionary<string, object>();
+            var schema = PacketSchema.Get(packetId);
+            if (schema != null)
+            {
+                foreach (var field in schema)
+                {
+                    var key = $"Field_{field.Name}";
+                    if (visual.Configuration?.Properties.TryGetValue(key, out var val) == true && val != null)
+                    {
+                        fieldValues[field.Name] = field.Type switch
+                        {
+                            FieldType.Byte => byte.Parse(val.ToString()!),
+                            FieldType.Ushort => ushort.Parse(val.ToString()!),
+                            FieldType.Int => int.Parse(val.ToString()!),
+                            FieldType.Uint => uint.Parse(val.ToString()!),
+                            FieldType.Ulong => ulong.Parse(val.ToString()!),
+                            FieldType.String => val.ToString()!,
+                            _ => val
+                        };
+                    }
+                }
+            }
+
             return new SendPacketNode
             {
                 Name = visual.NodeType!.Name,
                 PacketId = packetId,
-                PacketBuilder = null
+                FieldValues = fieldValues
             };
         }
     }

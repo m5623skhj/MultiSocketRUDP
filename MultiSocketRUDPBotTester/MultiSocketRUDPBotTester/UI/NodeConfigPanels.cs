@@ -1,7 +1,6 @@
 ﻿using MultiSocketRUDPBotTester.Bot;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using static System.Enum;
 
 namespace MultiSocketRUDPBotTester.UI
@@ -28,10 +27,52 @@ namespace MultiSocketRUDPBotTester.UI
             };
             stack.Children.Add(combo);
 
+            var fieldsPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            stack.Children.Add(fieldsPanel);
+
+            var fieldInputs = new Dictionary<string, TextBox>();
+            void RefreshFields(PacketId packetId)
+            {
+                fieldsPanel.Children.Clear();
+                fieldInputs.Clear();
+
+                var schema = PacketSchema.Get(packetId);
+                if (schema == null || schema.Length == 0)
+                {
+                    return;
+                }
+
+                fieldsPanel.Children.Add(new TextBlock
+                {
+                    Text = "Packet Fields:",
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 4)
+                });
+
+                foreach (var field in schema)
+                {
+                    var saved = node.Configuration?.Properties.GetValueOrDefault($"Field_{field.Name}");
+                    var box = ConfigUi.LabeledBox(fieldsPanel,
+                        $"{field.Name} ({field.Type}):",
+                        saved?.ToString() ?? field.DefaultValue?.ToString() ?? "",
+                        labelWidth: 160);
+                    fieldInputs[field.Name] = box;
+                }
+            }
+
+            RefreshFields((PacketId)combo.SelectedItem);
+            combo.SelectionChanged += (_, _) => RefreshFields((PacketId)combo.SelectedItem);
+
             stack.Children.Add(ConfigUi.SaveButton(() =>
             {
                 node.Configuration ??= new NodeConfiguration();
                 node.Configuration.PacketId = (PacketId)combo.SelectedItem;
+
+                foreach (var (name, box) in fieldInputs)
+                {
+                    node.Configuration.Properties[$"Field_{name}"] = box.Text;
+                }
+
                 log($"SendPacketNode configured: {combo.SelectedItem}");
                 closeDialog();
             }));

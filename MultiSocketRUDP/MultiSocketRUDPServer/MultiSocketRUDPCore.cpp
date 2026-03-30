@@ -714,7 +714,11 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult
 		}
 
 		context->session->DoDisconnect(reason);
-		LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
+		if (reason == DISCONNECT_REASON::BY_ERROR)
+		{
+			LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
+		}
+
 		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
 		{
 			contextPool.Free(context);
