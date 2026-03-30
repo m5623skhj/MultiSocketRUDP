@@ -7,7 +7,6 @@ namespace MultiSocketRUDPBotTester.Contents.Client.Action
     {
         public override void Execute(NetBuffer buffer)
         {
-            Log.Information("Received Pong packet from server.");
         }
     }
 
