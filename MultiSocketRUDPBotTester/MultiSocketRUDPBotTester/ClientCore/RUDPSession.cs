@@ -230,7 +230,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private NetBuffer MakeConnectPacket()
         {
-            var buffer = new NetBuffer();
+            var buffer = new NetBuffer(64);
             buffer.BuildConnectPacket(SessionInfo.SessionId);
 
             return buffer;
@@ -265,7 +265,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 return;
             }
 
-            var buffer = new NetBuffer();
+            var buffer = new NetBuffer(data.Length);
             buffer.WriteBytes(data);
 
             buffer.SkipBytes(HeaderSize);
@@ -364,7 +364,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void SendReplyToServer(PacketSequence packetSequence)
         {
-            var replyBuffer = new NetBuffer();
+            var replyBuffer = new NetBuffer(64);
             replyBuffer.BuildCorePacket(PacketType.SendReplyType, packetSequence);
 
             Debug.Assert(SessionInfo.AesGcm != null);
@@ -529,6 +529,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             lock (expectedRecvSequenceLock) { expectedRecvSequence = 0; }
 
             holdingPacketStore.Clear();
+            bufferStore.Clear();
         }
     }
 }

@@ -63,6 +63,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
             return sendBufferStore.GetAllSendPacketInfos();
         }
 
+        public void Clear()
+        {
+            sendBufferStore.Clear();
+        }
+
         public class SendBufferStore
         {
             private readonly SortedDictionary<PacketSequence, SendPacketInfo> sendBufferStore = new();
@@ -128,6 +133,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 lock (sendBufferStoreLock)
                 {
                     return sendBufferStore.Values.ToList();
+                }
+            }
+
+            public void Clear()
+            {
+                lock (sendBufferStoreLock)
+                {
+                    sendBufferStore.Clear();
                 }
             }
         }
