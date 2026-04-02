@@ -37,7 +37,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 return null;
             }
 
-            var buf = new NetBuffer();
+            var buf = new NetBuffer(256);
             buf.ReserveHeader();
             foreach (var field in schema)
             {
@@ -106,19 +106,23 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
+            var token = client.CancellationToken.Token;
             Task.Run(async () =>
             {
-                await Task.Delay(DelayMilliseconds);
-                Log.Debug("Delayed for {Ms}ms", DelayMilliseconds);
-
-                var context = client.GlobalContext;
-                context.SetPacket(receivedPacket);
-                var visited = new HashSet<ActionNodeBase>();
-                foreach (var nextNode in NextNodes)
+                try
                 {
-                    nextNode.Execute(client, receivedPacket);
+                    await Task.Delay(DelayMilliseconds, token);
+                    Log.Debug("Delayed for {Ms}ms", DelayMilliseconds);
+
+                    var context = client.GlobalContext;
+                    context.SetPacket(receivedPacket);
+                    foreach (var nextNode in NextNodes)
+                    {
+                        nextNode.Execute(client, receivedPacket);
+                    }
                 }
-            });
+                catch (OperationCanceledException) { }
+            }, token);
         }
     }
 
@@ -131,20 +135,24 @@ namespace MultiSocketRUDPBotTester.Bot
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
             var delay = Random.Shared.Next(MinDelayMilliseconds, MaxDelayMilliseconds + 1);
+            var token = client.CancellationToken.Token;
 
             Task.Run(async () =>
             {
-                await Task.Delay(delay);
-                Log.Debug("RandomDelayNode: Delayed for {Delay}ms (range: {Min}-{Max}ms", delay, MinDelayMilliseconds, MaxDelayMilliseconds);
-
-                var context = client.GlobalContext;
-                context.SetPacket(receivedPacket);
-                var visited = new HashSet<ActionNodeBase>();
-                foreach (var nextNode in NextNodes)
+                try
                 {
-                    nextNode.Execute(client, receivedPacket);
+                    await Task.Delay(delay, token);
+                    Log.Debug("RandomDelayNode: Delayed for {Delay}ms (range: {Min}-{Max}ms)", delay, MinDelayMilliseconds, MaxDelayMilliseconds);
+
+                    var context = client.GlobalContext;
+                    context.SetPacket(receivedPacket);
+                    foreach (var nextNode in NextNodes)
+                    {
+                        nextNode.Execute(client, receivedPacket);
+                    }
                 }
-            });
+                catch (OperationCanceledException) { }
+            }, token);
         }
     }
 
