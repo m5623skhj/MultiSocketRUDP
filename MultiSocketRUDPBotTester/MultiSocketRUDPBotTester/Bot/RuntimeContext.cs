@@ -63,5 +63,14 @@ namespace MultiSocketRUDPBotTester.Bot
             
             return (int)result;
         }
+
+        public void Clear()
+        {
+            vars.Clear();
+            lock (packetLock)
+            {
+                currentPacket = null;
+            }
+        }
     }
 }
