@@ -17,7 +17,12 @@ namespace MultiSocketRUDPBotTester.Bot
                 var buffer = (PacketBuilder != null ?
                     PacketBuilder(client) : BuildFromSchema()) ?? throw new Exception($"Failed to build packet buffer for PacketId: ${PacketId}");
 
-                _ = Task.Run(async () => await client.SendPacket(buffer, PacketId))
+                var token = client.CancellationToken.Token;
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+                _ = Task.Run(async () => await client.SendPacket(buffer, PacketId), token)
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),
                         TaskContinuationOptions.OnlyOnFaulted);
