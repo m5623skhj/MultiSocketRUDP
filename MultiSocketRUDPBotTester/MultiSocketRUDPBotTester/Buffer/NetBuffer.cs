@@ -220,6 +220,11 @@ namespace MultiSocketRUDPBotTester.Buffer
             _buffer[2] = (byte)((payloadSize >> 8) & 0xFF);
         }
 
+        public ReadOnlyMemory<byte> GetPacketMemory()
+        {
+            return new ReadOnlyMemory<byte>(_buffer, 0, _writePos);
+        }
+        
         public byte[] GetPacketBuffer()
         {
             var result = new byte[_writePos];
