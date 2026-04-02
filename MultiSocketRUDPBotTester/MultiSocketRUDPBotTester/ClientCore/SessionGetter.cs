@@ -4,7 +4,7 @@ using System.Security.Authentication;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
-    public class SessionGetter
+    public class SessionGetter : IDisposable
     {
         private TcpClient? tcpClient;
         private SslStream? sslStream;
@@ -47,11 +47,16 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public void Close()
         {
-            sslStream?.Close();
-            tcpClient?.Close();
+            sslStream?.Dispose();
+            tcpClient?.Dispose();
 
             sslStream = null;
             tcpClient = null;
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
     }
 }
