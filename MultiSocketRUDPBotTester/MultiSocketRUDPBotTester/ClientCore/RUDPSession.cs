@@ -138,7 +138,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void ParseSessionBrokerResponse(byte[] data)
         {
-            var buffer = new NetBuffer();
+            var buffer = new NetBuffer(data.Length);
             buffer.WriteBytes(data);
 
             var resultCode = (ConnectResultCode)buffer.ReadByte();
@@ -195,9 +195,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
             bufferStore.EnqueueSendBuffer(sendPacketInfo);
 
-            await udpClient.SendAsync(
-                sendPacketInfo.SentBuffer.GetPacketBuffer(),
-                sendPacketInfo.SentBuffer.GetLength());
+            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketMemory());
 
             return true;
         }
@@ -376,7 +374,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 SessionInfo.SessionSalt,
                 isCorePacket: true);
 
-            _ = udpClient.SendAsync(replyBuffer.GetPacketBuffer(), replyBuffer.GetLength());
+            _ = udpClient.SendAsync(replyBuffer.GetPacketMemory());
         }
 
         private void OnSendReply(PacketSequence packetSequence)
@@ -423,9 +421,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         }
 
                         info.RefreshSendPacketInfo(nowMs);
-                        await udpClient.SendAsync(
-                            info.SentBuffer.GetPacketBuffer(),
-                            info.SentBuffer.GetLength());
+                        await udpClient.SendAsync(info.SentBuffer.GetPacketMemory());
                     }
                 }
             }
@@ -440,7 +436,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             try
             {
                 var packet = BuildDisconnectPacket();
-                await udpClient.SendAsync(packet.GetPacketBuffer(), packet.GetLength());
+                await udpClient.SendAsync(packet.GetPacketMemory());
             }
             catch (Exception ex)
             {
@@ -453,7 +449,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private NetBuffer BuildDisconnectPacket()
         {
             var seq = Interlocked.Increment(ref lastSendSequence);
-            var buffer = new NetBuffer();
+            var buffer = new NetBuffer(64);
             buffer.BuildCorePacket(PacketType.DisconnectType, seq);
 
             Debug.Assert(SessionInfo.AesGcm != null);
