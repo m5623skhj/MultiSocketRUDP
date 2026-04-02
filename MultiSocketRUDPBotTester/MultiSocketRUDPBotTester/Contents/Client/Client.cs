@@ -32,6 +32,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         {
             Log.Information("Client disconnected, triggering OnDisconnected event");
             actionGraph.TriggerEvent(this, TriggerType.OnDisconnected);
+
+            GlobalContext.Clear();
         }
 
         protected override void OnRecvPacket(PacketId packetId, NetBuffer buffer)
