@@ -1,0 +1,7 @@
+# docs_bot 의존성
+requests>=2.31.0
+
+# tree-sitter (optional - 미설치 시 regex fallback)
+tree-sitter>=0.21.0
+tree-sitter-cpp>=0.21.0
+tree-sitter-c-sharp>=0.21.0
