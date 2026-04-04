@@ -217,6 +217,7 @@ private:
 
 	static BYTE maximumHoldingPacketQueueSize;
 
+	unsigned long long onSessionReleaseTime{};
 	unsigned long long sessionReservedTime{};
 	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
 

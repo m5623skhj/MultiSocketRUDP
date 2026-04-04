@@ -26,6 +26,7 @@ namespace MultiSocketRUDPBotTester
         private NodeVisual? selectedNode;
         private const double PortOffsetX = 18.0;
         private const double HalfPortSize = 18.0;
+        private const int MaxLogItems = 500;
 
         public ActionGraph? BuiltGraph { get; private set; }
 
@@ -730,6 +731,8 @@ namespace MultiSocketRUDPBotTester
             base.OnClosing(e);
             PreviewKeyDown -= BotActionGraphWindow_PreviewKeyDown;
 
+            interaction?.Cleanup();
+
             foreach (var node in allNodes)
             {
                 if (node.Border.ContextMenu == null)
@@ -743,10 +746,17 @@ namespace MultiSocketRUDPBotTester
 
             allNodes.Clear();
             GraphCanvas.Children.Clear();
+
+            BotTesterCore.Instance.ClearSavedGraphVisuals();
         }
 
         private void Log(string msg)
         {
+            if (LogListBox.Items.Count >= MaxLogItems)
+            {
+                LogListBox.Items.RemoveAt(0);
+            }
+
             LogListBox.Items.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
             LogListBox.ScrollIntoView(LogListBox.Items[^1]);
         }
