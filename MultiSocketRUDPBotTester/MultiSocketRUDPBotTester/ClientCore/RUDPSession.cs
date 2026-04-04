@@ -361,7 +361,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 OnRecvPacket(heldPacket.PacketId, heldPacket.Buffer);
             }
         }
-        static List<PacketSequence> li = new();
         private void SendReplyToServer(PacketSequence packetSequence)
         {
             var replyBuffer = new NetBuffer(64);
@@ -377,7 +376,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 isCorePacket: true);
 
             _ = udpClient.SendAsync(replyBuffer.GetPacketMemory());
-            li.Add(packetSequence);
         }
 
         private void OnSendReply(PacketSequence packetSequence)
