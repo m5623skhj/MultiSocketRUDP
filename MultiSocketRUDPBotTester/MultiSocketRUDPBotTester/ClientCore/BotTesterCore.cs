@@ -44,6 +44,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
             savedNodeVisuals = nodeVisuals;
         }
 
+        public void ClearSavedGraphVisuals()
+        {
+            savedNodeVisuals = null;
+        }
+
         public List<NodeVisual>? GetSavedGraphVisuals()
         {
             return savedNodeVisuals;
@@ -66,6 +71,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 }
 
                 rudpSession.SetActionGraph(botActionGraph);
+                rudpSession.OnSessionDisconnected = (sessionId) =>
+                {
+                    lock (sessionDictionaryLock)
+                    {
+                        sessionDictionary.Remove(sessionId);
+                        Log.Information("Session {Id} removed from dictionary after disconnect", sessionId);
+                    }
+                };
 
                 lock (sessionDictionaryLock)
                 {

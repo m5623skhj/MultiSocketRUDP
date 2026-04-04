@@ -26,6 +26,8 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
         private string? connectingPortType;
         private Line? tempConnectionLine;
 
+        private readonly MouseButtonEventHandler _canvasMouseUpHandler;
+
         public NodeInteractionHandler(
             WpfCanvas canvas,
             ScrollViewer scrollViewer,
@@ -39,18 +41,28 @@ namespace MultiSocketRUDPBotTester.CanvasRenderer
             this.renderer = renderer;
             this.log = log;
 
+            _canvasMouseUpHandler = (_, _) =>
+            {
+                isPanning = false;
+                canvas.ReleaseMouseCapture();
+            };
+
             SetupCanvasEvents();
         }
 
         private void SetupCanvasEvents()
         {
             canvas.PreviewMouseMove += OnCanvasMouseMove;
-            canvas.PreviewMouseLeftButtonUp += (_, _) =>
-            {
-                isPanning = false;
-                canvas.ReleaseMouseCapture();
-            };
+            canvas.PreviewMouseLeftButtonUp += _canvasMouseUpHandler;
             canvas.PreviewMouseLeftButtonDown += OnCanvasLeftButtonDown;
+        }
+
+        public void Cleanup()
+        {
+            canvas.PreviewMouseMove -= OnCanvasMouseMove;
+            canvas.PreviewMouseLeftButtonUp -= _canvasMouseUpHandler;
+            canvas.PreviewMouseLeftButtonDown -= OnCanvasLeftButtonDown;
+            CleanupConnection();
         }
 
         private void OnCanvasMouseMove(object sender, MouseEventArgs e)

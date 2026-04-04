@@ -271,6 +271,7 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 {
 	std::scoped_lock lock(releaseSessionIdListLock);
 	session.nowInReleaseThread.store(true, std::memory_order_seq_cst);
+	session.onSessionReleaseTime = GetTickCount64();
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 	SetEvent(sessionReleaseEventHandle);
 }
@@ -617,9 +618,12 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 
 void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopToken)
 {
+	static unsigned long long constexpr FORCE_CHANGE_SENDING_MODE_MS_IN_RELEASE_THREAD = 10000;
 	const HANDLE eventHandles[2] = { sessionReleaseEventHandle, sessionReleaseStopEventHandle };
 	while (not stopToken.stop_requested())
 	{
+		const auto now = GetTickCount64();
+
 		switch (WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:
@@ -643,8 +647,13 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 				if (releaseSession->GetSendContext().GetIOMode().load(std::memory_order_seq_cst) == IO_MODE::IO_SENDING ||
 					releaseSession->nowInProcessingRecvPacket.load(std::memory_order_seq_cst))
 				{
-					remainList.emplace_back(releaseSessionId);
-					continue;
+					if ((releaseSession->onSessionReleaseTime + FORCE_CHANGE_SENDING_MODE_MS_IN_RELEASE_THREAD) < now)
+					{
+						remainList.emplace_back(releaseSessionId);
+						continue;
+					}
+
+					releaseSession->GetSendContext().GetIOMode().store(IO_MODE::IO_NONE_SENDING, std::memory_order_seq_cst);
 				}
 
 				releaseSession->Disconnect();

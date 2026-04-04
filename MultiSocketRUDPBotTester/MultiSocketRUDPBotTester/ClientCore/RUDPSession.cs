@@ -124,6 +124,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private volatile bool isConnected;
         private int isDisposed;
 
+        public Action<SessionIdType>? OnSessionDisconnected { get; set; }
+
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual void OnConnected() { }
         protected virtual void OnDisconnected() { }
@@ -359,7 +361,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 OnRecvPacket(heldPacket.PacketId, heldPacket.Buffer);
             }
         }
-
+        static List<PacketSequence> li = new();
         private void SendReplyToServer(PacketSequence packetSequence)
         {
             var replyBuffer = new NetBuffer(64);
@@ -375,6 +377,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 isCorePacket: true);
 
             _ = udpClient.SendAsync(replyBuffer.GetPacketMemory());
+            li.Add(packetSequence);
         }
 
         private void OnSendReply(PacketSequence packetSequence)
@@ -500,6 +503,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 return;
             }
 
+            var capturedSessionId = SessionInfo.SessionId;
+
             isConnected = false;
             OnDisconnected();
 
@@ -526,6 +531,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             holdingPacketStore.Clear();
             bufferStore.Clear();
+
+            OnSessionDisconnected?.Invoke(capturedSessionId);
         }
     }
 }

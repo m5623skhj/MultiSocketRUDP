@@ -42,6 +42,7 @@ void RUDPSession::InitializeSession()
 	clientSockAddrInet = {};
 	nowInReleaseThread.store(false, std::memory_order_release);
 	sessionReservedTime = {};
+	onSessionReleaseTime = {};
 
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
