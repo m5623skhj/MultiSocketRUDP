@@ -1,0 +1,101 @@
+# =============================================================================
+# docs-bot: AI 기반 문서 자동화 파이프라인
+#
+# 트리거:
+#   - 매일 00:00 UTC (cron 스케줄링)
+#   - PR에 'docs-review' 라벨 추가 시 즉시 실행
+#   - 수동 트리거 (테스트용)
+#
+# 흐름:
+#   1. DOCS_BOT_LAST_RUN 조회
+#   2. 머지된 PR 수집 → 변경 감지 → 코드 추출
+#   3. 문서 매핑 → AI 분석
+#   4. 문서 수정 → PR 생성
+#   5. 성공 시 DOCS_BOT_LAST_RUN 갱신
+# =============================================================================
+
+name: docs-bot
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+  pull_request:
+    types: [labeled]
+
+  workflow_dispatch:
+
+jobs:
+  docs-bot:
+    if: >
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.label.name == 'docs-review')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+          pip install tree-sitter tree-sitter-cpp tree-sitter-c-sharp || echo "tree-sitter 미설치 → regex fallback"
+
+      - name: Get DOCS_BOT_LAST_RUN
+        id: get_last_run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST_RUN=$(gh variable get DOCS_BOT_LAST_RUN 2>/dev/null || echo "")
+          echo "last_run=$LAST_RUN" >> $GITHUB_OUTPUT
+
+      - name: Run docs_bot
+        id: run_bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DOCS_BOT_LAST_RUN: ${{ steps.get_last_run.outputs.last_run }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: |
+          # 수정: 리포 루트에서 실행. CWD가 Scripts/docs_bot이면 DOCS_DIR="Docs" 경로 불일치.
+          PYTHONPATH=Scripts/docs_bot python Scripts/docs_bot/main.py
+
+      # 초기 실행: DOCS_BOT_LAST_RUN 설정
+      - name: Set initial DOCS_BOT_LAST_RUN
+        if: steps.run_bot.outputs.initial_run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh variable set DOCS_BOT_LAST_RUN --body "${{ steps.run_bot.outputs.current_time }}"
+
+      # PR 생성 성공 시에만 DOCS_BOT_LAST_RUN 갱신
+      - name: Update DOCS_BOT_LAST_RUN
+        if: >
+          steps.run_bot.outputs.initial_run != 'true' &&
+          steps.run_bot.outputs.ai_skipped != 'true' &&
+          steps.run_bot.outputs.pr_number != '' &&
+          success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")
+          gh variable set DOCS_BOT_LAST_RUN --body "$CURRENT_TIME"
+          echo "DOCS_BOT_LAST_RUN 갱신: $CURRENT_TIME (PR #${{ steps.run_bot.outputs.pr_number }})"
