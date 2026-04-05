@@ -4,19 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "4ae14df3c51d3e9a",
+        "id": "abdc4c0b467e3441",
         "type": "tabs",
         "children": [
           {
-            "id": "0b355c975a89f506",
+            "id": "d68527863d5119d9",
             "type": "leaf",
             "state": {
-              "type": "image",
-              "state": {
-                "file": "Diagrams/BotTester_Architecture.svg"
-              },
-              "icon": "lucide-image",
-              "title": "BotTester_Architecture"
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "새 탭"
             }
           }
         ]
@@ -181,8 +179,12 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "0b355c975a89f506",
+  "active": "d68527863d5119d9",
   "lastOpenFiles": [
+    "Tools/PacketGenerator.md",
+    "00_Overview.md",
+    "BotTester/AI/AiTreeGenerator.md",
+    "Diagrams/BotTester_Architecture.svg",
     "Diagrams/Connection_Sequence.svg",
     "Diagrams/CryptoStructure.svg",
     "Diagrams/GraphEditor_Layout.svg",
@@ -192,8 +194,6 @@
     "Diagrams/SessionStateMachine.svg",
     "Diagrams/ThreadModel.svg",
     "Diagrams/Architecture_Overview.svg",
-    "Diagrams/BotTester_Architecture.svg",
-    "Diagrams/AiTreeFlow.svg",
-    "Tools/PacketGenerator.md"
+    "Diagrams/AiTreeFlow.svg"
   ]
 }

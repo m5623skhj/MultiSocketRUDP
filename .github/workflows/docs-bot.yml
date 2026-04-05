@@ -65,7 +65,7 @@ jobs:
           LAST_RUN=$(gh variable get DOCS_BOT_LAST_RUN 2>/dev/null || echo "")
           echo "last_run=$LAST_RUN" >> $GITHUB_OUTPUT
 
-      - name: Run docs_bot
+      - name: Run DocsBot
         id: run_bot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,8 +75,8 @@ jobs:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: |
-          # 수정: 리포 루트에서 실행. CWD가 Scripts/docs_bot이면 DOCS_DIR="Docs" 경로 불일치.
-          PYTHONPATH=Scripts/docs_bot python Scripts/docs_bot/main.py
+          # 수정: 리포 루트에서 실행. CWD가 Scripts/DocsBot이면 DOCS_DIR="Docs" 경로 불일치.
+          PYTHONPATH=Scripts/DocsBot python Scripts/DocsBot/main.py
 
       # 초기 실행: DOCS_BOT_LAST_RUN 설정
       - name: Set initial DOCS_BOT_LAST_RUN
