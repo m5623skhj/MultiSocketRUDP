@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using Serilog;
+using System.Threading.Channels;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
@@ -101,20 +102,19 @@ namespace MultiSocketRUDPBotTester.ClientCore
     public abstract class RudpSession
     {
         private const ulong LoginPacketSequence = 0;
-
         private const int HeaderSize = 5;
-
         private const int RetransmissionWakeUpMs = 30;
 
         public SessionInfo SessionInfo { get; } = new() { SessionState = SessionState.Disconnected };
         public TargetServerInfo TargetServerInfo { get; } = new();
 
         private UdpClient udpClient = null!;
-
         private PacketSequence lastSendSequence = 0;
 
         private readonly Lock expectedRecvSequenceLock = new();
         private PacketSequence expectedRecvSequence;
+
+        private readonly Lock aesGcmLock = new();
 
         private readonly HoldingPacketStore holdingPacketStore = new();
         private readonly BufferStore bufferStore = new();
@@ -125,6 +125,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private int isDisposed;
 
         public Action<SessionIdType>? OnSessionDisconnected { get; set; }
+
+        private readonly Channel<Action> recvProcessingChannel =
+            Channel.CreateUnbounded<Action>(
+                new UnboundedChannelOptions
+                {
+                    SingleReader = true,
+                    SingleWriter = true
+                });
 
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual void OnConnected() { }
@@ -145,9 +153,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             var resultCode = (ConnectResultCode)buffer.ReadByte();
             if (resultCode != ConnectResultCode.Success)
-            {
                 throw new Exception($"Session broker response error: {resultCode}");
-            }
 
             TargetServerInfo.ServerIp = buffer.ReadString();
             TargetServerInfo.ServerPort = buffer.ReadUShort();
@@ -159,12 +165,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
             SessionInfo.SessionState = SessionState.Connecting;
 
             udpClient = new UdpClient();
-            udpClient.Connect(new IPEndPoint(IPAddress.Parse(TargetServerInfo.ServerIp), TargetServerInfo.ServerPort));
+            udpClient.Connect(new IPEndPoint(
+                IPAddress.Parse(TargetServerInfo.ServerIp), TargetServerInfo.ServerPort));
 
-            _ = ReceiveAsync();
-            _ = RetransmissionAsync();
-
-            _ = SendConnectPacketAsync();
+            _ = Task.Run(ReceiveAsync);
+            _ = Task.Run(PacketProcessorAsync);
+            _ = Task.Run(RetransmissionAsync);
+            _ = Task.Run(SendConnectPacketAsync);
         }
 
         public void Disconnect() => Cleanup();
@@ -180,24 +187,23 @@ namespace MultiSocketRUDPBotTester.ClientCore
             packetBuffer.InsertPacketSequence(sequence);
             packetBuffer.InsertPacketId(packetId);
 
-            Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(
-                SessionInfo.AesGcm,
-                packetBuffer,
-                sequence,
-                PacketDirection.ClientToServer,
-                SessionInfo.SessionSalt,
-                isCorePacket: false);
+            lock (aesGcmLock)
+            {
+                Debug.Assert(SessionInfo.AesGcm != null);
+                NetBuffer.EncodePacket(
+                    SessionInfo.AesGcm, packetBuffer, sequence,
+                    PacketDirection.ClientToServer, SessionInfo.SessionSalt, isCorePacket: false);
+            }
 
-            await SendPacketInternal(new SendPacketInfo(packetBuffer, sequence));
+            await SendPacketInternal(new SendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
         }
 
         private async Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)
         {
-            sendPacketInfo.RefreshSendPacketInfo(CommonFunc.GetNowMs());
+            sendPacketInfo.InitializeSendTimestamp(CommonFunc.GetNowMs());
             bufferStore.EnqueueSendBuffer(sendPacketInfo);
 
-            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketMemory());
+            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
 
             return true;
         }
@@ -208,16 +214,16 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 var buffer = MakeConnectPacket();
 
-                Debug.Assert(SessionInfo.AesGcm != null);
-                NetBuffer.EncodePacket(
-                    SessionInfo.AesGcm,
-                    buffer,
-                    LoginPacketSequence,
-                    direction: PacketDirection.ClientToServer,
-                    sessionSalt: SessionInfo.SessionSalt,
-                    isCorePacket: true);
+                lock (aesGcmLock)
+                {
+                    Debug.Assert(SessionInfo.AesGcm != null);
+                    NetBuffer.EncodePacket(
+                        SessionInfo.AesGcm, buffer, LoginPacketSequence,
+                        PacketDirection.ClientToServer, SessionInfo.SessionSalt, isCorePacket: true);
+                }
 
-                if (!await SendPacketInternal(new SendPacketInfo(buffer, LoginPacketSequence)))
+                if (!await SendPacketInternal(new SendPacketInfo(buffer, LoginPacketSequence))
+                        .ConfigureAwait(false))
                 {
                     Log.Error("SendConnectPacketAsync() failed. SessionId {Id}", SessionInfo.SessionId);
                 }
@@ -232,7 +238,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             var buffer = new NetBuffer(64);
             buffer.BuildConnectPacket(SessionInfo.SessionId);
-
             return buffer;
         }
 
@@ -242,8 +247,18 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 while (!CancellationToken.Token.IsCancellationRequested)
                 {
-                    var result = await udpClient.ReceiveAsync(CancellationToken.Token);
-                    ProcessReceivedPacket(result.Buffer);
+                    var result = await udpClient
+                        .ReceiveAsync(CancellationToken.Token)
+                        .ConfigureAwait(false);
+
+                    try
+                    {
+                        await ProcessReceivedPacketAsync(result.Buffer).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("ProcessReceivedPacket error (loop continues): {Error}", ex.Message);
+                    }
                 }
             }
             catch (OperationCanceledException) { Log.Information("ReceiveAsync: Cancelled"); }
@@ -251,13 +266,36 @@ namespace MultiSocketRUDPBotTester.ClientCore
             catch (Exception ex)
             {
                 if (!CancellationToken.Token.IsCancellationRequested)
-                {
-                    Log.Error("ReceiveAsync failed: {Error}", ex.ToString());
-                }
+                    Log.Error("ReceiveAsync fatal error: {Error}", ex.ToString());
             }
         }
 
-        private void ProcessReceivedPacket(byte[] data)
+        private async Task PacketProcessorAsync()
+        {
+            try
+            {
+                await foreach (var action in
+                    recvProcessingChannel.Reader
+                        .ReadAllAsync(CancellationToken.Token)
+                        .ConfigureAwait(false))
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("PacketProcessorAsync: action failed: {Error}", ex.Message);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Information("PacketProcessorAsync: Cancelled");
+            }
+        }
+
+        private async Task ProcessReceivedPacketAsync(byte[] data)
         {
             if (SessionInfo.AesGcm == null)
             {
@@ -271,8 +309,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
             buffer.SkipBytes(HeaderSize);
             var packetType = (PacketType)buffer.ReadByte();
             var isCorePacket = packetType != PacketType.SendType;
-            PacketDirection direction;
 
+            PacketDirection direction;
             switch (packetType)
             {
                 case PacketType.HeartbeatType:
@@ -283,99 +321,126 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     direction = PacketDirection.ServerToClientReply;
                     break;
                 default:
-                    Log.Warning("ProcessReceivedPacket: Unknown packet type {Type}", packetType);
+                    Log.Warning("ProcessReceivedPacketAsync: Unknown packet type {Type}", packetType);
                     return;
             }
 
-            if (!NetBuffer.DecodePacket(
-                    SessionInfo.AesGcm,
-                    buffer,
-                    isCorePacket,
-                    SessionInfo.SessionSalt,
-                    direction))
+            bool decoded;
+            lock (aesGcmLock)
+            {
+                decoded = NetBuffer.DecodePacket(
+                    SessionInfo.AesGcm, buffer, isCorePacket, SessionInfo.SessionSalt, direction);
+            }
+
+            if (!decoded)
             {
                 Log.Error("DecodePacket failed (type={Type})", packetType);
                 return;
             }
 
             var packetSequence = buffer.ReadULong();
-
             var packetId = PacketId.InvalidPacketId;
             if (!isCorePacket)
-            {
                 packetId = (PacketId)buffer.ReadUInt();
-            }
 
             switch (packetType)
             {
                 case PacketType.HeartbeatType:
-                    {
-                        SendReplyToServer(packetSequence);
-                    }
+                    await SendReplyToServerAsync(packetSequence).ConfigureAwait(false);
                     break;
 
                 case PacketType.SendType:
-                    {
-                        SendReplyToServer(packetSequence);
-                        lock (expectedRecvSequenceLock)
-                        {
-                            if (packetSequence <= expectedRecvSequence)
-                            {
-                                return;
-                            }
+                    await SendReplyToServerAsync(packetSequence).ConfigureAwait(false);
 
-                            if (packetSequence == expectedRecvSequence + 1)
-                            {
-                                expectedRecvSequence = packetSequence;
-                                OnRecvPacket(packetId, buffer);
-                                ProcessHoldingPackets();
-                            }
-                            else
-                            {
-                                holdingPacketStore.Add(packetSequence,
-                                    new HeldPacket { PacketId = packetId, Buffer = buffer });
-                            }
-                        }
+                    var packetsToProcess = CollectPacketsToProcess(packetSequence, packetId, buffer);
+                    foreach (var (pid, buf) in packetsToProcess)
+                    {
+                        var capturedPid = pid;
+                        var capturedBuf = buf;
+                        recvProcessingChannel.Writer.TryWrite(() => OnRecvPacket(capturedPid, capturedBuf));
                     }
                     break;
 
                 case PacketType.SendReplyType:
-                    {
-                        OnSendReply(packetSequence);
-                    }
+                    OnSendReply(packetSequence);
                     break;
             }
         }
 
-        private void ProcessHoldingPackets()
+        private List<(PacketId packetId, NetBuffer buffer)> CollectPacketsToProcess(
+            PacketSequence packetSequence,
+            PacketId packetId,
+            NetBuffer buffer)
         {
-            while (holdingPacketStore.TryGetFirst(out var nextSequence, out var heldPacket))
+            var result = new List<(PacketId, NetBuffer)>();
+
+            lock (expectedRecvSequenceLock)
             {
-                if (nextSequence != expectedRecvSequence + 1)
+                if (packetSequence <= expectedRecvSequence)
+                    return result;
+
+                if (packetSequence == expectedRecvSequence + 1)
                 {
-                    break;
+                    expectedRecvSequence = packetSequence;
+                    result.Add((packetId, buffer));
+
+                    while (holdingPacketStore.TryGetFirst(out var nextSeq, out var held))
+                    {
+                        if (nextSeq != expectedRecvSequence + 1)
+                            break;
+
+                        expectedRecvSequence = nextSeq;
+                        holdingPacketStore.Remove(nextSeq);
+                        result.Add((held.PacketId, held.Buffer));
+                    }
+                }
+                else
+                {
+                    holdingPacketStore.Add(packetSequence,
+                        new HeldPacket { PacketId = packetId, Buffer = buffer });
+                }
+            }
+
+            return result;
+        }
+
+        private async Task SendReplyToServerAsync(PacketSequence packetSequence)
+        {
+            try
+            {
+                var replyBuffer = new NetBuffer(64);
+                replyBuffer.BuildCorePacket(PacketType.SendReplyType, packetSequence);
+
+                lock (aesGcmLock)
+                {
+                    if (SessionInfo.AesGcm == null)
+                    {
+                        Log.Warning("SendReplyToServerAsync: AesGcm is null, skipping seq {Seq}", packetSequence);
+                        return;
+                    }
+
+                    NetBuffer.EncodePacket(
+                        SessionInfo.AesGcm, replyBuffer, packetSequence,
+                        PacketDirection.ClientToServerReply, SessionInfo.SessionSalt, isCorePacket: true);
                 }
 
-                expectedRecvSequence = nextSequence;
-                holdingPacketStore.Remove(nextSequence);
-                OnRecvPacket(heldPacket.PacketId, heldPacket.Buffer);
+                var client = udpClient;
+                if (client == null)
+                {
+                    Log.Warning("SendReplyToServerAsync: udpClient is null, skipping seq {Seq}", packetSequence);
+                    return;
+                }
+
+                await client.SendAsync(replyBuffer.GetPacketMemory()).ConfigureAwait(false);
             }
-        }
-        private void SendReplyToServer(PacketSequence packetSequence)
-        {
-            var replyBuffer = new NetBuffer(64);
-            replyBuffer.BuildCorePacket(PacketType.SendReplyType, packetSequence);
-
-            Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(
-                SessionInfo.AesGcm,
-                replyBuffer,
-                packetSequence,
-                PacketDirection.ClientToServerReply,
-                SessionInfo.SessionSalt,
-                isCorePacket: true);
-
-            _ = udpClient.SendAsync(replyBuffer.GetPacketMemory());
+            catch (ObjectDisposedException)
+            {
+                Log.Information("SendReplyToServerAsync: Socket disposed for seq {Seq}", packetSequence);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("SendReplyToServerAsync error seq {Seq}: {Error}", packetSequence, ex.Message);
+            }
         }
 
         private void OnSendReply(PacketSequence packetSequence)
@@ -384,15 +449,19 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 isConnected = true;
                 SessionInfo.SessionState = SessionState.Connected;
-                _ = StartServerAliveCheck();
-                OnConnected();
+                _ = Task.Run(StartServerAliveCheck);
+
+                recvProcessingChannel.Writer.TryWrite(() =>
+                {
+                    try { OnConnected(); }
+                    catch (Exception ex) { Log.Error("OnConnected failed: {Error}", ex.Message); }
+                });
+
                 Log.Information("Connected to server. SessionId={Id}", SessionInfo.SessionId);
             }
 
             if (Interlocked.Read(ref lastSendSequence) < packetSequence)
-            {
                 return;
-            }
 
             bufferStore.RemoveSendBuffer(packetSequence);
         }
@@ -402,12 +471,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(RetransmissionWakeUpMs));
             try
             {
-                while (await timer.WaitForNextTickAsync(CancellationToken.Token))
+                while (await timer.WaitForNextTickAsync(CancellationToken.Token).ConfigureAwait(false))
                 {
                     if (bufferStore.GetSendBufferCount() == 0)
-                    {
                         continue;
-                    }
 
                     var nowMs = CommonFunc.GetNowMs();
                     var sendPacketInfos = bufferStore.GetAllSendPacketInfos();
@@ -416,13 +483,43 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     {
                         if (info.IsExceedMaxRetransmissionCount())
                         {
-                            Log.Warning("Max retransmission count exceeded, disconnecting...");
-                            await DisconnectAsync();
+                            if (!bufferStore.ContainsPacket(info.PacketSequence))
+                            {
+                                Log.Debug("RetransmissionAsync: seq={Seq} already ACKed, skipping",
+                                    info.PacketSequence);
+                                continue;
+                            }
+
+                            Log.Warning("Max retransmission exceeded for seq={Seq}, disconnecting...",
+                                info.PacketSequence);
+                            await DisconnectAsync().ConfigureAwait(false);
                             return;
                         }
 
                         info.RefreshSendPacketInfo(nowMs);
-                        await udpClient.SendAsync(info.SentBuffer.GetPacketMemory());
+
+                        var client = udpClient;
+                        if (client == null)
+                        {
+                            Log.Information("RetransmissionAsync: udpClient is null, stopping");
+                            return;
+                        }
+
+                        try
+                        {
+                            await client.SendAsync(info.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            Log.Information("RetransmissionAsync: Socket disposed, stopping");
+                            return;
+                        }
+                        catch (SocketException ex)
+                        {
+                            Log.Warning("RetransmissionAsync: SocketException seq={Seq}: {Error}",
+                                info.PacketSequence, ex.Message);
+                            return;
+                        }
                     }
                 }
             }
@@ -437,7 +534,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             try
             {
                 var packet = BuildDisconnectPacket();
-                await udpClient.SendAsync(packet.GetPacketMemory());
+                await udpClient.SendAsync(packet.GetPacketMemory()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -453,14 +550,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var buffer = new NetBuffer(64);
             buffer.BuildCorePacket(PacketType.DisconnectType, seq);
 
-            Debug.Assert(SessionInfo.AesGcm != null);
-            NetBuffer.EncodePacket(
-                SessionInfo.AesGcm,
-                buffer,
-                seq,
-                PacketDirection.ClientToServer,
-                SessionInfo.SessionSalt,
-                isCorePacket: true);
+            lock (aesGcmLock)
+            {
+                Debug.Assert(SessionInfo.AesGcm != null);
+                NetBuffer.EncodePacket(
+                    SessionInfo.AesGcm, buffer, seq,
+                    PacketDirection.ClientToServer, SessionInfo.SessionSalt, isCorePacket: true);
+            }
 
             return buffer;
         }
@@ -471,23 +567,17 @@ namespace MultiSocketRUDPBotTester.ClientCore
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
             try
             {
-                while (await timer.WaitForNextTickAsync(CancellationToken.Token))
+                while (await timer.WaitForNextTickAsync(CancellationToken.Token).ConfigureAwait(false))
                 {
-                    if (!isConnected)
-                    {
-                        break;
-                    }
+                    if (!isConnected) break;
 
                     PacketSequence curr;
                     lock (expectedRecvSequenceLock) { curr = expectedRecvSequence; }
 
-                    if (prev != curr) 
-                    { 
-                        prev = curr; continue; 
-                    }
+                    if (prev != curr) { prev = curr; continue; }
 
                     Log.Warning("No response from server, disconnecting...");
-                    await DisconnectAsync();
+                    await DisconnectAsync().ConfigureAwait(false);
                     break;
                 }
             }
@@ -497,14 +587,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private void Cleanup()
         {
             if (Interlocked.CompareExchange(ref isDisposed, 1, 0) != 0)
-            {
                 return;
-            }
 
             var capturedSessionId = SessionInfo.SessionId;
 
             isConnected = false;
             OnDisconnected();
+
+            recvProcessingChannel.Writer.TryComplete();
 
             CancellationToken.Cancel();
             CancellationToken.Dispose();
@@ -516,10 +606,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
             SessionInfo.SessionId = 0;
             SessionInfo.SessionKey = [];
             SessionInfo.SessionSalt = [];
-            if (SessionInfo.AesGcm != null)
+
+            lock (aesGcmLock)
             {
-                SessionInfo.AesGcm.Dispose();
-                SessionInfo.AesGcm = null;
+                if (SessionInfo.AesGcm != null)
+                {
+                    SessionInfo.AesGcm.Dispose();
+                    SessionInfo.AesGcm = null;
+                }
             }
 
             TargetServerInfo.ServerIp = string.Empty;
