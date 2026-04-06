@@ -75,7 +75,6 @@ jobs:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: |
-          # 수정: 리포 루트에서 실행. CWD가 Scripts/DocsBot이면 DOCS_DIR="Docs" 경로 불일치.
           PYTHONPATH=Scripts/DocsBot python Scripts/DocsBot/main.py
 
       # 초기 실행: DOCS_BOT_LAST_RUN 설정
