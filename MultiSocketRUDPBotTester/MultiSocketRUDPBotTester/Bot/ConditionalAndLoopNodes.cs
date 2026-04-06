@@ -71,47 +71,72 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            try
+            var cancellationToken = context.Client.CancellationToken.Token;
+            Task.Run(async () =>
             {
-                var iteration = 0;
-                while (iteration < MaxIterations && ContinueCondition(context))
+                try
                 {
-                    Log.Debug("Loop iteration: {Iteration}", iteration);
-                    context.Set("__loop_iteration", iteration);
-
-                    var visited = new HashSet<ActionNodeBase>();
-                    foreach (var node in LoopBody)
+                    var iteration = 0;
+                    while (iteration < MaxIterations && ContinueCondition(context))
                     {
-                        NodeExecutionHelper.ExecuteChain(context, node, visited);
+                        Log.Debug("Loop iteration: {Iteration}", iteration);
+                        context.Set("__loop_iteration", iteration);
+
+                        await context.GetAndClearPendingAsyncTask();
+
+                        var visited = new HashSet<ActionNodeBase>();
+                        foreach (var node in LoopBody)
+                        {
+                            NodeExecutionHelper.ExecuteChain(context, node, visited);
+                        }
+
+                        var pendingTask = context.GetAndClearPendingAsyncTask();
+                        try
+                        {
+                            await pendingTask.WaitAsync(
+                                TimeSpan.FromMilliseconds(TimeoutMilliseconds()),
+                                cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (TimeoutException)
+                        {
+                            Log.Warning("LoopNode: Body async task timed out at iteration {Iteration}, continuing",
+                                iteration);
+                        }
+
+                        iteration++;
                     }
 
-                    iteration++;
-                }
+                    if (iteration >= MaxIterations)
+                    {
+                        Log.Warning("Loop reached maximum iterations: {Max}", MaxIterations);
+                    }
 
-                if (iteration >= MaxIterations)
-                {
-                    Log.Warning("Loop reached maximum iterations: {Max}", MaxIterations);
-                }
+                    var exitVisited = new HashSet<ActionNodeBase>();
+                    foreach (var node in ExitNodes)
+                    {
+                        NodeExecutionHelper.ExecuteChain(context, node, exitVisited);
+                    }
 
-                var exitVisited = new HashSet<ActionNodeBase>();
-                foreach (var node in ExitNodes)
-                {
-                    NodeExecutionHelper.ExecuteChain(context, node, exitVisited);
+                    Log.Debug("LoopNode: Executing {Count} next nodes after loop", NextNodes.Count);
+                    var nextVisited = new HashSet<ActionNodeBase>();
+                    foreach (var nextNode in NextNodes)
+                    {
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
+                    }
                 }
-
-                Log.Debug("LoopNode: Executing {Count} next nodes after loop", NextNodes.Count);
-                var nextVisited = new HashSet<ActionNodeBase>();
-                foreach (var nextNode in NextNodes)
+                catch (OperationCanceledException)
                 {
-                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
+                    Log.Information("LoopNode: Cancelled");
                 }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Loop execution failed: {Message}", ex.Message);
-                throw;
-            }
+                catch (Exception ex)
+                {
+                    Log.Error("Loop execution failed: {Message}", ex.Message);
+                    throw;
+                }
+            }, cancellationToken);
         }
+
+        private static int TimeoutMilliseconds() => 60_000;
     }
 
     public class RepeatTimerNode : ContextNodeBase
