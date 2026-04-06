@@ -60,7 +60,7 @@ jobs:
       - name: Get DOCS_BOT_LAST_RUN
         id: get_last_run
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           LAST_RUN=$(gh variable get DOCS_BOT_LAST_RUN 2>/dev/null || echo "")
           echo "last_run=$LAST_RUN" >> $GITHUB_OUTPUT
@@ -81,7 +81,7 @@ jobs:
       - name: Set initial DOCS_BOT_LAST_RUN
         if: steps.run_bot.outputs.initial_run == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           gh variable set DOCS_BOT_LAST_RUN --body "${{ steps.run_bot.outputs.current_time }}"
 
@@ -93,7 +93,7 @@ jobs:
           steps.run_bot.outputs.pr_number != '' &&
           success()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")
           gh variable set DOCS_BOT_LAST_RUN --body "$CURRENT_TIME"
