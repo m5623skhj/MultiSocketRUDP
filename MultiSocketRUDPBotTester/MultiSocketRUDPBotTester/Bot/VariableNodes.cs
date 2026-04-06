@@ -19,81 +19,62 @@ namespace MultiSocketRUDPBotTester.Bot
             }
 
             var receivedKey = $"__received_{ExpectedPacketId}";
+            var cancellationToken = context.Client.CancellationToken.Token;
 
-            if (context.Has(receivedKey))
-            {
-                var buffer = context.Get<NetBuffer>(receivedKey);
-                Log.Information("WaitForPacketNode: Packet {Id} already received", ExpectedPacketId);
+            var waiterTask = context.Client.WaitForNextPacketAsync(
+                ExpectedPacketId, TimeoutMilliseconds, cancellationToken);
 
-                var visited = new HashSet<ActionNodeBase>();
-                foreach (var nextNode in NextNodes)
-                {
-                    NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
-                }
-
-                return;
-            }
-
-            Log.Information("WaitForPacketNode: Waiting for {Id} (timeout: {Timeout}ms)",
-                ExpectedPacketId, TimeoutMilliseconds);
-
-            var client = context.Client;
-            var startTime = CommonFunc.GetNowMs();
-
-            var cancellationToken = client.CancellationToken.Token;
-
-            Task.Run(async () =>
+            var waitTask = Task.Run(async () =>
             {
                 try
                 {
-                    while (true)
+                    NetBuffer? receivedBuffer;
+
+                    if (context.Has(receivedKey))
                     {
-                        if (cancellationToken.IsCancellationRequested)
+                        receivedBuffer = context.Get<NetBuffer>(receivedKey);
+                        Log.Information("WaitForPacketNode: Packet {Id} already in context, using cached",
+                            ExpectedPacketId);
+                    }
+                    else
+                    {
+                        Log.Information("WaitForPacketNode: Waiting for {Id} (timeout: {Timeout}ms)",
+                            ExpectedPacketId, TimeoutMilliseconds);
+                        receivedBuffer = await waiterTask.ConfigureAwait(false);
+                    }
+
+                    context.Remove(receivedKey);
+
+                    if (receivedBuffer != null)
+                    {
+                        Log.Information("WaitForPacketNode: Successfully received {Id}", ExpectedPacketId);
+                        var visited = new HashSet<ActionNodeBase>();
+                        foreach (var nextNode in NextNodes)
                         {
-                            Log.Information("WaitForPacketNode: Cancelled while waiting for {Id}", ExpectedPacketId);
-                            return;
+                            NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                         }
-
-                        if (context.Has(receivedKey))
+                    }
+                    else
+                    {
+                        Log.Warning("WaitForPacketNode: Timeout waiting for {Id}", ExpectedPacketId);
+                        var timeoutVisited = new HashSet<ActionNodeBase>();
+                        foreach (var timeoutNode in TimeoutNodes)
                         {
-                            var buffer = context.Get<NetBuffer>(receivedKey);
-                            Log.Information("WaitForPacketNode: Received expected packet {Id}", ExpectedPacketId);
-
-                            var visited = new HashSet<ActionNodeBase>();
-                            foreach (var nextNode in NextNodes)
-                            {
-                                NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
-                            }
-
-                            return;
+                            NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
                         }
-
-                        var elapsed = CommonFunc.GetNowMs() - startTime;
-                        if (elapsed >= (ulong)TimeoutMilliseconds)
-                        {
-                            Log.Warning("WaitForPacketNode: Timeout waiting for {Id}", ExpectedPacketId);
-
-                            var timeoutVisited = new HashSet<ActionNodeBase>();
-                            foreach (var timeoutNode in TimeoutNodes)
-                            {
-                                NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
-                            }
-
-                            return;
-                        }
-
-                        await Task.Delay(50, cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    Log.Information("WaitForPacketNode: Cancelled");
+                    Log.Information("WaitForPacketNode: Cancelled for {Id}", ExpectedPacketId);
                 }
                 catch (Exception ex)
                 {
                     Log.Error("WaitForPacketNode error: {Message}", ex.Message);
                 }
             }, cancellationToken);
+
+            context.SetPendingAsyncTask(waitTask);
         }
     }
 

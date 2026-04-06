@@ -13,6 +13,8 @@ namespace MultiSocketRUDPBotTester.Bot
 
         private readonly ConcurrentDictionary<string, object> vars = new();
 
+        private volatile Task _pendingAsyncTask = Task.CompletedTask;
+
         public NetBuffer? GetPacket()
         {
             lock (packetLock)
@@ -64,6 +66,23 @@ namespace MultiSocketRUDPBotTester.Bot
             return (int)result;
         }
 
+        public bool Remove(string key)
+        {
+            return vars.TryRemove(key, out _);
+        }
+
+        public void SetPendingAsyncTask(Task task)
+        {
+            _pendingAsyncTask = task;
+        }
+
+        public Task GetAndClearPendingAsyncTask()
+        {
+            var task = _pendingAsyncTask;
+            _pendingAsyncTask = Task.CompletedTask;
+            return task;
+        }
+
         public void Clear()
         {
             vars.Clear();
@@ -71,6 +90,7 @@ namespace MultiSocketRUDPBotTester.Bot
             {
                 currentPacket = null;
             }
+            _pendingAsyncTask = Task.CompletedTask;
         }
     }
 }
