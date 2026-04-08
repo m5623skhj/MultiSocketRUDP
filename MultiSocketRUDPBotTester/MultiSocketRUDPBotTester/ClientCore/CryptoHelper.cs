@@ -30,7 +30,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public static bool Decrypt(
             AesGcm aesGcm,
-            byte[] key,
             byte[] nonce,
             Span<byte> cipherText,
             ReadOnlySpan<byte> aad,

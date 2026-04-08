@@ -592,11 +592,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var capturedSessionId = SessionInfo.SessionId;
 
             isConnected = false;
-            OnDisconnected();
 
             recvProcessingChannel.Writer.TryComplete();
-
             CancellationToken.Cancel();
+
+            OnDisconnected();
+
             CancellationToken.Dispose();
 
             udpClient.Close();

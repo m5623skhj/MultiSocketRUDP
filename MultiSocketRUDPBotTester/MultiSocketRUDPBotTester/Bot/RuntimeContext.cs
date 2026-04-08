@@ -1,5 +1,6 @@
 ﻿using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
+using System.CodeDom;
 using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
@@ -56,6 +57,11 @@ namespace MultiSocketRUDPBotTester.Bot
             }
 
             return defaultValue;
+        }
+
+        public T GetOrcreate<T>(string key, Func<T> factory) where T : notnull
+        {
+            return (T)vars.GetOrAdd(key, _ => factory());
         }
 
         public int AtomicIncrement(string key, int delta = 1)

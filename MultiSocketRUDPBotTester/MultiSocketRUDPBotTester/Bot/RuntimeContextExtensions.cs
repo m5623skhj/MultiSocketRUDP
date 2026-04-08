@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System.CodeDom;
+using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
@@ -58,18 +59,7 @@ namespace MultiSocketRUDPBotTester.Bot
         public static void RecordMetric(this RuntimeContext ctx, string name, double value)
         {
             var key = $"__metric_{name}";
-            ConcurrentBag<double> bag;
-
-            if (ctx.TryGet<ConcurrentBag<double>>(key, out var existing) && existing != null)
-            {
-                bag = existing;
-            }
-            else
-            {
-                bag = new ConcurrentBag<double>();
-                ctx.Set(key, bag);
-            }
-
+            var bag = ctx.GetOrcreate(key, () => new ConcurrentBag<double>());
             bag.Add(value);
         }
 

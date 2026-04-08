@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using MultiSocketRUDPBotTester.ClientCore;
+using System.Security.Cryptography;
 
 namespace MultiSocketRUDPBotTester.Buffer
 {
@@ -85,7 +86,16 @@ namespace MultiSocketRUDPBotTester.Buffer
             _writePos += count;
         }
 
-        public byte ReadByte() => _buffer[_readPos++];
+        public byte ReadByte()
+        {
+            if (_readPos >= _buffer.Length)
+            {
+                throw new InvalidOperationException(
+                    $"Buffer underflow: tried to read at position {_readPos}, buffer size {_buffer.Length}");
+            }
+
+            return _buffer[_readPos++];
+        }
 
         public ushort ReadUShort()
         {
@@ -234,27 +244,6 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public int GetLength() => _writePos;
 
-        private static byte[] GenerateNonce(byte[] sessionSalt, ulong packetSequence, PacketDirection direction)
-        {
-            var nonce = new byte[12];
-            var directionBits = (byte)((byte)direction << 6);
-            nonce[0] = (byte)(directionBits | (sessionSalt[0] & 0x3F));
-            nonce[1] = sessionSalt[1];
-            nonce[2] = sessionSalt[2];
-            nonce[3] = sessionSalt[3];
-
-            nonce[4]  = (byte)((packetSequence >> 56) & 0xFF);
-            nonce[5]  = (byte)((packetSequence >> 48) & 0xFF);
-            nonce[6]  = (byte)((packetSequence >> 40) & 0xFF);
-            nonce[7]  = (byte)((packetSequence >> 32) & 0xFF);
-            nonce[8]  = (byte)((packetSequence >> 24) & 0xFF);
-            nonce[9]  = (byte)((packetSequence >> 16) & 0xFF);
-            nonce[10] = (byte)((packetSequence >> 8) & 0xFF);
-            nonce[11] = (byte)(packetSequence & 0xFF);
-
-            return nonce;
-        }
-
         public static void EncodePacket(
             AesGcm aesGcm,
             NetBuffer packet,
@@ -270,7 +259,7 @@ namespace MultiSocketRUDPBotTester.Buffer
                 bodySize = 0;
             }
 
-            var nonce = GenerateNonce(sessionSalt, packetSequence, direction);
+            var nonce = CryptoHelper.GenerateNonce(sessionSalt, packetSequence, direction);
             var tag = new byte[AuthTagSize];
 
             packet.SetHeader(AuthTagSize);
@@ -309,7 +298,7 @@ namespace MultiSocketRUDPBotTester.Buffer
                 return false;
             }
 
-            var nonce = GenerateNonce(sessionSalt, packetSequence, direction);
+            var nonce = CryptoHelper.GenerateNonce(sessionSalt, packetSequence, direction);
             var tag = packet._buffer.AsSpan(authTagOffset, AuthTagSize).ToArray();
 
             try

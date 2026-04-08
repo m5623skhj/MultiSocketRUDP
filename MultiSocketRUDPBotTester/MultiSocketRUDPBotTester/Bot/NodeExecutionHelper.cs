@@ -6,7 +6,7 @@ namespace MultiSocketRUDPBotTester.Bot
 {
     internal static class NodeExecutionHelper
     {
-        public static bool IsAsyncNode(ActionNodeBase node) =>
+        public static bool HandlesOwnNextNode(ActionNodeBase node) =>
             node is DelayNode
                 or RandomDelayNode
                 or RepeatTimerNode
@@ -24,14 +24,12 @@ namespace MultiSocketRUDPBotTester.Bot
             if (!visited.Add(node))
             {
                 Log.Warning("Circular reference detected in node: {NodeName}", node.Name);
-                {
-                    return;
-                }
+                return;
             }
 
             node.Execute(context.Client, context.GetPacket());
 
-            if (IsAsyncNode(node))
+            if (HandlesOwnNextNode(node))
             {
                 return;
             }
@@ -79,7 +77,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 client.GlobalContext.RecordMetric($"{node.Name}_time", sw.ElapsedMilliseconds);
             }
 
-            if (IsAsyncNode(node))
+            if (HandlesOwnNextNode(node))
             {
                 Log.Debug("Node {NodeName} is async, it will handle its own NextNodes", node.Name);
                 return;
