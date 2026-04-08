@@ -6,7 +6,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 {
     public sealed class BotTesterCore
     {
-        public static BotTesterCore Instance = new();
+        public static readonly BotTesterCore Instance = new();
 
         private readonly SessionGetter sessionGetter = new();
         private readonly Dictionary<SessionIdType, Client> sessionDictionary = new();

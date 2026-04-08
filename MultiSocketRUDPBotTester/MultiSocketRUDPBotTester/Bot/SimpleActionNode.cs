@@ -15,7 +15,7 @@ namespace MultiSocketRUDPBotTester.Bot
             try
             {
                 var buffer = (PacketBuilder != null ?
-                    PacketBuilder(client) : BuildFromSchema()) ?? throw new Exception($"Failed to build packet buffer for PacketId: ${PacketId}");
+                    PacketBuilder(client) : BuildFromSchema()) ?? throw new Exception($"Failed to build packet buffer for PacketId: {PacketId}");
 
                 var token = client.CancellationToken.Token;
                 if (token.IsCancellationRequested)
@@ -101,6 +101,7 @@ namespace MultiSocketRUDPBotTester.Bot
             catch (Exception ex)
             {
                 Log.Error("Custom action failed: {Message}", ex.Message);
+                throw;
             }
         }
     }
@@ -135,7 +136,6 @@ namespace MultiSocketRUDPBotTester.Bot
     {
         public int MinDelayMilliseconds { get; set; } = 500;
         public int MaxDelayMilliseconds { get; set; } = 2000;
-        private static readonly Random Random = new();
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {

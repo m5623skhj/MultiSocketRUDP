@@ -16,7 +16,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             sslStream = new SslStream(tcpClient.GetStream()
                 , false
-                , (_, certificate, _, _) =>
+                , (_, certificate, chain, SslPolicyErrors) =>
                 {
                     if (certFingerprint == null)
                     {
@@ -30,7 +30,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                     var serverFp = certificate.GetCertHashString();
                     return string.Equals(serverFp, certFingerprint, StringComparison.OrdinalIgnoreCase);
-
                 });
 
             await sslStream.AuthenticateAsClientAsync(
@@ -42,7 +41,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public async Task<int> ReceiveAsync(byte[] buffer, int offset)
         {
-            return await sslStream?.ReadAsync(buffer, offset, buffer.Length - offset)!;
+            if (sslStream == null)
+            {
+                throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
+            }
+
+            return await sslStream.ReadAsync(buffer, offset, buffer.Length - offset)!;
         }
 
         public void Close()
@@ -57,6 +61,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public void Dispose()
         {
             Close();
+            GC.SuppressFinalize(this);
         }
     }
 }

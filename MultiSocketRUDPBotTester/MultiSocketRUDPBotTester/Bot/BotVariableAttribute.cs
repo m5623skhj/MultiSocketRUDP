@@ -101,7 +101,7 @@ namespace MultiSocketRUDPBotTester.Bot
             }
 
             _isInitialized = true;
-            Serilog.Log.Information($"VariableAccessorRegistry initialized: {Getters.Count} getters, {Setters.Count} setters");
+            Serilog.Log.Information("VariableAccessorRegistry initialized: {Getters.Count} getters, {Setters.Count} setters");
         }
 
         public static List<VariableAccessor> GetAllGetters()

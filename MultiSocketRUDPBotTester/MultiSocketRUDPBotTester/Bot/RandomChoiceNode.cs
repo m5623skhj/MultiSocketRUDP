@@ -14,7 +14,6 @@ namespace MultiSocketRUDPBotTester.Bot
     public class RandomChoiceNode : ActionNodeBase
     {
         public List<ChoiceOption> Choices { get; set; } = [];
-        private static readonly Random Random = new();
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
