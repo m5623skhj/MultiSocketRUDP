@@ -265,14 +265,41 @@ def build_pr_body(
 
     errors = [r for r in analysis_results if r.is_error]
     gen_errs = [r for r in generate_results if r.is_error]
-    if errors or gen_errs or no_doc_mappings or no_section_mappings:
+    
+    if no_doc_mappings:
+        parts.append("### 문서 없는 클래스 - 문서생성 검토\n\n")
+        parts.append("다음 클래스에 대응하는 문서 파일이 없습니다.\n")
+        parts.append("변경된 함수의 시그니처를 기반으로 스켈레톤을 제안합니다.\n\n")
+        
+        by_class: dict[str, list] = {}
+        for m in no_doc_mappings:
+            cls = m.function_info.class_name
+            by_class.setdefault(cls, []).append(m.function_info)
+            
+        for cls, infos in by_class.items():
+            parts.append(f"<details><summary><b>{cls}</b> ({len(infos)}개 함수)</summary>\n\n")
+            parts.append(f"```markdown\n# {cls}\n\n> (설명을 작성하세요)\n\n---\n\n")
+            for info in infos:
+                parts.append(f"## {info.name}\n\n")
+                if info.signature:
+                    lang = "cshar" if info.file_path.endswitch(".cs") else "cpp"
+                    parts.append(f"```{lang}\n{info.signature}\n```\n\n")
+                if info.parameters:
+                    parts.append("**파라미터:**\n\n")
+                    for p in info.parameters:
+                        parts.append(f"- `{p.get('type', '')} {p.get('name', '')}` - (설명)\n")
+                    parts.append('\n')
+                if info.return_type:
+                    parts.append(f"**반환:** `{info.return_type}` - (설명)\n\n")
+                parts.append("---\n\n")
+            parts.append("```\n\n<details>\n\n")
+    
+    if errors or gen_errs or  no_section_mappings:
         parts.append("### ❌ 수동 확인 필요\n")
         for r in errors:
             parts.append(f"- AI 분석 실패: {', '.join(r.function_names)}\n")
         for r in gen_errs:
             parts.append(f"- 문서 생성 실패: `{r.function_name}`\n")
-        for m in no_doc_mappings:
-            parts.append(f"- 매핑 실패(문서없음): `{m.function_info.name}`\n")
         for m in no_section_mappings:
             parts.append(f"- 매핑 실패(섹션없음): `{m.function_info.name}`\n")
 

@@ -262,5 +262,25 @@ def _load_docs_files() -> dict[str, str]:
     return docs_files
 
 
+def _print_summary(section_groups, added_infos, deleted_mappings, excluded_mappings):
+    """AI 미연동 시 결과 요약 로그 출력"""
+    logger.info("=" * 60)
+    logger.info("결과 요약 (AI 미연동)")
+    logger.info("=" * 60)
+    logger.info(" 비교 분석 대상: %d개 섹션", len(section_groups))
+    for g in section_groups:
+        funcs = ", ".join(f.name for f in g.function_infos)
+        logger.info("   - %s [%s] -> %s", g.doc_file_path, g.section.heading[:40], funcs)
+    logger.info("   신규 생성 대상: %d개", len(added_infos))
+    for info in added_infos:
+        logger.info("   - %s::%s", info.class_name, info.name)
+    logger.info("   삭제 대상: %d개", len(deleted_mappings))
+    for m in deleted_mappings:
+        logger.info("   - %s::%s", m.function_info.class_name, m.functionn_info.name)
+    logger.info("   아키텍처 ㅡㄹ래그: %d건", len(excluded_mappings))
+    for m in excluded_mappings:
+        logger.info("   - %s -> %s", m.function_info.name, m.function_info.doc_file_path)
+
+
 if __name__ == "__main__":
     sys.exit(main())
