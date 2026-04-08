@@ -267,7 +267,7 @@ def build_pr_body(
     gen_errs = [r for r in generate_results if r.is_error]
     
     if no_doc_mappings:
-        parts.append("### 문서 없는 클래스 - 문서생성 검토\n\n")
+        parts.append("### 📋 문서 없는 클래스 - 문서생성 검토\n\n")
         parts.append("다음 클래스에 대응하는 문서 파일이 없습니다.\n")
         parts.append("변경된 함수의 시그니처를 기반으로 스켈레톤을 제안합니다.\n\n")
         
