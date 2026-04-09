@@ -9,6 +9,7 @@ import os
 # GitHub 환경 변수
 # ============================================================
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+PAT = os.environ.get("PAT", "")
 REPO = os.environ.get("REPO", "")  # "owner/repo" 형식
 DOCS_BOT_LAST_RUN = os.environ.get("DOCS_BOT_LAST_RUN", "")
 
