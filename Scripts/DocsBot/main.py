@@ -142,9 +142,16 @@ def main() -> int:
                 len(section_groups), len(added_infos), len(deleted_mappings))
 
     # Step 6: AI 분석
-    if not AI_PROVIDER or not AI_API_KEY:
-        logger.warning("AI_PROVIDER 또는 AI_API_KEY 미설정 → AI 분석 스킵")  # 수정: error → warning
-        logger.info("환경 변수를 설정하세요: AI_PROVIDER, AI_API_KEY")
+    isAIConfigError = not AI_PROVIDER or not AI_API_KEY
+    if not AI_PROVIDER:
+        logger.warning("AI_PROVIDER  → AI 분석 스킵")  # 수정: error → warning
+        logger.info("환경 변수를 설정하세요: AI_PROVIDER")
+
+    if not AI_API_KEY:
+        logger.warning("AI_API_KEY 미설정 → AI 분석 스킵")  # 수정: error → warning
+        logger.info("환경 변수를 설정하세요: AI_API_KEY")
+
+    if isAIConfigError:
         _print_summary(section_groups, added_infos, deleted_mappings, excluded_mappings)  # 추가: 결과 요약 출력
         set_output("has_changes", "true")
         set_output("ai_skipped", "true")
@@ -277,7 +284,7 @@ def _print_summary(section_groups, added_infos, deleted_mappings, excluded_mappi
     logger.info("   삭제 대상: %d개", len(deleted_mappings))
     for m in deleted_mappings:
         logger.info("   - %s::%s", m.function_info.class_name, m.functionn_info.name)
-    logger.info("   아키텍처 ㅡㄹ래그: %d건", len(excluded_mappings))
+    logger.info("   아키텍처 플래그: %d건", len(excluded_mappings))
     for m in excluded_mappings:
         logger.info("   - %s -> %s", m.function_info.name, m.function_info.doc_file_path)
 
