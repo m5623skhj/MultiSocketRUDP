@@ -466,7 +466,7 @@ def get_file_content(file_path: str, ref: str = MAIN_BRANCH) -> str | None:
     if cache_key in _file_cache:
         return _file_cache[cache_key]
 
-    url = f"{GITHUB_API_BASE}/repos/{REPO}/{file_path}?ref={ref}"
+    url = f"{GITHUB_API_BASE}/repos/{REPO}/contents/{file_path}?ref={ref}"
     r = safe_request(requests.get, url)
 
     if not r:
