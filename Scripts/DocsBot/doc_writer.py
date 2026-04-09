@@ -282,7 +282,7 @@ def build_pr_body(
             for info in infos:
                 parts.append(f"## {info.name}\n\n")
                 if info.signature:
-                    lang = "cshar" if info.file_path.endswitch(".cs") else "cpp"
+                    lang = "csharp" if info.file_path.endswith(".cs") else "cpp"
                     parts.append(f"```{lang}\n{info.signature}\n```\n\n")
                 if info.parameters:
                     parts.append("**파라미터:**\n\n")
