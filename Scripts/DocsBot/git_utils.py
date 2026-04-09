@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from config import (
     GITHUB_TOKEN,
+    PAT,
     REPO,
     GITHUB_API_BASE,
     REQUEST_TIMEOUT,
@@ -46,6 +47,15 @@ def gh_headers() -> dict:
     """GitHub API 요청용 헤더를 반환한다."""
     return {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+
+
+def pat_headers() -> dict:
+    """PAT 기반 GitHub API 요청용 헤더를 반환한다. PR 생성 등 write 권한이 필요한 작업에 사용."""
+    token = PAT or GITHUB_TOKEN  # PAT 없으면 GITHUB_TOKEN으로 fallback
+    return {
+        "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
     }
 
@@ -378,6 +388,7 @@ def create_pr(branch_name: str, title: str, body: str) -> int | None:
     url = f"{GITHUB_API_BASE}/repos/{REPO}/pulls"
     r = safe_request(
         requests.post, url,
+        headers=pat_headers(),
         json={
             "title": title,
             "body": body,
