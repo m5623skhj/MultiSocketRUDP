@@ -128,6 +128,10 @@ def find_related_doc(
                 if basename.lower().replace("_cs", "") == class_name.lower():
                     return doc_path
 
+        # target_docs_dir가 식별된 경우, 해당 디렉토리에서 찾지 못하면 None 반환
+        # (다른 도메인 문서로 오매핑 방지를 위함)
+        return None
+
     # 2차: 전체 Docs 디렉토리에서 이름 매칭 (폴백)
     for doc_path in docs_files:
         basename = os.path.splitext(os.path.basename(doc_path))[0]
