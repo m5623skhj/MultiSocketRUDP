@@ -53,6 +53,45 @@ int AtomicIncrement(string key, int delta=1)  // 원자적 증가
 
 ---
 
+## `RuntimeContext`
+
+```csharp
+public class RuntimeContext(Client client, NetBuffer? packet)
+```
+
+클라이언트의 네트워크 컨텍스트를 관리하며, 패킷 데이터와 세션 변수를 유지한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `client` | `Client` | 이 컨텍스트를 소유하는 클라이언트 인스턴스 |
+| `packet` | `NetBuffer?` | 트리거된 수신 패킷. 없으면 `null` |
+
+### `GetPacket`
+
+```csharp
+public NetBuffer? GetPacket()
+```
+
+현재 설정된 패킷을 반환한다. 스레드 안전하게 동작한다.
+
+### `SetPacket`
+
+```csharp
+public void SetPacket(NetBuffer? newPacket)
+```
+
+현재 패킷을 새로 설정한다. 스레드 안전하게 동작한다.
+
+### `Set<T>`
+
+```csharp
+public void Set<T>(string key, T value) where T : notnull
+```
+
+컨텍스트 내에 키-값 쌍을 저장한다.
+
+---
+
 ## 확장 메서드 (`RuntimeContextExtensions`)
 
 ```csharp
@@ -79,9 +118,6 @@ double max = ctx.GetMaxMetric("rtt_ms");
 // 노드 실행 횟수
 int count = ctx.GetExecutionCount("SendPing");
 ```
-
----
-
 ## WaitForPacketNode와의 연동
 
 `Client.OnRecvPacket`에서 패킷 수신 시 자동으로 컨텍스트에 버퍼를 저장:

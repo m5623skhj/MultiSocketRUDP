@@ -57,8 +57,34 @@ sessionGetter.Close()
 new Client(buffer[PacketHeaderSize..totalBytes])
 ```
 
----
+### `ConnectAsync`
 
+```csharp
+public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
+```
+
+지정된 호스트와 포트로 TCP 연결을 맺고 TLS 인증을 수행한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `host` | `string` | 접속할 호스트 주소 |
+| `port` | `int` | 접속할 포트 번호 |
+| `certFingerprint` | `string?` | 인증서 검증을 위한 지문. `null`이면 인증서를 검증하지 않음 |
+
+### `ReceiveAsync`
+
+```csharp
+public async Task<int> ReceiveAsync(byte[] buffer, int offset)
+```
+
+SSL 스트림으로부터 데이터를 수신한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `buffer` | `byte[]` | 데이터를 저장할 버퍼 |
+| `offset` | `int` | 버퍼 내 데이터 저장 시작 위치 |
+
+**반환값**: 수신된 바이트 수.
 ## 관련 문서
 - [[BotTesterCore]] — SessionGetter 호출 흐름
 - [[RUDPSessionBroker]] — 서버 측 세션 발급
