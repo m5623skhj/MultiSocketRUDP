@@ -8,12 +8,12 @@
 ## 목차
 
 1. [인스턴스 획득 (thread_local)](#1-인스턴스-획득-thread_local)
-2. [생성자 — BCrypt 초기화](#2-생성자-bcrypt-초기화)
+2. [생성자 — BCrypt 초기화](#2-생성자--bcrypt-초기화)
 3. [키 핸들 생성/파괴](#3-키-핸들-생성파괴)
-4. [난수 생성 — `GenerateSecureRandomBytes`](#4-난수-생성-generatesecurerandombytes)
-5. [Nonce 생성 — `GenerateNonce`](#5-nonce-생성-generatenonce)
-6. [암호화 — `EncryptAESGCM`](#6-암호화-encryptaesgcm)
-7. [복호화 — `Decrypt`](#7-복호화-decrypt)
+4. [난수 생성 — GenerateSecureRandomBytes](#4-난수-생성--generatesecurerandombytest)
+5. [Nonce 생성 — GenerateNonce](#5-nonce-생성--generatenonce)
+6. [암호화 — EncryptAESGCM](#6-암호화--encryptaesgcm)
+7. [복호화 — DecryptAESGCM](#7-복호화--decryptaesgcm)
 8. [BCrypt AUTHENTICATED_CIPHER_MODE_INFO 구조](#8-bcrypt-authenticated_cipher_mode_info-구조)
 9. [에러 코드 대응표](#9-에러-코드-대응표)
 10. [전체 사용 예시](#10-전체-사용-예시)
@@ -306,45 +306,63 @@ static bool CryptoHelper::EncryptAESGCM(
 
 ---
 
-## 7. 복호화 — `Decrypt`
+## 7. 복호화 — `DecryptAESGCM`
 
-```csharp
-public static bool Decrypt(
-    AesGcm aesGcm,
-    byte[] nonce,
-    Span<byte> cipherText,
-    ReadOnlySpan<byte> aad,
-    ReadOnlySpan<byte> authTag)
+```cpp
+static bool CryptoHelper::DecryptAESGCM(
+    const unsigned char* nonce,    size_t nonceSize,
+    const unsigned char* aad,      size_t aadSize,
+    const char* ciphertext,        size_t ciphertextSize,
+    const unsigned char* tag,                         // 검증할 AuthTag
+    char* plaintext,               size_t plaintextBufferSize,
+    BCRYPT_KEY_HANDLE keyHandle
+)
 ```
 
-`AesGcm`을 사용하여 암호문을 복호화하고 인증 태그를 검증한다.
+```cpp
+{
+    BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
+    BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
 
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `aesGcm` | `AesGcm` | 복호화에 사용할 `AesGcm` 인스턴스 |
-| `nonce` | `byte[]` | 암호화 시 사용된 nonce |
-| `cipherText` | `Span<byte>` | 복호화할 암호문 (복호화 후 평문으로 덮어씀) |
-| `aad` | `ReadOnlySpan<byte>` | 인증 추가 데이터 (AAD) |
-| `authTag` | `ReadOnlySpan<byte>` | 검증할 인증 태그 (AuthTag) |
+    authInfo.pbNonce    = const_cast<PUCHAR>(nonce);
+    authInfo.cbNonce    = static_cast<ULONG>(nonceSize);
+    authInfo.pbTag      = const_cast<PUCHAR>(tag);
+    authInfo.cbTag      = AUTH_TAG_SIZE;
+    authInfo.pbAuthData = const_cast<PUCHAR>(aad);
+    authInfo.cbAuthData = static_cast<ULONG>(aadSize);
 
-**반환값**
+    ULONG plaintextLength = 0;
+    NTSTATUS status = BCryptDecrypt(
+        keyHandle,
+        reinterpret_cast<PUCHAR>(const_cast<char*>(ciphertext)),
+        static_cast<ULONG>(ciphertextSize),
+        &authInfo,
+        nullptr, 0,
+        reinterpret_cast<PUCHAR>(plaintext),
+        static_cast<ULONG>(plaintextBufferSize),
+        &plaintextLength,
+        0
+    );
 
-| 반환값 | 조건 |
-|--------|------|
-| `true` | 복호화 성공 및 인증 태그 검증 완료 |
-| `false` | 복호화 실패 또는 인증 태그 불일치 (변조 또는 키 불일치) |
+    // STATUS_AUTH_TAG_MISMATCH = 0xC000A002
+    // → Nonce 불일치, AAD 변조, 페이로드 변조, 재전송 공격 등
+    return BCRYPT_SUCCESS(status);
+}
+```
 
-> **주의:** 복호화 과정에서 `CryptographicException`이 발생하면 `false`를 반환한다.
-
-**인증 태그 불일치 발생 원인:**
+**`STATUS_AUTH_TAG_MISMATCH` 발생 원인:**
 
 | 원인 | 설명 |
 |------|------|
-| Nonce 불일치 | 암호화/복호화 시 사용된 nonce가 다름 |
+| Nonce 불일치 | 암호화/복호화 시 direction 또는 sequence가 다름 |
 | AAD 변조 | 헤더/타입/시퀀스 필드가 전송 중 변조됨 |
 | 페이로드 변조 | 암호문이 변조됨 (중간자 공격) |
 | AuthTag 변조 | 태그가 변조됨 |
 | 세션 키 불일치 | 서버/클라이언트가 다른 키를 사용 |
+| 솔트 불일치 | 서버/클라이언트가 다른 솔트를 사용 |
+
+---
+
 ## 8. BCrypt AUTHENTICATED_CIPHER_MODE_INFO 구조
 
 ```cpp
