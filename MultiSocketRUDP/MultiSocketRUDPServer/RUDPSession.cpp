@@ -36,7 +36,6 @@ void RUDPSession::InitializeSession()
 {
 	sessionGeneration.fetch_add(1, std::memory_order_release);
 
-	sessionId = INVALID_SESSION_ID;
 	cryptoContext.Initialize();
 	clientAddr = {};
 	clientSockAddrInet = {};

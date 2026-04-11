@@ -15,7 +15,6 @@ void SendPacketInfo::Free(SendPacketInfo* target)
 
 	if (target->refCount.fetch_sub(1, std::memory_order_release) == 1)
 	{
-		std::atomic_thread_fence(std::memory_order_acquire);
 		NetBuffer::Free(target->buffer);
 		sendPacketInfoPool->Free(target);
 	}
