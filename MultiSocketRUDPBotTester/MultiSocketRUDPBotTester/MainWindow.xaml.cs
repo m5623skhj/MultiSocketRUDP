@@ -95,7 +95,9 @@ namespace MultiSocketRUDPBotTester
         private void UpdateUi()
         {
             var activeBotCount = BotTesterCore.Instance.GetActiveBotCount();
-            Title = $"Multi-Socket RUDP Bot Tester - Active Bots: {activeBotCount}";
+              Title = $"Active Bots: {activeBotCount} | " +
+                  $"ThreadPool Worker: {maxWorker - workerThreads}/{maxWorker} used | " +
+                  $"IO: {maxCompletion - completionPortThreads}/{maxCompletion} used";
         }
     }
 }
