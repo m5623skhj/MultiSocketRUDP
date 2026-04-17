@@ -18,63 +18,44 @@ namespace MultiSocketRUDPBotTester.Bot
                 return;
             }
 
-            var receivedKey = $"__received_{ExpectedPacketId}";
             var cancellationToken = context.Client.CancellationToken.Token;
-
             var waiterTask = context.Client.WaitForNextPacketAsync(
                 ExpectedPacketId, TimeoutMilliseconds, cancellationToken);
 
-            var waitTask = Task.Run(async () =>
+            context.SetPendingAsyncTask(WaitAndDispatchAsync(context, waiterTask));
+        }
+
+        private async Task WaitAndDispatchAsync(RuntimeContext context, Task<NetBuffer?> waiterTask)
+        {
+            try
             {
-                try
+                Log.Information("WaitForPacketNode: Waiting for {Id} (timeout: {Timeout}ms)",
+                    ExpectedPacketId, TimeoutMilliseconds);
+                var receivedBuffer = await waiterTask.ConfigureAwait(false);
+
+                if (receivedBuffer != null)
                 {
-                    NetBuffer? receivedBuffer;
-
-                    if (context.Has(receivedKey))
-                    {
-                        receivedBuffer = context.Get<NetBuffer>(receivedKey);
-                        Log.Information("WaitForPacketNode: Packet {Id} already in context, using cached",
-                            ExpectedPacketId);
-                    }
-                    else
-                    {
-                        Log.Information("WaitForPacketNode: Waiting for {Id} (timeout: {Timeout}ms)",
-                            ExpectedPacketId, TimeoutMilliseconds);
-                        receivedBuffer = await waiterTask.ConfigureAwait(false);
-                    }
-
-                    context.Remove(receivedKey);
-
-                    if (receivedBuffer != null)
-                    {
-                        Log.Information("WaitForPacketNode: Successfully received {Id}", ExpectedPacketId);
-                        var visited = new HashSet<ActionNodeBase>();
-                        foreach (var nextNode in NextNodes)
-                        {
-                            NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
-                        }
-                    }
-                    else
-                    {
-                        Log.Warning("WaitForPacketNode: Timeout waiting for {Id}", ExpectedPacketId);
-                        var timeoutVisited = new HashSet<ActionNodeBase>();
-                        foreach (var timeoutNode in TimeoutNodes)
-                        {
-                            NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
-                        }
-                    }
+                    Log.Information("WaitForPacketNode: Successfully received {Id}", ExpectedPacketId);
+                    var visited = new HashSet<ActionNodeBase>();
+                    foreach (var nextNode in NextNodes)
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
                 }
-                catch (OperationCanceledException)
+                else
                 {
-                    Log.Information("WaitForPacketNode: Cancelled for {Id}", ExpectedPacketId);
+                    Log.Warning("WaitForPacketNode: Timeout waiting for {Id}", ExpectedPacketId);
+                    var timeoutVisited = new HashSet<ActionNodeBase>();
+                    foreach (var timeoutNode in TimeoutNodes)
+                        NodeExecutionHelper.ExecuteChain(context, timeoutNode, timeoutVisited);
                 }
-                catch (Exception ex)
-                {
-                    Log.Error("WaitForPacketNode error: {Message}", ex.Message);
-                }
-            }, cancellationToken);
-
-            context.SetPendingAsyncTask(waitTask);
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Information("WaitForPacketNode: Cancelled for {Id}", ExpectedPacketId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("WaitForPacketNode error: {Message}", ex.Message);
+            }
         }
     }
 
