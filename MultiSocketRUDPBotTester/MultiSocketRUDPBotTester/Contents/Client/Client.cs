@@ -11,7 +11,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         private ActionGraph actionGraph = new();
         public RuntimeContext GlobalContext { get; }
 
-        private readonly ConcurrentDictionary<PacketId, List<TaskCompletionSource<NetBuffer?>>> _packetWaiters = new();
+        private readonly ConcurrentDictionary<PacketId, ConcurrentDictionary<long, TaskCompletionSource<NetBuffer?>>> _packetWaiters = new();
+        private long _nextWaiterId;
 
         public Client(byte[] sessionInfoStream)
             : base(sessionInfoStream)
@@ -23,22 +24,23 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public Task<NetBuffer?> WaitForNextPacketAsync(PacketId packetId, int timeoutMs, CancellationToken cancellationToken)
         {
             var tcs = new TaskCompletionSource<NetBuffer?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var waiterId = Interlocked.Increment(ref _nextWaiterId);
 
-            var waiters = _packetWaiters.GetOrAdd(packetId, _ => new List<TaskCompletionSource<NetBuffer?>>());
-            lock (waiters)
+            var waiters = _packetWaiters.GetOrAdd(packetId, _ => new ConcurrentDictionary<long, TaskCompletionSource<NetBuffer?>>());
+            waiters[waiterId] = tcs;
+            
+            try
             {
-                waiters.Add(tcs);
+                return await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs), cancellationToken).ConfigureAwait(false);
             }
-
-            var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            linkedCts.CancelAfter(timeoutMs);
-            linkedCts.Token.Register(() =>
+            catch (TimeoutException)
             {
-                tcs.TrySetResult(null);
-                linkedCts.Dispose();
-            }, useSynchronizationContext: false);
-
-            return tcs.Task;
+                return null;
+            }
+            finally
+            {
+                waiters.TryRemove(waiterId, out _);
+            }
         }
 
         public void SetActionGraph(ActionGraph graph)
@@ -64,11 +66,6 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         {
             Log.Debug("Received packet with ID: {PacketId}", packetId);
 
-            var bufferKey = $"__received_{packetId}";
-
-            GlobalContext.Set(bufferKey, buffer);
-            GlobalContext.Set($"{bufferKey}_timestamp", CommonFunc.GetNowMs());
-
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
                 action.Execute(buffer);
@@ -76,16 +73,12 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             if (_packetWaiters.TryGetValue(packetId, out var waiters))
             {
-                List<TaskCompletionSource<NetBuffer?>> snapshot;
-                lock (waiters)
+                foreach (var kvp in waiters.ToArray())
                 {
-                    snapshot = waiters.ToList();
-                    waiters.Clear();
-                }
-
-                foreach (var tcs in snapshot)
-                {
-                    tcs.TrySetResult(buffer);
+                    if (waiters.TryRemove(kvp.Key, out var tcs))
+                    {
+                        tcs.TrySetResult(buffer);
+                    }
                 }
             }
 
