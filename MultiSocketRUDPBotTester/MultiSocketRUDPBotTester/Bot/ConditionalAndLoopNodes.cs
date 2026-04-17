@@ -91,17 +91,7 @@ namespace MultiSocketRUDPBotTester.Bot
                         }
 
                         var pendingTask = context.GetAndClearPendingAsyncTask();
-                        try
-                        {
-                            await pendingTask.WaitAsync(
-                                TimeSpan.FromMilliseconds(TimeoutMilliseconds()),
-                                cancellationToken).ConfigureAwait(false);
-                        }
-                        catch (TimeoutException)
-                        {
-                            Log.Warning("LoopNode: Body async task timed out at iteration {Iteration}, continuing",
-                                iteration);
-                        }
+                        await pendingTask.WaitAsync(cancellationToken).ConfigureAwait(false);
 
                         iteration++;
                     }
@@ -135,8 +125,6 @@ namespace MultiSocketRUDPBotTester.Bot
                 }
             }, cancellationToken);
         }
-
-        private static int TimeoutMilliseconds() => 60_000;
     }
 
     public class RepeatTimerNode : ContextNodeBase
