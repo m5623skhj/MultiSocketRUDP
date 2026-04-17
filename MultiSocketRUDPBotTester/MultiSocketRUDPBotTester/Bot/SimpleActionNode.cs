@@ -22,7 +22,8 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     return;
                 }
-                _ = Task.Run(async () => await client.SendPacket(buffer, PacketId), token)
+                
+                _ = client.SendPacket(buffer, PacketId)
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),
                         TaskContinuationOptions.OnlyOnFaulted);
