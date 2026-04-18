@@ -57,6 +57,12 @@
     <ClCompile Include="..\..\CoreTest\subhook\subhook.c">
       <Filter>소스 파일\Subhook</Filter>
     </ClCompile>
+    <ClCompile Include="RUDPIOHandlerTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPPacketProcessorTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h">
