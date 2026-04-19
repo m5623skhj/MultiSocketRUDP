@@ -40,7 +40,7 @@ public:
     [[nodiscard]]
     SendPacketInfo* TryGetFrontAndPop(RUDPSession&) override { return tryGetFrontReturn; }
     [[nodiscard]]
-    SendPacketInfo* GetReservedSendPacketInfo(const RUDPSession&) override { return reservedSendReturn; }
+    SendPacketInfo* GetReservedSendPacketInfo(RUDPSession&) override { return reservedSendReturn; }
     void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override { reservedSendReturn = info; }
     [[nodiscard]]
     size_t GetSendPacketInfoQueueSize(RUDPSession&) override { return sendPacketInfoQueueSizeRet; }
@@ -80,6 +80,7 @@ public:
         return checkReservedTimeoutReturn;
     }
     void AbortReservedSession(RUDPSession&) override { ++abortReservedCount; }
+	void InitializeSession(RUDPSession&) override {}
     void SetSessionReservedTime(RUDPSession&, unsigned long long now) override
     {
         lastReservedTime = now;
@@ -130,7 +131,7 @@ public:
     PortType portReturn = 0;
     SessionIdType sessionIdReturn = INVALID_SESSION_ID;
 
-    IO_MODE dummyIOMode{};
+    std::atomic<IO_MODE> dummyIOMode{};
     bool isNothingToSendReturn = true;
     bool isSendPacketInfoQueueEmpty = true;
     SendPacketInfo* tryGetFrontReturn = nullptr;
