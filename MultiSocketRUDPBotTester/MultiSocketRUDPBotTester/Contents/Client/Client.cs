@@ -21,7 +21,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             GlobalContext = new RuntimeContext(this, null);
         }
 
-        public Task<NetBuffer?> WaitForNextPacketAsync(PacketId packetId, int timeoutMs, CancellationToken cancellationToken)
+        public async Task<NetBuffer?> WaitForNextPacketAsync(PacketId packetId, int timeoutMs, CancellationToken cancellationToken)
         {
             var tcs = new TaskCompletionSource<NetBuffer?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var waiterId = Interlocked.Increment(ref _nextWaiterId);
