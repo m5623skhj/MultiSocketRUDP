@@ -67,6 +67,9 @@ namespace TLSHelper
 		bool Initialize() override;
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
+
+	private:
+		std::wstring serverName{};
 	};
 
 	class TLSHelperServer : public TLSHelperBase
@@ -84,6 +87,5 @@ namespace TLSHelper
 	private:
 		std::wstring storeName{};
 		std::wstring certSubjectName{};
-		std::wstring serverName{};
 	};
 }
