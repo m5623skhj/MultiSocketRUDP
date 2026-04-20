@@ -235,12 +235,16 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperClient::Initialize()
+    bool TLSHelperClient::Initialize(const std::wstring& inServerName)
     {
+        serverName = inServerName;
+        
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
-        cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;
+        cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION
+                    | SCH_CRED_NO_DEFAULT_CREDS 
+                    | SCH_CRED_REVOCATION_CHECK_CHAIN;
 
         return AcquireCredentialsHandle(
             nullptr,
@@ -294,8 +298,8 @@ namespace TLSHelper
             status = InitializeSecurityContext(
                 &credHandle,
                 pContext,
-                nullptr,
-                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY,
+                const_cast<LPWSTR>(serverName.c_str()),
+                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_MUTUAL_AUTH,,
                 0,
                 SECURITY_NATIVE_DREP,
                 pContext ? &inBufferDesc : nullptr,
