@@ -84,5 +84,6 @@ namespace TLSHelper
 	private:
 		std::wstring storeName{};
 		std::wstring certSubjectName{};
+		std::wstring& inServerName
 	};
 }
