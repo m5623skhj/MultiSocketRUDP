@@ -57,7 +57,7 @@ ON_RECV_RESULT SessionPacketOrderer::OnReceive(const PacketSequence sequence, Ne
 				"maxHoldingQueueSize={}, nextExpected={}, lostSeq={} → DoDisconnect",
 				maxHoldingQueueSize,
 				nextRecvPacketSequence.load(std::memory_order_relaxed),
-				nextRecvPacketSequence.load(std::memory_order_relaxed)));
+				sequence));
 
 			return ON_RECV_RESULT::ERROR_OCCURED;
 		}
