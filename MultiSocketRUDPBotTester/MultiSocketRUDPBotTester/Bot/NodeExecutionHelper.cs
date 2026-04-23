@@ -54,7 +54,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
             Log.Debug("Executing node: {NodeName}", node.Name);
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var startTs = System.Diagnostics.Stopwatch.GetTimestamp();
             var success = true;
             string? error = null;
 
@@ -71,10 +71,10 @@ namespace MultiSocketRUDPBotTester.Bot
             }
             finally
             {
-                sw.Stop();
+                var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - startTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
                 ActionNodeBase.GetStatsTracker()?.RecordExecution(node.Name, sw.ElapsedMilliseconds, success, error);
-                client.GlobalContext.IncrementExecutionCount(node.Name);
-                client.GlobalContext.RecordMetric($"{node.Name}_time", sw.ElapsedMilliseconds);
+                client.GlobalContext.Increment(node.ExecCountKey);
+                client.GlobalContext.RecordMetricRaw(node.MetricFullKey, elapsedMs);
             }
 
             if (HandlesOwnNextNode(node))
