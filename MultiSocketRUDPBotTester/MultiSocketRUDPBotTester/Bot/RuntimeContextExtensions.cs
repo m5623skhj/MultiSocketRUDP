@@ -1,7 +1,4 @@
-﻿using System.CodeDom;
-using System.Collections.Concurrent;
-
-namespace MultiSocketRUDPBotTester.Bot
+﻿namespace MultiSocketRUDPBotTester.Bot
 {
     internal sealed class MetricAggregate
     {
@@ -125,7 +122,7 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             if (ctx.TryGet<MetricAggregate>($"__metric_{name}", out var agg) && agg != null && agg.Count > 0)
             {
-                return agg.Average();
+                return agg.Average;
             }
 
             return 0;
@@ -135,7 +132,7 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             if (ctx.TryGet<MetricAggregate>($"__metric_{name}", out var agg) && agg != null && agg.Count > 0)
             {
-                return agg.Min();
+                return agg.Min;
             }
 
             return 0;
@@ -145,7 +142,7 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             if (ctx.TryGet<MetricAggregate>($"__metric_{name}", out var agg) && agg != null && agg.Count > 0)
             {
-                return agg.Max();
+                return agg.Max;
             }
 
             return 0;

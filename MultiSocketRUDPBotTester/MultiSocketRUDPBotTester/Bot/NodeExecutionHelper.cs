@@ -72,7 +72,7 @@ namespace MultiSocketRUDPBotTester.Bot
             finally
             {
                 var elapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - startTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
-                ActionNodeBase.GetStatsTracker()?.RecordExecution(node.Name, sw.ElapsedMilliseconds, success, error);
+                ActionNodeBase.GetStatsTracker()?.RecordExecution(node.Name, elapsedMs, success, error);
                 client.GlobalContext.Increment(node.ExecCountKey);
                 client.GlobalContext.RecordMetricRaw(node.MetricFullKey, elapsedMs);
             }
