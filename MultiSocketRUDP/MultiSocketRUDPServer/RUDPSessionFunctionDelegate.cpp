@@ -108,7 +108,7 @@ void RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(RUDPSession& session, 
 	session.EnqueueToRecvBufferList(buffer);
 }
 
-std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSessionFunctionDelegate::GetCachedSequences(RUDPSession& session)
+std::vector<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSessionFunctionDelegate::GetCachedSequences(RUDPSession& session)
 {
 	return session.GetSendContext().GetCachedSequences();
 }

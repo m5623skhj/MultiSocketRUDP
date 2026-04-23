@@ -155,13 +155,7 @@ public:
 	// @return PacketSequenceSetKey 벡터 참조
 	// ----------------------------------------
 	[[nodiscard]]
-	std::vector<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet();
-	// ----------------------------------------
-	// @brief 캐시된 시퀀스 집합 보호용 mutex를 반환합니다.
-	// @return mutex 참조
-	// ----------------------------------------
-	[[nodiscard]]
-	std::mutex& GetCachedSequenceSetLock();
+	std::vector<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequences();
 
 	// ----------------------------------------
 	// @brief 마지막으로 사용된 송신 패킷 시퀀스를 반환합니다.

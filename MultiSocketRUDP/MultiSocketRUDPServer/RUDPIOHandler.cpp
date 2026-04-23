@@ -284,7 +284,7 @@ std::pair<bool, IOContext*> RUDPIOHandler::MakeSendContext(RUDPSession& session,
 
 std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdType threadId) const
 {
-	auto& packetSequences = sessionDelegate.packetSequences(session);
+	auto& packetSequences = sessionDelegate.GetCachedSequences(session);
 	packetSequences.clear();
 	
 	unsigned int totalSendSize = 0;
@@ -354,7 +354,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
 
-SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
+SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::vector<MultiSocketRUDP::PacketSequenceSetKey>& packetSequences, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
 	SendPacketInfo* sendPacketInfo = sessionDelegate.TryGetFrontAndPop(session);
 	if (sendPacketInfo == nullptr)
@@ -363,7 +363,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	}
 
 	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
-    if (std::find(packetSequenceSet.begin(), packetSequenceSet.end(), key) != packetSequenceSet.end())
+    if (std::find(packetSequences.begin(), packetSequences.end(), key) != packetSequences.end())
     {
         SendPacketInfo::Free(sendPacketInfo);
         return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
@@ -392,7 +392,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
-	packetSequenceSet.emplace_back(key);
+	packetSequences.emplace_back(key);
 	memcpy_s(&sessionDelegate.GetRIOSendBuffer(session)[beforeSendSize]
 		, MAX_SEND_BUFFER_SIZE - beforeSendSize
 		, sendPacketInfo->buffer->GetBufferPtr()
