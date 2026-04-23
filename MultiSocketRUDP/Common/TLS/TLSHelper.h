@@ -68,6 +68,12 @@ namespace TLSHelper
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 
+	    void SetPinnedSpkiSha256(std::vector<uint8_t> pin);
+
+	private:
+		[[nodiscard]]
+		bool VerifyPinnedCertificate() const;
+
 	private:
 		std::wstring serverName{};
 	};
@@ -84,12 +90,7 @@ namespace TLSHelper
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 
-	    void SetPinnedSpkiSha256(std::vector<uint8_t> pin);
-
 	private:
-		[[nodiscard]]
-		bool VerifyPinnedCertificate() const;
-
 		std::wstring storeName{};
 		std::wstring certSubjectName{};
 	};
