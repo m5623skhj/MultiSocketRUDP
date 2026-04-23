@@ -18,6 +18,9 @@ bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 
 	sendBufferId = bufferId;
 	pendingPacketQueue.Resize(pendingQueueCapacity);
+
+	cachedSequences.reserve(CACHED_SEQUENCE_SET_INITIAL_CAPACITY);
+	
 	return true;
 }
 
@@ -178,14 +181,9 @@ void SessionSendContext::ForEachAndClearSendPacketInfoMap(const std::function<vo
 	sendPacketInfoMap.clear();
 }
 
-std::set<MultiSocketRUDP::PacketSequenceSetKey>& SessionSendContext::GetCachedSequenceSet()
+std::vector<MultiSocketRUDP::PacketSequenceSetKey>& SessionSendContext::GetCachedSequences()
 {
-	return cachedSequenceSet;
-}
-
-std::mutex& SessionSendContext::GetCachedSequenceSetLock()
-{
-	return cachedSequenceSetLock;
+	return cachedSequences;
 }
 
 PacketSequence SessionSendContext::GetLastSendPacketSequence() const
