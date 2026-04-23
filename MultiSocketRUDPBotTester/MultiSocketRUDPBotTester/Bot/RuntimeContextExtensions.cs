@@ -102,5 +102,11 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             return ctx.GetOrDefault($"__exec_{nodeName}", 0);
         }
+
+        internal static void RecordMetricRaw(this RuntimeContext ctx, string fullKey, double value)
+        {
+            var agg = ctx.GetOrcreate(fullKey, () => new MetricAggregate());
+            agg.Add(value);
+        }
     }
 }
