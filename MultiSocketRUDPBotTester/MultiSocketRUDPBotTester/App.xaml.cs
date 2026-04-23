@@ -11,7 +11,7 @@ namespace MultiSocketRUDPBotTester
         protected override void OnStartup(StartupEventArgs e)
         {
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
+                .MinimumLevel.Infomation()
                 .WriteTo.File("logs\\app.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
             Log.Information("Application started.");
