@@ -235,16 +235,13 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperClient::Initialize(const std::wstring& inServerName)
+    bool TLSHelperClient::Initialize()
     {
-        serverName = inServerName;
-        
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
         cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION
-                    | SCH_CRED_NO_DEFAULT_CREDS 
-                    | SCH_CRED_REVOCATION_CHECK_CHAIN;
+                    | SCH_CRED_NO_DEFAULT_CREDS;
 
         return AcquireCredentialsHandle(
             nullptr,
@@ -257,6 +254,11 @@ namespace TLSHelper
             &credHandle,
             nullptr
         ) == SEC_E_OK;
+    }
+    
+    void TLSHelperClient::SetPinnedSpkiSha256(std::vector<uint8_t> pin)
+    {
+        pinnedSpkiSha256 = std::move(pin);
     }
 
     bool TLSHelperClient::Handshake(const SOCKET socket)
@@ -374,10 +376,70 @@ namespace TLSHelper
             return false;
         }
 
+        if (not VerifyPinnedCertificate())
+        {
+            DeleteSecurityContext(&ctxtHandle);
+            ZeroMemory(&ctxtHandle, sizeof(ctxtHandle));
+            return false;
+        }
+        
         handshakeCompleted = true;
         QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
 
         return true;
+    }
+
+    bool TLSHelperClient::VerifyPinnedCertificate() const
+    {
+        if (pinnedSpkiSha256.empty())
+        {
+            return false;   // 핀 미설정 = 실패 (fail-closed)
+        }
+
+        PCCERT_CONTEXT remote = nullptr;
+        const SECURITY_STATUS qs = QueryContextAttributes(
+            const_cast<CtxtHandle*>(&ctxtHandle),
+            SECPKG_ATTR_REMOTE_CERT_CONTEXT,
+            &remote);
+
+        if (qs != SEC_E_OK || remote == nullptr)
+        {
+            return false;
+        }
+
+        DWORD hashSize = 0;
+        if (not CryptHashPublicKeyInfo(
+            0,
+            CALG_SHA_256,
+            0,
+            X509_ASN_ENCODING,
+            &remote->pCertInfo->SubjectPublicKeyInfo,
+            nullptr,
+            &hashSize))
+        {
+            CertFreeCertificateContext(remote);
+            return false;
+        }
+
+        if (hashSize != pinnedSpkiSha256.size())
+        {
+            CertFreeCertificateContext(remote);
+            return false;
+        }
+
+        std::vector<uint8_t> hash(hashSize);
+        const bool hashOk = CryptHashPublicKeyInfo(
+            0,
+            CALG_SHA_256,
+            0,
+            X509_ASN_ENCODING,
+            &remote->pCertInfo->SubjectPublicKeyInfo,
+            hash.data(), &hashSize) != FALSE;
+
+        const bool match = hashOk && std::memcmp(hash.data(), pinnedSpkiSha256.data(), hashSize) == 0;
+
+        CertFreeCertificateContext(remote);
+        return match;
     }
 
     TLSHelperServer::TLSHelperServer(const std::wstring& inStoreName, const std::wstring& inCertSubjectName)
