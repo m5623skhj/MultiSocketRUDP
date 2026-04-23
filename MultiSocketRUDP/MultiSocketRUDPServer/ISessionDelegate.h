@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include <set>
+#include <vector>
 #include <shared_mutex>
 #include <winsock2.h>
 #include <MSWSock.h>
@@ -65,9 +65,7 @@ public:
 	[[nodiscard]]
 	virtual RIO_RQ GetSendRIORQ(const RUDPSession& session) = 0;
 	[[nodiscard]]
-	virtual std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) = 0;
-	[[nodiscard]]
-	virtual std::mutex& GetCachedSequenceSetMutex(RUDPSession& session) = 0;
+	virtual std::vector<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequences(RUDPSession& session) = 0;
 
 	[[nodiscard]]
 	virtual bool TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr) = 0;

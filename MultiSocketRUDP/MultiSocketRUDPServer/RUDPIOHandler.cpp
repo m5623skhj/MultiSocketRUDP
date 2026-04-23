@@ -284,15 +284,14 @@ std::pair<bool, IOContext*> RUDPIOHandler::MakeSendContext(RUDPSession& session,
 
 std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdType threadId) const
 {
-	std::scoped_lock cachedSequenceLock(sessionDelegate.GetCachedSequenceSetMutex(session));
-	auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
-	packetSequenceSet.clear();
+	auto& packetSequences = sessionDelegate.GetCachedSequences(session);
+	packetSequences.clear();
 	
 	unsigned int totalSendSize = 0;
 	const size_t bufferCount = sessionDelegate.GetSendPacketInfoQueueSize(session);
 	if (sessionDelegate.GetReservedSendPacketInfo(session) != nullptr)
 	{
-		if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
+		if (ReservedSendPacketInfoToStream(session, packetSequences, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
 		{
 			return { false, 0 };
 		}
@@ -300,7 +299,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session
 
 	for (size_t i = 0; i < bufferCount; ++i)
 	{
-		switch (StoredSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId))
+		switch (StoredSendPacketInfoToStream(session, packetSequences, totalSendSize, threadId))
 		{
 		case SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR:
 		{
@@ -318,7 +317,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session
 	return { true, totalSendSize };
 }
 
-SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
+SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(RUDPSession& session, std::vector<MultiSocketRUDP::PacketSequenceSetKey>& packetSequences, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
 	SendPacketInfo* sendPacketInfo = sessionDelegate.GetReservedSendPacketInfo(session);
 	if (sendPacketInfo == nullptr)
@@ -345,7 +344,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 
 	char* bufferPositionPointer = sessionDelegate.GetRIOSendBuffer(session);
 	memcpy_s(bufferPositionPointer, MAX_SEND_BUFFER_SIZE, sendPacketInfo->buffer->GetBufferPtr(), useSize);
-	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence });
+	packetSequences.emplace_back(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence });
 
 	totalSendSize += static_cast<int>(useSize);
 
@@ -355,7 +354,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
 
-SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
+SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RUDPSession& session, std::vector<MultiSocketRUDP::PacketSequenceSetKey>& packetSequences, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
 	SendPacketInfo* sendPacketInfo = sessionDelegate.TryGetFrontAndPop(session);
 	if (sendPacketInfo == nullptr)
@@ -364,11 +363,11 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	}
 
 	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
-	if (packetSequenceSet.contains(key) == true)
-	{
-		SendPacketInfo::Free(sendPacketInfo);
-		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
-	}
+    if (std::find(packetSequences.begin(), packetSequences.end(), key) != packetSequences.end())
+    {
+        SendPacketInfo::Free(sendPacketInfo);
+        return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
+    }
 
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
 	if (useSize > MAX_SEND_BUFFER_SIZE || useSize == 0)
@@ -393,7 +392,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
-	packetSequenceSet.insert(key);
+	packetSequences.emplace_back(key);
 	memcpy_s(&sessionDelegate.GetRIOSendBuffer(session)[beforeSendSize]
 		, MAX_SEND_BUFFER_SIZE - beforeSendSize
 		, sendPacketInfo->buffer->GetBufferPtr()
