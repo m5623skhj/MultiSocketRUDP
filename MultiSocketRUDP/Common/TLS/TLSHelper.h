@@ -75,7 +75,7 @@ namespace TLSHelper
 		bool VerifyPinnedCertificate() const;
 
 	private:
-		std::wstring serverName{};
+		std::vector<uint8_t> pinnedSpkiSha256{};
 	};
 
 	class TLSHelperServer : public TLSHelperBase
