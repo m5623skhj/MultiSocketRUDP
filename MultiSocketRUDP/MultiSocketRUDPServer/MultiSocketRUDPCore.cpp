@@ -215,25 +215,17 @@ void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, c
 		return;
 	}
 
-	bool isErased = false;
 	{
 		std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
 		if (eraseTarget->isInSendPacketInfoList)
 		{
-			if (eraseTarget->isInSendPacketInfoList)
-			{
-				sendPacketInfoList[threadId].erase(eraseTarget->listItor);
-				eraseTarget->isInSendPacketInfoList = false;
-				isErased = true;
-			}
+			sendPacketInfoList[threadId].erase(eraseTarget->listItor);
+			eraseTarget->isInSendPacketInfoList = false;
 		}
 		eraseTarget->isErasedPacketInfo = true;
 	}
 
-	if (isErased == true)
-	{
-		SendPacketInfo::Free(eraseTarget);
-	}
+	SendPacketInfo::Free(eraseTarget);
 }
 
 RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const
