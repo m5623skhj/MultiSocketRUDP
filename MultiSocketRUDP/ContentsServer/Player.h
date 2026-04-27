@@ -7,17 +7,9 @@ constexpr PlayerIdType InvalidPlayerId = 0;
 
 class Player final : public RUDPSession
 {
-public:
-	struct TraceStats
-	{
-		uint64_t pingRecvCount{};
-		uint64_t pongSendCount{};
-	};
-
 	Player() = delete;
 	~Player() override = default;
 	explicit Player(MultiSocketRUDPCore& inCore);
-	static TraceStats DrainTraceStats(); // TEMP_TPS_TRACE
 
 private:
 	void OnConnected() override;
