@@ -4,6 +4,7 @@ using MultiSocketRUDPBotTester.ClientCore;
 using Serilog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
@@ -103,7 +104,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             if (packetId == PacketId.Pong) // TEMP_TPS_TRACE
             {
                 Interlocked.Increment(ref _tracePongRecvCount);
-                Interlocked.Exchange(ref _traceLastDeliveredPongSequence, GetExpectedRecvSequenceForTrace());
+                Interlocked.Exchange(ref Unsafe.As<long, double>(ref _traceLastDeliveredPongSequence), GetExpectedRecvSequenceForTrace());
                 if (_tracePendingPingTicks.TryDequeue(out var pingInfo))
                 {
                     var elapsedMs = (long)Stopwatch.GetElapsedTime(pingInfo.tick).TotalMilliseconds;
