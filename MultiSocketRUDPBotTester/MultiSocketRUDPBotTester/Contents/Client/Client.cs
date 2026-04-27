@@ -3,16 +3,29 @@ using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.ClientCore;
 using Serilog;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
     public partial class Client : RudpSession
     {
+        private const string TempTpsTraceTag = "TEMP_TPS_TRACE";
+
         private ActionGraph actionGraph = new();
         public RuntimeContext GlobalContext { get; }
 
         private readonly ConcurrentDictionary<PacketId, ConcurrentDictionary<long, TaskCompletionSource<NetBuffer?>>> _packetWaiters = new();
         private long _nextWaiterId;
+        private long _tracePingSentCount;
+        private long _tracePongRecvCount;
+        private long _traceAckRecvCount;
+        private long _traceRetransmissionCount;
+        private long _traceWaitRegisteredCount;
+        private long _traceWaitTimeoutCount;
+        private long _traceWaitCompletedCount;
+        private long _traceLastPongRttMs;
+        private long _traceMaxPongRttMs;
+        private readonly ConcurrentQueue<(PacketSequence sequence, long tick)> _tracePendingPingTicks = new();
 
         public Client(byte[] sessionInfoStream)
             : base(sessionInfoStream)
@@ -28,13 +41,28 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             var waiters = _packetWaiters.GetOrAdd(packetId, _ => new ConcurrentDictionary<long, TaskCompletionSource<NetBuffer?>>());
             waiters[waiterId] = tcs;
+            Interlocked.Increment(ref _traceWaitRegisteredCount); // TEMP_TPS_TRACE
             
             try
             {
-                return await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs), cancellationToken).ConfigureAwait(false);
+                var result = await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs), cancellationToken).ConfigureAwait(false);
+                if (result != null)
+                {
+                    Interlocked.Increment(ref _traceWaitCompletedCount); // TEMP_TPS_TRACE
+                }
+
+                return result;
             }
             catch (TimeoutException)
             {
+                Interlocked.Increment(ref _traceWaitTimeoutCount); // TEMP_TPS_TRACE
+                Log.Warning(
+                    "[{Tag}][BOT_WAIT_TIMEOUT] sessionId={SessionId} packetId={PacketId} pendingSend={PendingSend} waiterCount={WaiterCount}",
+                    TempTpsTraceTag,
+                    GetSessionId(),
+                    packetId,
+                    GetPendingSendBufferCount(),
+                    GetCurrentWaiterCount());
                 return null;
             }
             finally
@@ -51,6 +79,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         protected override void OnConnected()
         {
             Log.Information("Client connected, triggering OnConnected event");
+            _ = Task.Run(TraceSummaryLoopAsync, CancellationToken.Token); // TEMP_TPS_TRACE
             actionGraph.TriggerEvent(this, TriggerType.OnConnected);
         }
 
@@ -65,6 +94,17 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         protected override void OnRecvPacket(PacketId packetId, NetBuffer buffer)
         {
             Log.Debug("Received packet with ID: {PacketId}", packetId);
+
+            if (packetId == PacketId.Pong) // TEMP_TPS_TRACE
+            {
+                Interlocked.Increment(ref _tracePongRecvCount);
+                if (_tracePendingPingTicks.TryDequeue(out var pingInfo))
+                {
+                    var elapsedMs = (long)Stopwatch.GetElapsedTime(pingInfo.tick).TotalMilliseconds;
+                    Interlocked.Exchange(ref _traceLastPongRttMs, elapsedMs);
+                    UpdateMaxRtt(elapsedMs);
+                }
+            }
 
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
@@ -83,6 +123,94 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             }
 
             actionGraph.TriggerEvent(this, TriggerType.OnPacketReceived, packetId, buffer);
+        }
+
+        protected override void OnTracePacketSent(PacketId packetId, PacketSequence packetSequence, PacketType packetType)
+        {
+            if (packetType != PacketType.SendType)
+            {
+                return;
+            }
+
+            if (packetId == PacketId.Ping)
+            {
+                Interlocked.Increment(ref _tracePingSentCount);
+                _tracePendingPingTicks.Enqueue((packetSequence, Stopwatch.GetTimestamp()));
+            }
+        }
+
+        protected override void OnTracePacketAcked(PacketSequence packetSequence)
+        {
+            Interlocked.Increment(ref _traceAckRecvCount);
+        }
+
+        protected override void OnTracePacketRetransmitted(PacketSequence packetSequence, long retransmissionCount, int pendingSendCount)
+        {
+            Interlocked.Increment(ref _traceRetransmissionCount);
+            Log.Debug(
+                "[{Tag}][BOT_RETRANSMIT] sessionId={SessionId} seq={Sequence} retransmissionCount={RetransmissionCount} pendingSend={PendingSend}",
+                TempTpsTraceTag,
+                GetSessionId(),
+                packetSequence,
+                retransmissionCount,
+                pendingSendCount);
+        }
+
+        private async Task TraceSummaryLoopAsync()
+        {
+            try
+            {
+                using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+                while (await timer.WaitForNextTickAsync(CancellationToken.Token).ConfigureAwait(false))
+                {
+                    Log.Information(
+                        "[{Tag}][BOT_SUMMARY] sessionId={SessionId} pingSent={PingSent} pongRecv={PongRecv} ackRecv={AckRecv} retransmits={Retransmits} waitRegistered={WaitRegistered} waitCompleted={WaitCompleted} waitTimeout={WaitTimeout} pendingSend={PendingSend} waiterCount={WaiterCount} lastPongRttMs={LastPongRttMs} maxPongRttMs={MaxPongRttMs}",
+                        TempTpsTraceTag,
+                        GetSessionId(),
+                        Interlocked.Exchange(ref _tracePingSentCount, 0),
+                        Interlocked.Exchange(ref _tracePongRecvCount, 0),
+                        Interlocked.Exchange(ref _traceAckRecvCount, 0),
+                        Interlocked.Exchange(ref _traceRetransmissionCount, 0),
+                        Interlocked.Exchange(ref _traceWaitRegisteredCount, 0),
+                        Interlocked.Exchange(ref _traceWaitCompletedCount, 0),
+                        Interlocked.Exchange(ref _traceWaitTimeoutCount, 0),
+                        GetPendingSendBufferCount(),
+                        GetCurrentWaiterCount(),
+                        Interlocked.Read(ref _traceLastPongRttMs),
+                        Interlocked.Read(ref _traceMaxPongRttMs));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private int GetCurrentWaiterCount()
+        {
+            var waiterCount = 0;
+            foreach (var waitersById in _packetWaiters.Values)
+            {
+                waiterCount += waitersById.Count;
+            }
+
+            return waiterCount;
+        }
+
+        private void UpdateMaxRtt(long elapsedMs)
+        {
+            while (true)
+            {
+                var currentMax = Interlocked.Read(ref _traceMaxPongRttMs);
+                if (elapsedMs <= currentMax)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref _traceMaxPongRttMs, elapsedMs, currentMax) == currentMax)
+                {
+                    return;
+                }
+            }
         }
     }
 }
