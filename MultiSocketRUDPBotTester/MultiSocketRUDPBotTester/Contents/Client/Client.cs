@@ -9,8 +9,6 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 {
     public partial class Client : RudpSession
     {
-        private const string TempTpsTraceTag = "TEMP_TPS_TRACE";
-
         private ActionGraph actionGraph = new();
         public RuntimeContext GlobalContext { get; }
 
@@ -25,6 +23,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         private long _traceWaitCompletedCount;
         private long _traceLastPongRttMs;
         private long _traceMaxPongRttMs;
+        private long _traceLastDeliveredPongSequence;
+        private long _traceOldOrDuplicatePacketCount;
         private readonly ConcurrentQueue<(PacketSequence sequence, long tick)> _tracePendingPingTicks = new();
 
         public Client(byte[] sessionInfoStream)
@@ -57,12 +57,17 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             {
                 Interlocked.Increment(ref _traceWaitTimeoutCount); // TEMP_TPS_TRACE
                 Log.Warning(
-                    "[{Tag}][BOT_WAIT_TIMEOUT] sessionId={SessionId} packetId={PacketId} pendingSend={PendingSend} waiterCount={WaiterCount}",
+                    "[{Tag}][BOT_WAIT_TIMEOUT] sessionId={SessionId} packetId={PacketId} pendingSend={PendingSend} waiterCount={WaiterCount} expectedRecvSequence={ExpectedRecvSequence} holdingCount={HoldingCount} holdingFirst={HoldingFirst} holdingLast={HoldingLast} lastDeliveredPongSequence={LastDeliveredPongSequence}",
                     TempTpsTraceTag,
                     GetSessionId(),
                     packetId,
                     GetPendingSendBufferCount(),
-                    GetCurrentWaiterCount());
+                    GetCurrentWaiterCount(),
+                    GetExpectedRecvSequenceForTrace(),
+                    GetHoldingPacketCountForTrace(),
+                    GetHoldingFirstForTrace(),
+                    GetHoldingLastForTrace(),
+                    Interlocked.Read(ref _traceLastDeliveredPongSequence));
                 return null;
             }
             finally
@@ -98,6 +103,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             if (packetId == PacketId.Pong) // TEMP_TPS_TRACE
             {
                 Interlocked.Increment(ref _tracePongRecvCount);
+                Interlocked.Exchange(ref _traceLastDeliveredPongSequence, GetExpectedRecvSequenceForTrace());
                 if (_tracePendingPingTicks.TryDequeue(out var pingInfo))
                 {
                     var elapsedMs = (long)Stopwatch.GetElapsedTime(pingInfo.tick).TotalMilliseconds;
@@ -148,12 +154,17 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         {
             Interlocked.Increment(ref _traceRetransmissionCount);
             Log.Debug(
-                "[{Tag}][BOT_RETRANSMIT] sessionId={SessionId} seq={Sequence} retransmissionCount={RetransmissionCount} pendingSend={PendingSend}",
+                "[{Tag}][BOT_RETRANSMIT] sessionId={SessionId} seq={Sequence} retransmissionCount={RetransmissionCount} pendingSend={PendingSend} expectedRecvSequence={ExpectedRecvSequence} holdingCount={HoldingCount} holdingFirst={HoldingFirst} holdingLast={HoldingLast} waiterCount={WaiterCount}",
                 TempTpsTraceTag,
                 GetSessionId(),
                 packetSequence,
                 retransmissionCount,
-                pendingSendCount);
+                pendingSendCount,
+                GetExpectedRecvSequenceForTrace(),
+                GetHoldingPacketCountForTrace(),
+                GetHoldingFirstForTrace(),
+                GetHoldingLastForTrace(),
+                GetCurrentWaiterCount());
         }
 
         private async Task TraceSummaryLoopAsync()
@@ -164,7 +175,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 while (await timer.WaitForNextTickAsync(CancellationToken.Token).ConfigureAwait(false))
                 {
                     Log.Information(
-                        "[{Tag}][BOT_SUMMARY] sessionId={SessionId} pingSent={PingSent} pongRecv={PongRecv} ackRecv={AckRecv} retransmits={Retransmits} waitRegistered={WaitRegistered} waitCompleted={WaitCompleted} waitTimeout={WaitTimeout} pendingSend={PendingSend} waiterCount={WaiterCount} lastPongRttMs={LastPongRttMs} maxPongRttMs={MaxPongRttMs}",
+                        "[{Tag}][BOT_SUMMARY] sessionId={SessionId} pingSent={PingSent} pongRecv={PongRecv} ackRecv={AckRecv} retransmits={Retransmits} waitRegistered={WaitRegistered} waitCompleted={WaitCompleted} waitTimeout={WaitTimeout} pendingSend={PendingSend} waiterCount={WaiterCount} expectedRecvSequence={ExpectedRecvSequence} holdingCount={HoldingCount} holdingFirst={HoldingFirst} holdingLast={HoldingLast} oldOrDuplicatePackets={OldOrDuplicatePackets} lastDeliveredPongSequence={LastDeliveredPongSequence} lastPongRttMs={LastPongRttMs} maxPongRttMs={MaxPongRttMs}",
                         TempTpsTraceTag,
                         GetSessionId(),
                         Interlocked.Exchange(ref _tracePingSentCount, 0),
@@ -176,6 +187,12 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                         Interlocked.Exchange(ref _traceWaitTimeoutCount, 0),
                         GetPendingSendBufferCount(),
                         GetCurrentWaiterCount(),
+                        GetExpectedRecvSequenceForTrace(),
+                        GetHoldingPacketCountForTrace(),
+                        GetHoldingFirstForTrace(),
+                        GetHoldingLastForTrace(),
+                        Interlocked.Exchange(ref _traceOldOrDuplicatePacketCount, 0),
+                        Interlocked.Read(ref _traceLastDeliveredPongSequence),
                         Interlocked.Read(ref _traceLastPongRttMs),
                         Interlocked.Read(ref _traceMaxPongRttMs));
                 }
@@ -196,6 +213,20 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             return waiterCount;
         }
 
+        private long GetHoldingFirstForTrace()
+        {
+            return TryGetHoldingPacketRangeForTrace(out var first, out _)
+                ? (long)first
+                : -1;
+        }
+
+        private long GetHoldingLastForTrace()
+        {
+            return TryGetHoldingPacketRangeForTrace(out _, out var last)
+                ? (long)last
+                : -1;
+        }
+
         private void UpdateMaxRtt(long elapsedMs)
         {
             while (true)
@@ -211,6 +242,11 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                     return;
                 }
             }
+        }
+
+        protected override void OnTraceOldOrDuplicatePacket(PacketId packetId, PacketSequence packetSequence, PacketSequence expectedPacketSequence)
+        {
+            Interlocked.Increment(ref _traceOldOrDuplicatePacketCount);
         }
     }
 }
