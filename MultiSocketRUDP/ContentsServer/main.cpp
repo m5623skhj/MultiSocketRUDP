@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include "LogExtension.h"
 #include "ServerConsole.h"
+#include "Logger.h"
 
 int main()
 {
