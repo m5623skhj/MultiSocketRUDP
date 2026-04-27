@@ -166,6 +166,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
         protected virtual void OnDisconnected() { }
         protected virtual void OnTracePacketSent(PacketId packetId, PacketSequence packetSequence, PacketType packetType) { } // TEMP_TPS_TRACE
         protected virtual void OnTracePacketAcked(PacketSequence packetSequence) { } // TEMP_TPS_TRACE
+        protected virtual void OnTracePacketDecoded(PacketId packetId, PacketSequence packetSequence, PacketType packetType) { } // TEMP_TPS_TRACE
+        protected virtual void OnTracePacketDelivered(PacketId packetId, PacketSequence packetSequence) { } // TEMP_TPS_TRACE
         protected virtual void OnTracePacketRetransmitted(PacketSequence packetSequence, long retransmissionCount, int pendingSendCount) { } // TEMP_TPS_TRACE
         protected virtual void OnTraceOldOrDuplicatePacket(PacketId packetId, PacketSequence packetSequence, PacketSequence expectedPacketSequence) { } // TEMP_TPS_TRACE
 
@@ -385,7 +387,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var packetSequence = buffer.ReadULong();
             var packetId = PacketId.InvalidPacketId;
             if (!isCorePacket)
+            {
                 packetId = (PacketId)buffer.ReadUInt();
+                OnTracePacketDecoded(packetId, packetSequence, packetType); // TEMP_TPS_TRACE
+            }
 
             switch (packetType)
             {
@@ -399,9 +404,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     var packetsToProcess = CollectPacketsToProcess(packetSequence, packetId, buffer);
                     foreach (var (sequence, pid, buf) in packetsToProcess)
                     {
+                        var capturedSequence = sequence;
                         var capturedPid = pid;
                         var capturedBuf = buf;
-                        recvProcessingChannel.Writer.TryWrite(() => OnRecvPacket(capturedPid, capturedBuf));
+                        recvProcessingChannel.Writer.TryWrite(() =>
+                        {
+                            OnTracePacketDelivered(capturedPid, capturedSequence); // TEMP_TPS_TRACE
+                            OnRecvPacket(capturedPid, capturedBuf);
+                        });
                     }
                     break;
 

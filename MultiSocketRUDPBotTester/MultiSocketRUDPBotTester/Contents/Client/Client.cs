@@ -4,7 +4,6 @@ using MultiSocketRUDPBotTester.ClientCore;
 using Serilog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace MultiSocketRUDPBotTester.Contents.Client
 {
@@ -104,7 +103,6 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             if (packetId == PacketId.Pong) // TEMP_TPS_TRACE
             {
                 Interlocked.Increment(ref _tracePongRecvCount);
-                Interlocked.Exchange(ref Unsafe.As<long, double>(ref _traceLastDeliveredPongSequence), GetExpectedRecvSequenceForTrace());
                 if (_tracePendingPingTicks.TryDequeue(out var pingInfo))
                 {
                     var elapsedMs = (long)Stopwatch.GetElapsedTime(pingInfo.tick).TotalMilliseconds;
@@ -149,6 +147,39 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         protected override void OnTracePacketAcked(PacketSequence packetSequence)
         {
             Interlocked.Increment(ref _traceAckRecvCount);
+        }
+
+        protected override void OnTracePacketDecoded(PacketId packetId, PacketSequence packetSequence, PacketType packetType)
+        {
+            if (packetType != PacketType.SendType || packetId != PacketId.Pong)
+            {
+                return;
+            }
+
+            Log.Debug(
+                "[{Tag}][BOT_RECV_DECODED] sessionId={SessionId} packetId={PacketId} seq={Sequence} expectedRecvSequence={ExpectedRecvSequence}",
+                TempTpsTraceTag,
+                GetSessionId(),
+                packetId,
+                packetSequence,
+                GetExpectedRecvSequenceForTrace());
+        }
+
+        protected override void OnTracePacketDelivered(PacketId packetId, PacketSequence packetSequence)
+        {
+            if (packetId != PacketId.Pong)
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref _traceLastDeliveredPongSequence, unchecked((long)packetSequence));
+            Log.Debug(
+                "[{Tag}][BOT_RECV_DELIVERED] sessionId={SessionId} packetId={PacketId} seq={Sequence} waiterCount={WaiterCount}",
+                TempTpsTraceTag,
+                GetSessionId(),
+                packetId,
+                packetSequence,
+                GetCurrentWaiterCount());
         }
 
         protected override void OnTracePacketRetransmitted(PacketSequence packetSequence, long retransmissionCount, int pendingSendCount)
