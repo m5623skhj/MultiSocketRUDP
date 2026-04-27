@@ -469,6 +469,10 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	SendPacketInfo* sendPacketInfo = rioContext.GetSendContext().FindAndEraseSendPacketInfo(packetSequence);
 	if (sendPacketInfo == nullptr)
 	{
+		LOG_DEBUG(std::format(
+			"[TEMP_TPS_TRACE][SERVER_ACK_MISS] sessionId={} seq={}",
+			sessionId,
+			packetSequence));
 		return;
 	}
 
@@ -480,6 +484,9 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 
 void RUDPSession::OnRetransmissionTimeout() noexcept
 {
+	LOG_DEBUG(std::format(
+		"[TEMP_TPS_TRACE][SERVER_RETRANSMIT_TIMEOUT] sessionId={}",
+		sessionId));
 	flowManager.OnTimeout();
 }
 

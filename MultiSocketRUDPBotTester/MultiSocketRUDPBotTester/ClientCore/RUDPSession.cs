@@ -137,6 +137,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual void OnConnected() { }
         protected virtual void OnDisconnected() { }
+        protected virtual void OnTracePacketSent(PacketId packetId, PacketSequence packetSequence, PacketType packetType) { } // TEMP_TPS_TRACE
+        protected virtual void OnTracePacketAcked(PacketSequence packetSequence) { } // TEMP_TPS_TRACE
+        protected virtual void OnTracePacketRetransmitted(PacketSequence packetSequence, long retransmissionCount, int pendingSendCount) { } // TEMP_TPS_TRACE
 
         protected RudpSession(byte[] sessionInfoStream)
         {
@@ -145,6 +148,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public SessionIdType GetSessionId() => SessionInfo.SessionId;
         public bool IsConnected() => isConnected;
+        protected int GetPendingSendBufferCount() => bufferStore.GetSendBufferCount(); // TEMP_TPS_TRACE
 
         private void ParseSessionBrokerResponse(byte[] data)
         {
@@ -196,6 +200,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
 
             await SendPacketInternal(new SendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
+            OnTracePacketSent(packetId, sequence, packetType); // TEMP_TPS_TRACE
         }
 
         private async Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)
@@ -464,6 +469,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 return;
 
             bufferStore.RemoveSendBuffer(packetSequence);
+            OnTracePacketAcked(packetSequence); // TEMP_TPS_TRACE
         }
 
         private async Task RetransmissionAsync()
@@ -497,6 +503,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         }
 
                         info.RefreshSendPacketInfo(nowMs);
+                        OnTracePacketRetransmitted(
+                            info.PacketSequence,
+                            info.GetRetransmissionCount(),
+                            sendPacketInfos.Count); // TEMP_TPS_TRACE
 
                         var client = udpClient;
                         if (client == null)
