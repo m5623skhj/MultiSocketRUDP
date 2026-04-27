@@ -12,6 +12,7 @@ SendPacketInfo::~SendPacketInfo()
 	ownerGeneration = {};
 	retransmissionCount = {};
 	sendPacketSequence = {};
+	tracePacketId = {};
 	retransmissionTimeStamp = {};
 	listItor = {};
 	isErasedPacketInfo = {};

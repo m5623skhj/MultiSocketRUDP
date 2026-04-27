@@ -17,6 +17,7 @@ struct SendPacketInfo
 	uint32_t ownerGeneration{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
+	unsigned int tracePacketId{};
 	unsigned long long retransmissionTimeStamp{};
 	std::atomic_bool isErasedPacketInfo{};
 	bool isInSendPacketInfoList{};
