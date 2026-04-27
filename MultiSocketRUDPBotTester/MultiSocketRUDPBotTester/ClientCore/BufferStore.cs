@@ -32,6 +32,11 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     {
         return Interlocked.Read(ref retransmissionCount) >= RetransmissionMaxCount;
     }
+
+    public long GetRetransmissionCount()
+    {
+        return Interlocked.Read(ref retransmissionCount);
+    }
 }
 
 public class BufferStore

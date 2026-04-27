@@ -7,12 +7,23 @@
 namespace Local
 {
 	static std::atomic_int16_t playerCount = 0;
+	std::atomic_uint64_t pingRecvCount = 0; // TEMP_TPS_TRACE
+	std::atomic_uint64_t pongSendCount = 0; // TEMP_TPS_TRACE
 }
 
 Player::Player(MultiSocketRUDPCore& inCore)
 	: RUDPSession(inCore)
 {
 	RegisterAllPacketHandler();
+}
+
+Player::TraceStats Player::DrainTraceStats()
+{
+	return
+	{
+		.pingRecvCount = Local::pingRecvCount.exchange(0, std::memory_order_relaxed),
+		.pongSendCount = Local::pongSendCount.exchange(0, std::memory_order_relaxed)
+	};
 }
 
 void Player::OnConnected()

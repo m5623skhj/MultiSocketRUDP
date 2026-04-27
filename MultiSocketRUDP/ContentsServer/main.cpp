@@ -1,7 +1,9 @@
 #include "PreCompile.h"
 #include "TestServer.h"
 #include "PlayerPacketHandlerRegister.h"
+#include "Player.h"
 #include <Windows.h>
+#include "LogExtension.h"
 #include "ServerConsole.h"
 
 int main()
@@ -45,6 +47,21 @@ int main()
 		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
 		serverStats.tps = TestServer::GetInst().GetTPS();
 		serverStats.error = TestServer::GetInst().GetNumOfError();
+
+		const auto traceStats = Player::DrainTraceStats(); // TEMP_TPS_TRACE
+		const auto log = Logger::MakeLogObject<ServerLog>(); // TEMP_TPS_TRACE
+		log->logString = std::format(
+			"[TEMP_TPS_TRACE][SERVER_SUMMARY] players={} connected={} disconnected={} retransDisconnect={} tps={} "
+			"pingRecv={} pongSent={} errors={}",
+			serverStats.player.load(),
+			serverStats.connected.load(),
+			serverStats.disconnected.load(),
+			serverStats.retrans.load(),
+			serverStats.tps.load(),
+			traceStats.pingRecvCount,
+			traceStats.pongSendCount,
+			serverStats.error.load());
+		Logger::GetInstance().WriteLog(log);
 
 		TestServer::GetInst().ResetTPS();
 	}
