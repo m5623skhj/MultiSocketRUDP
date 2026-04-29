@@ -50,6 +50,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public PacketSequence Sequence { get; set; }
         public PacketId PacketId { get; set; }
         public NetBuffer Buffer { get; set; } = null!;
+        public PacketType PacketType { get; set; }
     }
 
     public class HoldingPacketStore
@@ -395,15 +396,17 @@ namespace MultiSocketRUDPBotTester.ClientCore
             switch (packetType)
             {
                 case PacketType.HeartbeatType:
-                    await SendReplyToServerAsync(packetSequence).ConfigureAwait(false);
-                    break;
-
                 case PacketType.SendType:
                     await SendReplyToServerAsync(packetSequence).ConfigureAwait(false);
 
-                    var packetsToProcess = CollectPacketsToProcess(packetSequence, packetId, buffer);
-                    foreach (var (sequence, pid, buf) in packetsToProcess)
+                    var packetsToProcess = CollectPacketsToProcess(packetSequence, packetId, buffer, packetType);
+                    foreach (var (sequence, pid, buf, type) in packetsToProcess)
                     {
+                        if (type == PacketType.HeartbeatType)
+                        {
+                            continue;
+                        }
+
                         var capturedSequence = sequence;
                         var capturedPid = pid;
                         var capturedBuf = buf;
@@ -421,13 +424,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
-        private List<(PacketSequence packetSequence, PacketId packetId, NetBuffer buffer)> CollectPacketsToProcess(
+        private List<(PacketSequence, PacketId, NetBuffer, PacketType)> CollectPacketsToProcess(
             PacketSequence packetSequence,
             PacketId packetId,
-            NetBuffer buffer)
+            NetBuffer buffer,
+            PacketType packetType)
         {
-            var result = new List<(PacketSequence, PacketId, NetBuffer)>();
-
+            var result = new List<(PacketSequence, PacketId, NetBuffer, PacketType)>();
             lock (expectedRecvSequenceLock)
             {
                 if (packetSequence <= expectedRecvSequence)
@@ -439,7 +442,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 if (packetSequence == expectedRecvSequence + 1)
                 {
                     expectedRecvSequence = packetSequence;
-                    result.Add((packetSequence, packetId, buffer));
+                    result.Add((packetSequence, packetId, buffer, packetType));
 
                     while (holdingPacketStore.TryGetFirst(out var nextSeq, out var held))
                     {
@@ -448,14 +451,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                         expectedRecvSequence = nextSeq;
                         holdingPacketStore.Remove(nextSeq);
-                        result.Add((held.Sequence, held.PacketId, held.Buffer));
+                        result.Add((held.Sequence, held.PacketId, held.Buffer, held.PacketType));
                     }
                 }
                 else
                 {
                     var gapSize = packetSequence - (expectedRecvSequence + 1);
                     holdingPacketStore.Add(packetSequence,
-                        new HeldPacket { Sequence = packetSequence, PacketId = packetId, Buffer = buffer });
+                        new HeldPacket { Sequence = packetSequence, PacketId = packetId, Buffer = buffer, PacketType = packetType });
 
                     var holdingCount = holdingPacketStore.GetCount();
                     holdingPacketStore.TryGetRange(out var holdingFirst, out var holdingLast);
