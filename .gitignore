@@ -31,3 +31,7 @@ MultiSocketRUDP/Tool/PacketUploader/credentials.json
 MultiSocketRUDP/CoreTest/x64/
 .vs/
 *.cpp
+.dotnet-cli/
+MultiSocketRUDP/ContentsServer/ContentsServer/x64/Debug/vc143.idb
+MultiSocketRUDP/ContentsServer/ContentsServer/x64/Debug/vc143.pdb
+MultiSocketRUDP/ContentsServer/ContentsServer/x64/
