@@ -7,11 +7,15 @@ using System.Windows.Shapes;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.ClientCore;
 using MultiSocketRUDPBotTester.Evaluation;
+using MultiSocketRUDPBotTester.Graph;
 using MultiSocketRUDPBotTester.Windows;
 using MultiSocketRUDPBotTester.CanvasRenderer;
 using WpfCanvas = System.Windows.Controls.Canvas;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Win32;
 using Path = System.IO.Path;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
 
 namespace MultiSocketRUDPBotTester
@@ -34,6 +38,11 @@ namespace MultiSocketRUDPBotTester
         private Window? statsWindow;
 
         private WithGeminiClient.GeminiClient geminiClient = null!;
+        private static readonly JsonSerializerOptions GraphFileJsonOptions = new()
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
 
         public BotActionGraphWindow()
         {
@@ -339,6 +348,77 @@ namespace MultiSocketRUDPBotTester
             Log($"Node added: {t.Name}");
         }
 
+        private void SaveGraph_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new SaveFileDialog
+                {
+                    Filter = "Bot Graph (*.botgraph.json)|*.botgraph.json|JSON Files (*.json)|*.json",
+                    DefaultExt = ".botgraph.json",
+                    AddExtension = true,
+                    FileName = "BotActionGraph.botgraph.json"
+                };
+
+                if (dialog.ShowDialog(this) != true)
+                {
+                    return;
+                }
+
+                var graphFile = CreateGraphFileModel();
+                var json = JsonSerializer.Serialize(graphFile, GraphFileJsonOptions);
+                File.WriteAllText(dialog.FileName, json);
+
+                Log($"Graph saved: {dialog.FileName}");
+                SetStatusText("Graph Saved", Brushes.LightGreen);
+            }
+            catch (Exception ex)
+            {
+                Log($"Error saving graph: {ex.Message}");
+                SetStatusText("Save Failed", Brushes.IndianRed);
+                MessageBox.Show($"Error saving graph: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadGraph_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Filter = "Bot Graph (*.botgraph.json)|*.botgraph.json|JSON Files (*.json)|*.json",
+                    Multiselect = false
+                };
+
+                if (dialog.ShowDialog(this) != true)
+                {
+                    return;
+                }
+
+                var json = File.ReadAllText(dialog.FileName);
+                var graphFile = JsonSerializer.Deserialize<GraphFileModel>(json, GraphFileJsonOptions);
+                if (graphFile == null || graphFile.Nodes.Count == 0)
+                {
+                    throw new InvalidOperationException("Graph file is empty or invalid.");
+                }
+
+                ClearCurrentGraph();
+                RestoreGraphFromFile(graphFile);
+                BuiltGraph = null;
+
+                Log($"Graph loaded: {dialog.FileName}");
+                SetStatusText("Graph Loaded", Brushes.LightBlue);
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading graph: {ex.Message}");
+                SetStatusText("Load Failed", Brushes.IndianRed);
+                MessageBox.Show($"Error loading graph: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void CreateDynamicPorts(NodeVisual node, int count)
         {
             foreach (var port in node.DynamicOutputPorts)
@@ -552,6 +632,107 @@ namespace MultiSocketRUDPBotTester
             Log($"Graph restored with {allNodes.Count} nodes.");
         }
 
+        private void RestoreGraphFromFile(GraphFileModel graphFile)
+        {
+            var nodeMapping = new Dictionary<int, NodeVisual>();
+
+            foreach (var saved in graphFile.Nodes)
+            {
+                var newNode = CreateNodeFromFileModel(saved);
+                nodeMapping[saved.Id] = newNode;
+                AddNodeToCanvas(newNode);
+            }
+
+            foreach (var saved in graphFile.Nodes)
+            {
+                if (!nodeMapping.TryGetValue(saved.Id, out var newNode))
+                {
+                    continue;
+                }
+
+                if (saved.NextNodeId.HasValue && nodeMapping.TryGetValue(saved.NextNodeId.Value, out var next))
+                {
+                    newNode.Next = next;
+                }
+                if (saved.TrueChildId.HasValue && nodeMapping.TryGetValue(saved.TrueChildId.Value, out var trueNode))
+                {
+                    newNode.TrueChild = trueNode;
+                }
+                if (saved.FalseChildId.HasValue && nodeMapping.TryGetValue(saved.FalseChildId.Value, out var falseNode))
+                {
+                    newNode.FalseChild = falseNode;
+                }
+
+                for (var i = 0; i < saved.DynamicChildIds.Count && i < newNode.DynamicChildren.Count; i++)
+                {
+                    var childId = saved.DynamicChildIds[i];
+                    if (childId.HasValue && nodeMapping.TryGetValue(childId.Value, out var childNode))
+                    {
+                        newNode.DynamicChildren[i] = childNode;
+                    }
+                }
+            }
+
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Loaded,
+                new Action(() => renderer.RedrawConnections()));
+            Log($"Graph restored with {allNodes.Count} nodes.");
+        }
+
+        private NodeVisual CreateNodeFromFileModel(NodeVisualFileModel saved)
+        {
+            var nodeType = ResolveNodeType(saved.NodeTypeName, saved.IsRoot);
+            var color = saved.IsRoot ? Brushes.DarkGreen : GetNodeColor(saved.Category);
+            var title = saved.IsRoot ? "OnConnected" : ResolveNodeTitle(nodeType, saved.NodeTypeName);
+            var border = CreateNodeVisual(title, color);
+
+            var newNode = new NodeVisual
+            {
+                Border = border,
+                Category = saved.Category,
+                InputPort = CreateInputPort(),
+                IsRoot = saved.IsRoot,
+                NodeType = nodeType,
+                Configuration = CloneConfiguration(saved.Configuration),
+                NextPortType = saved.NextPortType,
+                TruePortType = saved.TruePortType,
+                FalsePortType = saved.FalsePortType
+            };
+
+            if (saved.IsRoot)
+            {
+                newNode.ActionNode = new CustomActionNode
+                {
+                    Name = "OnConnected",
+                    Trigger = new TriggerCondition { Type = TriggerType.OnConnected }
+                };
+            }
+
+            if (newNode.NodeType == typeof(RandomChoiceNode))
+            {
+                CreateDynamicPorts(newNode, saved.DynamicPortTypes.Count);
+            }
+            else if (!saved.IsRoot && saved.Category == NodeCategory.Action)
+            {
+                newNode.OutputPort = CreateOutputPort("default");
+            }
+            else if (!saved.IsRoot)
+            {
+                newNode.OutputPortTrue = CreateOutputPort(
+                    saved.Category == NodeCategory.Condition ? "true" : "continue");
+                newNode.OutputPortFalse = CreateOutputPort(
+                    saved.Category == NodeCategory.Condition ? "false" : "exit");
+            }
+            else
+            {
+                newNode.OutputPort = CreateOutputPort("default");
+            }
+
+            WpfCanvas.SetLeft(border, saved.Left);
+            WpfCanvas.SetTop(border, saved.Top);
+            return newNode;
+        }
+
         private NodeVisual CloneNodeVisual(NodeVisual original, (double left, double top) position)
         {
             var color = original.IsRoot ? Brushes.DarkGreen : GetNodeColor(original.Category);
@@ -613,6 +794,158 @@ namespace MultiSocketRUDPBotTester
                 StringValue = original.StringValue,
                 IntValue = original.IntValue,
                 Properties = new Dictionary<string, object>(original.Properties)
+            };
+        }
+
+        private static NodeConfiguration? CloneConfiguration(NodeConfigurationFileModel? original)
+        {
+            if (original == null)
+            {
+                return null;
+            }
+
+            return new NodeConfiguration
+            {
+                PacketId = original.PacketId,
+                StringValue = original.StringValue,
+                IntValue = original.IntValue,
+                Properties = original.Properties.ToDictionary(
+                    pair => pair.Key,
+                    pair => ConvertJsonElementToPropertyValue(pair.Value))
+            };
+        }
+
+        private GraphFileModel CreateGraphFileModel()
+        {
+            var nodeIds = allNodes
+                .Select((node, index) => new { node, id = index + 1 })
+                .ToDictionary(x => x.node, x => x.id);
+
+            return new GraphFileModel
+            {
+                Name = BuiltGraph?.Name ?? "Bot Action Graph",
+                Nodes = allNodes.Select(node => new NodeVisualFileModel
+                {
+                    Id = nodeIds[node],
+                    IsRoot = node.IsRoot,
+                    NodeTypeName = node.NodeType?.AssemblyQualifiedName,
+                    Category = node.Category,
+                    Left = NormalizeCanvasPosition(WpfCanvas.GetLeft(node.Border)),
+                    Top = NormalizeCanvasPosition(WpfCanvas.GetTop(node.Border)),
+                    Configuration = CreateConfigurationFileModel(node.Configuration),
+                    NextPortType = node.NextPortType,
+                    TruePortType = node.TruePortType,
+                    FalsePortType = node.FalsePortType,
+                    NextNodeId = node.Next != null && nodeIds.TryGetValue(node.Next, out var nextId) ? nextId : null,
+                    TrueChildId = node.TrueChild != null && nodeIds.TryGetValue(node.TrueChild, out var trueId) ? trueId : null,
+                    FalseChildId = node.FalseChild != null && nodeIds.TryGetValue(node.FalseChild, out var falseId) ? falseId : null,
+                    DynamicPortTypes = [.. node.DynamicPortTypes],
+                    DynamicChildIds = node.DynamicChildren
+                        .Select(child => child != null && nodeIds.TryGetValue(child, out var childId) ? childId : (int?)null)
+                        .ToList()
+                }).ToList()
+            };
+        }
+
+        private static NodeConfigurationFileModel? CreateConfigurationFileModel(NodeConfiguration? configuration)
+        {
+            if (configuration == null)
+            {
+                return null;
+            }
+
+            return new NodeConfigurationFileModel
+            {
+                PacketId = configuration.PacketId,
+                StringValue = configuration.StringValue,
+                IntValue = configuration.IntValue,
+                Properties = configuration.Properties.ToDictionary(
+                    pair => pair.Key,
+                    pair => JsonSerializer.SerializeToElement(pair.Value, pair.Value?.GetType() ?? typeof(object)))
+            };
+        }
+
+        private void ClearCurrentGraph()
+        {
+            selectedNode = null;
+            BuiltGraph = null;
+
+            foreach (var node in allNodes)
+            {
+                if (node.Border.ContextMenu == null)
+                {
+                    continue;
+                }
+
+                node.Border.ContextMenu.Items.Clear();
+                node.Border.ContextMenu = null;
+            }
+
+            allNodes.Clear();
+            GraphCanvas.Children.Clear();
+        }
+
+        private static double NormalizeCanvasPosition(double value) => double.IsNaN(value) ? 0 : value;
+
+        private static Type? ResolveNodeType(string? nodeTypeName, bool isRoot)
+        {
+            if (isRoot)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(nodeTypeName))
+            {
+                throw new InvalidOperationException("Loaded graph node is missing its type name.");
+            }
+
+            var resolvedType = Type.GetType(nodeTypeName, throwOnError: false);
+            if (resolvedType != null)
+            {
+                return resolvedType;
+            }
+
+            var simpleTypeName = nodeTypeName.Split(',')[0].Trim();
+            resolvedType = typeof(ActionNodeBase).Assembly.GetType(simpleTypeName, throwOnError: false);
+            if (resolvedType != null)
+            {
+                return resolvedType;
+            }
+
+            throw new InvalidOperationException($"Failed to resolve node type '{nodeTypeName}'.");
+        }
+
+        private static string ResolveNodeTitle(Type? nodeType, string? nodeTypeName)
+        {
+            if (nodeType != null)
+            {
+                return nodeType.Name;
+            }
+
+            if (string.IsNullOrWhiteSpace(nodeTypeName))
+            {
+                return "Unknown";
+            }
+
+            var typeName = nodeTypeName.Split(',')[0].Trim();
+            var lastDotIndex = typeName.LastIndexOf('.');
+            return lastDotIndex >= 0 ? typeName[(lastDotIndex + 1)..] : typeName;
+        }
+
+        private static object ConvertJsonElementToPropertyValue(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.String => element.GetString() ?? string.Empty,
+                JsonValueKind.Number => element.TryGetInt32(out var intValue)
+                    ? intValue
+                    : element.TryGetInt64(out var longValue)
+                        ? longValue
+                        : element.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => string.Empty,
+                _ => element.GetRawText()
             };
         }
 

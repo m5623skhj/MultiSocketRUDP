@@ -67,8 +67,8 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
         public ActionNodeBase Build(NodeVisual visual) => new RandomDelayNode
         {
             Name = visual.NodeType!.Name,
-            MinDelayMilliseconds = visual.Configuration?.Properties.GetValueOrDefault("MinDelay") as int? ?? 500,
-            MaxDelayMilliseconds = visual.Configuration?.Properties.GetValueOrDefault("MaxDelay") as int? ?? 2000
+            MinDelayMilliseconds = NodeConfigurationValueReader.GetInt(visual, "MinDelay", 500),
+            MaxDelayMilliseconds = NodeConfigurationValueReader.GetInt(visual, "MaxDelay", 2000)
         };
     }
 
