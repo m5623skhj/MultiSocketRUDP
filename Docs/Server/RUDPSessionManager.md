@@ -12,10 +12,11 @@
 2. [초기화 — Initialize](#2-초기화--initialize)
 3. [세션 할당 — AcquireSession](#3-세션-할당--acquiresession)
 4. [세션 반환 — ReleaseSession](#4-세션-반환--releasesession)
-5. [세션 조회](#5-세션-조회)
-6. [연결 수 카운터](#6-연결-수-카운터)
-7. [종료 순서 — 세 단계 안전 정리](#7-종료-순서--세-단계-안전-정리)
-8. [이중 반환 방지 — unusedSessionIdSet](#8-이중-반환-방지--unusedsessionidset)
+5. [함수 설명](#5-함수-설명)
+6. [세션 조회](#6-세션-조회)
+7. [연결 수 카운터](#7-연결-수-카운터)
+8. [종료 순서 — 세 단계 안전 정리](#8-종료-순서--세-단계-안전-정리)
+9. [이중 반환 방지 — unusedSessionIdSet](#9-이중-반환-방지--unusedsessionidset)
 
 ---
 
@@ -30,8 +31,8 @@
     sessionList[i] = session      ← 인덱스 = sessionId
 
 운영 중:
-  연결: AcquireSession() → O(1) pop (deque)
-  해제: ReleaseSession() → O(1) push_back (deque)
+  연결: AcquireSession() → O(1) pop_front (list)
+  해제: ReleaseSession() → O(1) push_back (list)
   조회: GetUsingSession(id) → O(1) 배열 인덱스
 
 서버 종료 시:
@@ -110,7 +111,7 @@ RUDPSession* RUDPSessionManager::AcquireSession()
 
 ```cpp
 {
-    std::scoped_lock lock(sessionIdListLock);
+    std::scoped_lock lock(unusedSessionIdListLock);
 
     if (unusedSessionIdList.empty()) {
         LOG_ERROR("Session pool exhausted");
@@ -126,13 +127,13 @@ RUDPSession* RUDPSessionManager::AcquireSession()
 }
 ```
 
-**`deque` 선택 이유:**
+**`std::list` 선택 이유:**
 
 ```
 vector: pop_front() → O(N) (앞 요소 제거 후 나머지 이동)
-deque:  pop_front() → O(1) (내부적으로 청크 포인터만 조정)
+list:   pop_front() → O(1), push_back() → O(1)
 
-빈번한 pop_front + push_back이 있으므로 deque가 적합.
+빈번한 pop_front + push_back이 있으므로 list가 적합하다.
 ```
 
 ---
@@ -145,7 +146,7 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 
 ```cpp
 {
-    std::scoped_lock lock(sessionIdListLock);
+    std::scoped_lock lock(unusedSessionIdListLock);
 
     // 이중 반환 방지: 이미 unusedSessionIdSet에 있으면 반환
     if (!unusedSessionIdSet.insert(sessionId).second) {
@@ -180,7 +181,7 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 **`unusedSessionIdSet`의 역할:**
 
 ```
-unusedSessionIdList: FIFO 반환 순서 유지 (deque)
+unusedSessionIdList: FIFO 반환 순서 유지 (list)
 unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
 
 두 자료구조를 동기화해서 유지:
@@ -190,7 +191,65 @@ unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
 
 ---
 
-## 5. 세션 조회
+## 5. 함수 설명
+
+#### `RUDPSessionManager(unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore, ISessionDelegate& inSessionDelegate)`
+- 최대 세션 수, 코어, 세션 delegate를 받아 세션 풀 관리자를 구성한다.
+- 세션 풀 크기와 의존성이 생성 시점에 확정되어야 하므로 필수 인자가 있는 생성자로 문서화한다.
+
+#### `bool Initialize(BYTE inNumOfWorkerThreads, SessionFactoryFunc&& factory)`
+- 세션 풀을 실제로 생성하고 각 세션에 `sessionId`와 `threadId`를 배정한다.
+
+#### `RUDPSession* AcquireSession()`
+- 재사용 가능한 세션을 하나 확보한다.
+
+#### `bool ReleaseSession(SessionIdType sessionId)`
+- 해제 완료된 세션을 unused 목록으로 되돌린다.
+
+#### `RUDPSession* GetUsingSession(SessionIdType sessionId)`
+#### `const RUDPSession* GetUsingSession(SessionIdType sessionId) const`
+- 사용 중인 세션을 조회한다.
+
+#### `RUDPSession* GetReleasingSession(SessionIdType sessionId) const`
+- RELEASING 상태 세션을 조회한다.
+
+#### `unsigned short GetNowSessionCount() const`
+- 현재 연결 세션 수를 반환한다.
+
+#### `unsigned int GetAllConnectedCount() const`
+- 누적 연결 수를 반환한다.
+
+#### `unsigned int GetAllDisconnectedCount() const`
+- 누적 해제 수를 반환한다.
+
+#### `unsigned int GetAllDisconnectedByRetransmissionCount() const`
+- 재전송 한도 초과로 종료된 누적 수를 반환한다.
+
+#### `unsigned short GetUnusedSessionCount() const`
+- 재사용 가능한 세션 수를 반환한다.
+
+#### `bool IsInitialized() const`
+- 세션 매니저 초기화 여부를 반환한다.
+
+#### `void CloseAllSessions()`
+- 모든 활성 세션 소켓을 닫는다.
+
+#### `void ClearAllSessions()`
+- 세션 객체 메모리를 정리한다.
+
+#### `void IncrementConnectedCount()`
+- 성공 연결 시 통계를 증가시킨다.
+
+#### `void DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason)`
+- 연결 해제 시 현재/누적 통계를 갱신한다.
+- 해제 사유에 따라 retransmission 종료 카운트도 함께 반영한다.
+
+#### `void HeartbeatCheck(const unsigned long long now) const`
+- heartbeat 및 reserved timeout 관점에서 세션 상태를 점검한다.
+
+---
+
+## 6. 세션 조회
 
 ```cpp
 // CONNECTED 또는 RESERVED 세션 접근 (콘텐츠 서버 API)
@@ -209,11 +268,6 @@ RUDPSession* GetReleasingSession(SessionIdType sessionId) const
     return session->IsReleasing() ? session : nullptr;
 }
 
-// 전체 세션 목록 순회 (HeartbeatThread, StopServer에서 사용)
-const std::vector<RUDPSession*>& GetSessionList() const
-{
-    return sessionList;
-}
 ```
 
 **`GetUsingSession` vs `GetReleasingSession` 분리 이유:**
@@ -232,14 +286,20 @@ GetReleasingSession:
 
 ---
 
-## 6. 연결 수 카운터
+## 7. 연결 수 카운터
 
 ```cpp
-std::atomic<unsigned short> connectedUserCount{ 0 };
+std::atomic_uint16_t connectedUserCount{ 0 };
+std::atomic_uint32_t allConnectedCount{ 0 };
+std::atomic_uint32_t allDisconnectedCount{ 0 };
+std::atomic_uint32_t allDisconnectedByRetransmissionCount{ 0 };
 
-void IncrementConnectedCount()   { ++connectedUserCount; }
-void DecrementConnectedCount()   { if (connectedUserCount > 0) --connectedUserCount; }
-unsigned short GetConnectedCount() const { return connectedUserCount.load(); }
+void IncrementConnectedCount();
+void DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason);
+unsigned short GetNowSessionCount() const;
+unsigned int GetAllConnectedCount() const;
+unsigned int GetAllDisconnectedCount() const;
+unsigned int GetAllDisconnectedByRetransmissionCount() const;
 ```
 
 **증가/감소 시점:**
@@ -258,20 +318,20 @@ DecrementConnectedCount():
 
 ```cpp
 unsigned short MultiSocketRUDPCore::GetNowSessionCount() const {
-    return sessionManager->GetConnectedCount();
+    return sessionManager->GetNowSessionCount();
 }
 ```
 
 ---
 
-## 7. 종료 순서 — 세 단계 안전 정리
+## 8. 종료 순서 — 세 단계 안전 정리
 
 ```cpp
 // MultiSocketRUDPCore::StopServer에서의 정리 순서:
 
 // ① 모든 세션 소켓 닫기
 CloseAllSessions();
-for (auto* session : sessionManager->GetSessionList()) {
+for (auto* session : sessionList) {
     sessionDelegate.CloseSocket(*session);
     // → IO Worker의 RIO 작업에 에러 유발 → IOCompleted에서 에러 처리
 }
@@ -308,7 +368,7 @@ ClearAllSessions();
 
 ---
 
-## 8. 이중 반환 방지 — `unusedSessionIdSet`
+## 9. 이중 반환 방지 — `unusedSessionIdSet`
 
 ```cpp
 // 이중 반환 시도 시나리오:
@@ -347,4 +407,4 @@ unusedSessionIdList.push_back(sessionId);
 - [[MultiSocketRUDPCore]] — Initialize 호출, GetUsingSession API
 - [[SessionLifecycle]] — AcquireSession/ReleaseSession 호출 시점
 - [[RUDPSession]] — sessionId 불변식 사용
-- [[ThreadModel]] — GetSessionList 사용 (HeartbeatThread)
+- [[ThreadModel]] — HeartbeatThread와 Session Release 흐름

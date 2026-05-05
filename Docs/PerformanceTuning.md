@@ -343,4 +343,9 @@ MAX_HOLDING_PACKET_QUEUE_SIZE=64
 - [[FlowController]] — CWND 동작 원리
 - [[ThreadModel]] — 스레드 구조 상세
 - [[MultiSocketRUDPCore]] — 옵션 파일 설정값
-- [[TroubleShooting]] — 성능 저하 디버깅
+- [[Troubleshooting]] — 성능 저하 디버깅
+---
+
+## 검토 메모
+
+- 성능 문서는 개념 문서이므로 함수별 설명 대신, 현재 코드에 존재하는 `GetTPS`, `ResetTPS`, `TryFlushPendingQueue`, `OnCongestionEvent`, `OnTimeout` 같은 실제 제어 지점과 맞춰 설명을 유지하는 편이 좋다.

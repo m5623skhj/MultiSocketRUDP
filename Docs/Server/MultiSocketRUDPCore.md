@@ -11,13 +11,14 @@
 
 1. [서버 시작 — StartServer](#1-서버-시작--startserver)
 2. [서버 종료 — StopServer](#2-서버-종료--stopserver)
-3. [콘텐츠 서버 API](#3-콘텐츠-서버-api)
-4. [내부 동작 — 패킷 전송 경로](#4-내부-동작--패킷-전송-경로)
-5. [내부 동작 — 세션 해제 경로](#5-내부-동작--세션-해제-경로)
-6. [내부 동작 — InitReserveSession](#6-내부-동작--initreservesession)
-7. [옵션 파일 설정값 전체](#7-옵션-파일-설정값-전체)
-8. [멀티소켓 구조의 의미](#8-멀티소켓-구조의-의미)
-9. [의존 컴포넌트](#9-의존-컴포넌트)
+3. [함수 설명](#3-함수-설명)
+4. [콘텐츠 서버 API](#4-콘텐츠-서버-api)
+5. [내부 동작 — 패킷 전송 경로](#5-내부-동작--패킷-전송-경로)
+6. [내부 동작 — 세션 해제 경로](#6-내부-동작--세션-해제-경로)
+7. [내부 동작 — InitReserveSession](#7-내부-동작--initreservesession)
+8. [옵션 파일 설정값 전체](#8-옵션-파일-설정값-전체)
+9. [멀티소켓 구조의 의미](#9-멀티소켓-구조의-의미)
+10. [의존 컴포넌트](#10-의존-컴포넌트)
 
 ---
 
@@ -214,7 +215,86 @@ void StopServer();
 
 ---
 
-## 3. 콘텐츠 서버 API
+## 3. 함수 설명
+
+### 공개 함수
+
+#### `MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName)`
+- SessionBroker가 사용할 인증서 저장소 이름과 Subject Name을 보관한다.
+- 인증서 정보가 없으면 브로커 초기화가 성립하지 않으므로 필수 인자가 있는 생성자로 취급한다.
+
+#### `bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole = false)`
+- 서버 전체 초기화 진입점이다.
+- 옵션 파일 로드, 네트워크/RIO 초기화, 세션 풀 생성, 워커 스레드 기동, SessionBroker 시작까지 담당한다.
+
+#### `void StopServer()`
+- 서버 전체 종료 진입점이다.
+- 브로커 중단, 세션 소켓 정리, 워커 스레드 정지, 세션 메모리 반환, Logger 종료, `WSACleanup()`를 순서대로 수행한다.
+
+#### `bool IsServerStopped() const`
+- 서버가 완전히 종료되었는지 반환한다.
+
+#### `unsigned short GetNowSessionCount() const`
+- 현재 CONNECTED 상태 세션 수를 반환한다.
+
+#### `unsigned int GetAllConnectedCount() const`
+- 서버 시작 이후 누적 연결 성공 횟수를 반환한다.
+
+#### `unsigned int GetAllDisconnectedCount() const`
+- 서버 시작 이후 누적 연결 해제 횟수를 반환한다.
+
+#### `unsigned int GetAllDisconnectedByRetransmissionCount() const`
+- 재전송 한도 초과로 종료된 누적 세션 수를 반환한다.
+
+#### `bool SendPacket(SendPacketInfo* sendPacketInfo) const`
+- 세션이 조립한 `SendPacketInfo`를 IO 계층으로 전달해 실제 송신을 시작한다.
+
+#### `void EraseSendPacketInfo(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
+- 스레드별 전송 추적 목록에서 특정 `SendPacketInfo`를 제거한다.
+- ACK 수신 후 정리나 송신 실패 정리 흐름에서 호출된다.
+
+#### `RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const`
+- 초기화된 RIO 함수 테이블을 반환한다.
+- 세션 RIO 초기화에서 사용된다.
+
+#### `static WORD GetPayloadLength(const NetBuffer& buffer)`
+- `NetBuffer` 헤더에서 payload 길이를 추출한다.
+- 패킷 형식 검증이나 디버깅 시 유용한 정적 유틸이다.
+
+#### `int32_t GetTPS() const`
+- 현재 TPS 카운터 값을 반환한다.
+
+#### `void ResetTPS() const`
+- TPS 카운터를 0으로 초기화한다.
+
+### 비공개 함수
+
+#### `void DisconnectSession(SessionIdType disconnectTargetSessionId) const`
+- 완전히 해제된 세션을 세션 풀로 반환한다.
+- 사용자 코드가 직접 호출하는 API가 아니라 Session Release 흐름 내부 함수다.
+
+#### `void PushToDisconnectTargetSession(RUDPSession& session)`
+- RELEASE 대상 세션을 release queue에 넣고 Session Release Thread를 깨운다.
+
+#### `RUDPSession* AcquireSession() const`
+- 세션 매니저에서 재사용 가능한 세션을 하나 확보한다.
+- SessionBroker가 새 연결을 발급할 때 간접 호출된다.
+
+#### `RUDPSession* GetUsingSession(SessionIdType sessionId) const`
+- RESERVED 또는 CONNECTED 상태 세션을 조회한다.
+- 반환 직후 상태가 바뀔 수 있으므로 즉시 검증 후 사용해야 한다.
+
+#### `RUDPSession* GetReleasingSession(SessionIdType sessionId) const`
+- RELEASING 상태 세션을 조회한다.
+- Session Release Thread 내부 로직에서 사용된다.
+
+#### `CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const`
+- 세션 소켓 생성, 세션 RIO 초기화, 첫 `DoRecv()` 등록, RESERVED 상태 전이를 수행한다.
+- SessionBroker가 새 세션을 발급할 때 호출된다.
+
+---
+
+## 4. 콘텐츠 서버 API
 
 ### 서버 상태 조회
 
@@ -226,6 +306,15 @@ bool IsServerStopped() const;
 // 현재 연결된 세션 수 (CONNECTED 상태)
 unsigned short GetNowSessionCount() const;
 // → sessionManager->GetConnectedCount() → connectedUserCount.load()
+
+// 서버 시작 이후 누적 연결 수
+unsigned int GetAllConnectedCount() const;
+
+// 서버 시작 이후 누적 연결 해제 수
+unsigned int GetAllDisconnectedCount() const;
+
+// 재전송 한도 초과로 종료된 누적 세션 수
+unsigned int GetAllDisconnectedByRetransmissionCount() const;
 ```
 
 ### TPS (초당 처리 패킷 수) 모니터링
@@ -321,7 +410,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 
 ---
 
-## 4. 내부 동작 — 패킷 전송 경로
+## 5. 내부 동작 — 패킷 전송 경로
 
 `session->SendPacket(packet)` 호출 이후의 전체 경로:
 
@@ -347,7 +436,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 
 ---
 
-## 5. 내부 동작 — 세션 해제 경로
+## 6. 내부 동작 — 세션 해제 경로
 
 ```
 [어디서든] session->DoDisconnect()
@@ -377,7 +466,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 
 ---
 
-## 6. 내부 동작 — `InitReserveSession`
+## 7. 내부 동작 — `InitReserveSession`
 
 `RUDPSessionBroker`가 새 클라이언트를 위해 호출:
 
@@ -443,7 +532,7 @@ RIOCreateRequestQueue(
 
 ---
 
-## 7. 옵션 파일 설정값 전체
+## 8. 옵션 파일 설정값 전체
 
 ### CoreOption.ini
 
@@ -484,7 +573,7 @@ SESSION_BROKER_PORT=10001 ; 세션 브로커 리스닝 포트 (TCP)
 
 ---
 
-## 8. 멀티소켓 구조의 의미
+## 9. 멀티소켓 구조의 의미
 
 기존 IOCP 서버가 **하나의 서버 소켓**에서 모든 클라이언트 패킷을 처리하는 것과 달리,  
 MultiSocketRUDP는 **세션마다 독립된 UDP 소켓을 가진다.**
@@ -515,7 +604,7 @@ MultiSocketRUDP:
 
 ---
 
-## 9. 의존 컴포넌트
+## 10. 의존 컴포넌트
 
 ```
 MultiSocketRUDPCore
@@ -572,4 +661,4 @@ RUDPSession* RUDPSessionBroker::ReserveSession(...) {
 - [[PacketProcessing]] — 수신 파이프라인
 - [[RUDPSessionManager]] — 세션 풀 관리
 - [[GettingStarted]] — 처음부터 서버 구축하기
-- [[TroubleShooting]] — 자주 발생하는 문제와 해결
+- [[Troubleshooting]] — 자주 발생하는 문제와 해결

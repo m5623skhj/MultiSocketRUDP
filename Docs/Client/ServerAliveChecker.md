@@ -135,8 +135,8 @@ void ServerAliveChecker::StartServerAliveCheck(unsigned int inCheckIntervalMs)
     // 초기 기준값 설정
     beforeCheckSequence = getNextRecvSequenceFunction();
 
-    serverAliveCheckThread = std::thread([this] {
-        RunServerAliveCheck();
+    serverAliveCheckThread = std::jthread([this] {
+        RunServerAliveCheckerThread();
     });
 }
 ```
@@ -184,7 +184,7 @@ void ServerAliveChecker::StopServerAliveCheck()
 ## 5. 내부 루프 상세
 
 ```cpp
-void ServerAliveChecker::RunServerAliveCheck()
+void ServerAliveChecker::RunServerAliveCheckerThread()
 {
     while (!isStopped) {
         // checkIntervalMs 동안 대기 (분할 sleep으로 stop 신호 빠르게 감지)
@@ -236,7 +236,7 @@ void ServerAliveChecker::RunServerAliveCheck()
 
 ```
 [ServerAliveCheckThread]
-  RunServerAliveCheck()
+  RunServerAliveCheckerThread()
     → 서버 무응답 감지
     → coreStopFunction()      // = RUDPClientCore::Stop()
          → JoinThreads()
@@ -364,5 +364,33 @@ RUDPClientCore::Stop()
 
 ## 관련 문서
 - [[RUDPClientCore]] — StartServerAliveCheck 호출 시점, JoinThreads
-- [[TroubleShooting]] — "Server is not alive" 로그 해석
+- [[Troubleshooting]] — "Server is not alive" 로그 해석
 - [[PerformanceTuning]] — HEARTBEAT 주기 설정
+---
+
+## 현재 코드 기준 함수 설명 및 정정
+
+### 공개 함수
+
+#### `ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<PacketSequence()>& inGetNextRecvSequenceFunction)`
+- 필수 콜백을 받는 생성자다.
+- 코어 중지 요청과 최근 수신 시퀀스 조회를 외부에 위임한다.
+
+#### `void StartServerAliveCheck(unsigned int inCheckIntervalMs)`
+- 서버 생존 감시 스레드를 시작한다.
+
+#### `void StopServerAliveCheck()`
+- 감시 스레드 중지를 요청한다.
+
+#### `bool IsServerAlive(PacketSequence nowPacketSequence)`
+- 이전 체크 지점 대비 수신 시퀀스가 진전됐는지 확인한다.
+
+### 내부 함수
+
+#### `void RunServerAliveCheckerThread()`
+- 주기적으로 시퀀스 진전을 검사하고, 진전이 없으면 `coreStopFunction`을 호출한다.
+
+### 정정 메모
+
+- 현재 헤더의 내부 스레드 함수 이름은 `RunServerAliveCheckerThread()`다.
+- 문서에 남아 있던 `RunServerAliveCheck()` 표기는 현재 코드와 맞지 않는다.

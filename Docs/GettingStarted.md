@@ -248,3 +248,9 @@ public static class BotVariables
 - [[BotTester/00_BotTester_Overview|BotTester 개요]]
 - [[ActionNodes]] — 사용 가능한 노드 타입
 - [[AiTreeGenerator]] — AI 생성 상세
+---
+
+## 검토 메모
+
+- 서버 TLS 생성자 예시는 현재 코드 기준으로 `MultiSocketRUDPCore core(L"MY", L"DevServerCert");` 형태가 맞다.
+- 브로커 인증서 설정 흐름은 `TLSHelperServer` 생성자 인자로 내려가므로, 예전 `Initialize(storeName, subjectName)` 설명을 그대로 재사용하면 현재 구현과 어긋난다.

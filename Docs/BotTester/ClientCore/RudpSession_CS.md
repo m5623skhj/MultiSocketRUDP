@@ -120,6 +120,86 @@ nonce[4] |= (byte)direction << 6
 
 ---
 
+## 함수 설명
+
+### `HoldingPacketStore`
+
+#### `Add(PacketSequence sequence, HeldPacket packet)`
+- 순서가 도착하지 않은 패킷을 보류 저장소에 추가한다.
+
+#### `Remove(PacketSequence sequence)`
+- 보류 패킷을 제거한다.
+
+#### `TryGetFirst(...)`
+- 가장 앞선 sequence의 보류 패킷을 조회한다.
+
+#### `GetCount()`
+- 현재 보류 패킷 개수를 반환한다.
+
+#### `TryGetRange(...)`
+- 보류 중인 sequence의 최소/최대 범위를 구한다.
+
+#### `Clear()`
+- 보류 저장소를 비운다.
+
+### `RudpSession`
+
+#### `SessionIdType GetSessionId()`
+- 현재 세션 ID를 반환한다.
+
+#### `bool IsConnected()`
+- 세션이 연결 완료 상태인지 반환한다.
+
+#### `ParseSessionBrokerResponse(byte[] data)`
+- SessionBroker 응답을 파싱해 서버 주소, 포트, 세션 키/솔트, 세션 ID를 초기화한다.
+
+#### `void Disconnect()`
+- 외부에서 세션 정리를 시작하는 진입점이다.
+
+#### `Task SendPacket(...)`
+- 패킷 타입/시퀀스/ID를 삽입하고 암호화한 뒤 실제 UDP 송신 큐에 넣는다.
+
+#### `Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)`
+- 재전송 저장소 등록과 실제 `UdpClient.SendAsync` 호출을 수행한다.
+
+#### `Task SendConnectPacketAsync()`
+- 서버에 CONNECT 코어 패킷을 전송한다.
+
+#### `NetBuffer MakeConnectPacket()`
+- CONNECT 패킷 버퍼를 조립한다.
+
+#### `Task ReceiveAsync()`
+- UDP 수신 루프를 유지한다.
+
+#### `Task PacketProcessorAsync()`
+- 수신 버퍼를 순서/패킷 타입 규칙에 맞게 처리하는 메인 루프다.
+
+#### `Task ProcessReceivedPacketAsync(byte[] data)`
+- 수신 데이터 1개를 복호화하고 패킷 타입에 따라 분기한다.
+
+#### `Task SendReplyToServerAsync(PacketSequence packetSequence)`
+- ACK 응답을 서버로 보낸다.
+
+#### `void OnSendReply(PacketSequence packetSequence)`
+- 서버 ACK를 수신했을 때 재전송 추적 상태를 정리한다.
+
+#### `Task RetransmissionAsync()`
+- 재전송 타이머 루프를 돌며 미ACK 패킷을 다시 전송한다.
+
+#### `Task DisconnectAsync()`
+- 비동기 종료 패킷 송신과 리소스 정리를 수행한다.
+
+#### `NetBuffer BuildDisconnectPacket()`
+- DISCONNECT 코어 패킷을 조립한다.
+
+#### `Task StartServerAliveCheck()`
+- 일정 시간 수신이 없을 때 서버 무응답으로 간주하는 감시 루프를 시작한다.
+
+#### `void Cleanup()`
+- 소켓, 토큰, 저장소, 작업 상태를 정리한다.
+
+---
+
 ## 관련 문서
 - [[BotTesterCore]] — 세션 생성 및 관리
 - [[SessionGetter_CS]] — 세션 정보 수신

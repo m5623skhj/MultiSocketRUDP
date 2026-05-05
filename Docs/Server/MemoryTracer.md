@@ -328,4 +328,4 @@ void FreeSendPacketInfo(SendPacketInfo* info) {
 
 ## 관련 문서
 - [[MultiSocketRUDPCore]] — 서버 종료 후 누수 보고서 생성
-- [[TroubleShooting]] — 메모리 사용량 증가 디버깅
+- [[Troubleshooting]] — 메모리 사용량 증가 디버깅

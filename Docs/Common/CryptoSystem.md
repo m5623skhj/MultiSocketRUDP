@@ -510,7 +510,7 @@ direction enum 값:
   C#: 동일 순서로 정의
 ```
 
-→ 불일치 시 `DecryptAESGCM`이 `false` 반환 → [[TroubleShooting]] `DecryptAESGCM 항상 false 반환` 참조
+→ 불일치 시 `DecryptAESGCM`이 `false` 반환 → [[Troubleshooting]] `DecryptAESGCM 항상 false 반환` 참조
 
 ---
 
@@ -520,4 +520,28 @@ direction enum 값:
 - [[PacketFormat]] — 패킷 버퍼 레이아웃 전체
 - [[RUDPSessionBroker]] — 세션 키/솔트 생성
 - [[TLSHelper]] — 키 전달 채널 (TLS 1.2)
-- [[TroubleShooting]] — Nonce 불일치 디버깅
+- [[Troubleshooting]] — Nonce 불일치 디버깅
+---
+
+## 관련 함수와 코드 위치
+
+이 문서는 개념 문서라 단일 파일의 함수 목록 대신, 실제 암복호화 흐름을 구성하는 핵심 함수를 현재 코드 기준으로 정리한다.
+
+#### `RUDPSessionBroker::GenerateSessionKey`
+#### `RUDPSessionBroker::GenerateSaltKey`
+#### `RUDPSessionBroker::InitSessionCrypto`
+- 서버가 세션별 `sessionKey`, `sessionSalt`, `BCRYPT_KEY_HANDLE`을 준비하는 경로다.
+
+#### `PacketCryptoHelper::EncodePacket`
+#### `PacketCryptoHelper::SetHeader`
+- 패킷 헤더 작성, nonce 계산, AES-GCM 암호화를 담당한다.
+
+#### `PacketCryptoHelper::DecodePacket`
+- 수신 패킷의 nonce, AAD, AuthTag를 사용해 복호화와 무결성 검증을 수행한다.
+
+#### `CryptoHelper::EncryptAESGCM`
+#### `CryptoHelper::DecryptAESGCM`
+#### `CryptoHelper::GenerateNonce`
+#### `CryptoHelper::GenerateSecureRandomBytes`
+#### `CryptoHelper::GetSymmetricKeyHandle`
+- 실제 암복호화와 nonce 생성, 세션 키 핸들 생성을 담당한다.

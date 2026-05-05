@@ -1,50 +1,41 @@
 # PacketCryptoHelper
 
-> **`NetBuffer` 기반 패킷 구조를 이해하고 [[CryptoHelper]]를 호출하는 암복호화 래퍼.**  
-> 서버([[RUDPSession]])와 클라이언트([[RUDPClientCore]]) 양쪽에서 공통으로 사용하며,  
-> 패킷 버퍼의 어디부터 어디까지 암호화할지, 헤더를 어떻게 구성하는지를 전담한다.
+> **`NetBuffer` 湲곕컲 ?⑦궥 援ъ“瑜??댄빐?섍퀬 [[CryptoHelper]]瑜??몄텧?섎뒗 ?붾났?명솕 ?섑띁.**  
+> ?쒕쾭([[RUDPSession]])? ?대씪?댁뼵??[[RUDPClientCore]]) ?묒そ?먯꽌 怨듯넻?쇰줈 ?ъ슜?섎ŉ,  
+> ?⑦궥 踰꾪띁???대뵒遺???대뵒源뚯? ?뷀샇?뷀븷吏, ?ㅻ뜑瑜??대뼸寃?援ъ꽦?섎뒗吏瑜??꾨떞?쒕떎.
 
 ---
 
-## 목차
+## 紐⑹감
 
-1. [설계 위치](#1-설계-위치)
-2. [SetHeader — 헤더 완성](#2-setheader--헤더-완성)
-3. [EncodePacket — 패킷 암호화](#3-encodepacket--패킷-암호화)
-4. [DecodePacket — 패킷 복호화](#4-decodepacket--패킷-복호화)
-5. [오프셋 상수 정리](#5-오프셋-상수-정리)
-6. [IPacketCryptoHelper / Adapter 패턴](#6-ipacketcryptohelper--adapter-패턴)
-7. [m_bIsEncoded 중복 인코딩 방지](#7-m_bisencoded-중복-인코딩-방지)
-8. [콜 사이트 전체 목록](#8-콜-사이트-전체-목록)
+1. [?ㅺ퀎 ?꾩튂](#1-?ㅺ퀎-?꾩튂)
+2. [SetHeader ???ㅻ뜑 ?꾩꽦](#2-setheader--?ㅻ뜑-?꾩꽦)
+3. [EncodePacket ???⑦궥 ?뷀샇??(#3-encodepacket--?⑦궥-?뷀샇??
+4. [DecodePacket ???⑦궥 蹂듯샇??(#4-decodepacket--?⑦궥-蹂듯샇??
+5. [?ㅽ봽???곸닔 ?뺣━](#5-?ㅽ봽???곸닔-?뺣━)
+6. [IPacketCryptoHelper / Adapter ?⑦꽩](#6-ipacketcryptohelper--adapter-?⑦꽩)
+7. [m_bIsEncoded 以묐났 ?몄퐫??諛⑹?](#7-m_bisencoded-以묐났-?몄퐫??諛⑹?)
+8. [肄??ъ씠???꾩껜 紐⑸줉](#8-肄??ъ씠???꾩껜-紐⑸줉)
 
 ---
 
-## 1. 설계 위치
+## 1. ?ㅺ퀎 ?꾩튂
 
 ```
 [RUDPSession::SendPacketImmediate]     [RUDPClientCore::SendPacket]
-              │                                    │
-              └──────────────┬─────────────────────┘
-                             ▼
-                  PacketCryptoHelper::EncodePacket()
-                             │
-                   CryptoHelper::GetTLSInstance()
-                             │
-                   CryptoHelper::EncryptAESGCM()
+              ??                                   ??              ?붴???????????????р???????????????????????                             ??                  PacketCryptoHelper::EncodePacket()
+                             ??                   CryptoHelper::GetTLSInstance()
+                             ??                   CryptoHelper::EncryptAESGCM()
 
 
 [RUDPPacketProcessor::ProcessByPacketType]  [RUDPClientCore::ProcessRecvPacket]
-                    │                                    │
-                    └──────────────┬─────────────────────┘
-                                   ▼
-                      PacketCryptoHelper::DecodePacket()
-                                   │
-                         CryptoHelper::DecryptAESGCM()
+                    ??                                   ??                    ?붴???????????????р???????????????????????                                   ??                      PacketCryptoHelper::DecodePacket()
+                                   ??                         CryptoHelper::DecryptAESGCM()
 ```
 
 ---
 
-## 2. SetHeader — 헤더 완성
+## 2. SetHeader ???ㅻ뜑 ?꾩꽦
 
 ```cpp
 static void PacketCryptoHelper::SetHeader(
@@ -53,7 +44,7 @@ static void PacketCryptoHelper::SetHeader(
 )
 ```
 
-**역할:** `NetBuffer`에 쌓인 페이로드 기준으로 3바이트 헤더를 완성한다.
+**??븷:** `NetBuffer`???볦씤 ?섏씠濡쒕뱶 湲곗??쇰줈 3諛붿씠???ㅻ뜑瑜??꾩꽦?쒕떎.
 
 ```cpp
 void PacketCryptoHelper::SetHeader(OUT NetBuffer& netBuffer, const int extraSize)
@@ -61,40 +52,38 @@ void PacketCryptoHelper::SetHeader(OUT NetBuffer& netBuffer, const int extraSize
     // Byte 0: HeaderCode
     netBuffer.m_pSerializeBuffer[0] = NetBuffer::m_byHeaderCode;
 
-    // Byte 1-2: PayloadLength (헤더 이후 바이트 수)
-    //   m_iWrite = 현재까지 쓰인 바이트 (헤더 포함)
-    //   extraSize = AUTH_TAG_SIZE(16) → 아직 AuthTag는 안 썼지만 길이에 포함
+    // Byte 1-2: PayloadLength (?ㅻ뜑 ?댄썑 諛붿씠????
+    //   m_iWrite = ?꾩옱源뚯? ?곗씤 諛붿씠??(?ㅻ뜑 ?ы븿)
+    //   extraSize = AUTH_TAG_SIZE(16) ???꾩쭅 AuthTag?????쇱?留?湲몄씠???ы븿
     *reinterpret_cast<uint16_t*>(&netBuffer.m_pSerializeBuffer[1])
         = static_cast<uint16_t>(netBuffer.m_iWrite - df_HEADER_SIZE + extraSize);
 
-    // 읽기 커서 초기화
-    netBuffer.m_iRead = 0;
+    // ?쎄린 而ㅼ꽌 珥덇린??    netBuffer.m_iRead = 0;
 
-    // 최종 끝 위치 (AuthTag 포함)
+    // 理쒖쥌 ???꾩튂 (AuthTag ?ы븿)
     netBuffer.m_iWriteLast = netBuffer.m_iWrite + extraSize;
 }
 ```
 
-**`extraSize`가 필요한 이유:**
+**`extraSize`媛 ?꾩슂???댁쑀:**
 
 ```
-EncodePacket 호출 전 버퍼 상태:
+EncodePacket ?몄텧 ??踰꾪띁 ?곹깭:
   [Header 3B][Type 1B][Seq 8B][PacketId 4B][Payload N B]
   m_iWrite = 3+1+8+4+N
 
 SetHeader(extraSize=AUTH_TAG_SIZE=16):
-  PayloadLen = m_iWrite - 3 + 16 = 1+8+4+N+16  ← AuthTag 포함
-  m_iWriteLast = m_iWrite + 16                  ← EncodePacket 후 AuthTag를 여기까지 추가
+  PayloadLen = m_iWrite - 3 + 16 = 1+8+4+N+16  ??AuthTag ?ы븿
+  m_iWriteLast = m_iWrite + 16                  ??EncodePacket ??AuthTag瑜??ш린源뚯? 異붽?
 
-EncodePacket 후:
+EncodePacket ??
   [Header 3B][Type 1B][Seq 8B][PacketId 4B][Ciphertext N B][AuthTag 16 B]
   m_iWrite = m_iWriteLast
 ```
 
 ---
 
-## 3. EncodePacket — 패킷 암호화
-
+## 3. EncodePacket ???⑦궥 ?뷀샇??
 ```cpp
 static void PacketCryptoHelper::EncodePacket(
     OUT NetBuffer& packet,
@@ -107,31 +96,31 @@ static void PacketCryptoHelper::EncodePacket(
 )
 ```
 
-**내부 구현:**
+**?대? 援ы쁽:**
 
 ```cpp
 {
-    // ① 중복 인코딩 방지
+    // ??以묐났 ?몄퐫??諛⑹?
     if (packet.m_bIsEncoded) return;
 
-    // ② 헤더 완성 (PayloadLen에 AuthTag 크기 미리 포함)
+    // ???ㅻ뜑 ?꾩꽦 (PayloadLen??AuthTag ?ш린 誘몃━ ?ы븿)
     SetHeader(packet, AUTH_TAG_SIZE);
 
-    // ③ AAD 추출 (헤더 3B + PacketType 1B + Sequence 8B = 12 bytes)
+    // ??AAD 異붿텧 (?ㅻ뜑 3B + PacketType 1B + Sequence 8B = 12 bytes)
     const unsigned char* aad = reinterpret_cast<const unsigned char*>(
         packet.m_pSerializeBuffer);
     constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
     // = 3 + 1 + 8 = 12
 
-    // ④ Nonce 생성
+    // ??Nonce ?앹꽦
     auto nonce = CryptoHelper::GenerateNonce(
         sessionSalt, sessionSaltSize, packetSequence, direction);
 
-    // ⑤ 암호화 범위 결정
+    // ???뷀샇??踰붿쐞 寃곗젙
     size_t bodyOffset;
     if (isCorePacket) {
         bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
-        // = 3 + 1 + 8 = 12  (PacketId 없음)
+        // = 3 + 1 + 8 = 12  (PacketId ?놁쓬)
     } else {
         bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE)
                    + sizeof(PacketSequence) + sizeof(PacketId);
@@ -140,15 +129,15 @@ static void PacketCryptoHelper::EncodePacket(
 
     char* bodyStart   = packet.m_pSerializeBuffer + bodyOffset;
     size_t bodySize   = packet.m_iWrite - bodyOffset;
-    // 현재 m_iWrite는 SetHeader 이전 값 (AuthTag 아직 안 씀)
+    // ?꾩옱 m_iWrite??SetHeader ?댁쟾 媛?(AuthTag ?꾩쭅 ???)
 
-    // ⑥ AES-GCM 암호화 (in-place)
+    // ??AES-GCM ?뷀샇??(in-place)
     unsigned char authTag[AUTH_TAG_SIZE];
     bool ok = CryptoHelper::EncryptAESGCM(
         nonce.data(), nonce.size(),
         aad, aadSize,
         bodyStart, bodySize,   // plaintext
-        bodyStart, bodySize,   // ciphertext (같은 버퍼 → in-place)
+        bodyStart, bodySize,   // ciphertext (媛숈? 踰꾪띁 ??in-place)
         authTag,
         keyHandle
     );
@@ -158,19 +147,18 @@ static void PacketCryptoHelper::EncodePacket(
         return;
     }
 
-    // ⑦ AuthTag 버퍼 끝에 추가
+    // ??AuthTag 踰꾪띁 ?앹뿉 異붽?
     memcpy(packet.m_pSerializeBuffer + packet.m_iWrite, authTag, AUTH_TAG_SIZE);
-    packet.m_iWrite = packet.m_iWriteLast;  // m_iWrite 갱신
+    packet.m_iWrite = packet.m_iWriteLast;  // m_iWrite 媛깆떊
 
-    // ⑧ 인코딩 완료 표시
+    // ???몄퐫???꾨즺 ?쒖떆
     packet.m_bIsEncoded = true;
 }
 ```
 
 ---
 
-## 4. DecodePacket — 패킷 복호화
-
+## 4. DecodePacket ???⑦궥 蹂듯샇??
 ```cpp
 static bool PacketCryptoHelper::DecodePacket(
     OUT NetBuffer& packet,
@@ -182,15 +170,14 @@ static bool PacketCryptoHelper::DecodePacket(
 )
 ```
 
-> `PacketType`은 `ProcessByPacketType`에서 이미 읽은 후 호출됨.  
-> 즉, `m_iRead`는 PacketType(1B) 이후에 위치한 상태.
+> `PacketType`? `ProcessByPacketType`?먯꽌 ?대? ?쎌? ???몄텧??  
+> 利? `m_iRead`??PacketType(1B) ?댄썑???꾩튂???곹깭.
 
-**내부 구현:**
+**?대? 援ы쁽:**
 
 ```cpp
 {
-    // ① 최소 크기 검사
-    // GetUseSize() = m_iWrite - m_iRead (현재 읽기 가능한 바이트)
+    // ??理쒖냼 ?ш린 寃??    // GetUseSize() = m_iWrite - m_iRead (?꾩옱 ?쎄린 媛?ν븳 諛붿씠??
     const size_t minBodySize = isCorePacket
         ? sizeof(PacketSequence) + AUTH_TAG_SIZE               // 8 + 16 = 24
         : sizeof(PacketSequence) + sizeof(PacketId) + AUTH_TAG_SIZE; // 8+4+16=28
@@ -200,19 +187,19 @@ static bool PacketCryptoHelper::DecodePacket(
         return false;
     }
 
-    // ② PacketSequence 추출 (암호화 밖, 헤더+Type 뒤)
-    //    m_iRead는 아직 PacketType 이후이므로 Sequence 위치 = m_iRead
+    // ??PacketSequence 異붿텧 (?뷀샇??諛? ?ㅻ뜑+Type ??
+    //    m_iRead???꾩쭅 PacketType ?댄썑?대?濡?Sequence ?꾩튂 = m_iRead
     PacketSequence packetSequence;
     memcpy(&packetSequence,
            packet.m_pSerializeBuffer + df_HEADER_SIZE + sizeof(PACKET_TYPE),
            sizeof(PacketSequence));
-    // 직접 버퍼에서 읽음 (m_iRead 변경 안 함)
+    // 吏곸젒 踰꾪띁?먯꽌 ?쎌쓬 (m_iRead 蹂寃?????
 
-    // ③ AuthTag 위치 계산
+    // ??AuthTag ?꾩튂 怨꾩궛
     const unsigned char* authTag = reinterpret_cast<const unsigned char*>(
         packet.m_pSerializeBuffer + packet.m_iWrite - AUTH_TAG_SIZE);
 
-    // ④ body 범위 결정
+    // ??body 踰붿쐞 寃곗젙
     size_t bodyOffset;
     if (isCorePacket) {
         bodyOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
@@ -226,33 +213,32 @@ static bool PacketCryptoHelper::DecodePacket(
     char* bodyStart = packet.m_pSerializeBuffer + bodyOffset;
     size_t bodySize = (packet.m_iWrite - AUTH_TAG_SIZE) - bodyOffset;
 
-    // ⑤ AAD (헤더 + Type + Sequence = 12 bytes, 암호화 안 됨)
+    // ??AAD (?ㅻ뜑 + Type + Sequence = 12 bytes, ?뷀샇??????
     const unsigned char* aad = reinterpret_cast<const unsigned char*>(
         packet.m_pSerializeBuffer);
     constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
 
-    // ⑥ Nonce 생성
+    // ??Nonce ?앹꽦
     auto nonce = CryptoHelper::GenerateNonce(
         sessionSalt, sessionSaltSize, packetSequence, direction);
 
-    // ⑦ AES-GCM 복호화 + 인증 태그 검증
-    bool ok = CryptoHelper::DecryptAESGCM(
+    // ??AES-GCM 蹂듯샇??+ ?몄쬆 ?쒓렇 寃利?    bool ok = CryptoHelper::DecryptAESGCM(
         nonce.data(), nonce.size(),
         aad, aadSize,
         bodyStart, bodySize,    // ciphertext
-        authTag,                // 검증할 태그
+        authTag,                // 寃利앺븷 ?쒓렇
         bodyStart, bodySize,    // plaintext (in-place)
         keyHandle
     );
 
     if (!ok) {
-        // 인증 실패 → 로그만 남기고 false 반환 (호출자가 패킷 폐기)
+        // ?몄쬆 ?ㅽ뙣 ??濡쒓렇留??④린怨?false 諛섑솚 (?몄텧?먭? ?⑦궥 ?먭린)
         LOG_ERROR(std::format(
             "DecodePacket: DecryptAESGCM failed. direction={}", static_cast<int>(direction)));
         return false;
     }
 
-    // ⑧ AuthTag 제거 (m_iWrite 조정)
+    // ??AuthTag ?쒓굅 (m_iWrite 議곗젙)
     packet.m_iWrite -= AUTH_TAG_SIZE;
 
     return true;
@@ -261,51 +247,50 @@ static bool PacketCryptoHelper::DecodePacket(
 
 ---
 
-## 5. 오프셋 상수 정리
+## 5. ?ㅽ봽???곸닔 ?뺣━
 
 ```
-PacketType 이후 기준 (m_iRead 기준):
+PacketType ?댄썑 湲곗? (m_iRead 湲곗?):
 
-isCorePacket=false (일반 패킷):
-  m_iRead → [Sequence 8B][PacketId 4B][Payload N B]
+isCorePacket=false (?쇰컲 ?⑦궥):
+  m_iRead ??[Sequence 8B][PacketId 4B][Payload N B]
   bodyOffsetWithNotHeader = sizeof(PacketType) + sizeof(Sequence) + sizeof(PacketId)
                           = 1 + 8 + 4 = 13
 
-isCorePacket=true (코어 패킷):
-  m_iRead → [Sequence 8B][Payload N B]
+isCorePacket=true (肄붿뼱 ?⑦궥):
+  m_iRead ??[Sequence 8B][Payload N B]
   bodyOffsetWithNotHeaderForCorePacket = sizeof(PacketType) + sizeof(Sequence)
                                        = 1 + 8 = 9
 
-절대 오프셋 기준 (m_pSerializeBuffer[0]):
+?덈? ?ㅽ봽??湲곗? (m_pSerializeBuffer[0]):
 
 isCorePacket=false:
   bodyOffset = df_HEADER_SIZE + PacketType + Sequence + PacketId
              = 3 + 1 + 8 + 4 = 16
-  →  bodyOffsetWithHeader = 16
+  ?? bodyOffsetWithHeader = 16
 
 isCorePacket=true:
   bodyOffset = df_HEADER_SIZE + PacketType + Sequence
              = 3 + 1 + 8 = 12
-  →  bodyOffsetWithHeaderForCorePacket = 12
+  ?? bodyOffsetWithHeaderForCorePacket = 12
 
-AAD 범위 (항상 동일):
+AAD 踰붿쐞 (??긽 ?숈씪):
   [0 .. 11] = df_HEADER_SIZE(3) + PacketType(1) + Sequence(8)
 
-AuthTag 위치:
-  m_iWrite - AUTH_TAG_SIZE  (복호화 전)
-  m_iWrite (복호화 후, AUTH_TAG_SIZE만큼 줄어듦)
+AuthTag ?꾩튂:
+  m_iWrite - AUTH_TAG_SIZE  (蹂듯샇????
+  m_iWrite (蹂듯샇???? AUTH_TAG_SIZE留뚰겮 以꾩뼱??
 ```
 
 ---
 
-## 6. IPacketCryptoHelper / Adapter 패턴
+## 6. IPacketCryptoHelper / Adapter ?⑦꽩
 
-테스트 용이성을 위해 인터페이스와 어댑터로 분리:
+?뚯뒪???⑹씠?깆쓣 ?꾪빐 ?명꽣?섏씠?ㅼ? ?대뙌?곕줈 遺꾨━:
 
 ```cpp
 class IPacketCryptoHelper {
 public:
-    virtual ~IPacketCryptoHelper() = default;
 
     virtual bool DecodePacket(
         OUT NetBuffer& packet,
@@ -331,7 +316,7 @@ public:
 
 class PacketCryptoHelperAdapter final : public IPacketCryptoHelper {
     bool DecodePacket(...) override {
-        return PacketCryptoHelper::DecodePacket(...);  // 정적 메서드 위임
+        return PacketCryptoHelper::DecodePacket(...);  // ?뺤쟻 硫붿꽌???꾩엫
     }
     void EncodePacket(...) override {
         PacketCryptoHelper::EncodePacket(...);
@@ -342,62 +327,59 @@ class PacketCryptoHelperAdapter final : public IPacketCryptoHelper {
 };
 ```
 
-**`RUDPPacketProcessor`는 `IPacketCryptoHelper*`를 생성자 주입으로 받아**  
-단위 테스트에서 `MockPacketCryptoHelper`로 대체 가능하다.
+**`RUDPPacketProcessor`??`IPacketCryptoHelper*`瑜??앹꽦??二쇱엯?쇰줈 諛쏆븘**  
+?⑥쐞 ?뚯뒪?몄뿉??`MockPacketCryptoHelper`濡??泥?媛?ν븯??
 
 ---
 
-## 7. `m_bIsEncoded` 중복 인코딩 방지
+## 7. `m_bIsEncoded` 以묐났 ?몄퐫??諛⑹?
 
 ```cpp
-// NetBuffer 멤버
+// NetBuffer 硫ㅻ쾭
 bool m_bIsEncoded = false;
 
-// EncodePacket 내부
-if (packet.m_bIsEncoded) return;  // 이미 암호화됨 → 즉시 반환
+// EncodePacket ?대?
+if (packet.m_bIsEncoded) return;  // ?대? ?뷀샇?붾맖 ??利됱떆 諛섑솚
 // ...
-packet.m_bIsEncoded = true;        // 완료 후 표시
+packet.m_bIsEncoded = true;        // ?꾨즺 ???쒖떆
 ```
 
-**중복 인코딩이 발생할 수 있는 시나리오:**
+**以묐났 ?몄퐫?⑹씠 諛쒖깮?????덈뒗 ?쒕굹由ъ삤:**
 
 ```
-재전송 경로:
-  최초 전송: EncodePacket() → m_bIsEncoded=true
-  재전송:    core.SendPacket(sendPacketInfo)
-                → 같은 NetBuffer* 재사용
-                → EncodePacket() 다시 호출될 수 있음
-                → m_bIsEncoded 체크로 스킵
+?ъ쟾??寃쎈줈:
+  理쒖큹 ?꾩넚: EncodePacket() ??m_bIsEncoded=true
+  ?ъ쟾??    core.SendPacket(sendPacketInfo)
+                ??媛숈? NetBuffer* ?ъ궗??                ??EncodePacket() ?ㅼ떆 ?몄텧?????덉쓬
+                ??m_bIsEncoded 泥댄겕濡??ㅽ궢
 ```
 
-`SendPacketImmediate`에서 `m_bIsEncoded == false`인 경우만 `EncodePacket`을 호출하도록  
-체크하는 경우도 있지만, `EncodePacket` 자체도 내부에서 중복 방지한다.
+`SendPacketImmediate`?먯꽌 `m_bIsEncoded == false`??寃쎌슦留?`EncodePacket`???몄텧?섎룄濡? 
+泥댄겕?섎뒗 寃쎌슦???덉?留? `EncodePacket` ?먯껜???대??먯꽌 以묐났 諛⑹??쒕떎.
 
 ---
 
-## 8. 콜 사이트 전체 목록
+## 8. 肄??ъ씠???꾩껜 紐⑸줉
 
-### `EncodePacket` 호출처
-
+### `EncodePacket` ?몄텧泥?
 ```cpp
-// 서버
+// ?쒕쾭
 RUDPSession::SendPacketImmediate()
-  → if (!buffer.m_bIsEncoded)
+  ??if (!buffer.m_bIsEncoded)
        PacketCryptoHelper::EncodePacket(buffer, sequence, direction,
            session.GetSessionSalt(), SESSION_SALT_SIZE,
            session.GetSessionKeyHandle(), isCorePacket)
 
-// 클라이언트 (C++)
+// ?대씪?댁뼵??(C++)
 RUDPClientCore::SendPacket(buffer, sequence, isCorePacket)
-  → PacketCryptoHelper::EncodePacket(...)
+  ??PacketCryptoHelper::EncodePacket(...)
 ```
 
-### `DecodePacket` 호출처
-
+### `DecodePacket` ?몄텧泥?
 ```cpp
-// 서버 (DECODE_PACKET 매크로로 감싸서 호출)
+// ?쒕쾭 (DECODE_PACKET 留ㅽ겕濡쒕줈 媛먯떥???몄텧)
 RUDPPacketProcessor::ProcessByPacketType()
-  → switch PacketType:
+  ??switch PacketType:
       CONNECT_TYPE:
         DecodePacket(buffer, salt, saltSize, keyHandle,
                      isCorePacket=true, CLIENT_TO_SERVER)
@@ -408,9 +390,9 @@ RUDPPacketProcessor::ProcessByPacketType()
       DISCONNECT_TYPE:
         DecodePacket(buffer, ..., isCorePacket=true, CLIENT_TO_SERVER)
 
-// 클라이언트 (C++)
+// ?대씪?댁뼵??(C++)
 RUDPClientCore::ProcessRecvPacket()
-  → switch PacketType:
+  ??switch PacketType:
       SEND_TYPE:
         DecodePacket(buffer, ..., isCorePacket=false, SERVER_TO_CLIENT)
       HEARTBEAT_TYPE:
@@ -419,19 +401,42 @@ RUDPClientCore::ProcessRecvPacket()
         DecodePacket(buffer, ..., isCorePacket=true, SERVER_TO_CLIENT_REPLY)
 ```
 
-### `SetHeader` 호출처
-
+### `SetHeader` ?몄텧泥?
 ```cpp
-// 직접 호출 (EncodePacket 내부가 아닌 경우)
+// 吏곸젒 ?몄텧 (EncodePacket ?대?媛 ?꾨땶 寃쎌슦)
 RUDPSessionBroker::SendSessionInfoToClient()
-  → SetHeader(sendBuffer)  ← extraSize=0 (암호화 없이 TLS로 전송)
+  ??SetHeader(sendBuffer)  ??extraSize=0 (?뷀샇???놁씠 TLS濡??꾩넚)
 ```
 
 ---
 
-## 관련 문서
-- [[CryptoHelper]] — BCrypt 저수준 연산
-- [[CryptoSystem]] — Nonce 구조, 암호화 범위 설계
-- [[PacketFormat]] — 패킷 레이아웃 및 오프셋 상수
-- [[PacketProcessing]] — DECODE_PACKET 매크로 사용처
-- [[RUDPSession]] — EncodePacket 호출 (SendPacketImmediate)
+## 愿??臾몄꽌
+- [[CryptoHelper]] ??BCrypt ??섏? ?곗궛
+- [[CryptoSystem]] ??Nonce 援ъ“, ?뷀샇??踰붿쐞 ?ㅺ퀎
+- [[PacketFormat]] ???⑦궥 ?덉씠?꾩썐 諛??ㅽ봽???곸닔
+- [[PacketProcessing]] ??DECODE_PACKET 留ㅽ겕濡??ъ슜泥?- [[RUDPSession]] ??EncodePacket ?몄텧 (SendPacketImmediate)
+---
+
+## ?꾩옱 肄붾뱶 湲곗? ?⑥닔 ?ㅻ챸
+
+### 怨듦컻 ?⑥닔
+
+#### `static void EncodePacket(NetBuffer& packet, PacketSequence packetSequence, PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, bool isCorePacket)`
+- 踰≫꽣 湲곕컲 ?몄뀡 ?뷀듃瑜?諛쏅뒗 ?ㅻ쾭濡쒕뱶??
+
+#### `static void EncodePacket(NetBuffer& packet, PacketSequence packetSequence, PACKET_DIRECTION direction, const unsigned char* sessionSalt, size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, bool isCorePacket)`
+- ?ㅻ뜑 ?묒꽦, nonce ?앹꽦, AAD 怨꾩궛, AES-GCM ?뷀샇?? AuthTag 遺李⑹쓣 ?섑뻾?쒕떎.
+
+#### `static bool DecodePacket(NetBuffer& packet, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, bool isCorePacket, const PACKET_DIRECTION direction)`
+- 踰≫꽣 湲곕컲 ?몄뀡 ?뷀듃瑜?諛쏅뒗 蹂듯샇???ㅻ쾭濡쒕뱶??
+
+#### `static bool DecodePacket(NetBuffer& packet, const unsigned char* sessionSalt, size_t sessionSaltSize, const BCRYPT_KEY_HANDLE& sessionKeyHandle, bool isCorePacket, const PACKET_DIRECTION direction)`
+- 理쒖냼 ?ш린 寃?? ?쒗??異붿텧, nonce/AAD 怨꾩궛, AES-GCM 蹂듯샇?붾? ?섑뻾?쒕떎.
+
+#### `static void SetHeader(NetBuffer& netBuffer, const int extraSize = 0)`
+- ?ㅻ뜑 肄붾뱶? payload 湲몄씠瑜?湲곕줉?섍퀬 `m_iRead`, `m_iWriteLast`瑜??뺣━?쒕떎.
+
+### ?대? ?⑥닔
+
+#### `static PACKET_DIRECTION DetermineDirection(uint8_t packetType)`
+- ?⑦궥 ???諛붿씠?몃? 諛⑺뼢 enum?쇰줈 留ㅽ븨?쒕떎.

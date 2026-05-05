@@ -33,6 +33,22 @@ public async Task<string> AskAsync(string userMessage)
 
 ---
 
+## 함수 설명
+
+#### `GeminiExtensions.GetText(this GenerateContentResponse response)`
+- Gemini 응답의 첫 번째 candidate에서 텍스트 파트만 이어붙여 최종 문자열을 만든다.
+- 문서상의 단순 파싱 helper가 아니라, 실제로 `AskAsync()`의 최종 반환 텍스트 추출에 사용된다.
+
+#### `GeminiClient(IConfiguration configuration)`
+- `GeminiSettings:ApiKey`, `ModelName`, `SystemPrompt`, `NodeSpecs`를 읽어 클라이언트를 초기화한다.
+- 필수 설정이 빠지면 즉시 예외를 발생시켜 잘못된 구성 상태를 조기에 드러낸다.
+
+#### `Task<string> AskAsync(string userMessage)`
+- 사용자 메시지를 Gemini 모델에 전달하고, `SystemPrompt`와 `NodeSpecs`를 `SystemInstruction`으로 함께 제공한다.
+- 성공 시 생성 텍스트를 반환하고, 실패 시 예외를 던지지 않고 오류 문자열을 반환한다.
+
+---
+
 ## System Prompt 역할
 
 `GeminiClientConfiguration.json`의 `SystemPrompt`:

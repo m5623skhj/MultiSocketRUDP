@@ -51,12 +51,44 @@ MainWindow
 void SetConnectionInfo(string ip, ushort port)
 void SetBotActionGraph(ActionGraph graph)
 void SaveGraphVisuals(List<NodeVisual>)    // 에디터 상태 저장
+void ClearSavedGraphVisuals()
 List<NodeVisual>? GetSavedGraphVisuals()  // 에디터 재오픈 시 복원
 
 async Task StartBotTest(ushort numOfBot)
 void StopBotTest()                        // 전체 Client.Disconnect()
 int GetActiveBotCount()                   // IsConnected() == true 개수
 ```
+
+---
+
+## 함수 설명
+
+#### `SetConnectionInfo(string targetIp, ushort targetPort)`
+- SessionBroker에 접속할 대상 IP와 포트를 저장한다.
+
+#### `SetBotActionGraph(ActionGraph graph)`
+- 이후 생성되는 봇들에게 적용할 행동 그래프를 저장한다.
+
+#### `SaveGraphVisuals(List<NodeVisual> nodeVisuals)`
+- 에디터 재오픈 시 복원할 수 있도록 현재 노드 비주얼 상태를 저장한다.
+
+#### `ClearSavedGraphVisuals()`
+- 저장해 둔 비주얼 상태를 제거한다.
+
+#### `List<NodeVisual>? GetSavedGraphVisuals()`
+- 마지막으로 저장한 비주얼 상태를 반환한다.
+
+#### `Task StartBotTest(ushort numOfBot)`
+- 지정한 수만큼 SessionBroker에서 세션 정보를 받아 `Client` 인스턴스를 만들고 행동 그래프를 적용한다.
+
+#### `void StopBotTest()`
+- 현재 관리 중인 모든 클라이언트 봇을 정리하고 연결을 끊는다.
+
+#### `int GetActiveBotCount()`
+- 현재 연결된 봇 수를 반환한다.
+
+#### `Task<Client?> GetSessionInfoFromSessionBroker()`
+- SessionBroker에 TLS로 접속해 세션 정보를 받아 새 `Client`를 생성한다.
 
 ---
 

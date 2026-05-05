@@ -15,7 +15,7 @@
 | 세션 상속 및 API | [[RUDPSession]] |
 | 패킷 흐름 이해 | [[PacketProcessing]] |
 | 스레드 구조 이해 | [[ThreadModel]] |
-| 연결 오류 해결 | [[TroubleShooting]] |
+| 연결 오류 해결 | [[Troubleshooting]] |
 | 성능 최적화 | [[PerformanceTuning]] |
 | 클라이언트 개발 | [[RUDPClientCore]] |
 | BotTester | [[BotTester/00_BotTester_Overview]] |
@@ -71,7 +71,7 @@
 | 문서 | 핵심 내용 |
 |------|-----------|
 | [[ContentServerGuide]] | Step-by-Step 콘텐츠 서버 구현 |
-| [[TroubleShooting]] | 연결/패킷/암호화/성능 문제 해결 |
+| [[Troubleshooting]] | 연결/패킷/암호화/성능 문제 해결 |
 | [[PerformanceTuning]] | 스레드/흐름제어/재전송 파라미터 최적화 |
 | [[GettingStarted]] | 빠른 시작 (서버+BotTester) |
 | [[Glossary]] | 용어집 |
@@ -93,3 +93,9 @@
 ## Diagrams/
 
 ![[Diagrams/README]]
+---
+
+## 검토 메모
+
+- `[[Troubleshooting]]` 링크 표기로 통일하는 편이 안전하다.
+- `Client` 영역에는 현재 `RUDPSessionBroker.md`도 포함되어 있으므로, 이 문서는 "클라이언트가 사용하는 브로커 프로토콜" 문서라는 점을 함께 보는 편이 맞다.

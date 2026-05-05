@@ -100,7 +100,6 @@ PacketGenerate.bat
 class Player final : public RUDPSession {
 public:
     explicit Player(MultiSocketRUDPCore& core);
-    ~Player() override = default;
 
 private:
     void OnConnected()    override;
@@ -555,5 +554,11 @@ void Player::OnMove(const MoveReq& packet) {
 - [[PacketGenerator]] — 패킷 코드 자동 생성
 - [[PacketFormat]] — 직렬화 상세
 - [[Ticker]] — 타이머 이벤트
-- [[TroubleShooting]] — 연동 오류 해결
+- [[Troubleshooting]] — 연동 오류 해결
 - [[GettingStarted]] — 빠른 시작
+---
+
+## 검토 메모
+
+- `Player` 예제처럼 필수 인자가 있는 생성자는 문서에 남겨도 되지만, 소멸자와 의미 없는 기본 생성자 설명은 굳이 늘리지 않는 편이 문서 기준과 맞다.
+- 패킷/핸들러 예시는 실제 현재 API 이름인 `RegisterPacketHandler`, `SendPacket`, `StartServer`, `StopServer` 기준으로 유지해야 한다.

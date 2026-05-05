@@ -28,6 +28,28 @@
 
 ---
 
+## 공통 실행 계약
+
+### `ActionNodeBase`
+
+#### `AddNext(ActionNodeBase nextNode)`
+- 기본 체인의 다음 노드를 연결한다.
+
+#### `SetStatsTracker(NodeStatsTracker? tracker)`
+- 전역 통계 추적기를 설정한다.
+
+#### `GetStatsTracker()`
+- 현재 등록된 통계 추적기를 반환한다.
+
+### 노드 구현 파일 구성
+
+- `SimpleActionNode.cs`: 송신, 로그, 변수 설정/조회처럼 단일 동작 위주의 노드들
+- `ConditionalAndLoopNodes.cs`: 조건 분기와 루프 구조 노드들
+- `FlowControlNodes.cs`: 대기, 재시도, 타임아웃, assertion 같은 흐름 제어 노드들
+- `VariableNodes.cs`: 컨텍스트 변수와 패킷 수신 상태를 이용하는 노드들
+
+---
+
 ## Action 노드 (DimGray)
 
 ### SendPacketNode
