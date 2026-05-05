@@ -4,6 +4,27 @@
 #include "LogExtension.h"
 #include "../Common/Crypto/CryptoHelper.h"
 
+inline bool HexStringToBytes(const wchar_t* hex, std::vector<uint8_t>& out)
+{
+    const size_t len = wcslen(hex);
+    if (len % 2 != 0) return false;
+    out.clear();
+    out.reserve(len / 2);
+    auto nyb = [](wchar_t c) -> int {
+        if (c >= L'0' && c <= L'9') return c - L'0';
+        if (c >= L'a' && c <= L'f') return c - L'a' + 10;
+        if (c >= L'A' && c <= L'F') return c - L'A' + 10;
+        return -1;
+    };
+    for (size_t i = 0; i < len; i += 2) {
+        const int hi = nyb(hex[i]);
+        const int lo = nyb(hex[i + 1]);
+        if (hi < 0 || lo < 0) return false;
+        out.push_back(static_cast<uint8_t>((hi << 4) | lo));
+    }
+    return true;
+}
+
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
 {
@@ -47,6 +68,7 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 #else
 bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
+	tlsHelper.SetPinnedSpkiSha256(sessionBrokerSpkiPin);
 	if (not tlsHelper.Initialize())
 	{
 		LOG_ERROR("RUDPClientCore::tlsHelper.Initialize() failed");
@@ -94,6 +116,16 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_KEY", &NetBuffer::m_byXORCode))
 		return false;
 
+	WCHAR pinHex[65]{};
+	if (!parser.GetValue_String(pBuff, L"SESSION_BROKER", L"EXPECTED_SPKI_SHA256", pinHex))
+	{
+	    return false;
+	}
+	if (not HexStringToBytes(pinHex, sessionBrokerSpkiPin) || sessionBrokerSpkiPin.size() != 32)
+	{
+	    return false;
+	}
+	
 	return true;
 }
 
