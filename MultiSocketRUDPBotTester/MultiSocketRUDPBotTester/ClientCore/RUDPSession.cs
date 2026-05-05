@@ -92,6 +92,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
+        /// <summary>
+        /// 현재 holdingPackets 컬렉션에 보류 중인 패킷의 수를 안전하게 반환합니다.
+        /// 이 작업은 스레드 안전을 위해 holdingPacketsLock을 사용하여 잠금을 수행합니다.
+        /// 실패 조건: 없습니다.
+        /// 상태 변화: 이 함수는 내부 컬렉션의 상태를 변경하지 않습니다.
+        /// Side Effect: 없습니다.
+        /// </summary>
+        /// <returns>보류 중인 패킷의 총 수입니다.</returns>
         public int GetCount()
         {
             lock (holdingPacketsLock)
@@ -100,6 +108,16 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
+        /// <summary>
+        /// 현재 holdingPackets 컬렉션에 있는 패킷들의 첫 번째와 마지막 PacketSequence를 안전하게 가져오려고 시도합니다.
+        /// 이 작업은 스레드 안전을 위해 holdingPacketsLock을 사용하여 잠금을 수행합니다.
+        /// 실패 조건: holdingPackets 컬렉션이 비어있는 경우 false를 반환하고, out 매개변수는 기본값으로 설정됩니다.
+        /// 상태 변화: out 매개변수인 firstSequence와 lastSequence에 PacketSequence 값을 설정합니다.
+        /// Side Effect: 없습니다.
+        /// </summary>
+        /// <param name="firstSequence">메서드가 반환될 때, 컬렉션의 첫 번째 PacketSequence가 포함됩니다 (컬렉션이 비어있지 않은 경우).</param>
+        /// <param name="lastSequence">메서드가 반환될 때, 컬렉션의 마지막 PacketSequence가 포함됩니다 (컬렉션이 비어있지 않은 경우).</param>
+        /// <returns>컬렉션에 패킷이 있으면 true, 그렇지 않으면 false입니다.</returns>
         public bool TryGetRange(out PacketSequence firstSequence, out PacketSequence lastSequence)
         {
             lock (holdingPacketsLock)
