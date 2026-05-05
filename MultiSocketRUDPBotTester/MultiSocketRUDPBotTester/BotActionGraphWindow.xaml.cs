@@ -38,7 +38,13 @@ namespace MultiSocketRUDPBotTester
         private Window? statsWindow;
 
         private WithGeminiClient.GeminiClient geminiClient = null!;
-        // GraphFileModel과 NodeVisualFileModel에서 JSON 직렬화 및 역직렬화 시, Enum 값을 문자열로 처리하도록 설정하여 가독성을 높이고, 향후 확장성에 대비할 수 있도록 합니다.
+
+        /// <summary>
+        /// 봇 액션 그래프 파일을 직렬화/역직렬화할 때 사용되는 JSON 직렬화 옵션입니다.
+        /// </summary>
+        /// <remarks>
+        /// 이 옵션은 JSON 출력을 가독성 있게 들여쓰기하고, 열거형 값을 문자열로 변환하여 처리하도록 설정합니다.
+        /// </remarks>
         private static readonly JsonSerializerOptions GraphFileJsonOptions = new()
         {
             WriteIndented = true,
@@ -349,8 +355,27 @@ namespace MultiSocketRUDPBotTester
             Log($"Node added: {t.Name}");
         }
 
-        // 현재 그래프의 시각적 표현과 구성을 GraphFileModel 객체로 변환하여 JSON으로 직렬화한 후, 사용자가 선택한 파일 경로에 저장하는 함수입니다.
-        // 저장 과정에서 발생할 수 있는 오류를 처리하여 사용자에게 알리고, 성공적으로 저장된 경우 상태 표시줄에 업데이트합니다.
+        /// <summary>
+        /// "Save Graph" 버튼 클릭 이벤트를 처리합니다.
+        /// 현재의 봇 액션 그래프를 JSON 형식으로 파일에 저장합니다.
+        /// </summary>
+        /// <param name="sender">이벤트를 발생시킨 객체입니다.</param>
+        /// <param name="e">이벤트 데이터를 포함하는 <see cref="RoutedEventArgs"/>입니다.</param>
+        /// <remarks>
+        /// 사용자가 파일을 저장할 위치를 선택하면, <see cref="CreateGraphFileModel"/>을 통해 현재 그래프 데이터를 가져와
+        /// <see cref="JsonSerializer.Serialize"/>를 사용하여 JSON 문자열로 변환한 후 해당 파일에 기록합니다.
+        /// 성공 또는 실패 시 로그 및 UI 상태 텍스트를 업데이트합니다.
+        /// </remarks>
+        /// <failure
+        ///   - 사용자가 파일 저장 대화 상자를 취소하면 아무런 동작 없이 함수를 종료합니다.
+        ///   - 파일 저장 중 예외가 발생하면 오류 메시지를 로그하고 사용자에게 경고 메시지 박스를 표시하며, UI 상태를 업데이트합니다.
+        /// </failure>
+        /// <sideeffect
+        ///   - 파일 시스템에 봇 그래프 JSON 파일이 생성되거나 갱신됩니다.
+        ///   - <see cref="Log"/>를 통해 작업 진행 상황이 기록됩니다.
+        ///   - UI 상태 텍스트(<see cref="SetStatusText"/>)와 색상이 업데이트됩니다.
+        ///   - 오류 발생 시 메시지 박스가 표시됩니다.
+        /// </sideeffect>
         private void SaveGraph_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -384,9 +409,30 @@ namespace MultiSocketRUDPBotTester
             }
         }
 
-        // 사용자가 파일 대화상자를 통해 선택한 그래프 파일을 읽어서, GraphFileModel 객체로 역직렬화한 후,
-        // 현재 그래프를 초기화하고 파일에서 노드와 연결 정보를 복원하여 그래프를 재구성하는 함수입니다.
-        // 로드 과정에서 발생할 수 있는 오류를 처리하여 사용자에게 알리고, 성공적으로 로드된 경우 상태 표시줄에 업데이트합니다.
+        /// <summary>
+        /// "Load Graph" 버튼 클릭 이벤트를 처리합니다.
+        /// 사용자가 선택한 JSON 파일로부터 봇 액션 그래프를 로드하여 UI에 표시합니다.
+        /// </summary>
+        /// <param name="sender">이벤트를 발생시킨 객체입니다.</param>
+        /// <param name="e">이벤트 데이터를 포함하는 <see cref="RoutedEventArgs"/>입니다.</param>
+        /// <remarks>
+        /// 파일 선택 대화 상자를 통해 파일을 선택하면, 파일 내용을 읽어 <see cref="GraphFileModel"/> 객체로 역직렬화합니다.
+        /// 기존 그래프를 지우고 <see cref="RestoreGraphFromFile"/>을 호출하여 로드된 데이터로 새 그래프를 구성합니다.
+        /// </remarks>
+        /// <failure
+        ///   - 사용자가 파일 열기 대화 상자를 취소하면 아무런 동작 없이 함수를 종료합니다.
+        ///   - 선택된 파일이 비어있거나 유효하지 않은 그래프 구조를 가질 경우 <see cref="InvalidOperationException"/>을 발생시킵니다.
+        ///   - 파일 읽기 또는 JSON 역직렬화 중 예외가 발생하면 오류 메시지를 로그하고 사용자에게 경고 메시지 박스를 표시하며, UI 상태를 업데이트합니다.
+        /// </failure>
+        /// <sideeffect
+        ///   - 파일 시스템으로부터 JSON 그래프 파일 내용을 읽어옵니다.
+        ///   - 현재 UI에 표시된 그래프와 내부 데이터를 <see cref="ClearCurrentGraph"/>를 통해 초기화합니다.
+        ///   - <see cref="RestoreGraphFromFile"/> 호출을 통해 UI에 새로운 그래프 노드와 연결이 그려집니다.
+        ///   - <see cref="BuiltGraph"/> 필드가 null로 설정됩니다.
+        ///   - <see cref="Log"/>를 통해 작업 진행 상황이 기록됩니다.
+        ///   - UI 상태 텍스트(<see cref="SetStatusText"/>)와 색상이 업데이트됩니다.
+        ///   - 오류 발생 시 메시지 박스가 표시됩니다.
+        /// </sideeffect>
         private void LoadGraph_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -638,7 +684,23 @@ namespace MultiSocketRUDPBotTester
             Log($"Graph restored with {allNodes.Count} nodes.");
         }
 
-        // GraphFileModel 객체에서 저장된 노드 정보를 기반으로 새로운 NodeVisual 객체를 생성하고, 노드 간의 연결을 복원하여 그래프를 재구성하는 함수입니다.
+        /// <summary>
+        /// 주어진 <see cref="GraphFileModel"/>을 기반으로 봇 액션 그래프를 UI에 재구성합니다.
+        /// 이 함수는 저장된 노드 데이터를 읽어 <see cref="NodeVisual"/> 객체를 생성하고, 이들 간의 연결을 설정한 후 UI를 업데이트합니다.
+        /// </summary>
+        /// <param name="graphFile">로드할 그래프 데이터를 포함하는 <see cref="GraphFileModel"/> 객체입니다.</param>
+        /// <remarks>
+        ///   - 첫 번째 단계에서는 파일 모델의 각 노드에 대해 시각적 노드(<see cref="NodeVisual"/>)를 생성하고 캔버스에 추가합니다.
+        ///   - 두 번째 단계에서는 생성된 시각적 노드들 간의 관계(Next, TrueChild, FalseChild, DynamicChildren)를 파일 모델에 정의된 ID를 사용하여 연결합니다.
+        ///   - 마지막으로 디스패처를 통해 UI 스레드에서 모든 연결을 다시 그리도록 요청합니다.
+        /// </remarks>
+        /// <sideeffect
+        ///   - <see cref="CreateNodeFromFileModel"/>을 호출하여 새로운 <see cref="NodeVisual"/> 인스턴스가 생성됩니다.
+        ///   - <see cref="AddNodeToCanvas"/>를 호출하여 생성된 노드들이 UI 캔버스에 추가되고, 내부 `allNodes` 컬렉션이 업데이트됩니다.
+        ///   - <see cref="NodeVisual"/> 객체 간의 참조(Next, TrueChild, FalseChild, DynamicChildren)가 설정되어 그래프 구조가 재구성됩니다.
+        ///   - UI 스레드에서 <see cref="renderer.RedrawConnections"/>가 호출되어 캔버스의 연결선이 다시 그려집니다.
+        ///   - <see cref="Log"/>를 통해 그래프 복원 완료 메시지가 기록됩니다.
+        /// </sideeffect>
         private void RestoreGraphFromFile(GraphFileModel graphFile)
         {
             var nodeMapping = new Dictionary<int, NodeVisual>();
@@ -686,7 +748,25 @@ namespace MultiSocketRUDPBotTester
             Log($"Graph restored with {allNodes.Count} nodes.");
         }
 
-        // NodeVisualFileModel 객체에서 저장된 정보를 기반으로 새로운 NodeVisual 객체를 생성하는 함수입니다.
+        /// <summary>
+        /// 파일에서 로드된 <see cref="NodeVisualFileModel"/> 데이터를 사용하여 새로운 <see cref="NodeVisual"/> 객체를 생성합니다.
+        /// 이 함수는 노드의 유형, 색상, 제목 및 포트 구성을 설정하고, 특정 노드 유형에 대한 추가 초기화를 수행합니다.
+        /// </summary>
+        /// <param name="saved">파일에서 로드된 노드 데이터를 포함하는 <see cref="NodeVisualFileModel"/> 객체입니다.</param>
+        /// <returns>
+        /// 초기화된 <see cref="NodeVisual"/> 객체입니다.
+        /// </returns>
+        /// <remarks>
+        ///   - 노드의 유형과 루트 여부에 따라 시각적 요소(색상, 제목)와 내부 액션 노드(<see cref="CustomActionNode"/>)를 설정합니다.
+        ///   - 노드 카테고리 및 유형에 따라 적절한 입력 및 출력 포트(<see cref="OutputPort"/>, <see cref="OutputPortTrue"/>, <see cref="OutputPortFalse"/>, 동적 포트)를 생성합니다.
+        ///   - 노드의 위치(Left, Top)를 설정합니다.
+        /// </remarks>
+        /// <sideeffect
+        ///   - <see cref="CreateNodeVisual"/>, <see cref="CreateInputPort"/>, <see cref="CreateOutputPort"/>, <see cref="CreateDynamicPorts"/> 등의 헬퍼 함수를 호출하여 새로운 UI 요소 및 포트 객체를 생성합니다.
+        ///   - <see cref="CloneConfiguration"/>을 호출하여 <see cref="NodeConfiguration"/> 객체를 복제합니다.
+        ///   - 루트 노드인 경우 <see cref="CustomActionNode"/> 인스턴스가 생성되어 <see cref="NodeVisual.ActionNode"/>에 할당됩니다.
+        ///   - <see cref="WpfCanvas.SetLeft"/> 및 <see cref="WpfCanvas.SetTop"/>을 호출하여 UI 요소의 위치를 설정합니다.
+        /// </sideeffect>
         private NodeVisual CreateNodeFromFileModel(NodeVisualFileModel saved)
         {
             var nodeType = ResolveNodeType(saved.NodeTypeName, saved.IsRoot);
@@ -805,7 +885,21 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
-        // NodeConfigurationFileModel에서 NodeConfiguration으로 변환하는 과정에서, JsonElement로 직렬화된 프로퍼티 값을 실제 .NET 객체로 변환하여 새로운 NodeConfiguration 객체를 생성합니다.
+        /// <summary>
+        /// <see cref="NodeConfigurationFileModel"/> 객체의 데이터를 기반으로 새로운 <see cref="NodeConfiguration"/> 객체를 생성하여 반환합니다.
+        /// 이는 파일 모델의 설정을 런타임에 사용될 수 있는 실제 구성 객체로 변환하는 역할을 합니다.
+        /// </summary>
+        /// <param name="original">복제할 원본 <see cref="NodeConfigurationFileModel"/> 객체입니다. null일 수 있습니다.</param>
+        /// <returns>
+        /// 원본이 null이면 null을 반환하고, 그렇지 않으면 원본의 데이터를 복사한 새로운 <see cref="NodeConfiguration"/> 객체를 반환합니다.
+        /// </returns>
+        /// <remarks>
+        /// Properties 컬렉션은 <see cref="ConvertJsonElementToPropertyValue"/>를 사용하여 <see cref="JsonElement"/>를 적절한 속성 값 타입으로 변환합니다.
+        /// </remarks>
+        /// <sideeffect
+        ///   - 새로운 <see cref="NodeConfiguration"/> 인스턴스와 해당 Properties 딕셔너리가 생성됩니다.
+        ///   - <see cref="ConvertJsonElementToPropertyValue"/> 헬퍼 함수가 호출됩니다.
+        /// </sideeffect>
         private static NodeConfiguration? CloneConfiguration(NodeConfigurationFileModel? original)
         {
             if (original == null)
@@ -824,7 +918,27 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
-        // 현재 그래프의 시각적 표현과 구성을 GraphFileModel 객체로 변환하여 파일로 저장할 때 사용할 수 있도록 합니다.
+        /// <summary>
+        /// 현재 시각적 그래프 데이터를 기반으로 저장 가능한 `GraphFileModel` 객체를 생성합니다.
+        /// 이 모델은 그래프의 직렬화 및 저장을 위해 사용됩니다.
+        /// </summary>
+        /// <returns>생성된 `GraphFileModel` 인스턴스.</returns>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>내부 `allNodes` 컬렉션의 `NodeVisual` 객체들을 `GraphFileModel`의 `NodeVisualFileModel` 리스트로 변환합니다.</item>
+        /// <item>각 `NodeVisual`에 대해 고유 ID를 부여하고, 노드 간의 연결(`NextNodeId`, `TrueChildId`, `FalseChildId`, `DynamicChildIds`)을 이 ID를 기반으로 참조합니다.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>연결된 노드(`Next`, `TrueChild`, `FalseChild`, `DynamicChildren`)가 `allNodes` 컬렉션에 없으면 해당 ID는 `null`이 됩니다.</item>
+        /// <item>`BuiltGraph`가 `null`인 경우, `Name` 속성은 "Bot Action Graph"로 기본 설정됩니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>클래스 멤버의 직접적인 상태 변경은 없으며, 내부 데이터를 기반으로 새로운 모델 객체를 생성하여 반환합니다.</item>
+        /// </list>
+        /// </remarks>
         private GraphFileModel CreateGraphFileModel()
         {
             var nodeIds = allNodes
@@ -857,7 +971,26 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
-        // NodeConfiguration 객체를 NodeConfigurationFileModel 객체로 변환하여 파일에 저장할 때 사용할 수 있도록 합니다.
+        /// <summary>
+        /// `NodeConfiguration` 객체를 직렬화에 적합한 `NodeConfigurationFileModel`로 변환합니다.
+        /// </summary>
+        /// <param name="configuration">변환할 `NodeConfiguration` 객체.</param>
+        /// <returns>변환된 `NodeConfigurationFileModel` 객체 또는 입력이 `null`인 경우 `null`.</returns>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>입력 `configuration` 객체의 속성들을 `NodeConfigurationFileModel`의 해당 속성들로 매핑합니다.</item>
+        /// <item>`Properties` 딕셔너리의 값은 `JsonSerializer.SerializeToElement`를 사용하여 `JsonElement`로 직렬화됩니다.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>입력 `configuration`이 `null`인 경우, 함수는 `null`을 반환합니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>클래스 인스턴스의 상태를 변경하지 않고, 새로운 모델 객체를 생성하여 반환합니다.</item>
+        /// </list>
+        /// </remarks>
         private static NodeConfigurationFileModel? CreateConfigurationFileModel(NodeConfiguration? configuration)
         {
             if (configuration == null)
@@ -876,7 +1009,28 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
-        // 현재 그래프를 완전히 초기화하여 빈 캔버스 상태로 되돌립니다. 모든 노드와 연결된 UI 요소가 제거되고, 관련 상태가 초기화됩니다.
+        /// <summary>
+        /// 현재 로드되거나 생성된 그래프의 모든 시각적 요소와 내부 상태를 초기화합니다.
+        /// </summary>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>`selectedNode`를 `null`로 설정하여 현재 선택된 노드를 해제합니다.</item>
+        /// <item>`BuiltGraph`를 `null`로 설정하여 빌드된 그래프 모델을 제거합니다.</item>
+        /// <item>`allNodes` 컬렉션을 비워 모든 노드 데이터와 참조를 제거합니다.</item>
+        /// <item>`GraphCanvas.Children` 컬렉션을 비워 UI에서 모든 시각적 노드를 제거합니다.</item>
+        /// <item>각 노드의 컨텍스트 메뉴를 클리어하고 `null`로 설정합니다.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>특정 노드의 `Border` 또는 `ContextMenu`가 `null`인 경우, 해당 노드의 컨텍스트 메뉴 처리는 건너뜁니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>UI (`GraphCanvas.Children`)를 직접적으로 변경하여 화면에서 그래프를 제거합니다.</item>
+        /// <item>클래스의 내부 상태(`selectedNode`, `BuiltGraph`, `allNodes`)를 초기 상태로 재설정합니다.</item>
+        /// </list>
+        /// </remarks>
         private void ClearCurrentGraph()
         {
             selectedNode = null;
@@ -897,10 +1051,52 @@ namespace MultiSocketRUDPBotTester
             GraphCanvas.Children.Clear();
         }
 
-        // 캔버스에 노드를 배치할 때 NaN 값이 들어가는 것을 방지하기 위해, 위치 값을 정규화하는 유틸리티 함수입니다.
+        /// <summary>
+        /// WPF 캔버스 위치 값으로 사용할 double 값을 정규화합니다.
+        /// 입력 값이 `double.NaN`인 경우 `0`을 반환하고, 그렇지 않으면 원래 값을 반환합니다.
+        /// </summary>
+        /// <param name="value">정규화할 double 값.</param>
+        /// <returns>정규화된 double 값.</returns>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>없음. 항상 유효한 double 값을 반환합니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// </remarks>
         private static double NormalizeCanvasPosition(double value) => double.IsNaN(value) ? 0 : value;
 
-        // 노드의 타입 이름 문자열을 기반으로 해당하는 Type 객체를 찾는 함수입니다. 루트 노드인 경우 null을 반환합니다.
+        /// <summary>
+        /// 노드 유형의 어셈블리 정규화된 이름으로부터 `Type` 객체를 해결합니다.
+        /// 루트 노드에 대한 특별한 처리와 실패 시 대체 해결 메커니즘을 포함합니다.
+        /// </summary>
+        /// <param name="nodeTypeName">해결할 노드 유형의 이름 (어셈블리 정규화된 이름일 수 있음).</param>
+        /// <param name="isRoot">해당 노드가 루트 노드인지 여부.</param>
+        /// <returns>해결된 `Type` 객체 또는 `isRoot`가 `true`일 경우 `null`.</returns>
+        /// <exception cref="InvalidOperationException">노드 유형 이름이 없거나, 어셈블리 내에서 유형을 해결할 수 없는 경우 발생합니다.</exception>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>`isRoot`가 `true`인 경우, `nodeTypeName`과 관계없이 즉시 `null`을 반환합니다.</item>
+        /// <item>`nodeTypeName`이 `null`이거나 공백이고 `isRoot`가 `false`인 경우, `InvalidOperationException`을 발생시킵니다.</item>
+        /// <item>지정된 `nodeTypeName`으로 `Type.GetType` 호출에 실패하면, 어셈블리 이름 부분을 제거하고 `ActionNodeBase` 어셈블리 내에서 다시 시도합니다.</item>
+        /// <item>모든 시도에도 불구하고 유형을 해결할 수 없는 경우, `InvalidOperationException`을 발생시킵니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>없음.</n></list>
+        /// </remarks>
         private static Type? ResolveNodeType(string? nodeTypeName, bool isRoot)
         {
             if (isRoot)
@@ -929,7 +1125,26 @@ namespace MultiSocketRUDPBotTester
             throw new InvalidOperationException($"Failed to resolve node type '{nodeTypeName}'.");
         }
 
-        // 노드의 Type 객체가 null이 아닌 경우 해당 타입의 이름을 반환하고, null인 경우에는 타입 이름 문자열에서 간단한 이름을 추출하여 반환하는 함수입니다. 루트 노드인 경우 "OnConnected"를 반환합니다.
+        /// <summary>
+        /// 노드의 표시 제목을 결정합니다. 제공된 `Type` 객체가 있으면 그 이름을 사용하고, 그렇지 않으면 유형 이름 문자열에서 파싱합니다.
+        /// </summary>
+        /// <param name="nodeType">노드의 `Type` 객체 (있을 경우).</param>
+        /// <param name="nodeTypeName">노드의 어셈블리 정규화된 유형 이름 (있을 경우).</param>
+        /// <returns>노드의 표시 제목.</returns>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>`nodeType`과 `nodeTypeName`이 모두 `null`이거나 공백인 경우, "Unknown"을 반환합니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// </remarks>
         private static string ResolveNodeTitle(Type? nodeType, string? nodeTypeName)
         {
             if (nodeType != null)
@@ -947,7 +1162,28 @@ namespace MultiSocketRUDPBotTester
             return lastDotIndex >= 0 ? typeName[(lastDotIndex + 1)..] : typeName;
         }
 
-        // JsonElement로 직렬화된 프로퍼티 값을 실제 .NET 객체로 변환하는 함수입니다. JsonValueKind에 따라 적절한 타입으로 변환하여 반환합니다.
+        /// <summary>
+        /// `JsonElement`의 `JsonValueKind`에 따라 해당 `JsonElement`를 .NET 기본 객체 유형으로 변환합니다.
+        /// </summary>
+        /// <param name="element">변환할 `JsonElement`.</param>
+        /// <returns>변환된 .NET 객체.</returns>
+        /// <remarks>
+        /// <para>상태 변화:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// <para>실패 조건:</para>
+        /// <list type="bullet">
+        /// <item>`JsonValueKind.String`이 `null`인 경우, `string.Empty`를 반환합니다.</item>
+        /// <item>`JsonValueKind.Number`인 경우 `int`, `long`, `double` 순서로 변환을 시도합니다.</item>
+        /// <item>`JsonValueKind.Null`은 `string.Empty`로 변환됩니다.</item>
+        /// <item>정의된 `JsonValueKind` 이외의 값(예: `Object`, `Array`)은 `element.GetRawText()`를 반환합니다.</item>
+        /// </list>
+        /// <para>Side Effects:</para>
+        /// <list type="bullet">
+        /// <item>없음.</item>
+        /// </list>
+        /// </remarks>
         private static object ConvertJsonElementToPropertyValue(JsonElement element)
         {
             return element.ValueKind switch
