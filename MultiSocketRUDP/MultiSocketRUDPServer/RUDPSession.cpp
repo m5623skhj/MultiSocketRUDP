@@ -14,11 +14,6 @@ namespace
 {
 	// ----------------------------------------
 	// @brief 두 PacketSequence 값 간의 차이를 계산하여 수신 순서를 결정하는 데 사용합니다.
-	//
-	// 이 함수는 두 패킷 시퀀스(a - b) 간의 부호 있는 차이(int32_t)를 반환합니다.
-	// 반환 값은 패킷 'a'가 패킷 'b'에 비해 얼마나 앞서거나 뒤쳐져 있는지를 나타내며,
-	// 주로 RUDP 세션에서 패킷 재정렬 및 순서 확인 로직에 활용됩니다.
-	//
 	// @param a 첫 번째 PacketSequence 값입니다.
 	// @param b 두 번째 PacketSequence 값입니다.
 	// @return PacketSequence a와 b의 차이(a - b)를 int32_t 타입으로 반환합니다.
