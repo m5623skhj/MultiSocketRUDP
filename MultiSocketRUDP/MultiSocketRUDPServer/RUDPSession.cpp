@@ -12,31 +12,9 @@
 
 namespace
 {
-	constexpr char TEMP_TPS_TRACE_TAG[] = "TEMP_TPS_TRACE";
-	constexpr PacketId TEMP_TPS_TRACE_PACKET_ID = static_cast<PacketId>(2);
-
-	bool IsTempTpsTracePacket(const PacketId inPacketId)
+	int32_t SeqDiffForRecvOrder(const PacketSequence a, const PacketSequence b)
 	{
-		return inPacketId == TEMP_TPS_TRACE_PACKET_ID;
-	}
-
-	PacketId ExtractPacketIdForTrace(NetBuffer& buffer, const bool isReplyType, const bool isCorePacket)
-	{
-		if (isReplyType || isCorePacket)
-		{
-			return static_cast<PacketId>(0);
-		}
-
-		const char* readBufferPtr = buffer.GetReadBufferPtr();
-		if (readBufferPtr == nullptr)
-		{
-			return static_cast<PacketId>(0);
-		}
-
-		PacketId packetId = static_cast<PacketId>(0);
-		constexpr size_t packetIdOffset = sizeof(PACKET_TYPE) + sizeof(PacketSequence);
-		std::memcpy(&packetId, readBufferPtr + packetIdOffset, sizeof(packetId));
-		return packetId;
+		return static_cast<int32_t>(a - b);
 	}
 }
 
@@ -203,7 +181,6 @@ bool RUDPSession::SendPacketImmediate(
 	}
 
 	sendPacketInfo->Initialize(this, sessionGeneration.load(std::memory_order_acquire), &buffer, inSendPacketSequence, isReplyType);
-	sendPacketInfo->tracePacketId = ExtractPacketIdForTrace(buffer, isReplyType, isCorePacket);
 	if (not isReplyType)
 	{
 		rioContext.GetSendContext().InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
@@ -237,17 +214,6 @@ bool RUDPSession::SendPacketImmediate(
 		}
 
 		return false;
-	}
-
-	if (IsTempTpsTracePacket(sendPacketInfo->tracePacketId))
-	{
-		LOG_DEBUG(std::format(
-			"[{}][SERVER_SEND_DATA] sessionId={} packetId={} seq={} isRetransmit={}",
-			TEMP_TPS_TRACE_TAG,
-			sessionId,
-			static_cast<unsigned int>(sendPacketInfo->tracePacketId),
-			inSendPacketSequence,
-			false));
 	}
 
 	SendPacketInfo::Free(sendPacketInfo);
@@ -421,6 +387,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
 
+	const PacketSequence nextExpectedSequence = sessionPacketOrderer.GetNextExpected();
+	if (SeqDiffForRecvOrder(packetSequence, nextExpectedSequence) < 0)
+	{
+		SendReplyToClient(packetSequence);
+		return true;
+	}
+
 	if (not flowManager.CanAccept(packetSequence))
 	{
 		return true;
@@ -504,12 +477,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
 
-	LOG_DEBUG(std::format(
-		"[{}][SERVER_ACK_RECV] sessionId={} seq={}",
-		TEMP_TPS_TRACE_TAG,
-		sessionId,
-		packetSequence));
-
 	if (rioContext.GetSendContext().GetLastSendPacketSequence() < packetSequence)
 	{
 		return;
@@ -518,10 +485,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	SendPacketInfo* sendPacketInfo = rioContext.GetSendContext().FindAndEraseSendPacketInfo(packetSequence);
 	if (sendPacketInfo == nullptr)
 	{
-		LOG_DEBUG(std::format(
-			"[TEMP_TPS_TRACE][SERVER_ACK_MISS] sessionId={} seq={}",
-			sessionId,
-			packetSequence));
 		return;
 	}
 
@@ -533,9 +496,6 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 
 void RUDPSession::OnRetransmissionTimeout() noexcept
 {
-	LOG_DEBUG(std::format(
-		"[TEMP_TPS_TRACE][SERVER_RETRANSMIT_TIMEOUT] sessionId={}",
-		sessionId));
 	flowManager.OnTimeout();
 }
 

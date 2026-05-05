@@ -128,7 +128,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
     public abstract class RudpSession
     {
-        protected const string TempTpsTraceTag = "TEMP_TPS_TRACE";
         private const ulong LoginPacketSequence = 0;
         private const int HeaderSize = 5;
         private const int RetransmissionWakeUpMs = 30;
@@ -165,12 +164,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual void OnConnected() { }
         protected virtual void OnDisconnected() { }
-        protected virtual void OnTracePacketSent(PacketId packetId, PacketSequence packetSequence, PacketType packetType) { } // TEMP_TPS_TRACE
-        protected virtual void OnTracePacketAcked(PacketSequence packetSequence) { } // TEMP_TPS_TRACE
-        protected virtual void OnTracePacketDecoded(PacketId packetId, PacketSequence packetSequence, PacketType packetType) { } // TEMP_TPS_TRACE
-        protected virtual void OnTracePacketDelivered(PacketId packetId, PacketSequence packetSequence) { } // TEMP_TPS_TRACE
-        protected virtual void OnTracePacketRetransmitted(PacketSequence packetSequence, long retransmissionCount, int pendingSendCount) { } // TEMP_TPS_TRACE
-        protected virtual void OnTraceOldOrDuplicatePacket(PacketId packetId, PacketSequence packetSequence, PacketSequence expectedPacketSequence) { } // TEMP_TPS_TRACE
 
         protected RudpSession(byte[] sessionInfoStream)
         {
@@ -179,18 +172,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public SessionIdType GetSessionId() => SessionInfo.SessionId;
         public bool IsConnected() => isConnected;
-        protected int GetPendingSendBufferCount() => bufferStore.GetSendBufferCount(); // TEMP_TPS_TRACE
-        protected PacketSequence GetExpectedRecvSequenceForTrace()
-        {
-            lock (expectedRecvSequenceLock)
-            {
-                return expectedRecvSequence;
-            }
-        }
-
-        protected int GetHoldingPacketCountForTrace() => holdingPacketStore.GetCount();
-        protected bool TryGetHoldingPacketRangeForTrace(out PacketSequence first, out PacketSequence last)
-            => holdingPacketStore.TryGetRange(out first, out last);
 
         private void ParseSessionBrokerResponse(byte[] data)
         {
@@ -242,7 +223,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
 
             await SendPacketInternal(new SendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
-            OnTracePacketSent(packetId, sequence, packetType); // TEMP_TPS_TRACE
         }
 
         private async Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)
@@ -390,7 +370,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
             if (!isCorePacket)
             {
                 packetId = (PacketId)buffer.ReadUInt();
-                OnTracePacketDecoded(packetId, packetSequence, packetType); // TEMP_TPS_TRACE
             }
 
             switch (packetType)
@@ -412,7 +391,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         var capturedBuf = buf;
                         recvProcessingChannel.Writer.TryWrite(() =>
                         {
-                            OnTracePacketDelivered(capturedPid, capturedSequence); // TEMP_TPS_TRACE
                             OnRecvPacket(capturedPid, capturedBuf);
                         });
                     }
@@ -435,7 +413,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 if (packetSequence <= expectedRecvSequence)
                 {
-                    OnTraceOldOrDuplicatePacket(packetId, packetSequence, expectedRecvSequence); // TEMP_TPS_TRACE
                     return result;
                 }
 
@@ -456,23 +433,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 }
                 else
                 {
-                    var gapSize = packetSequence - (expectedRecvSequence + 1);
                     holdingPacketStore.Add(packetSequence,
                         new HeldPacket { Sequence = packetSequence, PacketId = packetId, Buffer = buffer, PacketType = packetType });
-
-                    var holdingCount = holdingPacketStore.GetCount();
-                    holdingPacketStore.TryGetRange(out var holdingFirst, out var holdingLast);
-                    Log.Warning(
-                        "[{Tag}][BOT_ORDER_HOLD] sessionId={SessionId} packetId={PacketId} packetSequence={PacketSequence} expectedRecvSequence={ExpectedRecvSequence} gapSize={GapSize} holdingCount={HoldingCount} holdingFirst={HoldingFirst} holdingLast={HoldingLast}",
-                        TempTpsTraceTag,
-                        GetSessionId(),
-                        packetId,
-                        packetSequence,
-                        expectedRecvSequence,
-                        gapSize,
-                        holdingCount,
-                        holdingFirst,
-                        holdingLast);
                 }
             }
 
@@ -539,7 +501,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 return;
 
             bufferStore.RemoveSendBuffer(packetSequence);
-            OnTracePacketAcked(packetSequence); // TEMP_TPS_TRACE
         }
 
         private async Task RetransmissionAsync()
@@ -573,10 +534,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         }
 
                         info.RefreshSendPacketInfo(nowMs);
-                        OnTracePacketRetransmitted(
-                            info.PacketSequence,
-                            info.GetRetransmissionCount(),
-                            sendPacketInfos.Count); // TEMP_TPS_TRACE
 
                         var client = udpClient;
                         if (client == null)

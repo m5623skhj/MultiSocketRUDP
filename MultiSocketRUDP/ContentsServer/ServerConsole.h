@@ -36,7 +36,9 @@ struct ServerStats
 	std::atomic<int> disconnected{ 0 };
 	std::atomic<int> retrans{ 0 };
 	std::atomic<int> tps{ 0 };
+	std::atomic<unsigned long long> tpsAverage{ 0 };
 	std::atomic<int> error{ 0 };
+	int loopCount{ 0 };
 };
 
 ServerStats serverStats;
@@ -61,6 +63,9 @@ void UpdateUI(int consoleStartCursorX)
 	std::cout << serverStats.tps.load() << "    ";
 
 	MoveCursor(consoleStartCursorX, 7);
+	std::cout << serverStats.tpsAverage.load() << "    ";
+
+	MoveCursor(consoleStartCursorX, 8);
 	std::cout << serverStats.error.load() << "    ";
 
 	std::cout.flush();
@@ -77,6 +82,7 @@ void DrawUI()
 	std::cout << "* Num of disconnect count :\n";
 	std::cout << "* Disconnected by retransmission :\n";
 	std::cout << "* TPS :\n";
+	std::cout << "* TPS average :\n";
 	std::cout << "* Num of Error :\n\n\n";
 	std::cout << "* Process stop : esc\n";
 	std::cout << "-------------------- Log ---------------------\n";

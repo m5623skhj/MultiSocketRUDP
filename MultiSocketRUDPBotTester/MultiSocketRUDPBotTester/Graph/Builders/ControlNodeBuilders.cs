@@ -35,7 +35,7 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
 
         public ActionNodeBase Build(NodeVisual visual)
         {
-            var count = visual.Configuration?.Properties.GetValueOrDefault("LoopCount") as int? ?? 1;
+            var count = NodeConfigurationValueReader.GetInt(visual, "LoopCount", 1);
             var loopId = Guid.NewGuid().ToString();
 
             return new LoopNode
@@ -61,7 +61,7 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
         {
             Name = visual.NodeType!.Name,
             IntervalMilliseconds = visual.Configuration?.IntValue ?? 1000,
-            RepeatCount = visual.Configuration?.Properties.GetValueOrDefault("RepeatCount") as int? ?? 10
+            RepeatCount = NodeConfigurationValueReader.GetInt(visual, "RepeatCount", 10)
         };
     }
 
@@ -105,7 +105,7 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
             {
                 Name = visual.NodeType!.Name,
                 ErrorMessage = visual.Configuration?.StringValue ?? "Assertion failed",
-                StopOnFailure = visual.Configuration?.Properties.GetValueOrDefault("StopOnFailure") as bool? ?? true,
+                StopOnFailure = NodeConfigurationValueReader.GetBool(visual, "StopOnFailure", true),
                 Condition = ctx => evaluator(ctx, leftType, left, op, rightType, right)
             };
         }
@@ -118,9 +118,9 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
         public ActionNodeBase Build(NodeVisual visual) => new RetryNode
         {
             Name = visual.NodeType!.Name,
-            MaxRetries = visual.Configuration?.Properties.GetValueOrDefault("MaxRetries") as int? ?? 3,
-            RetryDelayMilliseconds = visual.Configuration?.Properties.GetValueOrDefault("RetryDelay") as int? ?? 1000,
-            UseExponentialBackoff = visual.Configuration?.Properties.GetValueOrDefault("ExponentialBackoff") as bool? ?? false
+            MaxRetries = NodeConfigurationValueReader.GetInt(visual, "MaxRetries", 3),
+            RetryDelayMilliseconds = NodeConfigurationValueReader.GetInt(visual, "RetryDelay", 1000),
+            UseExponentialBackoff = NodeConfigurationValueReader.GetBool(visual, "ExponentialBackoff", false)
         };
     }
 }

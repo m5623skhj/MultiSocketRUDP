@@ -20,15 +20,6 @@ int main()
 	HideCursor();
 	DrawUI();
 
-	std::thread uiThread([]()
-		{
-			while (true)
-			{
-				UpdateUI(40);
-				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-			}
-		});
-
 	while (true)
 	{
 		Sleep(1000);
@@ -44,16 +35,13 @@ int main()
 		serverStats.disconnected = TestServer::GetInst().GetNumOfDisconnected();
 		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
 		serverStats.tps = TestServer::GetInst().GetTPS();
+		++serverStats.loopCount;
+		serverStats.tpsAverage = (serverStats.tpsAverage * (serverStats.loopCount - 1) + serverStats.tps.load()) / serverStats.loopCount;
 		serverStats.error = TestServer::GetInst().GetNumOfError();
+		UpdateUI(40);
 
 		TestServer::GetInst().ResetTPS();
 	}
-
-	while (not TestServer::GetInst().IsServerStopped())
-	{
-		Sleep(1000);
-	}
-	uiThread.join();
 
 	system("cls");
 	std::cout << "Server stopped" << '\n';

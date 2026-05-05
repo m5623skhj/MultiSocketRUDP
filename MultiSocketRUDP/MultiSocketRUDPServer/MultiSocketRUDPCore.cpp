@@ -532,8 +532,6 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopTo
 
 void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
-	constexpr char tempTpsTraceTag[] = "TEMP_TPS_TRACE";
-	constexpr PacketId tempTpsTracePacketId = static_cast<PacketId>(2);
 	TickSet tickSet;
 	tickSet.nowTick = GetTickCount64();
 
@@ -599,17 +597,6 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 
 			if (sendPacketInfo->IsOwnerValid())
 			{
-				if (sendPacketInfo->tracePacketId == tempTpsTracePacketId)
-				{
-					LOG_DEBUG(std::format(
-						"[{}][SERVER_RETRANSMIT] sessionId={} packetId={} seq={} retransmissionCount={}",
-						tempTpsTraceTag,
-						sendPacketInfo->owner->GetSessionId(),
-						static_cast<unsigned int>(sendPacketInfo->tracePacketId),
-						sendPacketInfo->sendPacketSequence,
-						sendPacketInfo->retransmissionCount));
-				}
-
 				sendPacketInfo->owner->OnRetransmissionTimeout();
 			}
 
