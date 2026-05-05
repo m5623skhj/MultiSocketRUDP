@@ -89,6 +89,50 @@ DetectCycle(node, visited, recursionStack, path, depth)
 
 ---
 
+## 함수 설명
+
+### `GraphValidationResult`
+
+#### `AddError(string nodeName, string message, string category = "General")`
+- 치명적 검증 문제를 기록한다.
+
+#### `AddWarning(string nodeName, string message, string category = "General")`
+- 실행은 가능하지만 위험한 상태를 경고로 기록한다.
+
+#### `AddInfo(string nodeName, string message, string category = "General")`
+- 참고 수준 정보를 기록한다.
+
+### `GraphValidator`
+
+#### `ValidateGraph(ActionGraph graph)`
+- 그래프 검증의 메인 진입점이다.
+- 구조, 순환, 노드 설정, 연결성을 순서대로 검사해 하나의 결과 객체로 합친다.
+
+#### `ValidateBasicStructure(List<ActionNodeBase> nodes, GraphValidationResult result)`
+- 빈 그래프 여부와 트리거 노드 존재 여부를 검사한다.
+
+#### `ValidateCycles(List<ActionNodeBase> nodes, GraphValidationResult result)`
+- 트리거 루트부터 DFS를 시작해 비정상 순환 참조를 탐지한다.
+
+#### `DetectCycle(...)`
+- 재귀 방문 스택을 사용해 현재 경로 내 재방문을 감지한다.
+- `LoopNode`와 `RepeatTimerNode`는 의도된 루프로 간주해 info로 기록한다.
+
+#### `GetAllNextNodes(ActionNodeBase node)`
+- 노드 타입별로 다음 실행 후보를 모두 수집한다.
+- 단순 `NextNodes` 외에도 true/false branch, loop body, retry body 같은 특수 분기를 포함한다.
+
+#### `ValidateNodeConfigurations(List<ActionNodeBase> nodes, GraphValidationResult result)`
+- 각 노드의 필수 설정값과 비정상 범위를 검사한다.
+
+#### `ValidateConnectivity(List<ActionNodeBase> nodes, GraphValidationResult result)`
+- 어떤 트리거 루트에서도 도달할 수 없는 노드를 찾아 warning으로 기록한다.
+
+#### `CollectReachable(ActionNodeBase node, HashSet<ActionNodeBase> reachable)`
+- 루트에서 시작해 도달 가능한 노드를 재귀적으로 수집한다.
+
+---
+
 ## 관련 문서
 - [[BotActionGraphWindow]] — 빌드·검증 버튼
 - [[ActionNodes]] — 각 노드 설정값

@@ -79,3 +79,8 @@
 | **isAsyncNode** | 실행 후 NextNodes를 직접 관리하는 비동기 노드 여부 |
 | **BotVariables** | `[BotVariable]` 어트리뷰트로 등록된 Getter/Setter 메서드 집합 |
 | **__received_{PacketId}** | 패킷 수신 시 RuntimeContext에 자동 저장되는 예약 키 |
+---
+
+## 검토 메모
+
+- 용어집은 함수 설명 문서가 아니므로 개별 함수 목록을 추가하지 않고, 현재 코드에서 실제로 쓰는 용어와 enum 이름을 맞추는 데 집중하는 편이 맞다.

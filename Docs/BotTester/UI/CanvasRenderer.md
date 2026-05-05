@@ -103,6 +103,41 @@ NodeCanvasRenderer.Unhighlight(node)
 
 ---
 
+## 함수 설명
+
+### `NodeCanvasRenderer`
+
+#### `UpdatePortPositions(NodeVisual node)`
+- 노드 경계 위치를 기준으로 입력/출력 포트와 동적 포트 좌표를 다시 계산한다.
+
+#### `RedrawConnections()`
+- 현재 그래프 상태를 기준으로 연결선을 전부 다시 그린다.
+
+#### `Highlight(NodeVisual node)`
+- 선택된 노드를 강조 표시한다.
+
+#### `Unhighlight(NodeVisual node)`
+- 강조 표시를 원래 상태로 되돌린다.
+
+### `NodeInteractionHandler`
+
+#### `EnableDrag(NodeVisual node)`
+- 노드 드래그 이동을 활성화하고 이동 중 포트 위치와 연결선을 같이 갱신한다.
+
+#### `StartConnection(...)`
+- 출력 포트에서 시작되는 임시 연결선을 만들고 연결 모드로 진입한다.
+
+#### `TryFinishConnection(...)`
+- 대상 입력 포트에 연결 가능한지 검사하고 실제 노드 연결을 확정한다.
+
+#### `CreatesCycle(NodeVisual from, NodeVisual to)`
+- 새 연결이 그래프에 순환 참조를 만드는지 DFS로 검사한다.
+
+#### `CleanupConnection()`
+- 임시 연결 상태와 임시 선을 정리한다.
+
+---
+
 ## 관련 문서
 - [[BotActionGraphWindow]] — 렌더러 및 인터랙션 핸들러 사용
 - [[ActionNodes]] — NodeVisual 구조

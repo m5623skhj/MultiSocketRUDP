@@ -964,4 +964,93 @@ PACKET_KEY=0x99        ; XOR 키 (서버와 반드시 동일)
 - [[PacketFormat]] — 패킷 구조
 - [[FlowController]] — advertiseWindow 기반 흐름 제어 이론
 - [[RUDPSessionBroker]] — 서버 측 세션 발급
-- [[TroubleShooting]] — 연결 오류 해결
+- [[Troubleshooting]] — 연결 오류 해결
+---
+
+## 현재 코드 기준 함수 설명
+
+### 공개 함수
+
+#### `bool IsStopped() const`
+- 클라이언트 코어가 완전히 중지되었는지 반환한다.
+
+#### `bool IsConnected() const`
+- UDP RUDP 연결이 `CONNECT` ACK까지 끝난 상태인지 반환한다.
+
+#### `unsigned int GetRemainPacketSize()`
+- 애플리케이션이 아직 꺼내지 않은 수신 패킷 수를 반환한다.
+
+#### `NetBuffer* GetReceivedPacket()`
+- 정렬과 복호화가 끝난 패킷 하나를 반환한다.
+- 반환된 `NetBuffer`는 호출 측에서 해제해야 한다.
+
+#### `void SendPacket(IPacket& packet)`
+- 일반 콘텐츠 패킷 송신 진입점이다.
+- 내부에서 시퀀스 부여, 암호화, 재전송 추적 등록까지 이어진다.
+
+#### `void Disconnect()`
+- 연결 해제 코어 패킷을 보낸 뒤 종료 흐름으로 들어간다.
+
+### 내부 핵심 함수
+
+#### `bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole)`
+- 옵션 로드, Logger 시작, SessionBroker TLS 연결, UDP 소켓 생성, 송수신 스레드 시작, CONNECT 패킷 송신까지 초기화를 담당한다.
+
+#### `void Stop()`
+- SessionBroker 소켓, RUDP 소켓, 송수신 스레드, 재전송 큐, 보류 큐, 암호화 핸들을 정리한다.
+
+#### `void JoinThreads()`
+- `recvThread`, `sendThread`, `retransmissionThread`, `serverAliveChecker` 종료를 조율한다.
+
+#### `bool CreateRUDPSocket()`
+- 클라이언트 UDP 소켓을 생성하고 `serverAddr`를 준비한다.
+
+#### `void SendConnectPacket()`
+- `LOGIN_PACKET_SEQUENCE`를 사용하는 코어 CONNECT 패킷을 전송한다.
+
+#### `bool RunGetSessionFromServer(const std::wstring& optionFilePath)`
+#### `bool GetSessionFromServer()`
+#### `bool TryConnectToSessionBroker() const`
+#### `bool TrySetTargetSessionInfo()`
+#### `bool SetTargetSessionInfo(NetBuffer& receivedBuffer)`
+- SessionBroker TLS 연결, 세션 정보 수신, 세션 키와 포트 파싱을 담당한다.
+
+#### `void RunThreads()`
+#### `void RunRecvThread()`
+#### `void RunSendThread()`
+#### `void RunRetransmissionThread()`
+- recv/send/retransmission 스레드 수명주기를 담당한다.
+
+#### `void OnRecvStream(NetBuffer& recvBuffer, int recvSize)`
+#### `void ProcessRecvPacket(NetBuffer& receivedBuffer)`
+#### `void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence)`
+#### `void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE)`
+- 수신 패킷 분해, ACK 처리, 서버 reply 전송을 담당한다.
+
+#### `void DoSend()`
+#### `void SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket)`
+#### `void SendPacket(const SendPacketInfo& sendPacketInfo)`
+#### `void RegisterSendPacketInfo(NetBuffer& buffer, PacketSequence inSendPacketSequence)`
+#### `void TryFlushPendingQueue()`
+- 실제 UDP 송신, 재전송 추적, 흐름 제어 해소 후 보류 큐 재송신을 담당한다.
+
+#### `static inline WORD GetPayloadLength(const NetBuffer& buffer)`
+- 패킷 헤더에서 payload 길이를 읽는다.
+
+#### `bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)`
+#### `bool ReadClientCoreOptionFile(const std::wstring& optionFilePath)`
+#### `bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath)`
+- 클라이언트 코어와 SessionBroker 접속 설정을 읽는다.
+
+### SessionGetter 분기
+
+`USE_IOCP_SESSION_GETTER` 빌드에서는 중첩 `SessionGetter` 클래스가 TLS 세션 조회를 담당한다.
+
+#### `bool SessionGetter::Start(const std::wstring& optionFilePath)`
+#### `void OnConnectionComplete()`
+#### `void OnRecv(CNetServerSerializationBuf* recvBuffer)`
+#### `void OnSend(int sendsize)`
+#### `void OnWorkerThreadBegin()`
+#### `void OnWorkerThreadEnd()`
+#### `void OnError(st_Error* error)`
+- IOCP 기반 SessionBroker 조회 수명주기 훅이다.

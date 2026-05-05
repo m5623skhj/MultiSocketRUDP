@@ -70,6 +70,40 @@ ConfigUi.SaveButton(onClick)          // Save 버튼
 
 ---
 
+## 함수 설명
+
+### `NodeConfigPanelRegistry`
+
+#### `NodeConfigPanelRegistry(createDynamicPorts)`
+- 사용할 패널 목록을 등록하고, 랜덤 분기 노드 같은 동적 포트 생성 의존성을 주입한다.
+
+#### `GetPanel(NodeVisual node)`
+- 등록된 패널 목록을 순서대로 검사해 현재 노드를 설정할 수 있는 첫 번째 패널을 반환한다.
+
+### 패널 공통 규칙
+
+#### `CanConfigure(NodeVisual node)`
+- 패널이 특정 노드 타입을 처리할 수 있는지 판단한다.
+
+#### `CreatePanel(NodeVisual node, Action onSaved)`
+- 실제 WPF 설정 UI를 만들고, 저장 시 `NodeConfiguration`을 갱신한다.
+
+### `ConfigUi`
+
+#### `Header(string title)`
+- 굵은 제목 텍스트를 만드는 helper다.
+
+#### `Hint(string text)`
+- 회색 보조 설명 텍스트를 만든다.
+
+#### `LabeledBox(...)`
+- 라벨과 입력 박스를 한 줄로 배치하는 helper다.
+
+#### `SaveButton(Action onClick)`
+- 공통 저장 버튼을 생성한다.
+
+---
+
 ## 관련 문서
 - [[BotActionGraphWindow]] — 다이얼로그 호출
 - [[ActionNodes]] — 노드별 설정값 의미

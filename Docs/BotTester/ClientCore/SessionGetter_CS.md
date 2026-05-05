@@ -85,6 +85,39 @@ SSL 스트림으로부터 데이터를 수신한다.
 | `offset` | `int` | 버퍼 내 데이터 저장 시작 위치 |
 
 **반환값**: 수신된 바이트 수.
+
+### `Close`
+
+```csharp
+public void Close()
+```
+
+- `SslStream`과 `TcpClient`를 닫아 TLS 연결을 종료한다.
+
+### `Dispose`
+
+```csharp
+public void Dispose()
+```
+
+- `Close()`와 동일한 정리 목적의 IDisposable 진입점이다.
+
+---
+
+## 함수 설명
+
+#### `ConnectAsync(string host, int port, string? certFingerprint = null)`
+- TCP 연결을 열고 `SslStream`으로 TLS 인증을 완료한다.
+
+#### `ReceiveAsync(byte[] buffer, int offset)`
+- SSL 스트림에서 지정 버퍼 위치부터 데이터를 계속 읽는다.
+
+#### `Close()`
+- 스트림과 TCP 연결을 명시적으로 닫는다.
+
+#### `Dispose()`
+- `Close()`를 호출하는 정리 메서드다.
+
 ## 관련 문서
 - [[BotTesterCore]] — SessionGetter 호출 흐름
 - [[RUDPSessionBroker]] — 서버 측 세션 발급

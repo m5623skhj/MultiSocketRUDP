@@ -8,7 +8,7 @@
 ## 목차
 
 1. [인스턴스 획득 (thread_local)](#1-인스턴스-획득-thread_local)
-2. [생성자 — BCrypt 초기화](#2-생성자--bcrypt-초기화)
+2. [BCrypt 초기화 흐름](#2-bcrypt-초기화-흐름)
 3. [키 핸들 생성/파괴](#3-키-핸들-생성파괴)
 4. [난수 생성 — GenerateSecureRandomBytes](#4-난수-생성--generatesecurerandombytest)
 5. [Nonce 생성 — GenerateNonce](#5-nonce-생성--generatenonce)
@@ -60,59 +60,35 @@ SessionBroker Worker Thread (4개)
 
 ---
 
-## 2. 생성자 — BCrypt 초기화
+## 2. BCrypt 초기화 흐름
 
 ```cpp
-CryptoHelper::CryptoHelper()
-{
-    // ① AES 알고리즘 공급자 열기
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
-        &aesAlg,                // OUT: 알고리즘 핸들
-        BCRYPT_AES_ALGORITHM,   // L"AES"
-        nullptr,                // 기본 구현 공급자 (Microsoft Primitive Provider)
-        0
-    );
-    if (!BCRYPT_SUCCESS(status)) {
-        LOG_ERROR("BCryptOpenAlgorithmProvider failed");
-        return;
-    }
+// GetTLSInstance()가 thread_local 인스턴스를 처음 만들 때 수행되는 내부 초기화 흐름
+NTSTATUS status = BCryptOpenAlgorithmProvider(
+    &aesAlg,
+    BCRYPT_AES_ALGORITHM,
+    nullptr,
+    0
+);
 
-    // ② GCM 체인 모드 설정
-    status = BCryptSetProperty(
-        aesAlg,
-        BCRYPT_CHAINING_MODE,
-        reinterpret_cast<PUCHAR>(BCRYPT_CHAIN_MODE_GCM),  // L"ChainingModeGCM"
-        sizeof(BCRYPT_CHAIN_MODE_GCM),
-        0
-    );
-    if (!BCRYPT_SUCCESS(status)) {
-        LOG_ERROR("BCryptSetProperty CHAINING_MODE failed");
-        return;
-    }
+status = BCryptSetProperty(
+    aesAlg,
+    BCRYPT_CHAINING_MODE,
+    reinterpret_cast<PUCHAR>(BCRYPT_CHAIN_MODE_GCM),
+    sizeof(BCRYPT_CHAIN_MODE_GCM),
+    0
+);
 
-    // ③ 키 오브젝트 크기 조회 (GetSymmetricKeyHandle에서 사용)
-    ULONG resultSize = 0;
-    status = BCryptGetProperty(
-        aesAlg,
-        BCRYPT_OBJECT_LENGTH,       // 키 핸들 내부 오브젝트 필요 크기
-        reinterpret_cast<PUCHAR>(&keyObjectSize),
-        sizeof(keyObjectSize),
-        &resultSize,
-        0
-    );
-    if (!BCRYPT_SUCCESS(status)) {
-        throw std::runtime_error("BCryptGetProperty(OBJECT_LENGTH) failed");
-    }
-    // 초기화 성공 시 keyObjectSize > 0 보장
-}
+ULONG resultSize = 0;
+status = BCryptGetProperty(
+    aesAlg,
+    BCRYPT_OBJECT_LENGTH,
+    reinterpret_cast<PUCHAR>(&keyObjectSize),
+    sizeof(keyObjectSize),
+    &resultSize,
+    0
+);
 
-CryptoHelper::~CryptoHelper()
-{
-    if (aesAlg) {
-        std::ignore = BCryptCloseAlgorithmProvider(aesAlg, 0);
-        aesAlg = nullptr;
-    }
-}
 ```
 
 **`keyObjectSize`의 의미:**  
@@ -479,3 +455,37 @@ CryptoHelper::DestroySymmetricKeyHandle(handle);
 - [[PacketCryptoHelper]] — 패킷 버퍼 수준 래퍼
 - [[RUDPSessionBroker]] — GenerateSecureRandomBytes로 키/솔트 생성
 - [[SessionComponents]] — SessionCryptoContext에서 키 핸들 관리
+---
+
+## 현재 코드 기준 함수 설명
+
+### 공개 함수
+
+#### `static CryptoHelper& GetTLSInstance()`
+- 스레드마다 독립적인 `thread_local` 인스턴스를 반환한다.
+
+#### `static bool EncryptAESGCM(...)`
+- AES-GCM 암호화를 수행한다.
+
+#### `static bool DecryptAESGCM(...)`
+- AES-GCM 복호화를 수행한다.
+
+#### `BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(unsigned char* keyObject, unsigned char* sessionKey) const`
+- 세션 키 바이트에서 BCrypt 대칭키 핸들을 생성한다.
+
+#### `ULONG GetKeyObjectSize() const`
+- 대칭키 핸들 생성에 필요한 BCrypt key object 버퍼 크기를 반환한다.
+
+#### `static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle)`
+- 세션 종료 시 대칭키 핸들을 파괴한다.
+
+#### `static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length)`
+- CSPRNG 기반 랜덤 바이트를 생성한다.
+
+#### `static std::vector<unsigned char> GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction)`
+- 세션 솔트, 패킷 시퀀스, 방향 비트로 GCM nonce를 만든다.
+
+### 정정 메모
+
+- 현재 헤더에는 `GetKeyObjectSize()`가 공개 API로 존재한다.
+- 생성자와 소멸자는 내부 구현이므로 함수 목록에서 제외한다.

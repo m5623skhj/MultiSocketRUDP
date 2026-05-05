@@ -35,6 +35,53 @@
 
 ---
 
+## 함수 설명
+
+### `BotActionGraphWindow` 내부 AI 생성 진입점
+
+#### `ShowAiTreeGenerator()`
+- AI 트리 생성 보조 창을 열거나, 이미 열려 있으면 기존 창을 활성화한다.
+- 생성 버튼과 적용 버튼 이벤트를 연결하고, 마지막 생성 결과를 창 생명주기 동안 보관한다.
+
+#### `HandleGenerate(string userInput, TextBox outputBox, Action<AiTreeResponse?> setLastTree)`
+- 사용자 자연어 입력을 Gemini 요청용 프롬프트로 감싸서 전송한다.
+- 응답 텍스트를 `AiTreeService.Parse()`로 파싱하고 `Validate()`로 검증한 뒤, 성공/실패 결과를 출력 박스와 apply 상태에 반영한다.
+
+#### `HandleApply(AiTreeResponse? lastTree, Window window)`
+- 마지막으로 성공한 AI 응답을 캔버스의 `NodeVisual` 그래프로 변환해 적용한다.
+- 기존 노드는 루트만 남기고 정리한 뒤 `AiNodeFactory.CreateFromJson()`으로 새 노드 트리를 만든다.
+
+#### `ClearAllNodesExceptRoot()`
+- 현재 캔버스에서 루트를 제외한 모든 노드와 포트, 컨텍스트 메뉴를 제거한다.
+- AI 결과 적용 직전 초기화 단계에서 사용된다.
+
+#### `AITreeGenerator_Click(object sender, RoutedEventArgs e)`
+- 메뉴/버튼에서 AI 생성 창을 여는 UI 이벤트 핸들러다.
+
+### `AiTreeService`
+
+#### `Parse(string aiResponse)`
+- AI 응답에서 마크다운 펜스 제거, JSON 본문 추출, 에러 응답 해석, `description/tree` 추출을 수행한다.
+
+#### `Validate(AiTreeResponse response)`
+- 루트 JSON을 재귀적으로 순회하며 지원 노드 타입과 필수 속성 구조를 검증한다.
+
+#### `FormatJson(string json)`
+- 출력 창에 보기 좋게 표시하기 위해 JSON을 pretty-print 한다.
+
+### `AiNodeFactory`
+
+#### `CreateFromJson(JsonElement jsonNode, double x, double y, Dictionary<string, NodeVisual> createdNodes, string nodePath)`
+- JSON 노드 하나를 `NodeVisual`로 만들고, 자식 분기까지 재귀적으로 생성한다.
+
+#### `TryCreateChild(...)`
+- 특정 자식 프로퍼티가 있을 때 자식 노드를 생성하고 연결 위치를 갱신한다.
+
+#### `Configure(NodeVisual visual, JsonElement jsonNode)`
+- 노드 타입별 JSON 값을 `NodeConfiguration`으로 옮긴다.
+
+---
+
 ## AiTreeService
 
 ### Parse

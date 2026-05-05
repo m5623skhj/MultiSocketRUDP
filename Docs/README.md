@@ -99,3 +99,9 @@ BotTester/
     ├── RudpSession_CS.md      ← C# RUDP 세션
     └── SessionGetter_CS.md    ← TLS 세션 수신
 ```
+---
+
+## 검토 메모
+
+- 현재 문서 집합에는 `Docs/Client/RUDPSessionBroker.md`도 존재하므로 `Client/` 하위 설명 목록에 함께 적는 편이 구조상 더 맞다.
+- `Server/`와 `BotTester/` 문서 다수는 함수 설명 섹션이 추가된 상태를 기준으로 유지보수하는 편이 좋다.

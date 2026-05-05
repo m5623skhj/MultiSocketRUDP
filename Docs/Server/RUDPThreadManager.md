@@ -10,10 +10,11 @@
 
 1. [THREAD_GROUP 열거형](#1-thread_group-열거형)
 2. [내부 구조](#2-내부-구조)
-3. [스레드 시작 — StartThreads](#3-스레드-시작--startthreads)
-4. [스레드 종료 — StopThreadGroup / StopAllThreads](#4-스레드-종료--stopthreadgroup--stopallthreads)
-5. [jthread 선택 이유](#5-jthread-선택-이유)
-6. [각 그룹의 stop_token 처리](#6-각-그룹의-stop_token-처리)
+3. [함수 설명](#3-함수-설명)
+4. [스레드 시작 — StartThreads](#4-스레드-시작--startthreads)
+5. [스레드 종료 — StopThreadGroup / StopAllThreads](#5-스레드-종료--stopthreadgroup--stopallthreads)
+6. [jthread 선택 이유](#6-jthread-선택-이유)
+7. [각 그룹의 stop_token 처리](#7-각-그룹의-stop_token-처리)
 
 ---
 
@@ -35,41 +36,43 @@ enum class THREAD_GROUP : unsigned char {
 
 ```cpp
 class RUDPThreadManager {
-    // 그룹별 jthread 벡터
-    std::unordered_map<THREAD_GROUP, std::vector<std::jthread>> threadGroups;
-    mutable std::mutex groupsMutex;
+    std::map<THREAD_GROUP, std::vector<std::jthread>> threadGroups;
 
 public:
-    template<typename Func, typename... Args>
-    void StartThreads(THREAD_GROUP group, int count, Func&& func, Args&&... args);
-
-    void StopThreadGroup(THREAD_GROUP group);
+    void StartThreads(const THREAD_GROUP threadGroup, std::function<void(std::stop_token, unsigned char)> threadFunction, const uint8_t numOfThreads);
+    void StopThreadGroup(const THREAD_GROUP threadGroup);
     void StopAllThreads();
-
-    bool IsRunning(THREAD_GROUP group) const;
-    int  GetThreadCount(THREAD_GROUP group) const;
 };
 ```
 
 ---
 
-## 3. 스레드 시작 — `StartThreads`
+## 3. 함수 설명
+
+#### `void StartThreads(const THREAD_GROUP threadGroup, std::function<void(std::stop_token, unsigned char)> threadFunction, const uint8_t numOfThreads)`
+- 지정 그룹에 `numOfThreads` 개수만큼 `std::jthread`를 생성한다.
+- 각 스레드는 `stop_token`과 인덱스를 인자로 받아 동작한다.
+
+#### `void StopThreadGroup(const THREAD_GROUP threadGroup)`
+- 특정 그룹의 모든 스레드에 stop을 요청하고 정리한다.
+
+#### `void StopAllThreads()`
+- 전체 그룹을 순회하며 모든 스레드를 중단한다.
+
+---
+
+## 4. 스레드 시작 — `StartThreads`
 
 ```cpp
-template<typename Func, typename... Args>
 void RUDPThreadManager::StartThreads(
-    THREAD_GROUP group,
-    int count,
-    Func&& func,
-    Args&&... args)
+    const THREAD_GROUP threadGroup,
+    std::function<void(std::stop_token, unsigned char)> threadFunction,
+    const uint8_t numOfThreads)
 {
-    std::scoped_lock lock(groupsMutex);
-    auto& vec = threadGroups[group];
+    auto& vec = threadGroups[threadGroup];
 
-    for (int i = 0; i < count; ++i) {
-        // jthread 생성 = 스레드 즉시 시작
-        // 각 스레드는 stop_token과 threadId(i)를 파라미터로 받음
-        vec.emplace_back(func, args..., static_cast<unsigned char>(i));
+    for (uint8_t i = 0; i < numOfThreads; ++i) {
+        vec.emplace_back(threadFunction, static_cast<unsigned char>(i));
     }
 }
 ```
@@ -78,20 +81,25 @@ void RUDPThreadManager::StartThreads(
 
 ```cpp
 // 시작 순서 (순서 중요)
-threadManager->StartThreads(SESSION_RELEASE_THREAD, 1,
-    [this](std::stop_token st, unsigned char) { RunSessionReleaseThread(st); });
+threadManager->StartThreads(SESSION_RELEASE_THREAD,
+    [this](std::stop_token st, unsigned char) { RunSessionReleaseThread(st); },
+    1);
 
-threadManager->StartThreads(HEARTBEAT_THREAD, 1,
-    [this](std::stop_token st, unsigned char) { RunHeartbeatThread(st); });
+threadManager->StartThreads(HEARTBEAT_THREAD,
+    [this](std::stop_token st, unsigned char) { RunHeartbeatThread(st); },
+    1);
 
-threadManager->StartThreads(IO_WORKER_THREAD, numOfWorkerThread,
-    [this](std::stop_token st, unsigned char id) { RunIOWorkerThread(st, id); });
+threadManager->StartThreads(IO_WORKER_THREAD,
+    [this](std::stop_token st, unsigned char id) { RunIOWorkerThread(st, id); },
+    numOfWorkerThread);
 
-threadManager->StartThreads(RECV_LOGIC_WORKER_THREAD, numOfWorkerThread,
-    [this](std::stop_token st, unsigned char id) { RunRecvLogicWorkerThread(st, id); });
+threadManager->StartThreads(RECV_LOGIC_WORKER_THREAD,
+    [this](std::stop_token st, unsigned char id) { RunRecvLogicWorkerThread(st, id); },
+    numOfWorkerThread);
 
-threadManager->StartThreads(RETRANSMISSION_THREAD, numOfWorkerThread,
-    [this](std::stop_token st, unsigned char id) { RunRetransmissionThread(st, id); });
+threadManager->StartThreads(RETRANSMISSION_THREAD,
+    [this](std::stop_token st, unsigned char id) { RunRetransmissionThread(st, id); },
+    numOfWorkerThread);
 
 Sleep(1000);  // 모든 스레드 안정화 대기
 
@@ -100,12 +108,11 @@ sessionBroker->Start(...);  // 마지막에 클라이언트 수락 시작
 
 ---
 
-## 4. 스레드 종료 — `StopThreadGroup` / `StopAllThreads`
+## 5. 스레드 종료 — `StopThreadGroup` / `StopAllThreads`
 
 ```cpp
 void RUDPThreadManager::StopThreadGroup(THREAD_GROUP group)
 {
-    std::scoped_lock lock(groupsMutex);
     auto it = threadGroups.find(group);
     if (it == threadGroups.end()) return;
 
@@ -120,7 +127,6 @@ void RUDPThreadManager::StopAllThreads()
 {
     // 모든 그룹에 stop 신호 (동시)
     {
-        std::scoped_lock lock(groupsMutex);
         for (auto& [group, vec] : threadGroups) {
             for (auto& t : vec) {
                 t.request_stop();
@@ -129,7 +135,6 @@ void RUDPThreadManager::StopAllThreads()
     }
 
     // 순서대로 join (소멸자 방식)
-    std::scoped_lock lock(groupsMutex);
     threadGroups.clear();   // 모든 jthread 소멸 → join
 }
 ```
@@ -150,7 +155,7 @@ void RUDPThreadManager::StopAllThreads()
 
 ---
 
-## 5. jthread 선택 이유
+## 6. jthread 선택 이유
 
 ```cpp
 // std::thread (C++11)
@@ -188,7 +193,7 @@ std::jthread t([](std::stop_token st) {
 
 ---
 
-## 6. 각 그룹의 stop_token 처리
+## 7. 각 그룹의 stop_token 처리
 
 ### IO_WORKER_THREAD
 

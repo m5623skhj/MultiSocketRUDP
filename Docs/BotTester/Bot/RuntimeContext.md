@@ -131,6 +131,66 @@ GlobalContext.Set($"__received_{packetId}_timestamp", CommonFunc.GetNowMs());
 
 ---
 
+## 함수 설명
+
+### `RuntimeContext`
+
+#### `NetBuffer? GetPacket()`
+- 현재 처리 중인 패킷을 반환한다.
+- 내부 `packetLock`으로 보호된다.
+
+#### `void SetPacket(NetBuffer? newPacket)`
+- 현재 패킷 참조를 교체한다.
+
+#### `void Set<T>(string key, T value)`
+- 컨텍스트 변수 저장소에 값을 기록한다.
+
+#### `bool Has(string key)`
+- 키 존재 여부를 확인한다.
+
+#### `T Get<T>(string key)`
+- 타입까지 일치하는 값을 읽고, 없으면 예외를 던진다.
+
+#### `T GetOrDefault<T>(string key, T defaultValue)`
+- 값이 없거나 타입이 맞지 않으면 기본값을 반환한다.
+
+#### `T GetOrcreate<T>(string key, Func<T> factory)`
+- 값이 없을 때 factory로 생성해 저장하고 반환한다.
+
+#### `int AtomicIncrement(string key, int delta = 1)`
+- 정수형 카운터를 원자적으로 증가시킨다.
+
+#### `bool Remove(string key)`
+- 변수 저장소에서 키를 제거한다.
+
+#### `void SetPendingAsyncTask(Task task)`
+- 노드 체인 밖에서 이어서 await 해야 하는 비동기 작업을 임시 보관한다.
+
+#### `Task GetAndClearPendingAsyncTask()`
+- 보관된 비동기 작업을 가져오고 즉시 기본 완료 상태로 초기화한다.
+
+#### `void Clear()`
+- 변수 저장소, 현재 패킷, pending async task를 모두 초기화한다.
+
+### `RuntimeContextExtensions`
+
+#### `SetFlag`, `ClearFlag`, `IsFlagSet`
+- 불리언 플래그를 일관된 키 패턴으로 다루는 helper다.
+
+#### `ResetCounter`, `GetCounter`, `Increment`
+- 카운터형 컨텍스트 값을 편하게 조작한다.
+
+#### `StartTimer`, `GetElapsed`, `StopTimer`
+- 특정 이름의 시간 측정을 시작하고, 경과 시간을 조회하거나 정리한다.
+
+#### `RecordMetric`, `GetAverageMetric`, `GetMinMetric`, `GetMaxMetric`
+- 수치 샘플을 누적 기록하고 집계한다.
+
+#### `IncrementExecutionCount`, `GetExecutionCount`
+- 노드별 실행 횟수를 관리한다.
+
+---
+
 ## 관련 문서
 - [[ActionNodes]] — 컨텍스트를 사용하는 노드들
 - [[BotActionGraph]] — 컨텍스트 생성 및 전달

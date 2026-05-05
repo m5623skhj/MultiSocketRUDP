@@ -227,7 +227,7 @@ void Player::OnMove(const MovePacket& packet) {
   
 원인 2: 이미 닫힌 소켓에 Send 시도
   → CloseAllSessions() 이후 스레드가 완전히 종료되기 전에 Send
-  → StopAllThreads()가 완료될 때까지 대기 (jthread 소멸자 join 보장)
+  → StopAllThreads()가 완료될 때까지 대기 (jthread 정리 join 보장)
 
 원인 3: ClearAllSessions()에서 사용 중인 세션 delete
   → 반드시 StopAllThreads() 이후에 ClearAllSessions() 호출
@@ -278,3 +278,9 @@ EnableCrtDebug();  // DebugHelper.h
 - [[CryptoSystem]] — 암호화 관련 문제
 - [[MemoryTracer]] — 메모리 추적 도구
 - [[PerformanceTuning]] — 성능 최적화 가이드
+---
+
+## 검토 메모
+
+- 트러블슈팅 문서는 함수 설명 문서가 아니므로, 현재 코드 기준 API 이름과 에러 원인 매핑이 틀리지 않는지 중심으로 유지보수하는 편이 맞다.
+- 문서 내부에서 `TryConnect`, `DecodePacket`, `GetTPS` 같은 실제 함수 이름은 그대로 유지해야 검색성이 좋다.

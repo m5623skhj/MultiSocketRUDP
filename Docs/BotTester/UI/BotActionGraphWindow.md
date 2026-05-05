@@ -119,6 +119,83 @@ NodeBuilderRegistry
 
 ---
 
+## 함수 설명
+
+### 초기화/복원
+
+#### `OnWindowLoaded(...)`
+- 창 로드 시 초기화 루틴을 시작한다.
+
+#### `InitializeGeminiClient()`
+- Gemini 설정 파일을 읽어 AI 생성 기능을 준비한다.
+
+#### `LoadActionNodeTypes()`
+- 좌측 노드 목록에 표시할 타입 목록을 채운다.
+
+#### `CreateRootNode()`
+- 캔버스의 시작점이 되는 루트 노드를 만든다.
+
+#### `RestoreSavedGraph(...)`, `RestoreGraphFromFile(...)`
+- 저장된 `NodeVisual` 상태나 파일 모델로부터 그래프를 다시 구성한다.
+
+### 노드/포트 생성과 배치
+
+#### `CreateNodeVisual(string title, Brush color)`
+- 노드 외곽 Border와 기본 UI 요소를 만든다.
+
+#### `AddNodeToCanvas(NodeVisual node)`
+- 노드를 캔버스와 내부 목록에 등록한다.
+
+#### `CreateInputPort()`
+#### `CreateOutputPort(string type)`
+- 입력/출력 포트 UI를 생성한다.
+
+#### `CreateDynamicPorts(NodeVisual node, int count)`
+- 랜덤 분기 같은 노드에 동적 출력 포트를 생성한다.
+
+### 선택/삭제/편집
+
+#### `SelectNodeByBorder(Border b)`
+#### `SelectNode(NodeVisual node)`
+- 현재 선택 노드를 갱신하고 하이라이트 상태를 반영한다.
+
+#### `DeleteNode(NodeVisual node)`
+- 노드와 연결을 제거하고 캔버스에서 삭제한다.
+
+#### `DisconnectIncoming(NodeVisual node)`
+- 대상 노드로 들어오는 연결을 모두 해제한다.
+
+### 저장/로드/빌드/적용
+
+#### `SaveGraph_Click(...)`
+#### `LoadGraph_Click(...)`
+- 그래프를 파일 모델로 저장하거나 불러온다.
+
+#### `BuildGraph_Click(...)`
+- `NodeBuilderRegistry`를 사용해 현재 `NodeVisual`을 실행용 `ActionGraph`로 변환한다.
+
+#### `ValidateGraph_Click(...)`
+- 현재 그래프를 `GraphValidator`로 검사하고 결과 창을 띄운다.
+
+#### `ApplyGraph_Click(...)`
+- 빌드된 그래프와 비주얼 상태를 `BotTesterCore`에 적용한다.
+
+#### `ShowStatsWindow_Click(...)`
+- 노드 실행 통계 창을 띄운다.
+
+### 유틸리티
+
+#### `ClearCurrentGraph()`
+- 현재 그래프를 루트 기준으로 초기화한다.
+
+#### `CreateGraphFileModel()`
+- 현재 에디터 상태를 저장용 모델로 변환한다.
+
+#### `Log(string msg)`
+- 하단 로그 목록과 로깅 시스템에 메시지를 남긴다.
+
+---
+
 ## 관련 문서
 - [[ActionNodes]] — 노드 타입별 설명
 - [[CanvasRenderer]] — 렌더링 시스템

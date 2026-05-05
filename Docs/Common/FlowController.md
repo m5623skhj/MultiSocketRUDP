@@ -477,4 +477,58 @@ CWND=4, advertiseWindow=32:
 - [[PacketProcessing]] — advertiseWindow가 포함된 SEND_REPLY_TYPE 처리
 - [[PacketFormat]] — SEND_REPLY_TYPE 페이로드 구조
 - [[PerformanceTuning]] — CWND/윈도우 파라미터 설정
-- [[TroubleShooting]] — advertiseWindow=0 디버깅
+- [[Troubleshooting]] — advertiseWindow=0 디버깅
+---
+
+## 현재 코드 기준 함수 설명
+
+### `RUDPFlowController`
+
+#### `bool CanSendPacket(PacketSequence nextSendSequence, PacketSequence lastAckedSequence) const noexcept`
+- 현재 outstanding packet 수가 CWND보다 작은지 확인한다.
+
+#### `void OnReplyReceived(PacketSequence replySequence) noexcept`
+- ACK를 반영해 `lastReplySequence`와 CWND를 갱신한다.
+
+#### `void OnCongestionEvent() noexcept`
+- 혼잡 이벤트 감지 시 CWND를 줄이고 recovery 상태로 들어간다.
+
+#### `void OnTimeout() noexcept`
+- 재전송 타임아웃 시 CWND를 더 보수적으로 낮춘다.
+
+#### `void Reset() noexcept`
+- 흐름 제어 상태를 초기값으로 되돌린다.
+
+#### `uint8_t GetCwnd() const noexcept`
+#### `PacketSequence GetLastAckedSequence() const noexcept`
+- 현재 송신 윈도우와 마지막 ACK 시퀀스를 조회한다.
+
+#### `static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept`
+- 순환 가능한 시퀀스 번호 차이를 흐름 제어용으로 계산한다.
+
+### `RUDPReceiveWindow`
+
+#### `void ResizeRecvWindowSize(BYTE recvWindowSize)`
+- 수신 윈도우 크기와 내부 플래그 버퍼를 재설정한다.
+
+#### `bool CanReceive(PacketSequence inSequence) const noexcept`
+- 현재 수신 윈도우 범위 안에 있는 시퀀스인지 확인한다.
+
+#### `void MarkReceived(PacketSequence inSequence) noexcept`
+- 해당 시퀀스를 수신 완료로 표시하고, 선두부터 연속 구간이면 윈도우를 전진시킨다.
+
+#### `void Reset(PacketSequence startSequence) noexcept`
+- 수신 윈도우 시작점과 사용량을 초기화한다.
+
+#### `PacketSequence GetWindowStart() const noexcept`
+#### `PacketSequence GetWindowEnd() const noexcept`
+#### `BYTE GetWindowSize() const noexcept`
+#### `BYTE GetAdvertiseWindow() const noexcept`
+- 현재 수신 윈도우의 경계와 남은 여유 공간을 조회한다.
+
+#### `static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept`
+- 수신 윈도우용 시퀀스 차이를 계산한다.
+
+### 정정 메모
+
+- 이 문서는 예전의 `RUDPFlowManager` 중심 설명이 섞여 있지만, 현재 헤더 기준 공개 타입은 `RUDPFlowController`와 `RUDPReceiveWindow`다.

@@ -600,4 +600,4 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 - [[PacketFormat]] — 패킷 레이아웃 (오프셋, 필드 크기)
 - [[ThreadModel]] — IO Worker / RecvLogic 스레드 구조
 - [[FlowController]] — CanAccept, MarkReceived, advertiseWindow
-- [[TroubleShooting]] — 패킷 처리 실패 시 디버깅
+- [[Troubleshooting]] — 패킷 처리 실패 시 디버깅

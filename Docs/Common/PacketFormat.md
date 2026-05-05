@@ -249,3 +249,21 @@ Offset  Hex   설명
 - [[PacketCryptoHelper]] — EncodePacket / DecodePacket 구현
 - [[PacketGenerator]] — 패킷 클래스 자동 생성
 - [[PacketProcessing]] — 수신 시 파싱 흐름
+---
+
+## 관련 함수와 코드 위치
+
+이 문서는 패킷 레이아웃 개념 문서라서 단일 파일 함수 목록 대신, 현재 포맷을 실제로 읽고 쓰는 함수를 정리한다.
+
+#### `PacketCryptoHelper::SetHeader`
+- HeaderCode와 PayloadLength를 기록한다.
+
+#### `PacketCryptoHelper::EncodePacket`
+- `PacketType`, `Sequence`, `PacketId`, `Payload`, `AuthTag`가 실제 바이트 레이아웃으로 조합되는 지점이다.
+
+#### `PacketCryptoHelper::DecodePacket`
+- 바이트 레이아웃을 역으로 해석해 복호화한다.
+
+#### `RUDPClientCore::GetPayloadLength`
+#### `MultiSocketRUDPCore::GetPayloadLength`
+- 수신 버퍼에서 payload 길이를 읽는 유틸이다.

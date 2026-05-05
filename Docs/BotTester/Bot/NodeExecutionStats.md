@@ -77,6 +77,33 @@ ActionNodeBase.SetStatsTracker(statsTracker);
 
 ---
 
+## 함수 설명
+
+### `NodeExecutionStats`
+
+#### `RecordExecution(long executionTimeMs, bool success, string? error)`
+- 단일 노드 통계 객체에 실행 결과를 반영한다.
+- 실행 횟수, 성공/실패 수, 누적/최소/최대 실행 시간, 마지막 오류와 마지막 실행 시각을 갱신한다.
+
+### `NodeStatsTracker`
+
+#### `RecordExecution(string nodeName, long executionTimeMs, bool success, string? error = null)`
+- 노드 이름별 통계 객체를 가져오거나 새로 만들고 실행 결과를 기록한다.
+
+#### `NodeExecutionStats? GetStats(string nodeName)`
+- 특정 노드의 통계를 조회한다.
+
+#### `List<NodeExecutionStats> GetAllStats()`
+- 모든 노드 통계를 실행 횟수 내림차순으로 반환한다.
+
+#### `void Reset()`
+- 전체 통계를 초기화한다.
+
+#### `void ResetNode(string nodeName)`
+- 특정 노드 통계만 제거한다.
+
+---
+
 ## 관련 문서
 - [[BotActionGraphWindow]] — 통계 창 표시 버튼
 - [[BotActionGraph]] — ExecuteChainWithStats 호출
