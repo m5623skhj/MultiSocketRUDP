@@ -20,6 +20,8 @@ int main()
 	HideCursor();
 	DrawUI();
 
+	int previousConnectedCount = 0;
+
 	while (true)
 	{
 		Sleep(1000);
@@ -35,9 +37,24 @@ int main()
 		serverStats.disconnected = TestServer::GetInst().GetNumOfDisconnected();
 		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
 		serverStats.tps = TestServer::GetInst().GetTPS();
-		++serverStats.loopCount;
-		serverStats.tpsAverage = (serverStats.tpsAverage * (serverStats.loopCount - 1) + serverStats.tps.load()) / serverStats.loopCount;
 		serverStats.error = TestServer::GetInst().GetNumOfError();
+
+		const int connectedCount = serverStats.connected.load();
+		if (previousConnectedCount == 0 && connectedCount > 0)
+		{
+			serverStats.tpsAverage.store(0, std::memory_order_relaxed);
+			serverStats.tpsAverageSampleCount = 0;
+		}
+
+		if (connectedCount > 0)
+		{
+			++serverStats.tpsAverageSampleCount;
+			serverStats.tpsAverage =
+				(serverStats.tpsAverage * (serverStats.tpsAverageSampleCount - 1) + serverStats.tps.load()) /
+				serverStats.tpsAverageSampleCount;
+		}
+
+		previousConnectedCount = connectedCount;
 		UpdateUI(40);
 
 		TestServer::GetInst().ResetTPS();

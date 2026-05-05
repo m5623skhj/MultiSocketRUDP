@@ -38,7 +38,7 @@ struct ServerStats
 	std::atomic<int> tps{ 0 };
 	std::atomic<unsigned long long> tpsAverage{ 0 };
 	std::atomic<int> error{ 0 };
-	int loopCount{ 0 };
+	unsigned long long tpsAverageSampleCount{ 0 };
 };
 
 ServerStats serverStats;
