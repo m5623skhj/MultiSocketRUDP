@@ -1,22 +1,22 @@
-﻿using System.IO;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Win32;
+using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.CanvasRenderer;
+using MultiSocketRUDPBotTester.ClientCore;
+using MultiSocketRUDPBotTester.Evaluation;
+using MultiSocketRUDPBotTester.Graph;
+using MultiSocketRUDPBotTester.Windows;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using MultiSocketRUDPBotTester.Bot;
-using MultiSocketRUDPBotTester.ClientCore;
-using MultiSocketRUDPBotTester.Evaluation;
-using MultiSocketRUDPBotTester.Graph;
-using MultiSocketRUDPBotTester.Windows;
-using MultiSocketRUDPBotTester.CanvasRenderer;
-using WpfCanvas = System.Windows.Controls.Canvas;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Win32;
-using Path = System.IO.Path;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using static MultiSocketRUDPBotTester.Bot.NodeExecutionStats;
+using Path = System.IO.Path;
+using WpfCanvas = System.Windows.Controls.Canvas;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -38,6 +38,7 @@ namespace MultiSocketRUDPBotTester
         private Window? statsWindow;
 
         private WithGeminiClient.GeminiClient geminiClient = null!;
+        // GraphFileModel과 NodeVisualFileModel에서 JSON 직렬화 및 역직렬화 시, Enum 값을 문자열로 처리하도록 설정하여 가독성을 높이고, 향후 확장성에 대비할 수 있도록 합니다.
         private static readonly JsonSerializerOptions GraphFileJsonOptions = new()
         {
             WriteIndented = true,
@@ -348,6 +349,8 @@ namespace MultiSocketRUDPBotTester
             Log($"Node added: {t.Name}");
         }
 
+        // 현재 그래프의 시각적 표현과 구성을 GraphFileModel 객체로 변환하여 JSON으로 직렬화한 후, 사용자가 선택한 파일 경로에 저장하는 함수입니다.
+        // 저장 과정에서 발생할 수 있는 오류를 처리하여 사용자에게 알리고, 성공적으로 저장된 경우 상태 표시줄에 업데이트합니다.
         private void SaveGraph_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -381,6 +384,9 @@ namespace MultiSocketRUDPBotTester
             }
         }
 
+        // 사용자가 파일 대화상자를 통해 선택한 그래프 파일을 읽어서, GraphFileModel 객체로 역직렬화한 후,
+        // 현재 그래프를 초기화하고 파일에서 노드와 연결 정보를 복원하여 그래프를 재구성하는 함수입니다.
+        // 로드 과정에서 발생할 수 있는 오류를 처리하여 사용자에게 알리고, 성공적으로 로드된 경우 상태 표시줄에 업데이트합니다.
         private void LoadGraph_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -632,6 +638,7 @@ namespace MultiSocketRUDPBotTester
             Log($"Graph restored with {allNodes.Count} nodes.");
         }
 
+        // GraphFileModel 객체에서 저장된 노드 정보를 기반으로 새로운 NodeVisual 객체를 생성하고, 노드 간의 연결을 복원하여 그래프를 재구성하는 함수입니다.
         private void RestoreGraphFromFile(GraphFileModel graphFile)
         {
             var nodeMapping = new Dictionary<int, NodeVisual>();
@@ -679,6 +686,7 @@ namespace MultiSocketRUDPBotTester
             Log($"Graph restored with {allNodes.Count} nodes.");
         }
 
+        // NodeVisualFileModel 객체에서 저장된 정보를 기반으로 새로운 NodeVisual 객체를 생성하는 함수입니다.
         private NodeVisual CreateNodeFromFileModel(NodeVisualFileModel saved)
         {
             var nodeType = ResolveNodeType(saved.NodeTypeName, saved.IsRoot);
@@ -797,6 +805,7 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
+        // NodeConfigurationFileModel에서 NodeConfiguration으로 변환하는 과정에서, JsonElement로 직렬화된 프로퍼티 값을 실제 .NET 객체로 변환하여 새로운 NodeConfiguration 객체를 생성합니다.
         private static NodeConfiguration? CloneConfiguration(NodeConfigurationFileModel? original)
         {
             if (original == null)
@@ -815,6 +824,7 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
+        // 현재 그래프의 시각적 표현과 구성을 GraphFileModel 객체로 변환하여 파일로 저장할 때 사용할 수 있도록 합니다.
         private GraphFileModel CreateGraphFileModel()
         {
             var nodeIds = allNodes
@@ -847,6 +857,7 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
+        // NodeConfiguration 객체를 NodeConfigurationFileModel 객체로 변환하여 파일에 저장할 때 사용할 수 있도록 합니다.
         private static NodeConfigurationFileModel? CreateConfigurationFileModel(NodeConfiguration? configuration)
         {
             if (configuration == null)
@@ -865,6 +876,7 @@ namespace MultiSocketRUDPBotTester
             };
         }
 
+        // 현재 그래프를 완전히 초기화하여 빈 캔버스 상태로 되돌립니다. 모든 노드와 연결된 UI 요소가 제거되고, 관련 상태가 초기화됩니다.
         private void ClearCurrentGraph()
         {
             selectedNode = null;
@@ -885,8 +897,10 @@ namespace MultiSocketRUDPBotTester
             GraphCanvas.Children.Clear();
         }
 
+        // 캔버스에 노드를 배치할 때 NaN 값이 들어가는 것을 방지하기 위해, 위치 값을 정규화하는 유틸리티 함수입니다.
         private static double NormalizeCanvasPosition(double value) => double.IsNaN(value) ? 0 : value;
 
+        // 노드의 타입 이름 문자열을 기반으로 해당하는 Type 객체를 찾는 함수입니다. 루트 노드인 경우 null을 반환합니다.
         private static Type? ResolveNodeType(string? nodeTypeName, bool isRoot)
         {
             if (isRoot)
@@ -915,6 +929,7 @@ namespace MultiSocketRUDPBotTester
             throw new InvalidOperationException($"Failed to resolve node type '{nodeTypeName}'.");
         }
 
+        // 노드의 Type 객체가 null이 아닌 경우 해당 타입의 이름을 반환하고, null인 경우에는 타입 이름 문자열에서 간단한 이름을 추출하여 반환하는 함수입니다. 루트 노드인 경우 "OnConnected"를 반환합니다.
         private static string ResolveNodeTitle(Type? nodeType, string? nodeTypeName)
         {
             if (nodeType != null)
@@ -932,6 +947,7 @@ namespace MultiSocketRUDPBotTester
             return lastDotIndex >= 0 ? typeName[(lastDotIndex + 1)..] : typeName;
         }
 
+        // JsonElement로 직렬화된 프로퍼티 값을 실제 .NET 객체로 변환하는 함수입니다. JsonValueKind에 따라 적절한 타입으로 변환하여 반환합니다.
         private static object ConvertJsonElementToPropertyValue(JsonElement element)
         {
             return element.ValueKind switch
