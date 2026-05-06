@@ -28,7 +28,9 @@
     <ClCompile Include="RUDPIOHandlerTest.cpp" />
     <ClCompile Include="RUDPPacketProcessorTest.cpp" />
     <ClCompile Include="RUDPReceiveWindowTest.cpp" />
-    <ClCompile Include="SessionPacketOrderer.cpp" />
+    <ClCompile Include="RUDPSessionTest.cpp" />
+    <ClCompile Include="SessionCryptoContextTest.cpp" />
+    <ClCompile Include="SessionPacketOrdererTest.cpp" />
     <ClCompile Include="SessionStateMachineTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>

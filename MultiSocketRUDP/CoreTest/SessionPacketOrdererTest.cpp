@@ -3,15 +3,15 @@
 #include "SessionPacketOrderer.h"
 
 // ============================================================
-// SessionPacketOrderer ´ÜÀ§ Å×½ºÆ®
+// SessionPacketOrderer ï¿½ï¿½ï¿½ï¿½ ï¿½×½ï¿½Æ®
 //
-// ÇÙ½É µ¿ÀÛ:
-//  - seq < nextExpected  ¡æ DUPLICATED_RECV
-//  - seq == nextExpected ¡æ Ã³¸® ÈÄ º¸°üµÈ ÆÐÅ¶µµ ¿¬¼Ó Ã³¸® ¡æ PROCESSED / ERROR_OCCURED
-//  - seq >  nextExpected ¡æ maxHoldingQueueSize ¹Ì¸¸ÀÌ¸é È¦µù ¡æ PACKET_HELD
-//  - µ¿ÀÏ ¹Ì·¡ ½ÃÄö½º Áßº¹ ¼ö½Å ¡æ µÎ ¹øÂ°´Â ¹«½Ã (recvHoldingPacketSequences.contains)
-//  - Reset(startSeq)	: È¦µù ÆÐÅ¶ ÀüºÎ Free, nextExpected Àç¼³Á¤
-//  - Initialize(size)   : Reset(0) + maxSize Àç¼³Á¤
+// ï¿½Ù½ï¿½ ï¿½ï¿½ï¿½ï¿½:
+//  - seq < nextExpected  ï¿½ï¿½ DUPLICATED_RECV
+//  - seq == nextExpected ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å¶ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ PROCESSED / ERROR_OCCURED
+//  - seq >  nextExpected ï¿½ï¿½ maxHoldingQueueSize ï¿½Ì¸ï¿½ï¿½Ì¸ï¿½ È¦ï¿½ï¿½ ï¿½ï¿½ PACKET_HELD
+//  - ï¿½ï¿½ï¿½ï¿½ ï¿½Ì·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ßºï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Â°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (recvHoldingPacketSequences.contains)
+//  - Reset(startSeq)	: È¦ï¿½ï¿½ ï¿½ï¿½Å¶ ï¿½ï¿½ï¿½ï¿½ Free, nextExpected ï¿½ç¼³ï¿½ï¿½
+//  - Initialize(size)   : Reset(0) + maxSize ï¿½ç¼³ï¿½ï¿½
 // ============================================================
 
 static bool successCb(NetBuffer&, PacketSequence) { return true; }
@@ -45,7 +45,7 @@ protected:
 };
 
 // ------------------------------------------------------------
-// 1. ÃÊ±â »óÅÂ
+// 1. ï¿½Ê±ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, InitialState_NextExpectedEqualsStart)
 {
@@ -53,7 +53,7 @@ TEST_F(SessionPacketOrdererTest, InitialState_NextExpectedEqualsStart)
 }
 
 // ------------------------------------------------------------
-// 2. ¼ø¼­´ë·Î µµÂøÇÏ´Â ÆÐÅ¶
+// 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½Å¶
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, InOrder_ReturnsProcessed)
 {
@@ -83,7 +83,7 @@ TEST_F(SessionPacketOrdererTest, InOrder_SequenceAdvancesPerPacket)
 }
 
 // ------------------------------------------------------------
-// 3. Áßº¹ ¼ö½Å (°ú°Å ½ÃÄö½º)
+// 3. ï¿½ßºï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, PastSeq_ReturnsDuplicatedRecv)
 {
@@ -105,7 +105,7 @@ TEST_F(SessionPacketOrdererTest, FarPastSeq_ReturnsDuplicatedRecv)
 }
 
 // ------------------------------------------------------------
-// 4. ¹Ì·¡ ½ÃÄö½º È¦µù
+// 4. ï¿½Ì·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¦ï¿½ï¿½
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, FutureSeq_ReturnsPacketHeld)
 {
@@ -152,7 +152,7 @@ TEST_F(SessionPacketOrdererTest, MultipleHeldPackets_ProcessedInOrder)
 }
 
 // ------------------------------------------------------------
-// 5. Áßº¹ È¦µù ½ÃÄö½º: µÎ ¹ø ¹Þ¾Æµµ ÇÑ ¹ø¸¸ Ã³¸®
+// 5. ï¿½ßºï¿½ È¦ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ ï¿½ï¿½ ï¿½Þ¾Æµï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, DuplicateFutureSeq_HeldOnlyOnce)
 {
@@ -170,9 +170,9 @@ TEST_F(SessionPacketOrdererTest, DuplicateFutureSeq_HeldOnlyOnce)
 }
 
 // ------------------------------------------------------------
-// 6. Å¥ ¿ë·® ÃÊ°ú
+// 6. Å¥ ï¿½ë·® ï¿½Ê°ï¿½
 // ------------------------------------------------------------
-TEST_F(SessionPacketOrdererTest, QueueFull_ExtraPacketNotStored)
+TEST_F(SessionPacketOrdererTest, QueueFull_ReturnsErrorOccured)
 {
 	std::vector<AutoBuf> bufs(MAX_QUEUE);
 	for (BYTE i = 0; i < MAX_QUEUE; ++i)
@@ -183,11 +183,11 @@ TEST_F(SessionPacketOrdererTest, QueueFull_ExtraPacketNotStored)
 
 	AutoBuf extra;
 	EXPECT_EQ(orderer.OnReceive(START + 1 + MAX_QUEUE, extra.get(), successCb),
-		ON_RECV_RESULT::PACKET_HELD);
+		ON_RECV_RESULT::ERROR_OCCURED);
 }
 
 // ------------------------------------------------------------
-// 7. ÄÝ¹é ½ÇÆÐ Ã³¸®
+// 7. ï¿½Ý¹ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, CallbackFails_ReturnsErrorOccured)
 {
@@ -260,7 +260,7 @@ TEST_F(SessionPacketOrdererTest, Initialize_ResetsToZeroAndChangesMaxSize)
 }
 
 // ------------------------------------------------------------
-// 10. °¸(gap) ½Ã³ª¸®¿À
+// 10. ï¿½ï¿½(gap) ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, GapScenario_ProcessesInChunks)
 {
