@@ -133,12 +133,35 @@ nonce[4] |= (byte)direction << 6
 #### `TryGetFirst(...)`
 - 가장 앞선 sequence의 보류 패킷을 조회한다.
 
-#### `GetCount()`
-- 현재 보류 패킷 개수를 반환한다.
+### `GetCount`
 
-#### `TryGetRange(...)`
-- 보류 중인 sequence의 최소/최대 범위를 구한다.
+```csharp
+public int GetCount()
+```
 
+현재 `holdingPackets` 컬렉션에 보류 중인 패킷의 수를 반환한다.
+
+> **동시성 보호:** 내부적으로 `holdingPacketsLock`을 사용하여 스레드 안전하게 값을 조회한다.
+
+**반환값**
+- 보류 중인 패킷의 총 수.
+#### `TryGetRange`
+
+```csharp
+bool TryGetRange(out PacketSequence firstSequence, out PacketSequence lastSequence)
+```
+
+현재 `holdingPackets` 컬렉션에 있는 패킷들의 첫 번째와 마지막 `PacketSequence`를 가져온다. `holdingPacketsLock`을 사용하여 스레드 안전하게 동작한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `firstSequence` | `out PacketSequence` | [출력] 컬렉션의 첫 번째 시퀀스 |
+| `lastSequence` | `out PacketSequence` | [출력] 컬렉션의 마지막 시퀀스 |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 컬렉션에 패킷이 존재함 |
+| `false` | 컬렉션이 비어 있음 (시퀀스는 기본값으로 설정됨) |
 #### `Clear()`
 - 보류 저장소를 비운다.
 
