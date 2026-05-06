@@ -16,7 +16,7 @@ protected:
 
 
 // ------------------------------------------------------------
-// ÃÊ±â »óÅÂ¿¡¼­ cwnd(4) ¹üÀ§ ³» Àü¼ÛÀº °¡´ÉÇØ¾ß ÇÑ´Ù
+// ï¿½Ê±ï¿½ ï¿½ï¿½ï¿½Â¿ï¿½ï¿½ï¿½ cwnd(4) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 {
@@ -25,7 +25,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 }
 
 // ------------------------------------------------------------
-// cwnd¸¦ ÃÊ°úÇÏ´Â Àü¼ÛÀº ºÒ°¡ÇØ¾ß ÇÑ´Ù
+// cwndï¿½ï¿½ ï¿½Ê°ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ò°ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 {
@@ -33,7 +33,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 }
 
 // ------------------------------------------------------------
-// ACK ¼ö½Å ÈÄ cwnd°¡ ´Ã¾î³ª Ãß°¡ Àü¼ÛÀÌ °¡´ÉÇØ¾ß ÇÑ´Ù
+// ACK ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ cwndï¿½ï¿½ ï¿½Ã¾î³ª ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 {
@@ -44,7 +44,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 }
 
 // ------------------------------------------------------------
-// À©µµ¿ì ¹üÀ§ ³» ½ÃÄö½º´Â ¼ö½Å °¡´ÉÇØ¾ß ÇÑ´Ù
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 {
@@ -53,7 +53,7 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 }
 
 // ------------------------------------------------------------
-// À©µµ¿ì ¹üÀ§¸¦ ¹þ¾î³­ ½ÃÄö½º´Â ¼ö½Å ºÒ°¡ÇØ¾ß ÇÑ´Ù
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½î³­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ò°ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 {
@@ -61,7 +61,7 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 }
 
 // ------------------------------------------------------------
-// MarkReceived ÈÄ À©µµ¿ì°¡ ½½¶óÀÌµùµÇ¾î »õ ½ÃÄö½º¸¦ ¼ö½Å °¡´ÉÇØ¾ß ÇÑ´Ù
+// MarkReceived ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ì°¡ ï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½ï¿½Ç¾ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 {
@@ -72,19 +72,21 @@ TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 }
 
 // ------------------------------------------------------------
-// Å¸ÀÓ¾Æ¿ô ÈÄ cwnd°¡ 1·Î ÁÙ¾î Àü¼Û °¡´É ¹üÀ§°¡ Á¼¾ÆÁ®¾ß ÇÑ´Ù
+// Å¸ï¿½Ó¾Æ¿ï¿½ ï¿½ï¿½ cwndï¿½ï¿½ 1ï¿½ï¿½ ï¿½Ù¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
-TEST_F(RUDPFlowManagerTest, OnTimeout_ReducesCwndToOne)
+TEST_F(RUDPFlowManagerTest, OnTimeout_HalvesCwnd)
 {
+	const uint16_t cwndBeforeTimeout = fm.GetCwnd();
 	fm.OnTimeout();
-	EXPECT_EQ(fm.GetCwnd(), 1);
+	EXPECT_EQ(fm.GetCwnd(), std::max<uint8_t>(cwndBeforeTimeout / 2, 1));
 
 	EXPECT_TRUE(fm.CanSend(1));
-	EXPECT_FALSE(fm.CanSend(2));
+	EXPECT_TRUE(fm.CanSend(2));
+	EXPECT_FALSE(fm.CanSend(3));
 }
 
 // ------------------------------------------------------------
-// Reset ÈÄ ÁöÁ¤ÇÑ ½ÃÄö½ººÎÅÍ ¼ö½Å °¡´ÉÇØ¾ß ÇÑ´Ù
+// Reset ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´ï¿½
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 {
@@ -100,7 +102,7 @@ TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 }
 
 // ------------------------------------------------------------
-// GetReceiveWindowEnd Å×½ºÆ®
+// GetReceiveWindowEnd ï¿½×½ï¿½Æ®
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, GetReceiveWindowEnd_ReturnsCorrectEnd)
 {

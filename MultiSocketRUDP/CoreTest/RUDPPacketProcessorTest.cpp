@@ -223,7 +223,7 @@ TEST_F(RUDPPacketProcessorTest, GetTPS_AfterPacketCallsAndReset_ReturnsZero)
 {
     // 패킷 처리 시도(TPS 는 증가 안함) 후 ResetTPS 가 항상 0 으로 돌아오는지 확인
     const auto validAddr = MakeValidAddrBuffer();
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
     NetBuffer::Free(buf);
 
@@ -336,7 +336,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_AddrBuffer_ExactRequiredSize_Passes
 {
     // 정확히 sizeof(sockaddr_in) 이면 두 번째 guard 를 통과해 ProcessByPacketType 진입
     // → null keyHandle 검사에서 LOG_ERROR 후 반환 (no crash)
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
     const auto exactAddr = MakeValidAddrBuffer();
 
     EXPECT_NO_THROW(
@@ -353,7 +353,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_AddrBuffer_ExactRequiredSize_Passes
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_NullKeyHandle_NoCrash)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
     const auto validAddr = MakeValidAddrBuffer();
 
     EXPECT_NO_THROW(
@@ -364,7 +364,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_NullKeyHandle_NoCrash)
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_NullKeyHandle_TpsNotIncremented)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
     const auto validAddr = MakeValidAddrBuffer();
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
@@ -375,7 +375,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_NullKeyHandle_TpsNotIncremented)
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_NullKeyHandle_NoDelegateMethodsCalled)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
     const auto validAddr = MakeValidAddrBuffer();
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
@@ -397,7 +397,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_MultipleCalls_NoCrash)
 
     for (int i = 0; i < 10; ++i)
     {
-        NetBuffer* buf = MakePassthroughBuffer();
+        NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
         EXPECT_NO_THROW(
             processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr)))
             << "Crashed on iteration " << i;
@@ -443,7 +443,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_MismatchThenPassthrough_NoCrossCont
 
     // 두 번째: size 일치 → ProcessByPacketType 진입 → null keyHandle 에서 반환
     {
-        NetBuffer* buf = MakePassthroughBuffer();
+        NetBuffer* buf = MakeSingleBytePacketBuffer(PACKET_TYPE::INVALID_TYPE);
         EXPECT_NO_THROW(
             processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr)));
         NetBuffer::Free(buf);
