@@ -4,8 +4,6 @@
 
 #pragma comment(lib, "Bcrypt.lib")
 
-constexpr size_t NONCE_SIZE = 12;
-
 CryptoHelper::CryptoHelper()
 {
 	NTSTATUS status = BCryptOpenAlgorithmProvider(&aesAlg, BCRYPT_AES_ALGORITHM, nullptr, 0);
@@ -221,30 +219,33 @@ std::optional<std::vector<unsigned char>> CryptoHelper::GenerateSecureRandomByte
 	return bytes;
 }
 
-std::vector<unsigned char> CryptoHelper::GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltSize, const PacketSequence packetSequence, const PACKET_DIRECTION direction)
+bool CryptoHelper::FillNonce(
+	const unsigned char* sessionSalt,
+	const size_t sessionSaltSize,
+	const PacketSequence packetSequence,
+	const PACKET_DIRECTION direction,
+	OUT unsigned char* outNonce,
+	const size_t nonceSize)
 {
-	if (sessionSalt == nullptr || sessionSaltSize != SESSION_SALT_SIZE)
+	if (sessionSalt == nullptr || sessionSaltSize != SESSION_SALT_SIZE || outNonce == nullptr || nonceSize != NONCE_SIZE)
 	{
-		return {};
+		return false;
 	}
 
-	std::vector<unsigned char> nonce;
-	nonce.resize(NONCE_SIZE);
-
 	const unsigned char directionBits = static_cast<unsigned char>(direction) << 6;
-	nonce[0] = directionBits | (sessionSalt[0] & 0x3F);
-	nonce[1] = sessionSalt[1];
-	nonce[2] = sessionSalt[2];
-	nonce[3] = sessionSalt[3];
+	outNonce[0] = directionBits | (sessionSalt[0] & 0x3F);
+	outNonce[1] = sessionSalt[1];
+	outNonce[2] = sessionSalt[2];
+	outNonce[3] = sessionSalt[3];
 
-	nonce[4] = (packetSequence >> 56) & 0xFF;
-	nonce[5] = (packetSequence >> 48) & 0xFF;
-	nonce[6] = (packetSequence >> 40) & 0xFF;
-	nonce[7] = (packetSequence >> 32) & 0xFF;
-	nonce[8] = (packetSequence >> 24) & 0xFF;
-	nonce[9] = (packetSequence >> 16) & 0xFF;
-	nonce[10] = (packetSequence >> 8) & 0xFF;
-	nonce[11] = packetSequence & 0xFF;
+	outNonce[4] = (packetSequence >> 56) & 0xFF;
+	outNonce[5] = (packetSequence >> 48) & 0xFF;
+	outNonce[6] = (packetSequence >> 40) & 0xFF;
+	outNonce[7] = (packetSequence >> 32) & 0xFF;
+	outNonce[8] = (packetSequence >> 24) & 0xFF;
+	outNonce[9] = (packetSequence >> 16) & 0xFF;
+	outNonce[10] = (packetSequence >> 8) & 0xFF;
+	outNonce[11] = packetSequence & 0xFF;
 
-	return nonce;
+	return true;
 }

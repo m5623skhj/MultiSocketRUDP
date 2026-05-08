@@ -25,7 +25,13 @@ public:
 			return;
 		}
 
-		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
+		unsigned char nonce[NONCE_SIZE];
+		if (not CryptoHelper::FillNonce(sessionSalt, sessionSaltSize, packetSequence, direction, nonce, NONCE_SIZE))
+		{
+			LOG_ERROR("PacketCryptoHelper::EncodePacket() : FillNonce() failed");
+			return;
+		}
+
 		unsigned char authTag[AUTH_TAG_SIZE];
 		const int bodySize = packet.GetUseSize() - (isCorePacket ? bodyOffsetWithNotHeaderForCorePacket : bodyOffsetWithNotHeader);
 		const int bodyOffset = isCorePacket ? bodyOffsetWithHeaderForCorePacket : bodyOffsetWithHeader;
@@ -36,8 +42,8 @@ public:
 		const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
 
 		if (not CryptoHelper::EncryptAESGCM(
-			nonce.data(),
-			nonce.size(),
+			nonce,
+			NONCE_SIZE,
 			aad,
 			aadSize,
 			&packet.m_pSerializeBuffer[bodyOffset],
@@ -96,15 +102,15 @@ public:
 		constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
 		const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
 
-		std::vector<unsigned char> nonce = CryptoHelper::GenerateNonce(sessionSalt, sessionSaltSize, packetSequence, direction);
-		if (nonce.empty())
+		unsigned char nonce[NONCE_SIZE];
+		if (not CryptoHelper::FillNonce(sessionSalt, sessionSaltSize, packetSequence, direction, nonce, NONCE_SIZE))
 		{
 			return false;
 		}
 
 		return CryptoHelper::DecryptAESGCM(
-			nonce.data(),
-			nonce.size(),
+			nonce,
+			NONCE_SIZE,
 			aad,
 			aadSize,
 			&packet.m_pSerializeBuffer[bodyOffset],

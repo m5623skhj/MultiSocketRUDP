@@ -8,6 +8,7 @@
 #include "../Common/etc/CoreType.h"
 
 constexpr size_t AUTH_TAG_SIZE = 16;
+constexpr size_t NONCE_SIZE = 12;
 
 class CryptoHelper
 {
@@ -63,7 +64,13 @@ public:
 	[[nodiscard]]
 	static std::optional<std::vector<unsigned char>> GenerateSecureRandomBytes(unsigned short length);
 	[[nodiscard]]
-	static std::vector<unsigned char> GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction);
+	static bool FillNonce(
+		const unsigned char* sessionSalt,
+		const size_t sessionSaltLen,
+		const PacketSequence packetSequence,
+		const PACKET_DIRECTION direction,
+		OUT unsigned char* outNonce,
+		const size_t nonceSize);
 
 private:
 	BCRYPT_ALG_HANDLE aesAlg = nullptr;
