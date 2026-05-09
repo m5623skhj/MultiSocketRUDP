@@ -470,7 +470,6 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 	while (not stopToken.stop_requested())
 	{
 		RIORESULT rioResults[MAX_RIO_RESULT];
-		ZeroMemory(rioResults, sizeof(rioResults));
 
 		const ULONG numOfResults = rioManager->DequeueCompletions(threadId, rioResults, MAX_RIO_RESULT);
 		for (ULONG i = 0; i < numOfResults; ++i)
