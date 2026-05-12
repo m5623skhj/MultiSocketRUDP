@@ -6,6 +6,7 @@
 2. 구성
 3. Tools
 4. 문서
+5. 성능 측정
 
 ---
 
@@ -136,5 +137,11 @@
 ---
 
 4. [문서](https://github.com/m5623skhj/MultiSocketRUDP/tree/main/Docs)
+
+---
+
+5. 성능 측정
+
+[RTT 성능 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4432868918)
 
 ---
