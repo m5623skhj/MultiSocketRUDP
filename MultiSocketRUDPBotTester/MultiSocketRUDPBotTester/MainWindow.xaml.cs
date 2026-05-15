@@ -83,6 +83,70 @@ namespace MultiSocketRUDPBotTester
             }
         }
 
+        private async void StartRttTest_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!int.TryParse(RttSampleCountTextBox.Text, out var sampleCount) || sampleCount <= 0)
+                {
+                    MessageBox.Show("Please enter a valid RTT sample count.", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!int.TryParse(RttTimeoutTextBox.Text, out var timeoutMs) || timeoutMs <= 0)
+                {
+                    MessageBox.Show("Please enter a valid RTT timeout in milliseconds.", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!ushort.TryParse(HostPortTextBox.Text, out var hostPort) || hostPort == 0)
+                {
+                    MessageBox.Show("Please enter a valid port (1-65535)", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var hostIp = HostIpTextBox.Text.Trim();
+                if (string.IsNullOrEmpty(hostIp))
+                {
+                    MessageBox.Show("Please enter a valid IP address", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                HostIpTextBox.IsEnabled = false;
+                HostPortTextBox.IsEnabled = false;
+                BotCountTextBox.IsEnabled = false;
+                RttSampleCountTextBox.IsEnabled = false;
+                RttTimeoutTextBox.IsEnabled = false;
+
+                BotTesterCore.Instance.SetConnectionInfo(hostIp, hostPort);
+                var summary = await BotTesterCore.Instance.StartRttTest(sampleCount, timeoutMs);
+
+                MessageBox.Show(
+                    $"RTT test completed.\nSamples: {summary.SampleCount}\nAvg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\nElapsed: {summary.ElapsedSeconds:F3} s",
+                    "RTT Test Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                BotTesterCore.Instance.StopBotTest();
+            }
+            finally
+            {
+                HostIpTextBox.IsEnabled = true;
+                HostPortTextBox.IsEnabled = true;
+                BotCountTextBox.IsEnabled = true;
+                RttSampleCountTextBox.IsEnabled = true;
+                RttTimeoutTextBox.IsEnabled = true;
+            }
+        }
+
         private void StopBotTest_Click(object sender, RoutedEventArgs e)
         {
             BotTesterCore.Instance.StopBotTest();

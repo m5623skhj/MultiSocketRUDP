@@ -89,6 +89,47 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
+        public async Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs)
+        {
+            if (string.IsNullOrEmpty(hostIp) || hostPort == 0)
+            {
+                throw new InvalidOperationException("Connection info not set. Call SetConnectionInfo first.");
+            }
+
+            Client? rudpSession = null;
+            try
+            {
+                rudpSession = await GetSessionInfoFromSessionBroker();
+                if (rudpSession == null)
+                {
+                    throw new InvalidOperationException("Failed to get session info from session broker.");
+                }
+
+                rudpSession.EnableRttMode();
+                rudpSession.OnSessionDisconnected = sessionId =>
+                {
+                    lock (sessionDictionaryLock)
+                    {
+                        sessionDictionary.Remove(sessionId);
+                        Log.Information("Session {Id} removed from dictionary after disconnect", sessionId);
+                    }
+                };
+
+                lock (sessionDictionaryLock)
+                {
+                    sessionDictionary[rudpSession.GetSessionId()] = rudpSession;
+                }
+
+                var runner = new RttTestRunner(rudpSession);
+                return await runner.RunAsync(inSampleCount, inTimeoutMs, rudpSession.CancellationToken.Token);
+            }
+            finally
+            {
+                sessionGetter.Close();
+                rudpSession?.Disconnect();
+            }
+        }
+
         public void StopBotTest()
         {
             lock (sessionDictionaryLock)

@@ -3,6 +3,23 @@ using System.Security.Cryptography;
 
 namespace MultiSocketRUDPBotTester.Buffer
 {
+    public enum DecodePacketFailureReason
+    {
+        None,
+        InvalidLayout,
+        AuthDecryptFailed
+    }
+
+    public readonly record struct DecodePacketFailureDetails(
+        DecodePacketFailureReason Reason,
+        ulong PacketSequence,
+        PacketDirection Direction,
+        bool IsCorePacket,
+        int PacketLength,
+        int HeaderPayloadSize,
+        int BodySize,
+        int AuthTagOffset);
+
     public class NetBuffer
     {
         public static byte HeaderCode { get; set; } = 0xCC;
@@ -259,20 +276,20 @@ namespace MultiSocketRUDPBotTester.Buffer
                 bodySize = 0;
             }
 
-            var nonce = CryptoHelper.GenerateNonce(sessionSalt, packetSequence, direction);
-            var tag = new byte[AuthTagSize];
+            Span<byte> nonce = stackalloc byte[CryptoHelper.NonceSize];
+            CryptoHelper.WriteNonce(nonce, sessionSalt, packetSequence, direction);
 
             packet.SetHeader(AuthTagSize);
 
             const int aadSize = HeaderSize + PacketTypeSize + PacketSequenceSize;
+            var tagDest = packet._buffer.AsSpan(packet._writePos, AuthTagSize);
             aesGcm.Encrypt(
                 nonce,
                 plaintext: packet._buffer.AsSpan(bodyOffset, bodySize),
                 ciphertext: packet._buffer.AsSpan(bodyOffset, bodySize),
-                tag: tag,
+                tag: tagDest,
                 associatedData: packet._buffer.AsSpan(0, aadSize));
 
-            tag.CopyTo(packet._buffer, packet._writePos);
             packet._writePos += AuthTagSize;
         }
 
@@ -283,6 +300,23 @@ namespace MultiSocketRUDPBotTester.Buffer
             byte[] sessionSalt,
             PacketDirection direction)
         {
+            return DecodePacket(
+                aesGcm,
+                packet,
+                isCorePacket,
+                sessionSalt,
+                direction,
+                out _);
+        }
+
+        public static bool DecodePacket(
+            AesGcm aesGcm,
+            NetBuffer packet,
+            bool isCorePacket,
+            byte[] sessionSalt,
+            PacketDirection direction,
+            out DecodePacketFailureDetails outFailureDetails)
+        {
             ulong packetSequence = 0;
             for (var i = 0; i < PacketSequenceSize; i++)
             {
@@ -292,14 +326,24 @@ namespace MultiSocketRUDPBotTester.Buffer
             var bodyOffset = isCorePacket ? BodyOffsetCorePacket : BodyOffsetFullPacket;
             var authTagOffset = packet._writePos - AuthTagSize;
             var bodySize = authTagOffset - bodyOffset;
+            var headerPayloadSize = packet._buffer[1] | (packet._buffer[2] << 8);
 
             if (bodySize < 0 || authTagOffset < 0)
             {
+                outFailureDetails = new DecodePacketFailureDetails(
+                    DecodePacketFailureReason.InvalidLayout,
+                    packetSequence,
+                    direction,
+                    isCorePacket,
+                    packet._writePos,
+                    headerPayloadSize,
+                    bodySize,
+                    authTagOffset);
                 return false;
             }
 
-            var nonce = CryptoHelper.GenerateNonce(sessionSalt, packetSequence, direction);
-            var tag = packet._buffer.AsSpan(authTagOffset, AuthTagSize).ToArray();
+            Span<byte> nonce = stackalloc byte[CryptoHelper.NonceSize];
+            CryptoHelper.WriteNonce(nonce, sessionSalt, packetSequence, direction);
 
             try
             {
@@ -307,15 +351,25 @@ namespace MultiSocketRUDPBotTester.Buffer
                 aesGcm.Decrypt(
                     nonce,
                     ciphertext: packet._buffer.AsSpan(bodyOffset, bodySize),
-                    tag: tag,
+                    tag: packet._buffer.AsSpan(authTagOffset, AuthTagSize),
                     plaintext: packet._buffer.AsSpan(bodyOffset, bodySize),
                     associatedData: packet._buffer.AsSpan(0, aadSize));
 
                 packet._writePos -= AuthTagSize;
+                outFailureDetails = default;
                 return true;
             }
             catch (CryptographicException)
             {
+                outFailureDetails = new DecodePacketFailureDetails(
+                    DecodePacketFailureReason.AuthDecryptFailed,
+                    packetSequence,
+                    direction,
+                    isCorePacket,
+                    packet._writePos,
+                    headerPayloadSize,
+                    bodySize,
+                    authTagOffset);
                 return false;
             }
         }

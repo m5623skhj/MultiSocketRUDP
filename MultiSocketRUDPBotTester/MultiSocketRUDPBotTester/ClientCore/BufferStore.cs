@@ -5,7 +5,10 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     public NetBuffer SentBuffer { get; } = inSentBuffer;
     public PacketSequence PacketSequence { get; } = inPacketSequence;
 
+    private long createdTimestampMs;
     private long sendTimeStampMs;
+    private long ackReceivedTimestampMs;
+    private long removedTimestampMs;
     private long retransmissionCount;
 
     private const long RetransmissionTimeoutMs = 50;
@@ -13,6 +16,7 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
 
     public void InitializeSendTimestamp(ulong now)
     {
+        Interlocked.CompareExchange(ref createdTimestampMs, (long)now, 0);
         Interlocked.Exchange(ref sendTimeStampMs, (long)now);
     }
 
@@ -28,6 +32,16 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
         return (now - stamp) >= (ulong)RetransmissionTimeoutMs;
     }
 
+    public void MarkAckReceived(ulong now)
+    {
+        Interlocked.CompareExchange(ref ackReceivedTimestampMs, (long)now, 0);
+    }
+
+    public void MarkRemoved(ulong now)
+    {
+        Interlocked.Exchange(ref removedTimestampMs, (long)now);
+    }
+
     public bool IsExceedMaxRetransmissionCount()
     {
         return Interlocked.Read(ref retransmissionCount) >= RetransmissionMaxCount;
@@ -36,6 +50,31 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     public long GetRetransmissionCount()
     {
         return Interlocked.Read(ref retransmissionCount);
+    }
+
+    public long GetCreatedTimestampMs()
+    {
+        return Interlocked.Read(ref createdTimestampMs);
+    }
+
+    public long GetSendTimestampMs()
+    {
+        return Interlocked.Read(ref sendTimeStampMs);
+    }
+
+    public long GetAckReceivedTimestampMs()
+    {
+        return Interlocked.Read(ref ackReceivedTimestampMs);
+    }
+
+    public long GetRemovedTimestampMs()
+    {
+        return Interlocked.Read(ref removedTimestampMs);
+    }
+
+    public bool HasAckReceived()
+    {
+        return Interlocked.Read(ref ackReceivedTimestampMs) != 0;
     }
 }
 
@@ -63,6 +102,11 @@ public class BufferStore
         sendBufferStore.RemoveSendBuffer(sequence);
     }
 
+    public SendPacketInfo? RemoveAndGetSendBuffer(PacketSequence sequence)
+    {
+        return sendBufferStore.RemoveAndGetSendBuffer(sequence);
+    }
+
     public int GetSendBufferCount()
     {
         return sendBufferStore.GetSendBufferCount();
@@ -76,6 +120,11 @@ public class BufferStore
     public bool ContainsPacket(PacketSequence sequence)
     {
         return sendBufferStore.ContainsPacket(sequence);
+    }
+
+    public SendPacketInfo? GetSendBuffer(PacketSequence sequence)
+    {
+        return sendBufferStore.GetSendBuffer(sequence);
     }
 
     public void Clear()
@@ -135,6 +184,19 @@ public class BufferStore
             }
         }
 
+        public SendPacketInfo? RemoveAndGetSendBuffer(PacketSequence sequence)
+        {
+            lock (sendBufferStoreLock)
+            {
+                if (!sendBufferStore.Remove(sequence, out var sendPacketInfo))
+                {
+                    return null;
+                }
+
+                return sendPacketInfo;
+            }
+        }
+
         public int GetSendBufferCount()
         {
             lock (sendBufferStoreLock)
@@ -156,6 +218,15 @@ public class BufferStore
             lock (sendBufferStoreLock)
             {
                 return sendBufferStore.ContainsKey(sequence);
+            }
+        }
+
+        public SendPacketInfo? GetSendBuffer(PacketSequence sequence)
+        {
+            lock (sendBufferStoreLock)
+            {
+                sendBufferStore.TryGetValue(sequence, out var sendPacketInfo);
+                return sendPacketInfo;
             }
         }
 

@@ -18,6 +18,9 @@
             <Button Content="Start Bot Test"
                     Height="35"
                     Click="StartBotTest_Click"/>
+            <Button Content="Start RTT Test"
+                    Height="35"
+                    Click="StartRttTest_Click"/>
             <Button Content="Stop Bot Test"
                     Height="35"
                     Click="StopBotTest_Click"/>
@@ -71,6 +74,34 @@
                          Height="25"
                          Width="150"
                          Text="1"/>
+            </Grid>
+
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="RTT Samples:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="RttSampleCountTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"
+                         Text="100000"/>
+            </Grid>
+
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="RTT Timeout:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="RttTimeoutTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"
+                         Text="1000"/>
             </Grid>
 
         </StackPanel>

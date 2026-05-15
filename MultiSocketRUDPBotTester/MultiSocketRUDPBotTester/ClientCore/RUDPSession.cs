@@ -148,7 +148,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
     {
         private const ulong LoginPacketSequence = 0;
         private const int HeaderSize = 5;
-        private const int RetransmissionWakeUpMs = 30;
+        private const int RetransmissionWakeUpMs = 16;
+        private const long AckDelayRetransmissionThreshold = 1;
+        private const long AckRemovalDelayLogThresholdMs = 5;
 
         public SessionInfo SessionInfo { get; } = new() { SessionState = SessionState.Disconnected };
         public TargetServerInfo TargetServerInfo { get; } = new();
@@ -180,6 +182,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 });
 
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
+        protected virtual bool TryHandleRecvFastPath(PacketId packetId, NetBuffer buffer) => false;
+        protected virtual void OnRttPacketReceived(PacketId packetId, long inReceiveTimestamp) { }
         protected virtual void OnConnected() { }
         protected virtual void OnDisconnected() { }
 
@@ -298,7 +302,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                     try
                     {
-                        await ProcessReceivedPacketAsync(result.Buffer).ConfigureAwait(false);
+                        await ProcessReceivedStreamAsync(result.Buffer).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -340,6 +344,59 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
+        /// <summary>
+        /// 네이티브 클라이언트와 동일하게 하나의 UDP datagram 안에 합쳐진 여러 패킷을 헤더 기준으로 분리합니다.
+        /// </summary>
+        private async Task ProcessReceivedStreamAsync(byte[] data)
+        {
+            var offset = 0;
+            while (offset + HeaderSize <= data.Length)
+            {
+                if (!TryGetPacketSize(data, offset, out var packetSize))
+                {
+                    Log.Error(
+                        "ProcessReceivedStreamAsync: invalid packet layout offset={Offset} datagramLength={DatagramLength}",
+                        offset,
+                        data.Length);
+                    return;
+                }
+
+                if (offset + packetSize > data.Length)
+                {
+                    Log.Error(
+                        "ProcessReceivedStreamAsync: truncated packet offset={Offset} packetSize={PacketSize} datagramLength={DatagramLength}",
+                        offset,
+                        packetSize,
+                        data.Length);
+                    return;
+                }
+
+                var packetBytes = new byte[packetSize];
+                Array.Copy(data, offset, packetBytes, 0, packetSize);
+                await ProcessReceivedPacketAsync(packetBytes).ConfigureAwait(false);
+
+                offset += packetSize;
+            }
+        }
+
+        private static bool TryGetPacketSize(byte[] data, int offset, out int outPacketSize)
+        {
+            outPacketSize = 0;
+            if (offset + HeaderSize > data.Length)
+            {
+                return false;
+            }
+
+            var payloadLength = data[offset + 1] | (data[offset + 2] << 8);
+            if (payloadLength <= 0)
+            {
+                return false;
+            }
+
+            outPacketSize = HeaderSize + payloadLength;
+            return true;
+        }
+
         private async Task ProcessReceivedPacketAsync(byte[] data)
         {
             if (SessionInfo.AesGcm == null)
@@ -371,15 +428,28 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
 
             bool decoded;
+            DecodePacketFailureDetails decodeFailureDetails = default;
             lock (aesGcmLock)
             {
                 decoded = NetBuffer.DecodePacket(
-                    SessionInfo.AesGcm, buffer, isCorePacket, SessionInfo.SessionSalt, direction);
+                    SessionInfo.AesGcm, buffer, isCorePacket, SessionInfo.SessionSalt, direction, out decodeFailureDetails);
             }
 
             if (!decoded)
             {
-                Log.Error("DecodePacket failed (type={Type})", packetType);
+                Log.Error(
+                    "DecodePacket failed (type={Type}, reason={Reason}, sequence={Sequence}, direction={Direction}, isCorePacket={IsCorePacket}, packetLength={PacketLength}, headerPayloadSize={HeaderPayloadSize}, bodySize={BodySize}, authTagOffset={AuthTagOffset}, lastSendSequence={LastSendSequence}, outstandingSendBuffers={OutstandingSendBuffers})",
+                    packetType,
+                    decodeFailureDetails.Reason,
+                    decodeFailureDetails.PacketSequence,
+                    decodeFailureDetails.Direction,
+                    decodeFailureDetails.IsCorePacket,
+                    decodeFailureDetails.PacketLength,
+                    decodeFailureDetails.HeaderPayloadSize,
+                    decodeFailureDetails.BodySize,
+                    decodeFailureDetails.AuthTagOffset,
+                    Interlocked.Read(ref lastSendSequence),
+                    bufferStore.GetSendBufferCount());
                 return;
             }
 
@@ -389,6 +459,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 packetId = (PacketId)buffer.ReadUInt();
             }
+
+            OnRttPacketReceived(packetId, Stopwatch.GetTimestamp());
 
             switch (packetType)
             {
@@ -407,6 +479,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         var capturedSequence = sequence;
                         var capturedPid = pid;
                         var capturedBuf = buf;
+                        if (TryHandleRecvFastPath(capturedPid, capturedBuf))
+                        {
+                            continue;
+                        }
+
                         recvProcessingChannel.Writer.TryWrite(() =>
                         {
                             OnRecvPacket(capturedPid, capturedBuf);
@@ -500,6 +577,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void OnSendReply(PacketSequence packetSequence)
         {
+            var nowMs = CommonFunc.GetNowMs();
+
             if (packetSequence == LoginPacketSequence)
             {
                 isConnected = true;
@@ -518,7 +597,40 @@ namespace MultiSocketRUDPBotTester.ClientCore
             if (Interlocked.Read(ref lastSendSequence) < packetSequence)
                 return;
 
-            bufferStore.RemoveSendBuffer(packetSequence);
+            var ackedPacketInfo = bufferStore.GetSendBuffer(packetSequence);
+            if (ackedPacketInfo != null)
+            {
+                ackedPacketInfo.MarkAckReceived(nowMs);
+            }
+
+            if (ackedPacketInfo != null &&
+                ackedPacketInfo.GetRetransmissionCount() >= AckDelayRetransmissionThreshold)
+            {
+                Log.Information(
+                    "[ClientRetransmissionAck] seq={Sequence} retransmissions={RetransmissionCount} outstandingSendBuffers={OutstandingSendBuffers}",
+                    packetSequence,
+                    ackedPacketInfo.GetRetransmissionCount(),
+                    bufferStore.GetSendBufferCount());
+            }
+
+            var removedPacketInfo = bufferStore.RemoveAndGetSendBuffer(packetSequence);
+            if (removedPacketInfo == null)
+            {
+                return;
+            }
+
+            removedPacketInfo.MarkRemoved(nowMs);
+
+            var ackRemovalDelayMs = nowMs - (ulong)removedPacketInfo.GetAckReceivedTimestampMs();
+            if (ackRemovalDelayMs >= AckRemovalDelayLogThresholdMs)
+            {
+                Log.Information(
+                    "[ClientAckRemovalDelay] seq={Sequence} ackRemovalDelayMs={AckRemovalDelayMs} retransmissions={RetransmissionCount} outstandingSendBuffers={OutstandingSendBuffers}",
+                    packetSequence,
+                    ackRemovalDelayMs,
+                    removedPacketInfo.GetRetransmissionCount(),
+                    bufferStore.GetSendBufferCount());
+            }
         }
 
         private async Task RetransmissionAsync()
@@ -536,6 +648,18 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                     foreach (var info in sendPacketInfos.Where(p => p.IsRetransmissionTime(nowMs)))
                     {
+                        if (info.HasAckReceived())
+                        {
+                            var ackReceivedTimestampMs = info.GetAckReceivedTimestampMs();
+                            Log.Information(
+                                "[ClientAckRace] seq={Sequence} ackAgeMs={AckAgeMs} retransmissions={RetransmissionCount} outstandingSendBuffers={OutstandingSendBuffers}",
+                                info.PacketSequence,
+                                nowMs - (ulong)ackReceivedTimestampMs,
+                                info.GetRetransmissionCount(),
+                                bufferStore.GetSendBufferCount());
+                            continue;
+                        }
+
                         if (info.IsExceedMaxRetransmissionCount())
                         {
                             if (!bufferStore.ContainsPacket(info.PacketSequence))
@@ -552,6 +676,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         }
 
                         info.RefreshSendPacketInfo(nowMs);
+                        Log.Information(
+                            "[ClientRetransmission] seq={Sequence} retransmissions={RetransmissionCount} outstandingSendBuffers={OutstandingSendBuffers} createdAgeMs={CreatedAgeMs} lastSendAgeMs={LastSendAgeMs}",
+                            info.PacketSequence,
+                            info.GetRetransmissionCount(),
+                            bufferStore.GetSendBufferCount(),
+                            nowMs - (ulong)info.GetCreatedTimestampMs(),
+                            nowMs - (ulong)info.GetSendTimestampMs());
 
                         var client = udpClient;
                         if (client == null)
