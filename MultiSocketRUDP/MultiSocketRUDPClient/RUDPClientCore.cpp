@@ -84,16 +84,16 @@ void RUDPClientCore::Stop()
 		sessionBrokerSocket = INVALID_SOCKET;
 	}
 
-	SetEvent(sendEventHandles[1]);
 	threadStopFlag = true;
-
-	JoinThreads();
+	SetEvent(sendEventHandles[1]);
 
 	if (rudpSocket != INVALID_SOCKET)
 	{
 		closesocket(rudpSocket);
 		rudpSocket = INVALID_SOCKET;
 	}
+
+	JoinThreads();
 
 	if (sendEventHandles[0] != nullptr)
 	{
