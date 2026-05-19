@@ -20,7 +20,7 @@ class RUDPIOHandler;
 class RUDPSessionBroker;
 
 // ----------------------------------------
-// @brief RUDPSession Å¬·¡½ºÀÇ Æ¯Á¤ private/protected ¸Ş¼­µå¿¡ ´ëÇÑ Á¢±ÙÀ» À§ÀÓÇÏ´Â Å¬·¡½ºÀÔ´Ï´Ù.
+// @brief RUDPSession í´ë˜ìŠ¤ì˜ íŠ¹ì • private/protected ë©”ì„œë“œì— ëŒ€í•œ ì ‘ê·¼ì„ ìœ„ì„í•˜ëŠ” í´ë˜ìŠ¤ì…ë‹ˆë‹¤.
 // ----------------------------------------
 class RUDPSessionFunctionDelegate : public ISessionDelegate
 {
@@ -67,8 +67,7 @@ private:
 	SendPacketInfo* GetReservedSendPacketInfo(RUDPSession& session) override;
 	bool IsNothingToSend(RUDPSession& session) override;
 	void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) override;
-	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) override;
-	std::mutex& GetCachedSequenceSetMutex(RUDPSession& session) override;
+	std::vector<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequences(RUDPSession& session) override;
 	size_t GetSendPacketInfoQueueSize(RUDPSession& session) override;
 	char* GetRIOSendBuffer(RUDPSession& session) override;
 	void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo) override;

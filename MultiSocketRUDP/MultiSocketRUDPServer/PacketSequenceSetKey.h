@@ -10,6 +10,11 @@ namespace MultiSocketRUDP
 		{
 		}
 
+		bool operator==(const PacketSequenceSetKey& other) const
+        {
+            return isReplyType == other.isReplyType && packetSequence == other.packetSequence;
+        }
+
 		bool operator<(const PacketSequenceSetKey& other) const
 		{
 			if (isReplyType != other.isReplyType)

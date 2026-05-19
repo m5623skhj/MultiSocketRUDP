@@ -51,9 +51,7 @@ public:
     [[nodiscard]]
     RIO_RQ GetSendRIORQ(const RUDPSession&) override { return sendRIORQReturn; }
     [[nodiscard]]
-    std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession&) override { return dummySeqSet; }
-    [[nodiscard]]
-    std::mutex& GetCachedSequenceSetMutex(RUDPSession&) override { return dummySeqMutex; }
+    std::vector<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequences(RUDPSession&) override { return dummySeqSet; }
 
     [[nodiscard]]
     bool TryConnect(RUDPSession&, NetBuffer&, const sockaddr_in&) override
@@ -140,7 +138,7 @@ public:
     char dummySendBuffer[65536]{};
     RIO_BUFFERID sendBufferIdReturn = RIO_INVALID_BUFFERID;
     RIO_RQ sendRIORQReturn = RIO_INVALID_RQ;
-    std::set<MultiSocketRUDP::PacketSequenceSetKey> dummySeqSet;
+    std::vector<MultiSocketRUDP::PacketSequenceSetKey> dummySeqSet;
     mutable std::mutex dummySeqMutex;
 
     unsigned char dummyKey[32]{};
