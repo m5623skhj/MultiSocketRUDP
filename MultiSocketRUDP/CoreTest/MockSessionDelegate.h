@@ -41,6 +41,13 @@ public:
     SendPacketInfo* TryGetFrontAndPop(RUDPSession&) override { return tryGetFrontReturn; }
     [[nodiscard]]
     SendPacketInfo* GetReservedSendPacketInfo(RUDPSession&) override { return reservedSendReturn; }
+    [[nodiscard]]
+    SendPacketInfo* TakeReservedSendPacketInfo(RUDPSession&) override
+    {
+        SendPacketInfo* info = reservedSendReturn;
+        reservedSendReturn = nullptr;
+        return info;
+    }
     void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override { reservedSendReturn = info; }
     [[nodiscard]]
     size_t GetSendPacketInfoQueueSize(RUDPSession&) override { return sendPacketInfoQueueSizeRet; }

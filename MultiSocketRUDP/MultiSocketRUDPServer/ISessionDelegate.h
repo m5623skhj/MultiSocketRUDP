@@ -55,6 +55,8 @@ public:
 	virtual SendPacketInfo* TryGetFrontAndPop(RUDPSession& session) = 0;
 	[[nodiscard]]
 	virtual SendPacketInfo* GetReservedSendPacketInfo(RUDPSession& session) = 0;
+	[[nodiscard]]
+	virtual SendPacketInfo* TakeReservedSendPacketInfo(RUDPSession& session) = 0;
 	virtual void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* info) = 0;
 	[[nodiscard]]
 	virtual size_t GetSendPacketInfoQueueSize(RUDPSession& session) = 0;

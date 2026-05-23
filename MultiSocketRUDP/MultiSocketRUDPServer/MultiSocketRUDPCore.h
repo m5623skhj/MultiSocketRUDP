@@ -52,7 +52,8 @@ public:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
-	void EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
+	[[nodiscard]]
+	bool EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
 	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const override;
 
 	// ----------------------------------------

@@ -100,7 +100,13 @@ SendPacketInfo* SessionSendContext::GetReservedSendPacketInfo()
 	std::scoped_lock lock(sendPacketInfoQueueLock);
 	return reservedSendPacketInfo;
 }
-
+SendPacketInfo* SessionSendContext::TakeReservedSendPacketInfo()
+{
+	std::scoped_lock lock(sendPacketInfoQueueLock);
+	SendPacketInfo* info = reservedSendPacketInfo;
+	reservedSendPacketInfo = nullptr;
+	return info;
+}
 void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);

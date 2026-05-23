@@ -97,7 +97,10 @@ SendPacketInfo* RUDPSessionFunctionDelegate::GetReservedSendPacketInfo(RUDPSessi
 {
 	return session.GetSendContext().GetReservedSendPacketInfo();
 }
-
+SendPacketInfo* RUDPSessionFunctionDelegate::TakeReservedSendPacketInfo(RUDPSession& session)
+{
+	return session.GetSendContext().TakeReservedSendPacketInfo();
+}
 bool RUDPSessionFunctionDelegate::IsNothingToSend(RUDPSession& session)
 {
 	return session.GetSendContext().IsNothingToSend();

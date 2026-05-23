@@ -208,32 +208,32 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 	return true;
 }
 
-void MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
+bool MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
 	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo.load(std::memory_order_acquire))
 	{
-		return;
+		return false;
 	}
-
-	bool isErased = false;
+	bool didFreeRef = false;
 	{
 		std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
+		if (eraseTarget->isErasedPacketInfo.load(std::memory_order_acquire))
+		{
+			return false;
+		}
 		if (eraseTarget->isInSendPacketInfoList)
 		{
-			if (eraseTarget->isInSendPacketInfoList)
-			{
-				sendPacketInfoList[threadId].erase(eraseTarget->listItor);
-				eraseTarget->isInSendPacketInfoList = false;
-				isErased = true;
-			}
+			sendPacketInfoList[threadId].erase(eraseTarget->listItor);
+			eraseTarget->isInSendPacketInfoList = false;
+			didFreeRef = true;
 		}
-		eraseTarget->isErasedPacketInfo = true;
+		eraseTarget->isErasedPacketInfo.store(true, std::memory_order_release);
 	}
-
-	if (isErased == true)
+	if (didFreeRef == true)
 	{
 		SendPacketInfo::Free(eraseTarget);
 	}
+	return didFreeRef;
 }
 
 RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const

@@ -99,7 +99,10 @@ void RUDPSession::Disconnect()
 	{
 		rioContext.GetSendContext().ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info)
 		{
-			core.EraseSendPacketInfo(info, threadId);
+			if (core.EraseSendPacketInfo(info, threadId) == false)
+			{
+				SendPacketInfo::Free(info);
+			}
 		});
 	}
 	OnReleased();
@@ -210,8 +213,12 @@ bool RUDPSession::SendPacketImmediate(
 	{
 		if (not isReplyType)
 		{
-			core.EraseSendPacketInfo(sendPacketInfo, threadId);
+			const bool didFreeRef = core.EraseSendPacketInfo(sendPacketInfo, threadId);
 			rioContext.GetSendContext().EraseSendPacketInfo(inSendPacketSequence);
+			if (didFreeRef == false)
+			{
+				SendPacketInfo::Free(sendPacketInfo);
+			}
 		}
 		else
 		{
@@ -495,8 +502,10 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	}
 
 	flowManager.OnAckReceived(packetSequence);
-	core.EraseSendPacketInfo(sendPacketInfo, threadId);
-
+	if (core.EraseSendPacketInfo(sendPacketInfo, threadId) == false)
+	{
+		SendPacketInfo::Free(sendPacketInfo);
+	}
 	TryFlushPendingQueue();
 }
 

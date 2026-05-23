@@ -290,12 +290,9 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session
 	
 	unsigned int totalSendSize = 0;
 	const size_t bufferCount = sessionDelegate.GetSendPacketInfoQueueSize(session);
-	if (sessionDelegate.GetReservedSendPacketInfo(session) != nullptr)
+	if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
 	{
-		if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId) == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR)
-		{
-			return { false, 0 };
-		}
+		return { false, 0 };
 	}
 
 	for (size_t i = 0; i < bufferCount; ++i)
@@ -320,7 +317,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session
 
 SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(RUDPSession& session, std::set<MultiSocketRUDP::PacketSequenceSetKey>& packetSequenceSet, unsigned int& totalSendSize, ThreadIdType threadId) const
 {
-	SendPacketInfo* sendPacketInfo = sessionDelegate.GetReservedSendPacketInfo(session);
+	SendPacketInfo* sendPacketInfo = sessionDelegate.TakeReservedSendPacketInfo(session);
 	if (sendPacketInfo == nullptr)
 	{
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
@@ -332,14 +329,12 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
-		sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
 
 	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
 	{
 		SendPacketInfo::Free(sendPacketInfo);
-		sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
 
@@ -350,7 +345,6 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	totalSendSize += static_cast<int>(useSize);
 
 	SendPacketInfo::Free(sendPacketInfo);
-	sessionDelegate.SetReservedSendPacketInfo(session, nullptr);
 
 	return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 }
