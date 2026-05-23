@@ -23,9 +23,11 @@
 * Stop Bot Test : 봇 테스트 중지
 
 2 Start Bot Action Graph UI 구성
-<img width="1913" height="1024" alt="image" src="https://github.com/user-attachments/assets/102d3c69-890f-45de-b52a-b9bad51ca159" />  
+<img width="1915" height="1025" alt="image" src="https://github.com/user-attachments/assets/8cab5776-772c-401f-ae65-3d3021d106d9" />
 * AI Tree Generator : AI에게 액션 노드 트리를 구성하도록 요청
 * Add Node : 좌측의 노드들 중 현재 선택되어 있는 노드를 보드에 추가
+* Save Graph : 현재 그래프를 저장
+* Load Graph : 저장된 그래프를 불러옴
 * Vaildate Graph : 그래프의 정합성을 검증
 * Build Graph : 그래프를 빌드
 * Apply to BotTester : 빌드된 봇 테스트를 적용, 해당 버튼 클릭 이후 부터 메인 페이지의 Start Bot Test의 진행이 현재 구성으로 변경됨
