@@ -216,14 +216,19 @@ private:
 	std::atomic_uint32_t sessionGeneration{};
 
 	static BYTE maximumHoldingPacketQueueSize;
+	static unsigned long long reservedSessionTimeoutMs;
 
 	unsigned long long onSessionReleaseTime{};
 	unsigned long long sessionReservedTime{};
-	static unsigned long long constexpr RESERVED_SESSION_TIMEOUT_MS = 30000;
 
 public:
 	void SetStateMachineToDisconnect();
 	DISCONNECT_REASON GetDisconnectedReason() const;
+
+#if _DEBUG
+	static void SetReservedSessionTimeoutMsForTest(unsigned long long inTimeoutMs);
+	static unsigned long long GetReservedSessionTimeoutMsForTest();
+#endif
 
 private:
 	DISCONNECT_REASON disconnectedReason{ DISCONNECT_REASON::NOT_DISCONNECTED };

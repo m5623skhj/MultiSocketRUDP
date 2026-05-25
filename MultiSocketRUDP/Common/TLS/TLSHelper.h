@@ -30,6 +30,41 @@ namespace TLSHelper
 		constexpr const wchar_t* AuthRoot = L"AuthRoot";
 	};
 
+	enum class ServerCertificateSource : unsigned char
+	{
+		Store,
+		PfxFile
+	};
+
+	struct ServerCertificateConfig
+	{
+		ServerCertificateSource source{ ServerCertificateSource::Store };
+		std::wstring storeName{};
+		std::wstring certSubjectName{};
+		std::wstring pfxFilePath{};
+		std::wstring pfxPassword{};
+
+		[[nodiscard]]
+		static ServerCertificateConfig FromStore(const std::wstring& inStoreName, const std::wstring& inCertSubjectName)
+		{
+			ServerCertificateConfig config;
+			config.source = ServerCertificateSource::Store;
+			config.storeName = inStoreName;
+			config.certSubjectName = inCertSubjectName;
+			return config;
+		}
+
+		[[nodiscard]]
+		static ServerCertificateConfig FromPfxFile(const std::wstring& inPfxFilePath, const std::wstring& inPfxPassword)
+		{
+			ServerCertificateConfig config;
+			config.source = ServerCertificateSource::PfxFile;
+			config.pfxFilePath = inPfxFilePath;
+			config.pfxPassword = inPfxPassword;
+			return config;
+		}
+	};
+
 	class TLSHelperBase
 	{
 	public:
@@ -39,6 +74,11 @@ namespace TLSHelper
 	public:
 		virtual bool Initialize() = 0;
 		virtual bool Handshake(SOCKET socket) = 0;
+		[[nodiscard]]
+		SECURITY_STATUS GetLastStatus() const
+		{
+			return lastStatus;
+		}
 
 		[[nodiscard]]
 		bool EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize);
@@ -52,6 +92,7 @@ namespace TLSHelper
 	protected:
 		CredHandle credHandle;
 		CtxtHandle ctxtHandle;
+		SECURITY_STATUS lastStatus = SEC_E_OK;
 
 		bool handshakeCompleted = false;
 		SecPkgContext_StreamSizes streamSizes{};
@@ -75,7 +116,7 @@ namespace TLSHelper
 	class TLSHelperServer : public TLSHelperBase
 	{
 	public:
-		explicit TLSHelperServer(const std::wstring& inStoreName, const std::wstring& inCertSubjectName);
+		explicit TLSHelperServer(ServerCertificateConfig inCertificateConfig);
 		~TLSHelperServer() override = default;
 
 	public:
@@ -85,7 +126,12 @@ namespace TLSHelper
 		bool Handshake(SOCKET socket) override;
 
 	private:
-		std::wstring storeName{};
-		std::wstring certSubjectName{};
+		[[nodiscard]]
+		bool InitializeFromStore();
+		[[nodiscard]]
+		bool InitializeFromPfxFile();
+
+	private:
+		ServerCertificateConfig certificateConfig{};
 	};
 }

@@ -25,6 +25,7 @@ namespace
 }
 
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
+unsigned long long RUDPSession::reservedSessionTimeoutMs = 30000;
 
 RUDPSession::RUDPSession(MultiSocketRUDPCore& inCore)
 	: flowManager(maximumHoldingPacketQueueSize)
@@ -302,7 +303,7 @@ void RUDPSession::SendHeartbeatPacket()
 
 bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const
 {
-	return stateMachine.IsReserved() && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);
+	return stateMachine.IsReserved() && (now - sessionReservedTime >= reservedSessionTimeoutMs);
 }
 
 void RUDPSession::AbortReservedSession()
@@ -599,6 +600,18 @@ DISCONNECT_REASON RUDPSession::GetDisconnectedReason() const
 {
 	return disconnectedReason;
 }
+
+#if _DEBUG
+void RUDPSession::SetReservedSessionTimeoutMsForTest(const unsigned long long inTimeoutMs)
+{
+	reservedSessionTimeoutMs = inTimeoutMs;
+}
+
+unsigned long long RUDPSession::GetReservedSessionTimeoutMsForTest()
+{
+	return reservedSessionTimeoutMs;
+}
+#endif
 
 SessionCryptoContext& RUDPSession::GetCryptoContext()
 {

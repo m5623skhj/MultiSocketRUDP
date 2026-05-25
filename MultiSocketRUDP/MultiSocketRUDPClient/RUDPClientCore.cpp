@@ -71,7 +71,10 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 	RunThreads();
 	Sleep(1000);
 
-	SendConnectPacket();
+	if (ShouldSendConnectPacketOnStart())
+	{
+		SendConnectPacket();
+	}
 
 	return true;
 }
@@ -410,19 +413,29 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 		}
 
 		receivedBuffer >> packetSequence;
+		unsigned int packetId = 0;
+		if (packetType == PACKET_TYPE::SEND_TYPE)
+		{
+			const WORD originalRead = receivedBuffer.m_iRead;
+			receivedBuffer >> packetId;
+			receivedBuffer.m_iRead = originalRead;
+		}
 		NetBuffer::AddRefCount(&receivedBuffer);
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
 			recvPacketHoldingQueue.emplace(&receivedBuffer, packetSequence, packetType);
 		}
 
-		if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
+		if (ShouldSendReplyToServer(packetSequence, packetId))
 		{
-			SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
-		}
-		else
-		{
-			SendReplyToServer(packetSequence);
+			if (packetType == PACKET_TYPE::HEARTBEAT_TYPE)
+			{
+				SendReplyToServer(packetSequence, PACKET_TYPE::HEARTBEAT_REPLY_TYPE);
+			}
+			else
+			{
+				SendReplyToServer(packetSequence);
+			}
 		}
 		break;
 	}
