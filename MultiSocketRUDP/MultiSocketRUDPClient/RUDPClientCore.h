@@ -72,6 +72,10 @@ protected:
 	virtual bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
 	virtual void Stop();
 	void JoinThreads();
+	[[nodiscard]]
+	virtual bool ShouldSendConnectPacketOnStart() const { return true; }
+	[[nodiscard]]
+	virtual bool ShouldSendReplyToServer(PacketSequence inRecvPacketSequence, unsigned int inPacketId) const { return true; }
 
 public:
 	bool IsStopped() const { return isStopped; }

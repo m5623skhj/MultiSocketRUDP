@@ -12,12 +12,10 @@
 RUDPSessionBroker::RUDPSessionBroker(
 	MultiSocketRUDPCore& inCore,
 	ISessionDelegate& inSessionDelegate,
-	const std::wstring& inCertStoreName,
-	const std::wstring& inCertSubjectName)
+	TLSHelper::ServerCertificateConfig inServerCertificateConfig)
 	: core(inCore)
 	, sessionDelegate(inSessionDelegate)
-	, certStoreName(inCertStoreName)
-	, certSubjectName(inCertSubjectName)
+	, serverCertificateConfig(std::move(inServerCertificateConfig))
 {
 }
 
@@ -162,7 +160,7 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 
 void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP)
 {
-	TLSHelper::TLSHelperServer localTlsHelper(certStoreName, certSubjectName);
+	TLSHelper::TLSHelperServer localTlsHelper(serverCertificateConfig);
 
 	if (not localTlsHelper.Initialize())
 	{

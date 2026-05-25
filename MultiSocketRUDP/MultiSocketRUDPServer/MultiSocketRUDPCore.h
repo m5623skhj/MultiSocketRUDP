@@ -3,6 +3,7 @@
 #include <list>
 #include <thread>
 #include <MSWSock.h>
+#include "../Common/TLS/TLSHelper.h"
 #include "RUDPSession.h"
 #include "Queue.h"
 #include <vector>
@@ -28,6 +29,7 @@ class MultiSocketRUDPCore : public ICore
 
 public:
 	explicit MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName);
+	explicit MultiSocketRUDPCore(TLSHelper::ServerCertificateConfig inSessionBrokerCertificateConfig);
 	~MultiSocketRUDPCore() override;
 
 public:
@@ -43,6 +45,8 @@ public:
 	bool IsServerStopped() const;
 	[[nodiscard]]
 	unsigned short GetNowSessionCount() const;
+	[[nodiscard]]
+	unsigned short GetUnusedSessionCount() const;
 	[[nodiscard]]
 	unsigned int GetAllConnectedCount() const;
 	[[nodiscard]]
@@ -115,8 +119,7 @@ private:
 	CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session) const;
 
 private:
-	std::wstring sessionBrokerCertStoreName{};
-	std::wstring sessionBrokerCertSubjectName{};
+	TLSHelper::ServerCertificateConfig sessionBrokerCertificateConfig{};
 
 #pragma region thread
 private:
@@ -167,3 +170,4 @@ private:
 	std::unique_ptr<RUDPSessionManager> sessionManager;
 	RUDPSessionFunctionDelegate sessionDelegate;
 };
+

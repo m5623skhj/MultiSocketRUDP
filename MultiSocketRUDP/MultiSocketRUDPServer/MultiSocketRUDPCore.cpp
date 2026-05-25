@@ -57,8 +57,12 @@ namespace
 
 MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName
 	, std::wstring&& inSessionBrokerCertSubjectName)
-	: sessionBrokerCertStoreName(std::move(inSessionBrokerCertStoreName))
-	, sessionBrokerCertSubjectName(std::move(inSessionBrokerCertSubjectName))
+	: MultiSocketRUDPCore(TLSHelper::ServerCertificateConfig::FromStore(inSessionBrokerCertStoreName, inSessionBrokerCertSubjectName))
+{
+}
+
+MultiSocketRUDPCore::MultiSocketRUDPCore(TLSHelper::ServerCertificateConfig inSessionBrokerCertificateConfig)
+	: sessionBrokerCertificateConfig(std::move(inSessionBrokerCertificateConfig))
 	, recvIOCompletedContextPool(2, false)
 	, contextPool(2, false)
 {
@@ -136,6 +140,7 @@ void MultiSocketRUDPCore::StopServer()
 	Ticker::GetInstance().Stop();
 
 	ClearAllSession();
+	MultiSocketRUDPCoreFunctionDelegate::Instance().Clear(*this);
 
 	Logger::GetInstance().StopLoggerThread();
 
@@ -154,6 +159,11 @@ bool MultiSocketRUDPCore::IsServerStopped() const
 unsigned short MultiSocketRUDPCore::GetNowSessionCount() const
 {
 	return sessionManager->GetNowSessionCount();
+}
+
+unsigned short MultiSocketRUDPCore::GetUnusedSessionCount() const
+{
+	return sessionManager->GetUnusedSessionCount();
 }
 
 unsigned int MultiSocketRUDPCore::GetAllConnectedCount() const
@@ -368,7 +378,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	threadManager->StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
 
 	Sleep(1000);
-	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionDelegate, sessionBrokerCertStoreName, sessionBrokerCertSubjectName);
+	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionDelegate, sessionBrokerCertificateConfig);
 	if (not sessionBroker->Start(sessionBrokerPort, coreServerIp))
 	{
 		LOG_ERROR("RunSessionBroker failed");
@@ -774,3 +784,5 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		recvIOCompletedContextPool.Free(context);
 	}
 }
+
+

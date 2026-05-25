@@ -40,6 +40,12 @@ private:
         core = &inCore;
     }
 
+    void Clear(MultiSocketRUDPCore& inCore)
+    {
+        assert(core == &inCore);
+        core = nullptr;
+    }
+
 private:
     static void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);
 	static RUDPSession* AcquireSession();

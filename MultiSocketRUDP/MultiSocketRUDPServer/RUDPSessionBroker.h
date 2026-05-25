@@ -18,8 +18,7 @@ public:
 	explicit RUDPSessionBroker(
 		MultiSocketRUDPCore& inCore,
 		ISessionDelegate& inSessionDelegate,
-        const std::wstring& certStoreName,
-        const std::wstring& certSubjectName);
+		TLSHelper::ServerCertificateConfig inServerCertificateConfig);
     ~RUDPSessionBroker();
 
 	RUDPSessionBroker(const RUDPSessionBroker&) = delete;
@@ -65,8 +64,7 @@ private:
 	MultiSocketRUDPCore& core;
 	ISessionDelegate& sessionDelegate;
 
-	std::wstring certStoreName;
-	std::wstring certSubjectName;
+	TLSHelper::ServerCertificateConfig serverCertificateConfig{};
 
 	SOCKET sessionBrokerListenSocket = INVALID_SOCKET;
 	std::jthread sessionBrokerThread{};

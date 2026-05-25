@@ -1,11 +1,35 @@
 #include "PreCompile.h"
 #include "TLSHelper.h"
+#include <fstream>
 #include <vector>
 #include <sstream>
 
 namespace TLSHelper
 {
     constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
+
+    [[nodiscard]]
+    SECURITY_STATUS AcquireServerCredentials(PCCERT_CONTEXT certContext, OUT CredHandle& credHandle)
+    {
+        SCHANNEL_CRED cred = {};
+        cred.dwVersion = SCHANNEL_CRED_VERSION;
+        cred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER;
+        cred.cCreds = 1;
+        cred.paCred = &certContext;
+        cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
+
+        return AcquireCredentialsHandle(
+            nullptr,
+            const_cast<LPWSTR>(UNISP_NAME),
+            SECPKG_CRED_INBOUND,
+            nullptr,
+            &cred,
+            nullptr,
+            nullptr,
+            &credHandle,
+            nullptr
+        );
+    }
 
     TLSHelperBase::TLSHelperBase()
     {
@@ -239,10 +263,10 @@ namespace TLSHelper
     {
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
-        cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
+        cred.grbitEnabledProtocols = 0;
         cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;
 
-        return AcquireCredentialsHandle(
+        lastStatus = AcquireCredentialsHandle(
             nullptr,
             const_cast<LPWSTR>(UNISP_NAME),
             SECPKG_CRED_OUTBOUND,
@@ -252,7 +276,9 @@ namespace TLSHelper
             nullptr,
             &credHandle,
             nullptr
-        ) == SEC_E_OK;
+        );
+
+        return lastStatus == SEC_E_OK;
     }
 
     bool TLSHelperClient::Handshake(const SOCKET socket)
@@ -376,20 +402,32 @@ namespace TLSHelper
         return true;
     }
 
-    TLSHelperServer::TLSHelperServer(const std::wstring& inStoreName, const std::wstring& inCertSubjectName)
-        : storeName(inStoreName)
-        , certSubjectName(inCertSubjectName)
+    TLSHelperServer::TLSHelperServer(ServerCertificateConfig inCertificateConfig)
+        : certificateConfig(std::move(inCertificateConfig))
     {
     }
 
     bool TLSHelperServer::Initialize()
+    {
+        switch (certificateConfig.source)
+        {
+        case ServerCertificateSource::Store:
+            return InitializeFromStore();
+        case ServerCertificateSource::PfxFile:
+            return InitializeFromPfxFile();
+        default:
+            return false;
+        }
+    }
+
+    bool TLSHelperServer::InitializeFromStore()
     {
         const HCERTSTORE hStore = CertOpenStore(
             CERT_STORE_PROV_SYSTEM,
             0,
             0,
             CERT_SYSTEM_STORE_CURRENT_USER,
-            storeName.c_str()
+            certificateConfig.storeName.c_str()
         );
 
         if (not hStore)
@@ -402,7 +440,7 @@ namespace TLSHelper
             X509_ASN_ENCODING,
             0,
             CERT_FIND_SUBJECT_STR,
-            certSubjectName.c_str(),
+            certificateConfig.certSubjectName.c_str(),
             nullptr
         );
 
@@ -412,29 +450,69 @@ namespace TLSHelper
             return false;
         }
 
-        SCHANNEL_CRED cred = {};
-        cred.dwVersion = SCHANNEL_CRED_VERSION;
-        cred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER;
-        cred.cCreds = 1;
-        cred.paCred = &pCertContext;
-        cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
-
-        const SECURITY_STATUS status = AcquireCredentialsHandle(
-            nullptr,
-            const_cast<LPWSTR>(UNISP_NAME),
-            SECPKG_CRED_INBOUND,
-            nullptr,
-            &cred,
-            nullptr,
-            nullptr,
-            &credHandle,
-            nullptr
-        );
+        lastStatus = AcquireServerCredentials(pCertContext, credHandle);
 
         CertFreeCertificateContext(pCertContext);
         CertCloseStore(hStore, 0);
 
-        return status == SEC_E_OK;
+        return lastStatus == SEC_E_OK;
+    }
+
+    bool TLSHelperServer::InitializeFromPfxFile()
+    {
+        std::ifstream pfxStream(certificateConfig.pfxFilePath, std::ios::binary | std::ios::ate);
+        if (not pfxStream.is_open())
+        {
+            return false;
+        }
+
+        const std::streamsize pfxSize = pfxStream.tellg();
+        if (pfxSize <= 0)
+        {
+            return false;
+        }
+
+        std::vector<char> pfxBuffer(static_cast<size_t>(pfxSize));
+        pfxStream.seekg(0, std::ios::beg);
+        if (not pfxStream.read(pfxBuffer.data(), pfxSize))
+        {
+            return false;
+        }
+
+        CRYPT_DATA_BLOB pfxBlob{};
+        pfxBlob.cbData = static_cast<DWORD>(pfxBuffer.size());
+        pfxBlob.pbData = reinterpret_cast<BYTE*>(pfxBuffer.data());
+
+        const HCERTSTORE hStore = PFXImportCertStore(
+            &pfxBlob,
+            certificateConfig.pfxPassword.c_str(),
+            CRYPT_EXPORTABLE
+        );
+        if (hStore == nullptr)
+        {
+            return false;
+        }
+
+        PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
+            hStore,
+            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+            0,
+            CERT_FIND_HAS_PRIVATE_KEY,
+            nullptr,
+            nullptr
+        );
+        if (pCertContext == nullptr)
+        {
+            CertCloseStore(hStore, 0);
+            return false;
+        }
+
+        lastStatus = AcquireServerCredentials(pCertContext, credHandle);
+
+        CertFreeCertificateContext(pCertContext);
+        CertCloseStore(hStore, 0);
+
+        return lastStatus == SEC_E_OK;
     }
 
     bool TLSHelperServer::Handshake(const SOCKET socket)
