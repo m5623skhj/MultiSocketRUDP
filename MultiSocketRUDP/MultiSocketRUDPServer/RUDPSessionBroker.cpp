@@ -175,7 +175,6 @@ void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::s
 		closesocket(clientSocket);
 		return;
 	}
-
 	NetBuffer sendBuffer;
 	sendBuffer.Init();
 
@@ -187,7 +186,6 @@ void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::s
 			sessionDelegate.AbortReservedSession(*session);
 		}
 	}
-
 	closesocket(clientSocket);
 }
 
