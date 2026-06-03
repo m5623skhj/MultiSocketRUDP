@@ -34,6 +34,10 @@ jobs:
       - name: Restore NuGet
         run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
 
+      - name: Generate IntegrationTest certificate
+        shell: cmd
+        run: MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
+
       - name: Build GTest
         shell: pwsh
         run: |
