@@ -223,6 +223,10 @@ void StopServer();
 - SessionBroker가 사용할 인증서 저장소 이름과 Subject Name을 보관한다.
 - 인증서 정보가 없으면 브로커 초기화가 성립하지 않으므로 필수 인자가 있는 생성자로 취급한다.
 
+#### `MultiSocketRUDPCore(TLSHelper::ServerCertificateConfig inSessionBrokerCertificateConfig)`
+- SessionBroker가 사용할 서버 인증서 설정을 보관한다.
+- 저장소 기반 인증서와 PFX 파일 기반 인증서를 모두 표현할 수 있는 현재 코드 기준 생성자다.
+
 #### `bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole = false)`
 - 서버 전체 초기화 진입점이다.
 - 옵션 파일 로드, 네트워크/RIO 초기화, 세션 풀 생성, 워커 스레드 기동, SessionBroker 시작까지 담당한다.
@@ -237,6 +241,9 @@ void StopServer();
 #### `unsigned short GetNowSessionCount() const`
 - 현재 CONNECTED 상태 세션 수를 반환한다.
 
+#### `unsigned short GetUnusedSessionCount() const`
+- 현재 세션 풀에 남아 있는 미사용 세션 수를 반환한다.
+
 #### `unsigned int GetAllConnectedCount() const`
 - 서버 시작 이후 누적 연결 성공 횟수를 반환한다.
 
@@ -249,9 +256,10 @@ void StopServer();
 #### `bool SendPacket(SendPacketInfo* sendPacketInfo) const`
 - 세션이 조립한 `SendPacketInfo`를 IO 계층으로 전달해 실제 송신을 시작한다.
 
-#### `void EraseSendPacketInfo(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
+#### `bool EraseSendPacketInfo(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
 - 스레드별 전송 추적 목록에서 특정 `SendPacketInfo`를 제거한다.
 - ACK 수신 후 정리나 송신 실패 정리 흐름에서 호출된다.
+- 제거에 성공하면 `true`, 대상이 없거나 처리할 수 없으면 `false`를 반환한다.
 
 #### `RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const`
 - 초기화된 RIO 함수 테이블을 반환한다.
@@ -288,7 +296,7 @@ void StopServer();
 - RELEASING 상태 세션을 조회한다.
 - Session Release Thread 내부 로직에서 사용된다.
 
-#### `CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const`
+#### `CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session) const`
 - 세션 소켓 생성, 세션 RIO 초기화, 첫 `DoRecv()` 등록, RESERVED 상태 전이를 수행한다.
 - SessionBroker가 새 세션을 발급할 때 호출된다.
 
@@ -306,6 +314,10 @@ bool IsServerStopped() const;
 // 현재 연결된 세션 수 (CONNECTED 상태)
 unsigned short GetNowSessionCount() const;
 // → sessionManager->GetConnectedCount() → connectedUserCount.load()
+
+// 현재 미사용 세션 수
+unsigned short GetUnusedSessionCount() const;
+// → sessionManager->GetUnusedSessionCount()
 
 // 서버 시작 이후 누적 연결 수
 unsigned int GetAllConnectedCount() const;
@@ -471,6 +483,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 `RUDPSessionBroker`가 새 클라이언트를 위해 호출:
 
 ```cpp
+[[nodiscard]]
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
 ```
 
