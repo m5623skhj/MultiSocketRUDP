@@ -112,10 +112,10 @@ bool RUDPClientCore::Start(
    → sendThread = thread([this] { RunSendThread(); })
    → retransmissionThread = thread([this] { RunRetransmissionThread(); })
 
-8. SendConnectPacketToServer()
+8. ShouldSendConnectPacketOnStart()가 true이면 SendConnectPacket()
    → CONNECT_TYPE | seq=0 | sessionId
    → EncodePacket(CLIENT_TO_SERVER, isCorePacket=true)
-   → sendto(rudpSocket, buffer, ..., &serverAddr)
+   → SendPacket(..., isCorePacket=true) 경로를 통해 send 큐에 등록
 
 9. return true
 ```
@@ -215,9 +215,6 @@ bool TrySetTargetSessionInfo(SOCKET socket, TLSHelperClient& tls)
         auto result = tls.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
 
         switch (result) {
-        case TlsDecryptResult::NEED_MORE_DATA:
-            continue;   // TLS 레코드 불완전, recv 더 필요
-
         case TlsDecryptResult::Error:
             return false;
 
@@ -226,7 +223,7 @@ bool TrySetTargetSessionInfo(SOCKET socket, TLSHelperClient& tls)
             if (payloadComplete) return true;
             return false;   // 데이터 덜 받았는데 닫힘
 
-        case TlsDecryptResult::OK:
+        case TlsDecryptResult::PlainData:
             // 첫 수신 시 헤더 파싱
             if (totalPlainReceived == 0 && plainSize >= df_HEADER_SIZE) {
                 WORD payLen;
@@ -243,6 +240,9 @@ bool TrySetTargetSessionInfo(SOCKET socket, TLSHelperClient& tls)
                     return false;
             }
             break;
+
+        case TlsDecryptResult::None:
+            continue;   // TLS 레코드 불완전 또는 아직 plaintext 없음
         }
     }
 
@@ -305,7 +305,7 @@ bool SetTargetSessionInfo(const char* buffer, size_t size)
 
 ```
 [HeaderCode 1B][PayloadLen 2B]
-[CONNECT_RESULT_CODE 4B]
+[CONNECT_RESULT_CODE 1B]
 [serverIp string (len 2B + bytes)]
 [serverUdpPort 2B]
 [sessionId 2B]
@@ -318,40 +318,22 @@ bool SetTargetSessionInfo(const char* buffer, size_t size)
 ## 5. CONNECT 패킷 전송
 
 ```cpp
-void SendConnectPacketToServer()
+void SendConnectPacket()
 {
-    NetBuffer* buf = NetBuffer::Alloc();
+    NetBuffer& connectPacket = *NetBuffer::Alloc();
 
     auto type = PACKET_TYPE::CONNECT_TYPE;
     PacketSequence seq = LOGIN_PACKET_SEQUENCE;  // = 0
 
-    *buf << type << seq << sessionId;
+    connectPacket << type << seq << sessionId;
     // Total payload: Type(1) + Seq(8) + SessionId(2) = 11 bytes
 
-    // AES-GCM 암호화 (isCorePacket=true, direction=CLIENT_TO_SERVER)
-    PacketCryptoHelper::EncodePacket(
-        *buf, seq,
-        CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER,
-        sessionSalt, SESSION_SALT_SIZE,
-        sessionKeyHandle,
-        true  // isCorePacket
-    );
-
-    // 직접 sendto (send 스레드 우회)
-    sendto(rudpSocket,
-           buf->m_pSerializeBuffer,
-           buf->m_iWriteLast,
-           0,
-           reinterpret_cast<sockaddr*>(&serverAddr),
-           sizeof(serverAddr));
-
-    NetBuffer::Free(buf);
+    SendPacket(connectPacket, seq, true);
 }
 ```
 
-> **sendto를 직접 호출하는 이유**: CONNECT 패킷은 send 큐에 넣지 않는다.  
-> send 스레드가 아직 완전히 준비되기 전에 전송해야 하며,  
-> 재전송 추적도 불필요(서버가 sequence=0 ACK로 응답하면 확인됨).
+CONNECT 패킷은 현재 구현에서 일반 콘텐츠 패킷처럼 흐름 제어 대상은 아니지만,
+`SendPacket(connectPacket, 0, true)`를 통해 암호화, 재전송 등록, send 큐 삽입 경로를 사용한다.
 
 ---
 
@@ -959,6 +941,7 @@ PACKET_KEY=0x99        ; XOR 키 (서버와 반드시 동일)
 
 ## 관련 문서
 - [[ServerAliveChecker]] — 서버 생존 감시 상세
+- [[Client/RUDPClientCoreHooks]] — 기본 hook과 테스트 override 차이
 - [[TLSHelper]] — TLS 세션 수신 채널
 - [[CryptoSystem]] — AES-GCM 암호화
 - [[PacketFormat]] — 패킷 구조
