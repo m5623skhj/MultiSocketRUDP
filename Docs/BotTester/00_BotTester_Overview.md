@@ -89,5 +89,5 @@
 
 ## 관련 문서 (서버 연동)
 - [[MultiSocketRUDPCore]] — 봇이 연결하는 서버
-- [[RUDPSessionBroker]] — TLS 세션 발급
-- [[PacketFormat]] — 공유 패킷 구조
+- [[Client/RUDPSessionBroker]] — TLS 세션 발급 응답 형식
+- [[Common/PacketFormat]] — 공유 패킷 구조

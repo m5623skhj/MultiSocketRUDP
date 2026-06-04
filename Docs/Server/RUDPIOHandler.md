@@ -336,7 +336,7 @@ bool RUDPIOHandler::RecvIOCompleted(
     NetBuffer* recvBuf = NetBuffer::Alloc();
     if (!recvBuf) {
         LOG_ERROR("NetBuffer::Alloc failed");
-        session.DoDisconnect();
+        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
         return false;
     }
 

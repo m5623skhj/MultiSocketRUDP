@@ -34,12 +34,12 @@
 |------|-----------|
 | [[MultiSocketRUDPCore]] | 서버 시작/종료 API, 세션 조회, 옵션 설정, 멀티소켓 구조 |
 | [[RUDPSession]] | 상속 방법, 핸들러 등록, 송신 API, 이벤트 훅, 동시성 보호 |
-| [[RUDPSessionBroker]] | TLS 세션 발급 흐름, 실패 처리, 인증서 설정 |
+| [[Server/RUDPSessionBroker]] | TLS 세션 발급 흐름, 실패 처리, 인증서 설정 |
 | [[RUDPSessionManager]] | 세션 풀 O(1) 할당/반환, 이중 반환 방지 |
 | [[SessionLifecycle]] | 4상태 전이 다이어그램, 각 전이 조건 및 코드 |
 | [[SessionComponents]] | StateMachine/CryptoContext/SocketContext/RIOContext/FlowManager |
 | [[PacketProcessing]] | 수신 전체 파이프라인, PacketType 분기, 순서 보장, 이상 처리 |
-| [[PacketFormat]] | 헤더/타입/시퀀스/페이로드/AuthTag 오프셋 |
+| [[Server/PacketFormat]] | 서버 패킷 처리 기준 레이아웃과 오프셋 |
 | [[ThreadModel]] | IO Worker/Logic/Retransmission/Release/Heartbeat 스레드 상세 |
 | [[RUDPIOHandler]] | DoRecv/DoSend/IOCompleted, MakeSendStream 배치 전송 |
 | [[RIOManager]] | RIO 완료 큐 생성, 버퍼 등록, DequeueCompletions |
@@ -54,6 +54,7 @@
 | 문서 | 핵심 내용 |
 |------|-----------|
 | [[RUDPClientCore]] | TLS 세션 수신, UDP 연결, 송신/수신 API, 흐름 제어 |
+| [[Client/RUDPSessionBroker]] | 클라이언트가 수신하는 브로커 응답 형식 |
 | [[ServerAliveChecker]] | 서버 무응답 감지, deadlock 방지 설계 |
 
 ## Common/
@@ -93,9 +94,3 @@
 ## Diagrams/
 
 ![[Diagrams/README]]
----
-
-## 검토 메모
-
-- `[[Troubleshooting]]` 링크 표기로 통일하는 편이 안전하다.
-- `Client` 영역에는 현재 `RUDPSessionBroker.md`도 포함되어 있으므로, 이 문서는 "클라이언트가 사용하는 브로커 프로토콜" 문서라는 점을 함께 보는 편이 맞다.

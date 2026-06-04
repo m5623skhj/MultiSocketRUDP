@@ -517,8 +517,8 @@ direction enum 값:
 ## 관련 문서
 - [[CryptoHelper]] — BCrypt API 래퍼 상세
 - [[PacketCryptoHelper]] — EncodePacket/DecodePacket 구현
-- [[PacketFormat]] — 패킷 버퍼 레이아웃 전체
-- [[RUDPSessionBroker]] — 세션 키/솔트 생성
+- [[Common/PacketFormat]] — 패킷 버퍼 레이아웃 전체
+- [[Server/RUDPSessionBroker]] — 세션 키/솔트 생성
 - [[TLSHelper]] — 키 전달 채널 (TLS 1.2)
 - [[Troubleshooting]] — Nonce 불일치 디버깅
 ---
