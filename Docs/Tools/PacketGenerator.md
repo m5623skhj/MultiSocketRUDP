@@ -123,7 +123,7 @@ Tool\PacketGenerateAndUploader.bat  # 생성 + Google Sheets 업로드
 ## 관련 문서
 - [[PacketProcessing]] — 생성된 패킷이 처리되는 방식
 - [[RUDPSession]] — RegisterPacketHandler 사용
-- [[PacketFormat]] — 패킷 구조
+- [[Common/PacketFormat]] — 패킷 구조
 ---
 
 ## 현재 코드 기준 함수 설명

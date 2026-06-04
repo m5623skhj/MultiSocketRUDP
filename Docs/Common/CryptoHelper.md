@@ -453,7 +453,7 @@ CryptoHelper::DestroySymmetricKeyHandle(handle);
 ## 관련 문서
 - [[CryptoSystem]] — 전체 암호화 구조 및 Nonce 설계
 - [[PacketCryptoHelper]] — 패킷 버퍼 수준 래퍼
-- [[RUDPSessionBroker]] — GenerateSecureRandomBytes로 키/솔트 생성
+- [[Server/RUDPSessionBroker]] — GenerateSecureRandomBytes로 키/솔트 생성
 - [[SessionComponents]] — SessionCryptoContext에서 키 핸들 관리
 ---
 
@@ -485,7 +485,7 @@ CryptoHelper::DestroySymmetricKeyHandle(handle);
 #### `static std::vector<unsigned char> GenerateNonce(const unsigned char* sessionSalt, const size_t sessionSaltLen, const PacketSequence packetSequence, const PACKET_DIRECTION direction)`
 - 세션 솔트, 패킷 시퀀스, 방향 비트로 GCM nonce를 만든다.
 
-### 정정 메모
+### 현재 API 메모
 
 - 현재 헤더에는 `GetKeyObjectSize()`가 공개 API로 존재한다.
 - 생성자와 소멸자는 내부 구현이므로 함수 목록에서 제외한다.

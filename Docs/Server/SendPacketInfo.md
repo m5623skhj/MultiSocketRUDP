@@ -32,7 +32,7 @@ struct SendPacketInfo
 
     RUDPSession* owner = nullptr;
     // 소유 세션 포인터.
-    // 재전송 횟수 초과 시 owner->DoDisconnect() 호출에 사용.
+    // 재전송 횟수 초과 시 owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION) 호출에 사용.
 
     PacketRetransmissionCount retransmissionCount = 0;
     // 재전송 횟수 카운터. 타입: unsigned short 또는 int8_t.
@@ -338,7 +338,7 @@ OnSendReply(seq):
 [Retransmission Thread]
   info->AddRefCount() → refCount=2
   ++info->retransmissionCount >= max
-  info->owner->DoDisconnect()
+  info->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
     → RELEASING 전이
     → PushToDisconnectTargetSession
   Free(info) → refCount=2-1=1

@@ -148,7 +148,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
         auto dir = CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER;
         DECODE_PACKET()
 
-        session.DoDisconnect();
+        session.DoDisconnect(DISCONNECT_REASON::NORMAL);
         LOG_DEBUG(std::format("Client disconnected (DISCONNECT_TYPE). SessionId={}",
             session.GetSessionId()));
         break;
@@ -166,7 +166,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
 
         if (!session.OnRecvPacket(recvPacket)) {
             // 순서 보장 큐 가득 참 또는 ProcessPacket 실패
-            session.DoDisconnect();
+            session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
             break;
         }
 
@@ -226,7 +226,7 @@ AES-GCM 인증 실패의 원인은 알 수 없다:
 - 클라이언트 버그 (잘못된 Nonce 생성)
 
 어떤 경우든 해당 패킷 1개만 폐기하는 것이 안전하다.  
-`DoDisconnect()`를 즉시 호출하면 정상 클라이언트가 네트워크 노이즈 하나로  
+`DoDisconnect(reason)`를 즉시 호출하면 정상 클라이언트가 네트워크 노이즈 하나로  
 연결이 끊길 수 있다. 반복적인 실패는 로그로 파악한다.
 
 ---

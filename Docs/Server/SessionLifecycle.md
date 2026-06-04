@@ -477,5 +477,5 @@ ACK는 nowInReleaseThread 체크로 전송 시도하지만 효과 없음.
 - [[SessionComponents]] — SessionStateMachine 구현 상세
 - [[RUDPSession]] — TryConnect, DoDisconnect, Disconnect 전체 코드
 - [[ThreadModel]] — Session Release Thread 대기 조건
-- [[RUDPSessionBroker]] — RESERVED 상태 진입 (ReserveSession)
+- [[Server/RUDPSessionBroker]] — RESERVED 상태 진입 (ReserveSession)
 - [[MultiSocketRUDPCore]] — AbortReservedSession, DisconnectSession

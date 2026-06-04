@@ -390,7 +390,7 @@ RUDPClientCore::Stop()
 #### `void RunServerAliveCheckerThread()`
 - 주기적으로 시퀀스 진전을 검사하고, 진전이 없으면 `coreStopFunction`을 호출한다.
 
-### 정정 메모
+### 현재 코드 기준 주의사항
 
 - 현재 헤더의 내부 스레드 함수 이름은 `RunServerAliveCheckerThread()`다.
 - 문서에 남아 있던 `RunServerAliveCheck()` 표기는 현재 코드와 맞지 않는다.

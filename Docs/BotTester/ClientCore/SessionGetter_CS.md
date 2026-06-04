@@ -120,5 +120,5 @@ public void Dispose()
 
 ## 관련 문서
 - [[BotTesterCore]] — SessionGetter 호출 흐름
-- [[RUDPSessionBroker]] — 서버 측 세션 발급
+- [[Client/RUDPSessionBroker]] — 브로커 응답 형식
 - [[TLSHelper]] — 서버 측 TLS 구현

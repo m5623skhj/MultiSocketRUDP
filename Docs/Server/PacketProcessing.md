@@ -31,8 +31,8 @@
 │                                                                              │
 │  RIODequeueCompletion()                                                      │
 │    │                                                                         │
-│    ├─ BytesTransferred=0 → 세션 종료 신호 → DoDisconnect()                  │
-│    ├─ Status≠0           → RIO 에러 → DoDisconnect()                        │
+│    ├─ BytesTransferred=0 → 세션 종료 신호 → DoDisconnect(DISCONNECT_REASON::BY_ERROR) │
+│    ├─ Status≠0           → RIO 에러 → DoDisconnect(DISCONNECT_REASON::BY_ERROR)       │
 │    └─ 정상 완료          → IOCompleted(context, transferred, threadId)       │
 │                                   │                                          │
 │                          ┌────────┴────────┐                                │
@@ -61,7 +61,7 @@
 │              ├─ CONNECT_TYPE  → TryConnect()                                 │
 │              ├─ SEND_TYPE     → OnRecvPacket() → 순서 보장 → 핸들러        │
 │              ├─ SEND_REPLY_TYPE → OnSendReply() → CWND 증가                 │
-│              ├─ DISCONNECT_TYPE → DoDisconnect()                             │
+│              ├─ DISCONNECT_TYPE → DoDisconnect(DISCONNECT_REASON::NORMAL)     │
 │              └─ HEARTBEAT_REPLY_TYPE → OnSendReply()                        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -109,7 +109,7 @@ bool RUDPIOHandler::RecvIOCompleted(IOContext* context, ULONG transferred, BYTE 
     // ① 새 NetBuffer 할당 (메모리 풀에서, lock-free)
     NetBuffer* recvPacketBuffer = NetBuffer::Alloc();
     if (recvPacketBuffer == nullptr) {
-        session.DoDisconnect();
+        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
         return false;
     }
 
@@ -297,7 +297,7 @@ case PACKET_TYPE::SEND_TYPE:
 
     // ④ 수신 파이프라인 (순서 보장 + 핸들러)
     if (!session.OnRecvPacket(recvPacket)) {
-        session.DoDisconnect();
+        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
     }
 
     // ⑤ TPS 카운터
@@ -333,7 +333,7 @@ case PACKET_TYPE::DISCONNECT_TYPE:
     if (!session.CanProcessPacket(clientAddr)) break;
     DECODE_PACKET()
 
-    session.DoDisconnect();
+    session.DoDisconnect(DISCONNECT_REASON::NORMAL);
     LOG_DEBUG(std::format("Client disconnected. SessionId={}", session.GetSessionId()));
 }
 break;
@@ -566,7 +566,7 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 
     // isReplyType=true → PendingQueue 우회, 재전송 추적 없음
     if (!SendPacket(*replyBuffer, recvPacketSequence, true, true)) {
-        DoDisconnect();
+        DoDisconnect(DISCONNECT_REASON::BY_ERROR);
     }
 }
 ```
@@ -597,7 +597,7 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 ## 관련 문서
 - [[RUDPSession]] — OnRecvPacket, ProcessPacket 구현 상세
 - [[CryptoSystem]] — AES-GCM 복호화 전체 과정
-- [[PacketFormat]] — 패킷 레이아웃 (오프셋, 필드 크기)
+- [[Server/PacketFormat]] — 패킷 레이아웃 (오프셋, 필드 크기)
 - [[ThreadModel]] — IO Worker / RecvLogic 스레드 구조
 - [[FlowController]] — CanAccept, MarkReceived, advertiseWindow
 - [[Troubleshooting]] — 패킷 처리 실패 시 디버깅

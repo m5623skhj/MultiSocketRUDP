@@ -53,7 +53,7 @@
 
 ## 관련 문서
 - [[00_Overview]] — 전체 구조 개요
-- [[PacketFormat]] — 패킷 구조 상세
+- [[Common/PacketFormat]] — 패킷 구조 상세
 - [[CryptoSystem]] — 암호화 용어 상세
 
 ---
@@ -77,10 +77,5 @@
 | **BackgroundBrush (카테고리)** | Action=DimGray, Condition=DarkOrange, Loop=DarkMagenta |
 | **AssertionFailedException** | `AssertNode`가 `StopOnFailure=true`인 상태에서 조건 실패 시 발생 |
 | **isAsyncNode** | 실행 후 NextNodes를 직접 관리하는 비동기 노드 여부 |
-| **BotVariables** | `[BotVariable]` 어트리뷰트로 등록된 Getter/Setter 메서드 집합 |
+| **BotVariable** | `[BotVariable]` 어트리뷰트로 등록된 Getter/Setter 메서드 |
 | **__received_{PacketId}** | 패킷 수신 시 RuntimeContext에 자동 저장되는 예약 키 |
----
-
-## 검토 메모
-
-- 용어집은 함수 설명 문서가 아니므로 개별 함수 목록을 추가하지 않고, 현재 코드에서 실제로 쓰는 용어와 enum 이름을 맞추는 데 집중하는 편이 맞다.

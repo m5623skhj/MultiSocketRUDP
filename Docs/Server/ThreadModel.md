@@ -97,7 +97,7 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult
 
     // RIO 에러 처리
     if (rioResult.Status != 0) {
-        context->session->DoDisconnect();
+        context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
         return nullptr;
     }
 
@@ -259,7 +259,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(
             if (++info->retransmissionCount >= maxPacketRetransmissionCount) {
                 LOG_DEBUG(std::format("Max retransmission count. SessionId={}",
                     info->owner->GetSessionId()));
-                info->owner->DoDisconnect();
+                info->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
                 SendPacketInfo::Free(info);
                 continue;
             }
@@ -310,7 +310,7 @@ RefCount가 1보다 크면 메모리를 실제로 해제하지 않아 use-after-
 
 ### 역할
 
-`DoDisconnect()`에 의해 RELEASING 상태가 된 세션의 소켓을 닫고 풀에 반환한다.  
+`DoDisconnect(reason)`에 의해 RELEASING 상태가 된 세션의 소켓을 닫고 풀에 반환한다.  
 IO 완료 여부를 확인해 race condition을 방지한다.
 
 ### 코드 해석
@@ -442,7 +442,7 @@ SendHeartbeatPacket()
 
 재전송 한계 초과(클라이언트 응답 없음):
   RunRetransmissionThread → ++retransmissionCount >= max
-  → session->DoDisconnect()  ← 서버 측에서 종료 감지
+  → session->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)  ← 서버 측에서 종료 감지
 ```
 
 ---
@@ -555,7 +555,7 @@ SendHeartbeatPacket()
       → isErasedPacketInfo 확인 (ACK 이미 받았으면 skip)
       → 타임아웃 확인
       → core.SendPacket(info)                           ← 재전송
-      → retransmissionCount >= max → session.DoDisconnect()
+      → retransmissionCount >= max → session.DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
 
 [Session Release Thread]
   │
