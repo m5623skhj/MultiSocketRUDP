@@ -9,13 +9,13 @@
 
 ## 목차
 
-1. [서버 시작 — StartServer](#1-서버-시작--startserver)
-2. [서버 종료 — StopServer](#2-서버-종료--stopserver)
+1. [서버 시작 — `StartServer`](#1-서버-시작-startserver)
+2. [서버 종료 — `StopServer`](#2-서버-종료-stopserver)
 3. [함수 설명](#3-함수-설명)
 4. [콘텐츠 서버 API](#4-콘텐츠-서버-api)
-5. [내부 동작 — 패킷 전송 경로](#5-내부-동작--패킷-전송-경로)
-6. [내부 동작 — 세션 해제 경로](#6-내부-동작--세션-해제-경로)
-7. [내부 동작 — InitReserveSession](#7-내부-동작--initreservesession)
+5. [내부 동작 — 패킷 전송 경로](#5-내부-동작-패킷-전송-경로)
+6. [내부 동작 — 세션 해제 경로](#6-내부-동작-세션-해제-경로)
+7. [내부 동작 — `InitReserveSession`](#7-내부-동작-initreservesession)
 8. [옵션 파일 설정값 전체](#8-옵션-파일-설정값-전체)
 9. [멀티소켓 구조의 의미](#9-멀티소켓-구조의-의미)
 10. [의존 컴포넌트](#10-의존-컴포넌트)
@@ -288,12 +288,21 @@ void StopServer();
 - RELEASING 상태 세션을 조회한다.
 - Session Release Thread 내부 로직에서 사용된다.
 
-#### `CONNECT_RESULT_CODE InitReserveSession(RUDPSession& session) const`
-- 세션 소켓 생성, 세션 RIO 초기화, 첫 `DoRecv()` 등록, RESERVED 상태 전이를 수행한다.
-- SessionBroker가 새 세션을 발급할 때 호출된다.
+### `InitReserveSession`
 
----
+```cpp
+[[nodiscard]]
+CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session) const;
+```
 
+세션 소켓 생성, 세션 RIO 초기화, 첫 `DoRecv()` 등록, RESERVED 상태 전이를 수행한다.
+SessionBroker가 새 세션을 발급할 때 호출된다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `session` | `RUDPSession&` | **[출력]** 초기화할 세션 |
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ## 4. 콘텐츠 서버 API
 
 ### 서버 상태 조회
@@ -471,7 +480,8 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 `RUDPSessionBroker`가 새 클라이언트를 위해 호출:
 
 ```cpp
-CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
+[[nodiscard]]
+CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const;
 ```
 
 ```
@@ -512,7 +522,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 
 **`RIOCreateRequestQueue` 파라미터:**
 
-```cpp
+```
 RIOCreateRequestQueue(
     sock,          // 세션 소켓
     1,             // MaxOutstandingReceive (한 번에 등록 가능한 recv 수)
@@ -530,8 +540,7 @@ RIOCreateRequestQueue(
 > UDP는 한 번의 recvfrom이 하나의 완전한 데이터그램을 반환하므로  
 > TCP처럼 여러 버퍼를 미리 등록할 필요가 없다.
 
----
-
+> **주의:** 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ## 8. 옵션 파일 설정값 전체
 
 ### CoreOption.ini

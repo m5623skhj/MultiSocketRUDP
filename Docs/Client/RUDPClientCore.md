@@ -9,18 +9,18 @@
 ## 목차
 
 1. [전체 연결 흐름](#1-전체-연결-흐름)
-2. [시작 — Start](#2-시작--start)
-3. [종료 — Stop](#3-종료--stop)
+2. [시작 — `Start`](#2-시작-start)
+3. [종료 — `Stop`](#3-종료-stop)
 4. [TLS 세션 정보 수신](#4-tls-세션-정보-수신)
 5. [CONNECT 패킷 전송](#5-connect-패킷-전송)
-6. [데이터 송신 — SendPacket](#6-데이터-송신--sendpacket)
-7. [데이터 수신 — GetReceivedPacket](#7-데이터-수신--getreceivedpacket)
-8. [수신 스레드 — recvThread](#8-수신-스레드--recvthread)
-9. [수신 처리 — ProcessRecvPacket](#9-수신-처리--processrecvpacket)
-10. [ACK 수신 — OnSendReply](#10-ack-수신--onsendreply)
-11. [송신 스레드 — sendThread](#11-송신-스레드--sendthread)
-12. [재전송 스레드 — RunRetransmissionThread](#12-재전송-스레드--runretransmissionthread)
-13. [흐름 제어 — TryFlushPendingQueue](#13-흐름-제어--tryflushpendingqueue)
+6. [데이터 송신 — `SendPacket`](#6-데이터-송신-sendpacket)
+7. [데이터 수신 — `GetReceivedPacket`](#7-데이터-수신-getreceivedpacket)
+8. [수신 스레드 — `recvThread`](#8-수신-스레드-recvthread)
+9. [수신 처리 — `ProcessRecvPacket`](#9-수신-처리-processrecvpacket)
+10. [ACK 수신 — `OnSendReply`](#10-ack-수신-onsendreply)
+11. [송신 스레드 — `sendThread`](#11-송신-스레드-sendthread)
+12. [재전송 스레드 — `RunRetransmissionThread`](#12-재전송-스레드-runretransmissionthread)
+13. [흐름 제어 — `TryFlushPendingQueue`](#13-흐름-제어-tryflushpendingqueue)
 14. [옵션 파일 설정값](#14-옵션-파일-설정값)
 15. [주요 멤버 변수](#15-주요-멤버-변수)
 16. [스레드 구조 요약](#16-스레드-구조-요약)
@@ -956,6 +956,49 @@ PACKET_KEY=0x99        ; XOR 키 (서버와 반드시 동일)
 ```
 
 ---
+
+
+---
+
+### `ShouldSendConnectPacketOnStart`
+
+```cpp
+[[nodiscard]]
+bool ShouldSendConnectPacketOnStart() const override
+```
+
+클라이언트 시작 시 연결 패킷(Connect Packet)을 즉시 전송할지 여부를 반환한다.
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 시작 시 연결 패킷을 전송한다 |
+| `false` | 시작 시 연결 패킷을 전송하지 않는다 |
+
+> **주의:** 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
+
+
+---
+
+### `ShouldSendReplyToServer`
+
+```cpp
+[[nodiscard]]
+bool ShouldSendReplyToServer(const PacketSequence, const unsigned int inPacketId) const override;
+```
+
+서버로 응답 패킷을 전송해야 하는지 여부를 결정한다. 패킷 ID가 0인 경우 항상 전송하며, 그 외의 경우에는 자동 응답 설정 값에 따라 결정된다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `PacketSequence` | `const PacketSequence` | 패킷 시퀀스 정보 |
+| `inPacketId` | `const unsigned int` | 검사할 패킷 ID |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | `inPacketId`가 0이거나 자동 응답 설정이 활성화된 경우 |
+| `false` | `inPacketId`가 0이 아니고 자동 응답 설정이 비활성화된 경우 |
+
+반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 ## 관련 문서
 - [[ServerAliveChecker]] — 서버 생존 감시 상세
