@@ -15,6 +15,7 @@ public:
     SessionSocketContext& operator=(SessionSocketContext&&) = delete;
 
 public:
+    // 반드시 호출자가 GetSocketMutex()를 unique(exclusive)로 잡은 상태에서 호출해야 합니다.
     void CloseSocket();
 
     [[nodiscard]] SOCKET GetSocket() const;
@@ -23,6 +24,9 @@ public:
     [[nodiscard]] PortType GetServerPort() const;
     void SetServerPort(PortType port);
 
+    // 소켓/RIO 자원의 수명을 함께 보호하는 세션 단위 락입니다.
+    // recv/send 등록(post) : shared(읽기)
+    // close + RIO 정리 : unique(쓰기)
     [[nodiscard]] std::shared_mutex& GetSocketMutex() const;
 
 private:
