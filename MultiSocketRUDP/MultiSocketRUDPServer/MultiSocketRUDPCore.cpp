@@ -433,11 +433,10 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
 
-	auto raii = Util::MakeScopeExit([&session, this]() {
+	auto raii = Util::MakeScopeExit([&session]() {
 		if (session.GetSocket() != INVALID_SOCKET)
 		{
-			session.rioContext.Cleanup(rioManager->GetRIOFunctionTable());
-			session.socketContext.CloseSocket();
+			session.CloseSocket();
 		}
 	});
 
