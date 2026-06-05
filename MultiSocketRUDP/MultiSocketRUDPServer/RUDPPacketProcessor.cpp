@@ -100,6 +100,11 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
 
 void RUDPPacketProcessor::OnRecvPacket(RUDPSession& session, NetBuffer& buffer, const std::span<const unsigned char> clientAddrBuffer)
 {
+	if (buffer.GetUseSize() < df_HEADER_SIZE)
+	{
+		return;
+	}
+	
     if (buffer.GetUseSize() != GetPayloadLength(buffer))
     {
         return;
