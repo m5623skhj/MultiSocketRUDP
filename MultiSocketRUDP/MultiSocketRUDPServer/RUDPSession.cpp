@@ -323,8 +323,9 @@ void RUDPSession::AbortReservedSession()
 
 void RUDPSession::CloseSocket()
 {
-	rioContext.Cleanup(core.GetRIOFunctionTable());
+	std::unique_lock lock(socketContext.GetSocketMutex());
 	socketContext.CloseSocket();
+	rioContext.Cleanup(core.GetRIOFunctionTable());
 }
 
 void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
