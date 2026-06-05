@@ -11,6 +11,7 @@ RUDPReceiveWindow::RUDPReceiveWindow(const BYTE recvWindowSize)
 
 void RUDPReceiveWindow::ResizeRecvWindowSize(const BYTE recvWindowSize)
 {
+	windowSize = recvWindowSize;
 	receivedFlags.resize(recvWindowSize, 0);
 }
 
