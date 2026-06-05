@@ -122,33 +122,59 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 void MultiSocketRUDPCore::StopServer()
 {
-	sessionBroker->Stop();
+	if (sessionBroker != nullptr)
+	{
+		 sessionBroker->Stop();
+	}
 	CloseAllSessions();
 
-	SetEvent(recvLogicThreadEventStopHandle);
-	SetEvent(sessionReleaseStopEventHandle);
+	if (recvLogicThreadEventStopHandle != NULL)
+	{
+		SetEvent(recvLogicThreadEventStopHandle);
+	}
+	if (sessionReleaseStopEventHandle != NULL)
+	{
+		SetEvent(sessionReleaseStopEventHandle);
+	}
 	StopAllThreads();
 
-	for (auto const handle : recvLogicThreadEventHandles)
+	for (auto const recvLogicThreadEventHandle : recvLogicThreadEventHandles)
 	{
-		CloseHandle(handle);
+		if (recvLogicThreadEventHandle == NULL)
+		{
+			continue;
+		}
+
+		CloseHandle(recvLogicThreadEventHandle);
 	}
-	CloseHandle(recvLogicThreadEventStopHandle);
-	CloseHandle(sessionReleaseEventHandle);
-	CloseHandle(sessionReleaseStopEventHandle);
+
+	if (recvLogicThreadEventStopHandle != NULL)
+	{
+		CloseHandle(recvLogicThreadEventStopHandle);
+	}
+
+	if (sessionReleaseEventHandle != NULL)
+	{
+		CloseHandle(sessionReleaseEventHandle);
+	}
+
+	if (sessionReleaseStopEventHandle != NULL)
+	{
+		CloseHandle(sessionReleaseStopEventHandle);
+	}
 
 	Ticker::GetInstance().Stop();
 
 	ClearAllSession();
 	MultiSocketRUDPCoreFunctionDelegate::Instance().Clear(*this);
 
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = "Server stop";
+	Logger::GetInstance().WriteLog(log);
 	Logger::GetInstance().StopLoggerThread();
 
 	WSACleanup();
 	isServerStopped = true;
-	const auto log = Logger::MakeLogObject<ServerLog>();
-	log->logString = "Server stop";
-	Logger::GetInstance().WriteLog(log);
 }
 
 bool MultiSocketRUDPCore::IsServerStopped() const
@@ -395,6 +421,11 @@ bool MultiSocketRUDPCore::RunAllThreads()
 
 void MultiSocketRUDPCore::CloseAllSessions() const
 {
+	if (sessionManager == nullptr)
+	{
+		return;
+	}
+
 	sessionManager->CloseAllSessions();
 }
 
@@ -403,6 +434,11 @@ void MultiSocketRUDPCore::ClearAllSession()
 	{
 		std::scoped_lock lock(releaseSessionIdListLock);
 		releaseSessionIdList.clear();
+	}
+
+	if (sessionManager == nullptr)
+	{
+		return;
 	}
 
 	sessionManager->ClearAllSessions();
@@ -469,6 +505,11 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 
 void MultiSocketRUDPCore::StopAllThreads() const
 {
+	if (threadManager == nullptr)
+	{
+		return;
+	}
+
 	threadManager->StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
 	threadManager->StopThreadGroup(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD);
 	threadManager->StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
