@@ -8,7 +8,6 @@ SessionSocketContext::~SessionSocketContext()
 
 void SessionSocketContext::CloseSocket()
 {
-    std::unique_lock lock(socketLock);
     if (socket == INVALID_SOCKET)
     {
         return;
