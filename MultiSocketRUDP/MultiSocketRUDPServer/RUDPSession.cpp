@@ -57,6 +57,7 @@ void RUDPSession::InitializeSession()
 	nowInReleaseThread.store(false, std::memory_order_release);
 	sessionReservedTime = {};
 	onSessionReleaseTime = {};
+	lastReceivedPacketTime.store(0, std::memory_order_relaxed);
 
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
@@ -272,9 +273,9 @@ void RUDPSession::TryFlushPendingQueue()
 	}
 }
 
-void RUDPSession::SendHeartbeatPacket()
+void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 {
-	if (nowInReleaseThread.load(std::memory_order_acquire) || not IsConnected())
+	if (not NeedToSendHeartbeat(now))
 	{
 		return;
 	}
@@ -300,6 +301,21 @@ void RUDPSession::SendHeartbeatPacket()
 	{
 		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}
+}
+
+void RUDPSession::RefreshLastReceivedPacketTime(unsigned long long now)
+{
+	lastReceivedPacketTime.store(now, std::memory_order_relaxed);
+}
+
+bool RUDPSession::NeedToSendHeartbeat(unsigned long long now) const
+{
+	if (nowInReleaseThread.load(std::memory_order_acquire) || not IsConnected())
+	{
+		return false;
+	}
+
+	return now - lastReceivedPacketTime.load(std::memory_order_relaxed) >= core.GetHeartbeatThreadSleepMs();
 }
 
 bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) const

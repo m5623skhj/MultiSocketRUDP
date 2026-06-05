@@ -74,6 +74,7 @@ public:
 
 	int32_t GetTPS() const;
 	void ResetTPS() const;
+	unsigned int GetHeartbeatThreadSleepMs() const;
 
 private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;

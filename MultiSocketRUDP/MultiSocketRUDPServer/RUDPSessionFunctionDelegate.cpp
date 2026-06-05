@@ -28,9 +28,9 @@ void RUDPSessionFunctionDelegate::RecvContextReset(RUDPSession& session)
 	session.RecvContextReset();
 }
 
-void RUDPSessionFunctionDelegate::SendHeartbeatPacket(RUDPSession& session)
+void RUDPSessionFunctionDelegate::SendHeartbeatPacket(RUDPSession& session, const unsigned long long now)
 {
-	session.SendHeartbeatPacket();
+	session.SendHeartbeatPacket(now);
 }
 
 bool RUDPSessionFunctionDelegate::CheckReservedSessionTimeout(const RUDPSession& session, const unsigned long long now)
@@ -66,6 +66,11 @@ void RUDPSessionFunctionDelegate::OnSendReply(RUDPSession& session, NetBuffer& r
 bool RUDPSessionFunctionDelegate::OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket)
 {
 	return session.OnRecvPacket(recvPacket);
+}
+
+void RUDPSessionFunctionDelegate::RefreshLastRecvPacketTime(RUDPSession& session, unsigned long long now)
+{
+	session.RefreshLastReceivedPacketTime(now);
 }
 
 std::shared_ptr<IOContext> RUDPSessionFunctionDelegate::GetRecvBufferContext(const RUDPSession& session)

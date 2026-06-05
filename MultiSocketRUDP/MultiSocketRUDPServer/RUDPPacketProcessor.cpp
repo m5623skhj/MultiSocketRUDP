@@ -11,7 +11,12 @@
 
 #define DECODE_PACKET() \
     if (not PacketCryptoHelper::DecodePacket(recvPacket, sessionSalt, SESSION_SALT_SIZE, sessionKeyHandle, isCorePacket, direction)) \
-    { break; }
+    { break; } \
+    else \
+    { \
+        const auto now = GetTickCount64(); \
+        sessionDelegate.RefreshLastRecvPacketTime(session, now); \
+    }
 
 RUDPPacketProcessor::RUDPPacketProcessor(RUDPSessionManager& inSessionManager
 	, ISessionDelegate& inSessionDelegate)
@@ -35,7 +40,7 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
 		LOG_ERROR("Session key or salt is nullptr in RUDPPacketProcessor::ProcessByPacketType()");
 		return;
 	}
-
+	
     switch (packetType)
     {
     case PACKET_TYPE::CONNECT_TYPE:

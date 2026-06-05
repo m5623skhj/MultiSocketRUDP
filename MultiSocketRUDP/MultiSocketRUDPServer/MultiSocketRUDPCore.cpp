@@ -261,6 +261,11 @@ void MultiSocketRUDPCore::ResetTPS() const
 	packetProcessor->ResetTPS();
 }
 
+unsigned int MultiSocketRUDPCore::GetHeartbeatThreadSleepMs() const
+{
+	return heartbeatThreadSleepMs;
+}
+
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId) const
 {
 	if (not sessionManager->ReleaseSession(disconnectTargetSessionId))

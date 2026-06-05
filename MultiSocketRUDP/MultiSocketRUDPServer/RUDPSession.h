@@ -76,7 +76,10 @@ private:
 	// ----------------------------------------
 	void TryFlushPendingQueue();
 
-	void SendHeartbeatPacket();
+	void SendHeartbeatPacket(const unsigned long long now);
+	void RefreshLastReceivedPacketTime(unsigned long long now);
+	[[nodiscard]]
+	bool NeedToSendHeartbeat(unsigned long long now) const;
 
 	// ----------------------------------------
 	// @brief 예약된 세션이 타임아웃되었는지 확인합니다.
@@ -220,6 +223,7 @@ private:
 
 	unsigned long long onSessionReleaseTime{};
 	unsigned long long sessionReservedTime{};
+	std::atomic_ullong lastReceivedPacketTime{};
 
 public:
 	void SetStateMachineToDisconnect();

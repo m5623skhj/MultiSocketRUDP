@@ -243,7 +243,7 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
 
 		if (session->IsConnected() == true)
 		{
-			sessionDelegate.SendHeartbeatPacket(*session);
+			sessionDelegate.SendHeartbeatPacket(*session, now);
 		}
 		else if (session->IsReserved() == true)
 		{

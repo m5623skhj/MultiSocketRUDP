@@ -45,7 +45,7 @@ private:
 	void SetThreadId(RUDPSession& session, ThreadIdType threadId) override;
 	void CloseSocket(RUDPSession& session) override;
 	void RecvContextReset(RUDPSession& session) override;
-	void SendHeartbeatPacket(RUDPSession& session) override;
+	void SendHeartbeatPacket(RUDPSession& session, const unsigned long long now) override;
 	bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) override;
 	void AbortReservedSession(RUDPSession& session) override;
 	void InitializeSession(RUDPSession& session) override;
@@ -56,6 +56,7 @@ private:
 	bool CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr) override;
 	void OnSendReply(RUDPSession& session, NetBuffer& recvPacket) override;
 	bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket) override;
+	void RefreshLastRecvPacketTime(RUDPSession& session, unsigned long long now) override;
 #pragma endregion For RUDPPacketProcessor
 
 #pragma region For RUDPIOHandler

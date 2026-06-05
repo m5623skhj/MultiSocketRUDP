@@ -77,10 +77,12 @@ public:
         ++onRecvPacketCount; return onRecvPacketReturn;
     }
 
+	void RefreshLastRecvPacketTime(RUDPSession&, unsigned long long) override {}
+
     void OnSendReply(RUDPSession&, NetBuffer&) override { ++onSendReplyCount; }
     void Disconnect(RUDPSession&, NetBuffer&) override { ++disconnectCount; }
 
-    void SendHeartbeatPacket(RUDPSession&) override { ++sendHeartbeatCount; }
+    void SendHeartbeatPacket(RUDPSession&, const unsigned long long) override { ++sendHeartbeatCount; }
     [[nodiscard]]
     bool CheckReservedSessionTimeout(const RUDPSession&, unsigned long long) override
     {

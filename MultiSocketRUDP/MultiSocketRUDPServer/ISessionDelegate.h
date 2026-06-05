@@ -77,10 +77,11 @@ public:
 	virtual bool CanProcessPacket(const RUDPSession& session, const sockaddr_in& clientAddr) = 0;
 	[[nodiscard]]
 	virtual bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket) = 0;
+	virtual void RefreshLastRecvPacketTime(RUDPSession& session, unsigned long long now) = 0;
 	virtual void OnSendReply(RUDPSession& session, NetBuffer& recvPacket) = 0;
 	virtual void Disconnect(RUDPSession& session, NetBuffer& recvPacket) = 0;
 
-	virtual void SendHeartbeatPacket(RUDPSession& session) = 0;
+	virtual void SendHeartbeatPacket(RUDPSession& session, const unsigned long long now) = 0;
 	[[nodiscard]]
 	virtual bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) = 0;
 	virtual void AbortReservedSession(RUDPSession& session) = 0;
