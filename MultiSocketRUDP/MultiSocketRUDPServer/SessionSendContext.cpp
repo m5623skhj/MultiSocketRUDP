@@ -18,6 +18,8 @@ bool SessionSendContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
 
 	sendBufferId = bufferId;
 	pendingPacketQueue.Resize(pendingQueueCapacity);
+	cachedSequenceSet.clear();
+
 	return true;
 }
 
