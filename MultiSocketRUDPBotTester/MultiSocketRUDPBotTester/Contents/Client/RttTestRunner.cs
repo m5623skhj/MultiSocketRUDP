@@ -31,6 +31,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             double minRttMs = double.MaxValue;
             double maxRttMs = 0;
             double totalRttMs = 0;
+            var rttSamples = new List<double>(inSampleCount);
             var stopwatch = Stopwatch.StartNew();
 
             for (var sampleIndex = 1; sampleIndex <= inSampleCount; ++sampleIndex)
@@ -53,6 +54,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 totalRttMs += rttMs;
                 minRttMs = Math.Min(minRttMs, rttMs);
                 maxRttMs = Math.Max(maxRttMs, rttMs);
+                rttSamples.Add(rttMs);
 
                 if (ShouldPrintProgress(sampleIndex) || sampleIndex == inSampleCount)
                 {
@@ -70,24 +72,43 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             stopwatch.Stop();
 
+            rttSamples.Sort();
             var summary = new RttTestSummary
             {
                 SampleCount = inSampleCount,
                 AverageRttMs = totalRttMs / inSampleCount,
                 MinRttMs = minRttMs,
                 MaxRttMs = maxRttMs,
+                P50RttMs = Percentile(rttSamples, 50.0),
+                P95RttMs = Percentile(rttSamples, 95.0),
+                P99RttMs = Percentile(rttSamples, 99.0),
                 ElapsedSeconds = stopwatch.Elapsed.TotalSeconds
             };
 
             Log.Information(
-                "summary samples={SampleCount} avg={AverageMs:F3} ms min={MinMs:F3} ms max={MaxMs:F3} ms elapsed={ElapsedSeconds:F3} s",
+                "summary samples={SampleCount} avg={AverageMs:F3} ms min={MinMs:F3} ms max={MaxMs:F3} ms p50={P50Ms:F3} ms p95={P95Ms:F3} ms p99={P99Ms:F3} ms elapsed={ElapsedSeconds:F3} s",
                 summary.SampleCount,
                 summary.AverageRttMs,
                 summary.MinRttMs,
                 summary.MaxRttMs,
+                summary.P50RttMs,
+                summary.P95RttMs,
+                summary.P99RttMs,
                 summary.ElapsedSeconds);
 
             return summary;
+        }
+
+        private static double Percentile(List<double> sortedSamples, double percentile)
+        {
+            if (sortedSamples.Count == 0)
+            {
+                return 0;
+            }
+
+            var rank = (int)Math.Ceiling(percentile / 100.0 * sortedSamples.Count);
+            var index = Math.Clamp(rank - 1, 0, sortedSamples.Count - 1);
+            return sortedSamples[index];
         }
 
         private static bool ShouldPrintProgress(int inSampleCount)

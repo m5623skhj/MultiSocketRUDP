@@ -6,6 +6,9 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public double AverageRttMs { get; init; }
         public double MinRttMs { get; init; }
         public double MaxRttMs { get; init; }
+        public double P50RttMs { get; init; }
+        public double P95RttMs { get; init; }
+        public double P99RttMs { get; init; }
         public double ElapsedSeconds { get; init; }
     }
 }

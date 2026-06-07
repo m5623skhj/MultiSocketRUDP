@@ -126,7 +126,7 @@ namespace MultiSocketRUDPBotTester
                 var summary = await BotTesterCore.Instance.StartRttTest(sampleCount, timeoutMs);
 
                 MessageBox.Show(
-                    $"RTT test completed.\nSamples: {summary.SampleCount}\nAvg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\nElapsed: {summary.ElapsedSeconds:F3} s",
+                    $"RTT test completed.\nSamples: {summary.SampleCount}\nAvg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\np50: {summary.P50RttMs:F3} ms\np95: {summary.P95RttMs:F3} ms\np99: {summary.P99RttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\nElapsed: {summary.ElapsedSeconds:F3} s",
                     "RTT Test Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
