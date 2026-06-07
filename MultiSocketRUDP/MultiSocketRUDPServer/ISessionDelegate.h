@@ -68,8 +68,6 @@ public:
 	virtual RIO_RQ GetSendRIORQ(const RUDPSession& session) = 0;
 	[[nodiscard]]
 	virtual std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) = 0;
-	[[nodiscard]]
-	virtual std::mutex& GetCachedSequenceSetMutex(RUDPSession& session) = 0;
 
 	[[nodiscard]]
 	virtual bool TryConnect(RUDPSession& session, NetBuffer& recvPacket, const sockaddr_in& clientAddr) = 0;

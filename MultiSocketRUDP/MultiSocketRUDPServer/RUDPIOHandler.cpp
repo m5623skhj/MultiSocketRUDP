@@ -284,7 +284,6 @@ std::pair<bool, IOContext*> RUDPIOHandler::MakeSendContext(RUDPSession& session,
 
 std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(RUDPSession& session, const ThreadIdType threadId) const
 {
-	std::scoped_lock cachedSequenceLock(sessionDelegate.GetCachedSequenceSetMutex(session));
 	auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
 	packetSequenceSet.clear();
 	
