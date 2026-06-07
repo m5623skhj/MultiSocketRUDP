@@ -121,11 +121,6 @@ std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSessionFunctionDelegate::Ge
 	return session.GetSendContext().GetCachedSequenceSet();
 }
 
-std::mutex& RUDPSessionFunctionDelegate::GetCachedSequenceSetMutex(RUDPSession& session)
-{
-	return session.GetSendContext().GetCachedSequenceSetLock();
-}
-
 size_t RUDPSessionFunctionDelegate::GetSendPacketInfoQueueSize(RUDPSession& session)
 {
 	return session.GetSendContext().GetSendPacketInfoQueueSize();

@@ -70,7 +70,6 @@ private:
 	bool IsNothingToSend(RUDPSession& session) override;
 	void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) override;
 	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) override;
-	std::mutex& GetCachedSequenceSetMutex(RUDPSession& session) override;
 	size_t GetSendPacketInfoQueueSize(RUDPSession& session) override;
 	char* GetRIOSendBuffer(RUDPSession& session) override;
 	void SetReservedSendPacketInfo(RUDPSession& session, SendPacketInfo* reserveSendPacketInfo) override;

@@ -59,8 +59,6 @@ public:
     RIO_RQ GetSendRIORQ(const RUDPSession&) override { return sendRIORQReturn; }
     [[nodiscard]]
     std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession&) override { return dummySeqSet; }
-    [[nodiscard]]
-    std::mutex& GetCachedSequenceSetMutex(RUDPSession&) override { return dummySeqMutex; }
 
     [[nodiscard]]
     bool TryConnect(RUDPSession&, NetBuffer&, const sockaddr_in&) override
