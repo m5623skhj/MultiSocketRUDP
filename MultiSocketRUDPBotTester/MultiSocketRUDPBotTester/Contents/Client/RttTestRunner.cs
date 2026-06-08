@@ -79,10 +79,10 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             var udpAfter = CaptureUdpStats();
             Log.Information(
                 "[UdpStats] recv={Recv} sent={Sent} discarded(noPort)={Disc} errors(inErrors)={Err}",
-                udpAfter.Received - udpBefore.Received,
-                udpAfter.Sent - udpBefore.Sent,
-                udpAfter.Discarded - udpBefore.Discarded,
-                udpAfter.Errors - udpBefore.Errors);
+                udpAfter.received - udpBefore.received,
+                udpAfter.sent - udpBefore.sent,
+                udpAfter.discarded - udpBefore.discarded,
+                udpAfter.errors - udpBefore.errors);
             
             rttSamples.Sort();
             var summary = new RttTestSummary
