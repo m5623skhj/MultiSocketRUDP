@@ -111,6 +111,22 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             return summary;
         }
 
+        /// <summary>
+        /// 현재 시스템의 IPv4 UDP 통계를 캡처합니다.
+        /// 여기에는 수신, 송신, 폐기된(포트 없음), 오류가 있는 데이터그램 수가 포함됩니다.
+        /// </summary>
+        /// <returns>
+        /// (수신된 데이터그램 수, 송신된 데이터그램 수, 폐기된 데이터그램 수, 오류가 있는 데이터그램 수) 튜플을 반환합니다.
+        /// 통계 캡처 중 오류가 발생하면 모든 값이 0으로 설정된 튜플을 반환하고 경고를 로깅합니다.
+        /// </returns>
+        /// <remarks>
+        /// 이 함수는 다음을 수행합니다:
+        /// <list type="bullet">
+        /// <item><see cref="IPGlobalProperties"/>를 사용하여 시스템의 UDP IPv4 통계를 가져옵니다. (상태 변화 없음)</item>
+        /// <item>통계 정보를 튜플 형태로 반환하며, 이는 시스템의 현재 UDP 네트워크 활동 스냅샷을 제공합니다.</item>
+        /// <item>통계를 가져오는 과정에서 예외가 발생하면, 이를 경고로 로깅하고 기본값 (0, 0, 0, 0)을 반환하여 프로그램의 강제 종료를 방지합니다. (Side effect: 로깅, 실패 조건)</item>
+        /// </list>
+        /// </remarks>
         private static (long received, long sent, long discarded, long errors) CaptureUdpStats()
         {
             try
