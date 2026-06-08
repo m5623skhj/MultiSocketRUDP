@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using MultiSocketRUDPBotTester.Buffer;
 using Serilog;
 
@@ -6,6 +7,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 {
     public sealed class RttTestRunner
     {
+        
         private const int DetailedSampleCount = 5;
         private const int ReportInterval = 100000;
         private const double TailLatencyLogThresholdMs = 0.5;
@@ -28,6 +30,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             await client.WaitUntilConnectedAsync(inTimeoutMs, inCancellationToken).ConfigureAwait(false);
 
+            var udpBefore = CaptureUdpStats();
+            
             double minRttMs = double.MaxValue;
             double maxRttMs = 0;
             double totalRttMs = 0;
@@ -72,6 +76,14 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             stopwatch.Stop();
 
+            var udpAfter = CaptureUdpStats();
+            Log.Information(
+                "[UdpStats] recv={Recv} sent={Sent} discarded(noPort)={Disc} errors(inErrors)={Err}",
+                udpAfter.Received - udpBefore.Received,
+                udpAfter.Sent - udpBefore.Sent,
+                udpAfter.Discarded - udpBefore.Discarded,
+                udpAfter.Errors - udpBefore.Errors);
+            
             rttSamples.Sort();
             var summary = new RttTestSummary
             {
@@ -97,6 +109,20 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 summary.ElapsedSeconds);
 
             return summary;
+        }
+
+        private static (long received, long sent, long discarded, long errors) CaptureUdpStats()
+        {
+            try
+            {
+                var stats = IPGlobalProperties.GetIPGlobalProperties().GetUdpIPv4Statistics();
+                return (stats.DatagramsReceived, stats.DatagramsSent, stats.IncomingDatagramsDiscarded, stats.IncomingDatagramsWithErrors);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("CaptureUdpStats failed: {Error}", ex.Message);
+                return (0, 0, 0, 0);
+            }
         }
 
         private static double Percentile(List<double> sortedSamples, double percentile)
