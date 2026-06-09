@@ -35,6 +35,8 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 - `RUDPIOHandlerTest`
 - `RUDPPacketProcessorTest`
 - `RUDPReceiveWindowTest`
+- `RUDPSessionTest`
+- `SendPacketInfoTest`
 - `SessionCryptoContextTest`
 - `SessionPacketOrdererTest`
 - `SessionStateMachineTest`
@@ -141,6 +143,10 @@ GitHub Actions workflow:
 6. `*Test.exe` 실행
 7. 실패 테스트만 retry
 8. PR comment 갱신
+9. OpenCppCoverage 설치
+10. CoreTest(유닛 테스트) 커버리지 측정 (Cobertura + HTML)
+11. 커버리지 HTML 리포트 아티팩트 업로드
+12. 커버리지 PR comment 갱신 (별도 마커, `if: always()`)
 
 서브모듈 checkout은 full fetch를 사용한다.
 
