@@ -38,7 +38,15 @@ jobs:
         shell: cmd
         run: MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
 
+      - name: Cache GTest build
+        id: cache-gtest
+        uses: actions/cache@v4
+        with:
+          path: external/CommonCode/Common/googletest-main/build
+          key: gtest-${{ runner.os }}-${{ hashFiles('.gitmodules') }}
+
       - name: Build GTest
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" |
