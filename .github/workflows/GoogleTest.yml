@@ -186,3 +186,70 @@ jobs:
                 body: body
               });
             }
+
+      - name: Install OpenCppCoverage
+        if: always()
+        run: choco install opencppcoverage -y
+
+      - name: Measure CoreTest coverage
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $occ = "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe"
+          if (-not (Test-Path $occ)) { Write-Error "OpenCppCoverage not found at $occ"; exit 1 }
+
+          $exe = Get-ChildItem -Recurse -Filter "CoreTest.exe" |
+                Where-Object { $_.FullName -match "x64\\Debug" } |
+                Select-Object -First 1 -ExpandProperty FullName
+          if (-not $exe) { Write-Error "CoreTest.exe not found"; exit 1 }
+
+          & $occ --modules CoreTest.exe --sources MultiSocketRUDPServer --sources Common --excluded_sources CommonCode --excluded_sources CoreTest --excluded_sources googletest --export_type cobertura:coverage.xml --export_type html:CoverageReport -- $exe
+
+          [xml]$c = Get-Content coverage.xml
+          $pct = [math]::Round([double]$c.coverage.'line-rate' * 100, 2)
+          $covered = $c.coverage.'lines-covered'
+          $valid = $c.coverage.'lines-valid'
+          @(
+            '<!-- COVERAGE_SUMMARY_MARKER -->',
+            '## CoreTest Line Coverage',
+            "**$pct%**  ($covered / $valid lines)"
+          ) | Out-File coverage_summary.txt -Encoding utf8
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport
+
+      - name: Upsert Coverage PR Comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- COVERAGE_SUMMARY_MARKER -->';
+            if (!fs.existsSync('coverage_summary.txt')) return;
+            const body = fs.readFileSync('coverage_summary.txt', 'utf8');
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body
+              )};
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: boy
+              });
+            }
