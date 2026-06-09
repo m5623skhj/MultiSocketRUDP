@@ -212,7 +212,7 @@ jobs:
           $valid = $c.coverage.'lines-valid'
           @(
             '<!-- COVERAGE_SUMMARY_MARKER -->',
-            '## CoreTest Line Coverage',
+            '## 📊 CoreTest Line Coverage',
             "**$pct%**  ($covered / $valid lines)"
           ) | Out-File coverage_summary.txt -Encoding utf8
 
