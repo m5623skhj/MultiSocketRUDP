@@ -3,6 +3,7 @@
 #include "Queue.h"
 #include "NetServerSerializeBuffer.h"
 #include "../Common/etc/CoreType.h"
+#include <array>
 
 struct RecvBufferSlot
 {
