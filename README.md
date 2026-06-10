@@ -164,6 +164,6 @@
 
 6. 성능 측정
 
-[RTT 성능 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4432868918)
+[RTT 성능 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
 
 ---
