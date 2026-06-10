@@ -67,34 +67,30 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 	return false;
 }
 
-bool RUDPIOHandler::DoRecv(const RUDPSession& session) const
+bool RUDPIOHandler::DoRecv(RUDPSession& session) const
 {
-	const auto context = sessionDelegate.GetRecvBufferContext(session);
-	if (context == nullptr)
+	std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+	if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
 	{
-		LOG_ERROR("DoRecv context is nullptr");
 		return false;
 	}
 
-	{
-		std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
-		if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
-		{
-			return false;
-		}
+	auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
+	const auto rioRQ = sessionDelegate.GetRecvRIORQ(session);
 
-		if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
-			, context.get()
-			, 1
-			, &context->localAddrRIOBuffer
-			, &context->clientAddrRIOBuffer
-			, nullptr
-			, nullptr
-			, 0
-			, context.get()))
-		{
-			return false;
-		}
+	while (IOContext* context = recvBuffer.AcquireFreeRecvContext())
+	if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
+		, context
+		, 1
+		, &context->localAddrRIOBuffer
+		, &context->clientAddrRIOBuffer
+		, nullptr
+		, nullptr
+		, 0
+		, context))
+	{
+		recvBuffer.ReleaseRecvContext(context);
+		return false;
 	}
 
 	return true;
@@ -161,9 +157,11 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	}
 
 	const auto buffer = NetBuffer::Alloc();
-	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, sessionDelegate.GetRecvBuffer(*contextResult->session).buffer, transferred) != 0)
+	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->recvDataBuffer, transferred) != 0)
 	{
 		NetBuffer::Free(buffer);
+		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+
 		return false;
 	}
 	buffer->m_iWrite = static_cast<WORD>(transferred);
@@ -171,6 +169,7 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	sessionDelegate.EnqueueToRecvBufferList(*contextResult->session, buffer);
 	MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(contextResult, threadId);
 
+	sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
 	return DoRecv(*contextResult->session);
 }
 

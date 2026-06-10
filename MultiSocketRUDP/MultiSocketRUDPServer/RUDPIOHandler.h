@@ -56,7 +56,7 @@ public:
 	// DoRecv 함수는 주어진 세션으로부터 데이터를 수신하는 작업을 시작합니다.
 	// RIO 수신 요청을 트리거하고 필요한 경우 버퍼를 관리합니다.
 	[[nodiscard]]
-	bool DoRecv(const RUDPSession& session) const override;
+	bool DoRecv(RUDPSession& session) const override;
 	// DoSend 함수는 주어진 세션에 데이터를 전송하는 작업을 시작합니다.
 	// RIO 송신 요청을 트리거하고 전송 대기열을 관리합니다.
 	[[nodiscard]]
