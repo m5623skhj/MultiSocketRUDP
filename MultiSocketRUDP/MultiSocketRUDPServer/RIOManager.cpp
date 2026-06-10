@@ -31,7 +31,7 @@ bool RIOManager::Initialize(const size_t numOfSockets, const size_t inNumOfWorke
 	}
 
 	rioCompletionQueues.reserve(numOfWorkerThreads);
-	const size_t queueSize = numOfSockets / numOfWorkerThreads * MAX_SEND_BUFFER_SIZE;
+	const size_t queueSize = numOfSockets / numOfWorkerThreads * MAX_OUTSTANDING_RECEIVE;
 	for (size_t i = 0; i < numOfWorkerThreads; ++i)
 	{
 		auto rioCQ = CreateCompletionQueue(queueSize);
