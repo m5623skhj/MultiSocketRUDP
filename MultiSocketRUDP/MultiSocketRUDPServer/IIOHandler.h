@@ -32,7 +32,7 @@ public:
   // @return 수신 작업이 성공적으로 시작되었는지 여부.
   // ----------------------------------------
   [[nodiscard]]
-  virtual bool DoRecv(const RUDPSession& session) const = 0;
+  virtual bool DoRecv(RUDPSession& session) const = 0;
   // ----------------------------------------
   // @brief RUDP 세션에 대한 데이터 전송 작업을 시작하는 함수입니다.
   // 해당 세션의 데이터를 외부로 전송하는 로직을 정의합니다.

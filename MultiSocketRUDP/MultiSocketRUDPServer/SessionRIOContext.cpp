@@ -26,7 +26,7 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
         return false;
     }
 
-    rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, 1, 1, 1, 1, rioRecvCQ, rioSendCQ, &cachedSessionId);
+    rioRQ = rioFunctionTable.RIOCreateRequestQueue(sock, RECV_OUTSTANDING_COUNT, 1, 1, 1, rioRecvCQ, rioSendCQ, &cachedSessionId);
     if (rioRQ == RIO_INVALID_RQ)
     {
         LOG_ERROR(std::format("RIOCreateRequestQueue failed with error {}", WSAGetLastError()));

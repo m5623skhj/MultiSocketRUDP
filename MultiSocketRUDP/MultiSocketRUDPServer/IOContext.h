@@ -17,6 +17,7 @@ struct IOContext : RIO_BUF
 	SessionIdType ownerSessionId = INVALID_SESSION_ID;
 	RIO_OPERATION_TYPE ioType = RIO_OPERATION_TYPE::OP_ERROR;
 	RUDPSession* session = nullptr;
+	char* recvDataBuffer = nullptr;
 	RIO_BUF clientAddrRIOBuffer{ RIO_INVALID_BUFFERID, };
 	RIO_BUF localAddrRIOBuffer{ RIO_INVALID_BUFFERID, };
 	char clientAddrBuffer[sizeof(SOCKADDR_INET)];
