@@ -20,6 +20,7 @@ bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
         context->Length = RECV_BUFFER_SIZE;
         context->Offset = 0;
         context->session = ownerSession;
+        context->recvDataBuffer = slot.buffer;
 
         context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
         context->clientAddrRIOBuffer.Offset = 0;
@@ -36,6 +37,8 @@ bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
         {
             return false;
         }
+
+		recvBuffer.ReleaseRecvContext(context.get());
     }
 
     return true;
