@@ -16,7 +16,9 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
 	, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
 	, const BYTE inMaxHoldingPacketQueueSize
-	, const unsigned int inRetransmissionMs)
+	, const unsigned int inRetransmissionMs
+	, const unsinged int inSimulatedPacketLossPercent
+	, const int inSimulatedPacketLossSeed)
 	: rioManager(inRioManager)
 	, sessionDelegate(inSessionDelegate)
 	, contextPool(contextPool)
@@ -25,6 +27,10 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, maximumHoldingPacketQueueSize(inMaxHoldingPacketQueueSize)
 	, retransmissionMs(inRetransmissionMs)
 {
+	if (inSimulatedPacketLossPercent > 0)
+	{
+		lossSimulator = std::make_unique<DatagramLossSimulator>(inSimulatedPacketLossPercent, inSimulatedPacketLossSeed);
+	}
 }
 
 bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, const BYTE threadId) const
@@ -142,6 +148,13 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 			return succeeded;
 		}
 
+		if (lossSimulator != nullptr && lossSimulator->ShouldDropSendingDatagram())
+		{
+			contextPool.Free(sendContext);
+			releaseIOSending();
+			continue;
+		}
+
 		return TryRIOSend(session, sendContext);
 	}
 
@@ -156,6 +169,12 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 		return false;
 	}
 
+	if (lossSimulator != nullptr && lossSimulator->ShouldDropReceivedDatagram())
+	{
+		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+		return DoRecv(*contextResult->session);
+	}
+	
 	const auto buffer = NetBuffer::Alloc();
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->recvDataBuffer, transferred) != 0)
 	{
