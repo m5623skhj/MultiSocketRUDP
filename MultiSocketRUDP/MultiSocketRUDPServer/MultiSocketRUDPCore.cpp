@@ -354,7 +354,8 @@ bool MultiSocketRUDPCore::InitRIO()
 	do
 	{
 		rioManager = std::make_unique<RIOManager>(sessionDelegate);
-		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, sessionDelegate, contextPool, sendPacketInfoList, sendPacketInfoListLock, maxHoldingPacketQueueSize, retransmissionMs);
+		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, sessionDelegate, contextPool, sendPacketInfoList, sendPacketInfoListLock, maxHoldingPacketQueueSize, retransmissionMs,
+			simulatedPacketLossPercent, simulatedPacketLossSeed);
 		if (rioManager == nullptr || ioHandler == nullptr)
 		{
 			LOG_ERROR("RIOManager or RUDPIOHandler creation failed");
