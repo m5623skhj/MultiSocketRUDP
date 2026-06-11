@@ -7,7 +7,7 @@
 3. Tools
 4. 문서
 5. 테스트
-6. 성능 측정
+6. 측정
 
 ---
 
@@ -162,8 +162,8 @@
 
 ---
 
-6. 성능 측정
+6. 측정
 
-[RTT 성능 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
+[RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
 
 ---
