@@ -9,6 +9,9 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public double P50RttMs { get; init; }
         public double P95RttMs { get; init; }
         public double P99RttMs { get; init; }
+        public int RetransmissionSuspectedCount { get; init; }
+        public double LossRate { get; init; }
+        public int LossSeed { get; init; }
         public double ElapsedSeconds { get; init; }
     }
 }
