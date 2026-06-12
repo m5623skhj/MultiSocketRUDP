@@ -48,9 +48,6 @@ namespace
 			return INVALID_SOCKET;
 		}
 
-		socklen_t len = sizeof(serverAddr);
-		getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
-
 		return sock;
 	}
 }
