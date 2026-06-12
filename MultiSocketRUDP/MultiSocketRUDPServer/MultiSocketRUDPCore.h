@@ -140,7 +140,7 @@ private:
 	unsigned int heartbeatThreadSleepMs{};
 	unsigned int timerTickMs{};
 	BYTE maxHoldingPacketQueueSize{};
-	unsinged int simulatedPacketLossPercent{};
+	unsigned int simulatedPacketLossPercent{};
 	int simulatedPacketLossSeed{};
 
 	std::unique_ptr<RUDPThreadManager> threadManager;
