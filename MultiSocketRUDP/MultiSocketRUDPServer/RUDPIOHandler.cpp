@@ -82,21 +82,21 @@ bool RUDPIOHandler::DoRecv(RUDPSession& session) const
 	}
 
 	auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
-	const auto rioRQ = sessionDelegate.GetRecvRIORQ(session);
-
 	while (IOContext* context = recvBuffer.AcquireFreeRecvContext())
-	if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
-		, context
-		, 1
-		, &context->localAddrRIOBuffer
-		, &context->clientAddrRIOBuffer
-		, nullptr
-		, nullptr
-		, 0
-		, context))
 	{
-		recvBuffer.ReleaseRecvContext(context);
-		return false;
+		if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
+			, context
+			, 1
+			, &context->localAddrRIOBuffer
+			, &context->clientAddrRIOBuffer
+			, nullptr
+			, nullptr
+			, 0
+			, context))
+		{
+			recvBuffer.ReleaseRecvContext(context);
+			return false;
+		}
 	}
 
 	return true;
@@ -176,6 +176,14 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	}
 	
 	const auto buffer = NetBuffer::Alloc();
+	if (buffer == nullptr)
+	{
+		LOG_ERROR("RecvIOCompleted NetBuffer::Allock() failed");
+		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+		
+		return false;
+	}
+	
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->recvDataBuffer, transferred) != 0)
 	{
 		NetBuffer::Free(buffer);
@@ -343,7 +351,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
 	if (useSize >= MAX_SEND_BUFFER_SIZE)
 	{
-		LOG_ERROR(std::format("MakeSendStream() : useSize is less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
+		LOG_ERROR(std::format("MakeSendStream() : useSize must be less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
 		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
