@@ -4,9 +4,9 @@
 
 namespace GTestHelper
 {
-	bool StartTest()
+	bool StartTest(int argc, char** argv)
 	{
-		testing::InitGoogleTest();
+		testing::InitGoogleTest(&argc, argv);
 		return RUN_ALL_TESTS() == 0;
 	}
 }
