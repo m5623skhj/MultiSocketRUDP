@@ -90,6 +90,7 @@ protected:
     void SetupValidRecvContext()
     {
         mockDelegate.recvBufferContextReturn = std::make_shared<IOContext>();
+        mockDelegate.dummyRecvBuffer.ReleaseRecvContext(mockDelegate.recvBufferContextReturn.get());
         mockDelegate.getSocketReturn = SOCKET(1);
     }
 
@@ -239,23 +240,17 @@ TEST_F(RUDPIOHandlerTest, IOCompleted_OpSend_MultipleCalls_AllReturnTrue)
 }
 
 // ============================================================
-// 5. DoRecv — GetRecvBufferContext 가 nullptr 반환
+// 5. DoRecv — free recv context 없음
+//    슬롯 방식에서는 모든 슬롯이 in-flight 상태(free 큐가 빈 상태)가
+//    정상이므로, 게시 없이 true를 반환해야 한다
 // ============================================================
 
-TEST_F(RUDPIOHandlerTest, DoRecv_NullRecvBufferContext_ReturnsFalse)
+TEST_F(RUDPIOHandlerTest, DoRecv_NoFreeRecvContext_PostsNothingAndReturnsTrue)
 {
-    mockDelegate.recvBufferContextReturn = nullptr;
-
-    EXPECT_FALSE(handler->DoRecv(session));
-}
-
-TEST_F(RUDPIOHandlerTest, DoRecv_NullRecvBufferContext_NeverCallsRIOReceiveEx)
-{
-    mockDelegate.recvBufferContextReturn = nullptr;
+    mockDelegate.getSocketReturn = SOCKET(1);
     mockRIO.rioReceiveExCallCount = 0;
 
-    std::ignore = handler->DoRecv(session);
-
+    EXPECT_TRUE(handler->DoRecv(session));
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 0);
 }
 
@@ -341,6 +336,7 @@ TEST_F(RUDPIOHandlerTest, DoRecv_RepeatedSuccessfulCalls_CountAccumulates)
     for (int i = 0; i < 5; ++i)
     {
         EXPECT_TRUE(handler->DoRecv(session)) << "Failed on iteration " << i;
+        mockDelegate.dummyRecvBuffer.ReleaseRecvContext(mockDelegate.recvBufferContextReturn.get());
     }
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 5);
 }
