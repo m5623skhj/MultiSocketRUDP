@@ -70,20 +70,6 @@ void SendPacketInfo::Free(SendPacketInfo* deleteTarget)
 	}
 }
 
-void SendPacketInfo::Free(SendPacketInfo* deleteTarget, const char subCount)
-{
-	if (deleteTarget == nullptr)
-	{
-		return;
-	}
-
-	if (deleteTarget->refCount.fetch_sub(subCount, std::memory_order_release) == subCount)
-	{
-		NetBuffer::Free(deleteTarget->buffer);
-		sendPacketInfoPool->Free(deleteTarget);
-	}
-}
-
 NetBuffer* SendPacketInfo::GetBuffer() const
 {
 	return buffer;
