@@ -104,6 +104,34 @@
                          Text="1000"/>
             </Grid>
 
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="RTT Loss Rate:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="RttLossRateTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"
+                         Text="0.1"/>
+            </Grid>
+
+            <Grid Height="30">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="RTT Loss Seed:" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="RttLossSeedTextBox"
+                         Grid.Column="2"
+                         Height="25"
+                         Width="150"
+                         Text="12345"/>
+            </Grid>
+
         </StackPanel>
     </Grid>
 </Window>
