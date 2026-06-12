@@ -65,7 +65,7 @@ jobs:
               New-Item -ItemType Directory -Path $gtestBuild | Out-Null
           }
 
-          cmake -S $gtestActualRoot -B $gtestBuild -A x64 -DCMAKE_BUILD_TYPE=Debug
+          cmake -S $gtestActualRoot -B $gtestBuild -A x64 -T v143 -DCMAKE_BUILD_TYPE=Debug
           cmake --build $gtestBuild --config Debug
 
       - name: Build Solution (x64 Debug)
