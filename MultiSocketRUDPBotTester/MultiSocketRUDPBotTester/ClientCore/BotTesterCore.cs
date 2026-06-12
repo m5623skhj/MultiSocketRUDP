@@ -89,7 +89,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
-        public async Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs)
+        public Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs)
+        {
+            return StartRttTest(inSampleCount, inTimeoutMs, 0.0, 0);
+        }
+            
+        public async Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs, double inLossRate, int inLossSeed)
         {
             if (string.IsNullOrEmpty(hostIp) || hostPort == 0)
             {
@@ -121,7 +126,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 }
 
                 var runner = new RttTestRunner(rudpSession);
-                return await runner.RunAsync(inSampleCount, inTimeoutMs, rudpSession.CancellationToken.Token);
+                return await runner.RunAsync(inSampleCount, inTimeoutMs, inLossRate, inLossSeed, rudpSession.CancellationToken.Token);
             }
             finally
             {
