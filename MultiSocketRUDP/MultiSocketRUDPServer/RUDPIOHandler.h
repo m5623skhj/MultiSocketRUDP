@@ -73,8 +73,8 @@ public:
 		, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
 		, BYTE inMaxHoldingPacketQueueSize
 		, unsigned int inRetransmissionMs
-		, unsigned int inSimulatedPacketLossPercent
-		, int inSimulatedPacketLossSeed
+		, unsigned int inSimulatedPacketLossPercent = 0
+		, int inSimulatedPacketLossSeed = 0
 	);
 	~RUDPIOHandler() override = default;
 
