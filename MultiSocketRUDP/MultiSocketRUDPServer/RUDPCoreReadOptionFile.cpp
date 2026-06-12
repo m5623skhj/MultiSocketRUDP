@@ -45,12 +45,12 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 		return false;
 	}
 
-	if (g_Parser.GetValue_Int(buffer, L"CORE", L"SIMULATED_PACKET_LOSS_PERCENT", reinterpret_cast<int*>(&simulatedPacketLossPercent)) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"SIMULATED_PACKET_LOSS_PERCENT", reinterpret_cast<int*>(&simulatedPacketLossPercent)) == false)
 	{
 		simulatedPacketLossPercent = 0;
 	}
 
-	if (g_Parser.GetValue_Int(buffer, L"CORE", L"SIMULATED_PACKET_LOSS_SEED", &simulatedPacketLossSeed) == false)
+	if (g_Paser.GetValue_Int(buffer, L"CORE", L"SIMULATED_PACKET_LOSS_SEED", &simulatedPacketLossSeed) == false)
 	{
 		simulatedPacketLossSeed = 0;
 	}
