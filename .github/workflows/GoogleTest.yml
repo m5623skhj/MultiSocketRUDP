@@ -78,6 +78,7 @@ jobs:
 
           $failedTests = @()
           $finalFailed = @()
+          $crashedRuns = @()
 
           function Parse-XmlFailures($xmlPath, [ref]$failedList) {
               if (!(Test-Path $xmlPath)) { return }
@@ -101,6 +102,11 @@ jobs:
               $xmlPath = Join-Path $_.DirectoryName "test_result.xml"
 
               & $exePath --gtest_output=xml:$xmlPath
+              $exeExitCode = $LASTEXITCODE
+
+              if (!(Test-Path $xmlPath)) {
+                $crashedRuns += "$($_.Name) (exit=$exeExitCode, result SML not produced)"
+              }
 
               $temp = @()
               Parse-XmlFailures $xmlPath ([ref]$temp)
@@ -120,6 +126,11 @@ jobs:
                   $retryXml = Join-Path $_.DirectoryName "retry_result.xml"
 
                   & $exePath --gtest_filter=$filter --gtest_output=xml:$retryXml
+                  $retryExitCode = $LASTEXITCODE
+
+                  if (!(Test-Path $retryXml)) {
+                    $crashedRuns += "$($_.Name) retry (exit=$retryExitCode, result XML not produced)"
+                  }
                   Parse-XmlFailures $retryXml ([ref]$finalFailed)
               }
           }
@@ -130,7 +141,13 @@ jobs:
           
           "@
 
-          if ($finalFailed.Count -eq 0 -and $failedTests.Count -eq 0) {
+          if ($crashedRuns.Count -gt 0) {
+            $summary += "Test process crashed (no result XML):`r`n"
+            foreach ($c in $crashedRuns) {
+              $summary += "- $c`r`n"
+            }
+          }
+          elseif ($finalFailed.Count -eq 0 -and $failedTests.Count -eq 0) {
               $summary += "All tests passed.`r`n"
           }
           elseif ($finalFailed.Count -eq 0) {
@@ -151,7 +168,7 @@ jobs:
 
           $summary | Out-File -FilePath test_summary.txt -Encoding utf8
 
-          if ($finalFailed.Count -gt 0) {
+          if ($finalFailed.Count -gt 0 -or $crashedRuns.Count -gt 0) {
               exit 1
           }
 
