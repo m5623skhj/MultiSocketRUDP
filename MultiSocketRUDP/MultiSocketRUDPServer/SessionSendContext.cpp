@@ -34,6 +34,7 @@ void SessionSendContext::Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunction
 
 void SessionSendContext::Reset()
 {
+	ioMode.store(IO_MODE::IO_NONE_SENDING, std::memory_order_seq_cst);
 	lastSendPacketSequence = 0;
 	sendBufferId = RIO_INVALID_BUFFERID;
 
