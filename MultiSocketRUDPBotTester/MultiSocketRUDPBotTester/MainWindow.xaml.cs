@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
+using System.Globalization;
 
 namespace MultiSocketRUDPBotTester
 {
@@ -101,6 +102,20 @@ namespace MultiSocketRUDPBotTester
                     return;
                 }
 
+                if (!double.TryParse(RttLossRateTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lossRate) || lossRate < 0.0 || lossRate >= 1.0)
+                {
+                    MessageBox.Show("Please enter a valid loss rate (0 <= rate < 1, e.g. 0.1).", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!int.TryParse(RttLossSeedTextBox.Text, out var lossSeed)
+                {
+                    MessageBox.Show("Please enter a valid loss seed (integer).", "Invalid Input",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 if (!ushort.TryParse(HostPortTextBox.Text, out var hostPort) || hostPort == 0)
                 {
                     MessageBox.Show("Please enter a valid port (1-65535)", "Invalid Input",
@@ -121,12 +136,14 @@ namespace MultiSocketRUDPBotTester
                 BotCountTextBox.IsEnabled = false;
                 RttSampleCountTextBox.IsEnabled = false;
                 RttTimeoutTextBox.IsEnabled = false;
+                RttLossRateTextBox.IsEnabled = false;
+                RttLossSeedTextBox.IsEnabled = false;
 
                 BotTesterCore.Instance.SetConnectionInfo(hostIp, hostPort);
-                var summary = await BotTesterCore.Instance.StartRttTest(sampleCount, timeoutMs);
+                var summary = await BotTesterCore.Instance.StartRttTest(sampleCount, timeoutMs, lossRate, lossSeed);
 
                 MessageBox.Show(
-                    $"RTT test completed.\nSamples: {summary.SampleCount}\nAvg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\np50: {summary.P50RttMs:F3} ms\np95: {summary.P95RttMs:F3} ms\np99: {summary.P99RttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\nElapsed: {summary.ElapsedSeconds:F3} s",
+                    $"RTT test completed.\nSamples: {summary.SampleCount}\nLoss: {summary.LossRate:P1} (seed {summary.LossSeed})\nAvg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\nP50: {summary.P50RttMs:F3} ms\nP95: {summary.P95RttMs:F3} ms\nP99: {summary.P99RttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\nRetransmission suspected (>=40ms): {summary.RetransmissionSuspectedCount}\nElapsed: {summary.ElapsedSeconds:F3} s",
                     "RTT Test Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -144,6 +161,8 @@ namespace MultiSocketRUDPBotTester
                 BotCountTextBox.IsEnabled = true;
                 RttSampleCountTextBox.IsEnabled = true;
                 RttTimeoutTextBox.IsEnabled = true;
+                RttLossRateTextBox.IsEnabled = true;
+                RttLossSeedTextBox.IsEnabled = true;
             }
         }
 
