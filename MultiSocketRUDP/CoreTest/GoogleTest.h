@@ -2,5 +2,5 @@
 
 namespace GTestHelper
 {
-	bool StartTest();
+	bool StartTest(int argc, char** argv);
 }
