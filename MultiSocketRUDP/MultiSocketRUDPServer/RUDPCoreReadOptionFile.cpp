@@ -69,11 +69,18 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	LoadParsingText(buffer, sessionBrokerOptionFilePath.c_str(), BUFFER_MAX);
 
 	// session broker
-	WCHAR targetIP[16];
+	WCHAR targetIP[64];
 	if (g_Paser.GetValue_String(buffer, L"SESSION_BROKER", L"CORE_IP", targetIP) == false)
 	{
 		return false;
 	}
+
+	constexpr size_t maxIPv4StringLength = 15;
+	if (const size_t ipLength = wcslen(targetIP); ipLength == 0 || ipLength > maxIPv4StringLength)
+	{
+		retufn false;
+	}
+	
 	if (g_Paser.GetValue_Short(buffer, L"SESSION_BROKER", L"SESSION_BROKER_PORT", reinterpret_cast<short*>(&sessionBrokerPort)) == false)
 	{
 		return false;
