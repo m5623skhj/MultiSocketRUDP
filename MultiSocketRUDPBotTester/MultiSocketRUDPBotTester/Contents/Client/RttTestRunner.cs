@@ -11,6 +11,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         private const int DetailedSampleCount = 5;
         private const int ReportInterval = 100000;
         private const double TailLatencyLogThresholdMs = 0.5;
+        private const double RetransmissionSuspectedThresholdMs = 40.0
         private readonly Client client;
 
         public RttTestRunner(Client inClient)
@@ -18,9 +19,19 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             client = inClient;
         }
 
+        public Task<RttTestSummary> RunAsync(
+            int inSampleCount,
+            int inTimeoutMs,
+            CancellationToken inCancellationToken)
+        {
+            return RunAsync(inSampleCount, inTimeoutMs, 0.0, 0, inCancellationToken);
+        }
+
         public async Task<RttTestSummary> RunAsync(
             int inSampleCount,
             int inTimeoutMs,
+            double inLossRate,
+            int inLossSeed,
             CancellationToken inCancellationToken)
         {
             if (inSampleCount <= 0)
@@ -30,6 +41,16 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             await client.WaitUntilConnectedAsync(inTimeoutMs, inCancellationToken).ConfigureAwait(false);
 
+            var isLossSimulationEnabled = inLossRate > 0.0;
+            if (isLossSimulationEnabled)
+            {
+                client.SetPacketLossSimulation(inLossRate, inLossSeed);
+                Log.Infomation(
+                    "Packet loss simulation enabled: lossRate={LossRate} seed={Seed}",
+                        inLossRate,
+                        inLossSeed);
+            }
+            
             var udpBefore = CaptureUdpStats();
             
             double minRttMs = double.MaxValue;
@@ -38,39 +59,52 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             var rttSamples = new List<double>(inSampleCount);
             var stopwatch = Stopwatch.StartNew();
 
-            for (var sampleIndex = 1; sampleIndex <= inSampleCount; ++sampleIndex)
+            try
             {
-                inCancellationToken.ThrowIfCancellationRequested();
-
-                var pongWaitTask = client.WaitForPongAsync(inTimeoutMs, inCancellationToken);
-                var sentTimestamp = Stopwatch.GetTimestamp();
-                client.BeginRttSample(sentTimestamp);
-                await client.SendPingAsync().ConfigureAwait(false);
-
-                var pong = await pongWaitTask.ConfigureAwait(false);
-                if (pong == null)
+                for (var sampleIndex = 1; sampleIndex <= inSampleCount; ++sampleIndex)
                 {
-                    throw new TimeoutException($"Timed out waiting for Pong at sample {sampleIndex}.");
+                    inCancellationToken.ThrowIfCancellationRequested();
+
+                    var pongWaitTask = client.WaitForPongAsync(inTimeoutMs, inCancellationToken);
+                    var sentTimestamp = Stopwatch.GetTimestamp();
+                    client.BeginRttSample(sentTimestamp);
+                    await client.SendPingAsync().ConfigureAwait(false);
+
+                    var pong = await pongWaitTask.ConfigureAwait(false);
+                    if (pong == null)
+                    {
+                        throw new TimeoutException($"Timed out waiting for Pong at sample {sampleIndex}.");
+                    }
+
+                    var rttMs = Stopwatch.GetElapsedTime(sentTimestamp).TotalMilliseconds;
+                    if (!isLossSimulationEnabled)
+                    {
+                        TryLogTailLatency(sampleIndex, sentTimestamp, rttMs);
+                    }
+                    totalRttMs += rttMs;
+                    minRttMs = Math.Min(minRttMs, rttMs);
+                    maxRttMs = Math.Max(maxRttMs, rttMs);
+                    rttSamples.Add(rttMs);
+
+                    if (ShouldPrintProgress(sampleIndex) || sampleIndex == inSampleCount)
+                    {
+                        var averageRttMs = totalRttMs / sampleIndex;
+                        Log.Information(
+                            "seq={Sequence} rtt={RttMs:F3} ms avg={AverageMs:F3} ms min={MinMs:F3} ms max={MaxMs:F3} ms samples={SampleCount}",
+                            sampleIndex,
+                            rttMs,
+                            averageRttMs,
+                            minRttMs,
+                            maxRttMs,
+                            sampleIndex);
+                    }
                 }
-
-                var rttMs = Stopwatch.GetElapsedTime(sentTimestamp).TotalMilliseconds;
-                TryLogTailLatency(sampleIndex, sentTimestamp, rttMs);
-                totalRttMs += rttMs;
-                minRttMs = Math.Min(minRttMs, rttMs);
-                maxRttMs = Math.Max(maxRttMs, rttMs);
-                rttSamples.Add(rttMs);
-
-                if (ShouldPrintProgress(sampleIndex) || sampleIndex == inSampleCount)
+            }
+            finally
+            {
+                if (isLossSimulationEnabled)
                 {
-                    var averageRttMs = totalRttMs / sampleIndex;
-                    Log.Information(
-                        "seq={Sequence} rtt={RttMs:F3} ms avg={AverageMs:F3} ms min={MinMs:F3} ms max={MaxMs:F3} ms samples={SampleCount}",
-                        sampleIndex,
-                        rttMs,
-                        averageRttMs,
-                        minRttMs,
-                        maxRttMs,
-                        sampleIndex);
+                    client.SetPacketLossSimulation(0.0, 0);
                 }
             }
 
@@ -94,11 +128,15 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 P50RttMs = Percentile(rttSamples, 50.0),
                 P95RttMs = Percentile(rttSamples, 95.0),
                 P99RttMs = Percentile(rttSamples, 99.0),
+                RetransmissionSuspectedCount = rttSamplesMs.Count(
+                    rtt => rtt >= RetransmissionSuspectedThresholdMs),
+                LossRate = inLossRate,
+                LossSeed = inLossSeed,
                 ElapsedSeconds = stopwatch.Elapsed.TotalSeconds
             };
 
             Log.Information(
-                "summary samples={SampleCount} avg={AverageMs:F3} ms min={MinMs:F3} ms max={MaxMs:F3} ms p50={P50Ms:F3} ms p95={P95Ms:F3} ms p99={P99Ms:F3} ms elapsed={ElapsedSeconds:F3} s",
+                "summary samples={SampleCount} avg={AverageMs:F3} ms min={MinMs:F3} ms p50={P50Ms:F3} ms p95={P95Ms:F3} ms p99={P99Ms:F3} ms max={MaxMs:F3} ms retransmissionSuspected={RetransmissionSuspected} lossRate={LossRate} seed={Seed} elapsed={ElapsedSeconds:F3} s",
                 summary.SampleCount,
                 summary.AverageRttMs,
                 summary.MinRttMs,
