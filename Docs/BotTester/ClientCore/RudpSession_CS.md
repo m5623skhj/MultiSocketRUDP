@@ -104,10 +104,9 @@ ACK sequence 0을 받으면:
 3. `StartServerAliveCheck()` 시작
 4. `OnConnected()` 콜백 큐잉
 
-종료 시에는 `DisconnectAsync()`와 `Cleanup()`이 소켓, 토큰, 보류 저장소, 재전송 저장소를 정리한다.
+종료 시에는 `Disconnect()`를 호출한다. 해당 메서드는 내부적으로 정리 프로세스(`Cleanup`)를 수행하여 소켓, 토큰, 보류 저장소, 재전송 저장소를 해제한다.
 
 ---
-
 ## 구현상 주의
 
 - C# 구현은 `remoteAdvertisedWindow` 기반 단순 전송 창 모델을 그대로 쓰지 않는다.
