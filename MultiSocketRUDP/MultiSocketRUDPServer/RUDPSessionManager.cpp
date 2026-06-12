@@ -73,7 +73,7 @@ RUDPSession* RUDPSessionManager::AcquireSession()
 
 bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 {
-	if (sessionId >= sessionList.size())
+	if (sessionId >= sessionList.size() || sessionList[sessionId] == nullptr)
 	{
 		LOG_ERROR("Invalid sessionId in ReleaseSession");
 		return false;
@@ -85,7 +85,6 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		return false;
 	}
 	const auto disconnectedReason = sessionList[sessionId]->GetDisconnectedReason();
-	sessionDelegate.InitializeSession(*sessionList[sessionId]);
 
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
@@ -95,6 +94,7 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 			return false;
 		}
 
+		sessionDelegate.InitializeSession(*sessionList[sessionId]);
 		unusedSessionIdList.emplace_back(sessionId);
 		unusedSessionIdSet.emplace(sessionId);
 	}
@@ -292,6 +292,5 @@ bool RUDPSessionManager::IsUnusedSession(const SessionIdType sessionId) const
 {
 	std::scoped_lock lock(unusedSessionIdListLock);
 
-	const auto it = std::ranges::find(unusedSessionIdList, sessionId);
-	return it != unusedSessionIdList.end();
+	return unusedSessionIdSet.Contains(sessionId);
 }
