@@ -482,6 +482,44 @@ std::vector가 아닌 std::list 이유:
 
 ---
 
+
+---
+
+### `ShouldDropReceivedDatagram`
+
+```csharp
+public bool ShouldDropReceivedDatagram()
+```
+
+패킷 손실 시뮬레이션 활성화 여부와 설정된 손실률에 따라 수신된 데이터그램을 폐기할지 결정한다.
+
+#### 반환값
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 시뮬레이션이 활성화되어 있고, 무작위 확률에 따라 폐기 대상으로 결정됨 |
+| `false` | 시뮬레이션이 비활성화되어 있거나, 폐기하지 않기로 결정됨 |
+
+> **주의:** 내부적으로 `receivedLock`을 사용하여 스레드 안전하게 처리된다. `lossRate` 및 `isEnabled` 상태에 따라 결과가 달라지므로 호출 시점에 따라 반환값이 변할 수 있다.
+
+
+---
+
+### `ShouldDropSendingDatagram`
+
+```csharp
+public bool ShouldDropSendingDatagram();
+```
+
+패킷 손실 시뮬레이션이 활성화된 경우, 설정된 `lossRate`에 따라 데이터그램을 드롭해야 하는지 결정한다.
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 패킷 손실 시뮬레이션 활성 상태이며, 난수 발생 결과에 따라 드롭함 |
+| `false` | 시뮬레이션 비활성 상태이거나, 난수 발생 결과 드롭하지 않음 |
+
+> **주의:** 내부적으로 `sendLock`을 사용하여 동시성을 보호한다. 패킷 전송 로직의 임계 구역 안에서 호출 시 데드락 발생 가능성을 고려해야 한다.
+
 ## 관련 문서
 - [[ThreadModel]] — IO Worker Thread에서 IOCompleted 호출
 - [[PacketProcessing]] — RecvIOCompleted → RecvLogic Worker 경로
