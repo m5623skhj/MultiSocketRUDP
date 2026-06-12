@@ -292,5 +292,5 @@ bool RUDPSessionManager::IsUnusedSession(const SessionIdType sessionId) const
 {
 	std::scoped_lock lock(unusedSessionIdListLock);
 
-	return unusedSessionIdSet.Contains(sessionId);
+	return unusedSessionIdSet.contains(sessionId);
 }
