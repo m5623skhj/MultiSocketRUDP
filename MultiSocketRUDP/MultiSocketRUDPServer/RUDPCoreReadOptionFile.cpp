@@ -78,7 +78,7 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	constexpr size_t maxIPv4StringLength = 15;
 	if (const size_t ipLength = wcslen(targetIP); ipLength == 0 || ipLength > maxIPv4StringLength)
 	{
-		retufn false;
+		return false;
 	}
 	
 	if (g_Paser.GetValue_Short(buffer, L"SESSION_BROKER", L"SESSION_BROKER_PORT", reinterpret_cast<short*>(&sessionBrokerPort)) == false)
