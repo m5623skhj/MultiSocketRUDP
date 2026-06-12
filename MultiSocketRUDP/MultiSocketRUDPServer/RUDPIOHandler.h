@@ -59,7 +59,7 @@ private:
 	std::mt19937 sendEngine;
 	std::mutex recvLock;
 	std::mutex sendLock;
-}
+};
 
 // RUDPIOHandler 클래스는 RIO(Registered I/O) 기반의 네트워크 통신을 처리하는 핸들러입니다.
 // 세션 관리, 패킷 송수신, 재전송 처리 등 RUDP 프로토콜의 핵심 I/O 로직을 담당합니다.
