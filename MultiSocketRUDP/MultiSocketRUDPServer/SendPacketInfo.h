@@ -34,7 +34,6 @@ struct SendPacketInfo
 	void AddRefCount();
 
 	static void Free(SendPacketInfo* deleteTarget);
-	static void Free(SendPacketInfo* deleteTarget, char subCount);
 
 	[[nodiscard]]
 	NetBuffer* GetBuffer() const;
