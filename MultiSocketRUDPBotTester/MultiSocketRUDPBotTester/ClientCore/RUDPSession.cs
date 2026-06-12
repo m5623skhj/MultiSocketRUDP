@@ -166,6 +166,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly HoldingPacketStore holdingPacketStore = new();
         private readonly BufferStore bufferStore = new();
 
+        private volatile PacketLossSimulator? packetLossSimulator;
+
         public CancellationTokenSource CancellationToken = new();
 
         private volatile bool isConnected;
@@ -225,6 +227,35 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public void Disconnect() => Cleanup();
 
+        /// <summary>
+        /// 소켓 경계에서의 양방향 패킷 손실 시뮬레이션을 설정합니다.
+        /// inLossRate가 0 이하면 시뮬레이션을 비활성화합니다.
+        /// 핸드세이크가 손실로 오염되지 않도록 연결 완료 이후에 호출해야 합니다.
+        /// </summary>
+        public void SetPacketLossSimulation(double inLossRate, int inSeed)
+        {
+            if (inLossRate <= 0.0)
+            {
+                packetLossSimulator?.SetEnabled(false);
+                packetLossSimulator = null;
+                return;
+            }
+
+            var simualator = new PacketLossSimulator(inLossRate, inSeed);
+            simualator.SetEnabled(true);
+            packetLossSimulator = simualator;
+        }
+
+        private async Task SendDatagramAsnyc(UdpClient client, ReadOnlyMemory<byte> datagram)
+        {
+            if (packetLossSimulator?.ShouldDropSendingDatagram() == true)
+            {
+                return;
+            }
+
+            await client.SendAsync(datagram).ConfigureAwait(false);
+        }
+        
         public async Task SendPacket(
             NetBuffer packetBuffer,
             PacketId packetId,
@@ -252,7 +283,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             sendPacketInfo.InitializeSendTimestamp(CommonFunc.GetNowMs());
             bufferStore.EnqueueSendBuffer(sendPacketInfo);
 
-            await udpClient.SendAsync(sendPacketInfo.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
+            await udpClient.SendAsync(udpClient, sendPacketInfo.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
 
             return true;
         }
@@ -300,6 +331,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         .ReceiveAsync(CancellationToken.Token)
                         .ConfigureAwait(false);
 
+                    if (packetLossSimulator?.ShouldDropReceivedDatagram() == true)
+                    {
+                        continue;
+                    }
+                    
                     try
                     {
                         await ProcessReceivedStreamAsync(result.Buffer).ConfigureAwait(false);
@@ -563,7 +599,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     return;
                 }
 
-                await client.SendAsync(replyBuffer.GetPacketMemory()).ConfigureAwait(false);
+                await SendDatagramAsync(client, replyBuffer.GetPacketMemory()).ConfigureAwait(false);
             }
             catch (ObjectDisposedException)
             {
@@ -693,7 +729,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                         try
                         {
-                            await client.SendAsync(info.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
+                            await SendDatagramAsync(client, info.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
@@ -720,7 +756,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             try
             {
                 var packet = BuildDisconnectPacket();
-                await udpClient.SendAsync(packet.GetPacketMemory()).ConfigureAwait(false);
+                await SendDatagramAsync(udpClient, packet.GetPacketMemory()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
