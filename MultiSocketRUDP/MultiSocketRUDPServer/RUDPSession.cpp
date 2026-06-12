@@ -411,6 +411,7 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 
 void RUDPSession::Disconnect(NetBuffer& recvPacket)
 {
+	UNREFERENCED_PARAMETER(recvPacket);
 	DoDisconnect(DISCONNECT_REASON::NORMAL);
 }
 
