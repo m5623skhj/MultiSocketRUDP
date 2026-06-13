@@ -109,7 +109,7 @@ namespace MultiSocketRUDPBotTester
                     return;
                 }
 
-                if (!int.TryParse(RttLossSeedTextBox.Text, out var lossSeed)
+                if (!int.TryParse(RttLossSeedTextBox.Text, out var lossSeed))
                 {
                     MessageBox.Show("Please enter a valid loss seed (integer).", "Invalid Input",
                         MessageBoxButton.OK, MessageBoxImage.Warning);

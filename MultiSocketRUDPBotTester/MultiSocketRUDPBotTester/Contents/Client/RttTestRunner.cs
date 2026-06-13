@@ -11,7 +11,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         private const int DetailedSampleCount = 5;
         private const int ReportInterval = 100000;
         private const double TailLatencyLogThresholdMs = 0.5;
-        private const double RetransmissionSuspectedThresholdMs = 40.0
+        private const double RetransmissionSuspectedThresholdMs = 40.0;
         private readonly Client client;
 
         public RttTestRunner(Client inClient)
@@ -45,7 +45,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             if (isLossSimulationEnabled)
             {
                 client.SetPacketLossSimulation(inLossRate, inLossSeed);
-                Log.Infomation(
+                Log.Information(
                     "Packet loss simulation enabled: lossRate={LossRate} seed={Seed}",
                         inLossRate,
                         inLossSeed);
@@ -128,7 +128,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 P50RttMs = Percentile(rttSamples, 50.0),
                 P95RttMs = Percentile(rttSamples, 95.0),
                 P99RttMs = Percentile(rttSamples, 99.0),
-                RetransmissionSuspectedCount = rttSamplesMs.Count(
+                RetransmissionSuspectedCount = rttSamples.Count(
                     rtt => rtt >= RetransmissionSuspectedThresholdMs),
                 LossRate = inLossRate,
                 LossSeed = inLossSeed,

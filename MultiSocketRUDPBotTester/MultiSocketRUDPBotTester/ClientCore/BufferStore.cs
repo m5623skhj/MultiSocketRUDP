@@ -11,7 +11,7 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     private long removedTimestampMs;
     private long retransmissionCount;
 
-    private const long RetransmissionTimeoutMs = 50;
+    private const long RetransmissionTimeoutMs = 20;
     private const long RetransmissionMaxCount = 16;
 
     public void InitializeSendTimestamp(ulong now)

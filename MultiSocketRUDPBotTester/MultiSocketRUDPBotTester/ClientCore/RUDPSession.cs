@@ -246,7 +246,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             packetLossSimulator = simualator;
         }
 
-        private async Task SendDatagramAsnyc(UdpClient client, ReadOnlyMemory<byte> datagram)
+        private async Task SendDatagramAsync(UdpClient client, ReadOnlyMemory<byte> datagram)
         {
             if (packetLossSimulator?.ShouldDropSendingDatagram() == true)
             {
@@ -283,7 +283,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             sendPacketInfo.InitializeSendTimestamp(CommonFunc.GetNowMs());
             bufferStore.EnqueueSendBuffer(sendPacketInfo);
 
-            await udpClient.SendAsync(udpClient, sendPacketInfo.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
+            await SendDatagramAsync(udpClient, sendPacketInfo.SentBuffer.GetPacketMemory()).ConfigureAwait(false);
 
             return true;
         }

@@ -21,7 +21,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         return false;
       }
 
-      lock (receivedLock)
+      lock (receiveLock)
       {
         return receiveRandom.NextDouble() < lossRate;
       }
