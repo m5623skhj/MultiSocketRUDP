@@ -123,20 +123,11 @@ bool RIOManager::InitializeSessionRIO(RUDPSession& session, const ThreadIdType t
 	return true;
 }
 
-RIO_CQ RIOManager::GetCompletionQueue(const ThreadIdType threadId) const
-{
-	if (not isInitialized || threadId >= rioCompletionQueues.size())
-	{
-		return RIO_INVALID_CQ;
-	}
-
-	return rioCompletionQueues[threadId];
-}
-
 const RIO_EXTENSION_FUNCTION_TABLE& RIOManager::GetRIOFunctionTable() const
 {
 	return rioFunctionTable;
 }
+
 ULONG RIOManager::DequeueCompletions(const ThreadIdType threadId, RIORESULT* results, const ULONG maxResults) const
 {
 	if (not isInitialized || threadId >= rioCompletionQueues.size())
