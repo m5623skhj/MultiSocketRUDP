@@ -508,11 +508,7 @@ void MultiSocketRUDPCore::StopAllThreads() const
 		return;
 	}
 
-	threadManager->StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
-	threadManager->StopThreadGroup(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD);
-	threadManager->StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
-	threadManager->StopThreadGroup(THREAD_GROUP::SESSION_RELEASE_THREAD);
-	threadManager->StopThreadGroup(THREAD_GROUP::HEARTBEAT_THREAD);
+	threadManager->StopAllThreads();
 }
 
 void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, const ThreadIdType threadId)
