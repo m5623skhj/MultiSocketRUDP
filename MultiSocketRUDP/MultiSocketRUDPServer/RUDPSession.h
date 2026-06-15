@@ -34,8 +34,6 @@ protected:
 private:
 	[[nodiscard]]
 	bool InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ);
-	[[nodiscard]]
-	bool InitRIOSendBuffer(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 	void InitializeSession();
 
 	void SetSessionId( const SessionIdType inSessionId);
