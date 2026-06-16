@@ -125,7 +125,6 @@ private:
 	std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList;
 	std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock;
 
-	BYTE maximumHoldingPacketQueueSize;
 	unsigned int retransmissionMs {};
 
 	std::unique_ptr<DatagramLossSimulator> lossSimulator;
