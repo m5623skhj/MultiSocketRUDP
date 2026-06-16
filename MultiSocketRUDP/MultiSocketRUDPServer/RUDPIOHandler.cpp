@@ -24,7 +24,6 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, contextPool(contextPool)
 	, sendPacketInfoList(sendPacketInfoList)
 	, sendPacketInfoListLock(sendPacketInfoListLock)
-	, maximumHoldingPacketQueueSize(inMaxHoldingPacketQueueSize)
 	, retransmissionMs(inRetransmissionMs)
 {
 	if (inSimulatedPacketLossPercent > 0)
