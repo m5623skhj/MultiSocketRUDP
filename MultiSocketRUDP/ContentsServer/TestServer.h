@@ -22,7 +22,7 @@ public:
 	int32_t GetNumOfPlayers() const;
 	int32_t GetNumOfConnected() const;
 	int32_t GetNumOfDisconnected() const;
-	int32_t GetNumOfDisconnectedByRetransmssion() const;
+	int32_t GetNumOfDisconnectedByRetransmission() const;
 	int32_t GetTPS() const;
 	int32_t GetNumOfError() const;
 
