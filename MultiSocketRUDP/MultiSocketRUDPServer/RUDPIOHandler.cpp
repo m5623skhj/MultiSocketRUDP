@@ -110,15 +110,13 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 
 	const auto releaseIOSending = [&]()
 	{
-		sessionDelegate.GetSendIOMode(session).store(
-			IO_MODE::IO_NONE_SENDING, std::memory_order_seq_cst);
+		sessionDelegate.GetSendIOMode(session).store(IO_MODE::IO_NONE_SENDING);
 	};
 
 	while (true)
 	{
 		IO_MODE expected = IO_MODE::IO_NONE_SENDING;
-		if (not sessionDelegate.GetSendIOMode(session).compare_exchange_strong(
-			expected, IO_MODE::IO_SENDING, std::memory_order_seq_cst))
+		if (not sessionDelegate.GetSendIOMode(session).compare_exchange_strong(expected, IO_MODE::IO_SENDING))
 		{
 			break;
 		}
@@ -207,7 +205,7 @@ bool RUDPIOHandler::SendIOCompleted(IOContext* context, const BYTE threadId) con
 		return false;
 	}
 
-	sessionDelegate.GetSendIOMode(*context->session).store(IO_MODE::IO_NONE_SENDING, std::memory_order_seq_cst);
+	sessionDelegate.GetSendIOMode(*context->session).store(IO_MODE::IO_NONE_SENDING);
 	if (context->session->IsReleasing())
 	{
 		contextPool.Free(context);
@@ -223,9 +221,7 @@ bool RUDPIOHandler::TryRIOSend(RUDPSession& session, IOContext* context) const
 {
 	const auto releaseIOSending = [&]()
 	{
-		InterlockedExchange(
-			reinterpret_cast<UINT*>(&sessionDelegate.GetSendIOMode(session)),
-			static_cast<UINT>(IO_MODE::IO_NONE_SENDING));
+		sessionDelegate.GetSendIOMode(session).store(IO_MODE::IO_NONE_SENDING);
 	};
 
 	context->session = &session;
