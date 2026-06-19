@@ -51,9 +51,15 @@ void RUDPThreadManager::StopThreadGroup(const THREAD_GROUP threadGroup)
 
 void RUDPThreadManager::StopAllThreads()
 {
-	for (auto& threadGroup : threadGroups | std::views::keys)
+	for (auto& threads : threadGroups | std::views::values)
 	{
-		StopThreadGroup(threadGroup);
+		for (auto& thread : threads)
+		{
+			if (thread.joinable())
+			{
+				thread.request_stop();
+			}
+		}
 	}
 
 	threadGroups.clear();
