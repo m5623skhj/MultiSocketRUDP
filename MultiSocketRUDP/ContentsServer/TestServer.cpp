@@ -61,7 +61,7 @@ int32_t TestServer::GetNumOfDisconnected() const
 	return serverCore.GetAllDisconnectedCount();
 }
 
-int32_t TestServer::GetNumOfDisconnectedByRetransmssion() const
+int32_t TestServer::GetNumOfDisconnectedByRetransmission() const
 {
 	return serverCore.GetAllDisconnectedByRetransmissionCount();
 }
