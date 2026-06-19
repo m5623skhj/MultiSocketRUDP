@@ -35,7 +35,7 @@ int main()
 		serverStats.player = TestServer::GetInst().GetNumOfPlayers();
 		serverStats.connected = TestServer::GetInst().GetNumOfConnected();
 		serverStats.disconnected = TestServer::GetInst().GetNumOfDisconnected();
-		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmssion();
+		serverStats.retrans = TestServer::GetInst().GetNumOfDisconnectedByRetransmission();
 		serverStats.tps = TestServer::GetInst().GetTPS();
 		serverStats.error = TestServer::GetInst().GetNumOfError();
 
