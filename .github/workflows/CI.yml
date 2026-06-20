@@ -48,8 +48,9 @@ jobs:
     if: needs.classify_changes.outputs.bot_tester == 'true'
     uses: ./.github/workflows/BotTester.yml
 
-  ci_gate:
-    name: CI Gate
+  build-and-test:
+    # Keep this check name stable because branch protection requires it.
+    name: build-and-test
     if: always()
     needs: [classify_changes, native_gtest, bot_tester]
     runs-on: ubuntu-latest

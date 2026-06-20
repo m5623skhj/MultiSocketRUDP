@@ -158,6 +158,7 @@
 
 * `CoreTest`는 GoogleTest 기반 유닛 테스트입니다.
 * `IntegrationTest`는 실제 서버/클라이언트, TLS, UDP 흐름을 사용하는 통합 테스트입니다.
+* PR CI는 변경 경로에 따라 Native GTest와 BotTester 테스트를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
 * 자세한 실행 방법과 CI 주의점은 [Testing](./Docs/Testing.md)을 참고합니다.
 
 ---
