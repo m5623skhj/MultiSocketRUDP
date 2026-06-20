@@ -38,5 +38,23 @@
 봇 테스트 노드를 직접 그리기 어려울 경우, 원하는 테스트 내용을 입력하면 AI에게 요청하여 테스트 노드 트리를 생성할 수 있습니다.  
 단, 이 기능을 사용할 경우, AI가 원하는 테스트 내용을 정상적으로 생성했는지에 대한 확인이 필요합니다.  
 
+---
+
+## 테스트와 CI
+
+BotTester 로컬 빌드:
+
+```powershell
+dotnet build .\MultiSocketRUDPBotTester.sln --configuration Debug
+```
+
+C++/C# 프로토콜 상호운용 테스트:
+
+```powershell
+dotnet run --project .\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug
+```
+
+PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출된다. BotTester workflow는 메인 솔루션 전체를 빌드한 후 프로토콜 테스트를 실행한다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행된다.
+
 1.2.2 노드 통계 창  
 <img width="883" height="584" alt="image" src="https://github.com/user-attachments/assets/115d479e-13cd-4009-810a-b74895efb1fb" />

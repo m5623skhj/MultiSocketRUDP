@@ -6,7 +6,7 @@
 
 ## 테스트 구성
 
-현재 테스트는 크게 두 계층이다.
+현재 테스트는 세 범위로 구성한다.
 
 - `CoreTest`
   - 서버 코어 내부 컴포넌트를 대상으로 하는 GoogleTest 기반 유닛 테스트
@@ -14,6 +14,9 @@
 - `IntegrationTest`
   - 실제 서버 코어와 클라이언트 하네스를 함께 실행하는 통합 테스트
   - TLS 세션 브로커, UDP CONNECT, 요청/응답, 재전송 실패에 의한 disconnect 흐름을 검증
+- `ProtocolInteropTest`
+  - BotTester의 C# 패킷 암호화 구현을 검증하는 실행형 테스트
+  - C++ CoreTest와 공용 protocol vector를 사용해 AES-GCM 결과 호환성을 검증
 
 `IntegrationClientHarness`는 `IntegrationTest`가 별도 프로세스로 실행하는 테스트용 클라이언트 실행 파일이다.
 
@@ -30,15 +33,18 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 주요 테스트 범위:
 
 - `PacketManagerTest`
+- `PacketCryptoTest`
+- `CryptoHelperTest`
 - `RUDPFlowControllerTest`
 - `RUDPFlowManagerTest`
 - `RUDPIOHandlerTest`
 - `RUDPPacketProcessorTest`
 - `RUDPReceiveWindowTest`
 - `RUDPSessionTest`
-- `SendPacketInfoTest`
+- `RUDPSessionManagerTest`
 - `SessionCryptoContextTest`
 - `SessionPacketOrdererTest`
+- `SessionSendContextTest`
 - `SessionStateMachineTest`
 - `TickerTimerEventTest`
 
@@ -101,6 +107,25 @@ msbuild .\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuration=Debug /p:Platf
 
 ---
 
+## C++/C# 프로토콜 상호운용 테스트
+
+공용 vector:
+
+```text
+MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json
+```
+
+C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 평문 및 예상 패킷을 읽는다.
+
+BotTester 전체 빌드와 protocol test 실행:
+
+```powershell
+dotnet build .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.sln --configuration Debug
+dotnet run --project .\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug
+```
+
+---
+
 ## TLS 테스트 인증서
 
 통합 테스트는 PFX 인증서 파일을 사용한다.
@@ -127,26 +152,54 @@ GitHub Actions에서는 `GoogleTest.yml`에서 테스트 전에 이 스크립트
 
 ## CI 흐름
 
-GitHub Actions workflow:
+PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 
 ```text
-.github/workflows/GoogleTest.yml
+.github/workflows/CI.yml          # 변경 경로 분류 및 최종 상태 집계
+.github/workflows/GoogleTest.yml  # C++ Native 테스트
+.github/workflows/BotTester.yml   # C# BotTester 빌드 및 프로토콜 테스트
 ```
 
-주요 순서:
+`CI.yml`은 모든 PR에서 실행되고 변경 파일을 기준으로 필요한 workflow만 호출한다.
+
+| 변경 경로 | Native GTest | BotTester |
+|---|---:|---:|
+| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 |
+| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 |
+| 공용 `ProtocolInteropVector.json` | 실행 | 실행 |
+| `CI.yml` | 실행 | 실행 |
+| 관련 없는 문서만 변경 | 미실행 | 미실행 |
+
+### Native GTest
 
 1. submodule 포함 checkout
 2. NuGet restore
 3. IntegrationTest 인증서 생성
-4. GoogleTest 빌드
-5. solution Debug x64 빌드
-6. `*Test.exe` 실행
+4. GoogleTest 및 solution Debug x64 빌드
+5. `CoreTest.exe`, `IntegrationTest.exe`만 실행
+6. 실행 파일별 XML과 exit code 검증
 7. 실패 테스트만 retry
-8. PR comment 갱신
-9. OpenCppCoverage 설치
-10. CoreTest(유닛 테스트) 커버리지 측정 (Cobertura + HTML)
-11. 커버리지 HTML 리포트 아티팩트 업로드
-12. 커버리지 PR comment 갱신 (별도 마커, `if: always()`)
+8. PR comment와 OpenCppCoverage 결과 갱신
+
+### BotTester
+
+1. .NET 9 설정
+2. `MultiSocketRUDPBotTester.sln` 전체 빌드
+3. `ProtocolInteropTest.csproj` 빌드 및 실행
+4. C++과 C#이 공용 `ProtocolInteropVector.json`을 기준으로 동일한 암호화 결과를 내는지 검증
+
+### 필수 체크
+
+Branch protection의 필수 체크는 최종 집계 job인 `build-and-test` 하나로 설정한다. 이 이름은 기존 branch protection과의 호환성을 위해 고정한다.
+
+`build-and-test`는 모든 PR에서 항상 생성되며 다음 규칙으로 결과를 판정한다.
+
+- 변경 경로상 필요한 테스트가 모두 성공하면 성공
+- 관련 없는 테스트가 skip되면 성공
+- 필요한 테스트가 실패, 취소 또는 비정상 skip되면 실패
+- 변경 경로 분류가 실패하면 실패
+
+`Expected — Waiting for status to be reported`가 계속 표시되면 branch protection이 더 이상 생성되지 않는 과거 check 이름을 요구하는지 확인한다. Repository settings의 required checks에는 `build-and-test`만 남기고 `CI Gate`, `Native GTest` 또는 `Native GTest / build-and-test` 같은 이전 항목은 제거한다.
 
 서브모듈 checkout은 full fetch를 사용한다.
 
@@ -202,7 +255,10 @@ error C1083: Cannot open source file
 - `MultiSocketRUDP/IntegrationTest`
 - `MultiSocketRUDP/IntegrationClientHarness`
 - `MultiSocketRUDP/Tool/ForTLS/CreateDevTLSPfx.bat`
+- `.github/workflows/CI.yml`
 - `.github/workflows/GoogleTest.yml`
+- `.github/workflows/BotTester.yml`
+- `MultiSocketRUDPBotTester/ProtocolInteropTest`
 
 ---
 
