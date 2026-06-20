@@ -195,8 +195,8 @@ Host/Port에는 SessionBroker 주소를 넣는다.
 
 ### 변수 확장
 
-현재 저장소에는 `BotVariables.cs`가 없다.  
-봇 런타임 변수 관련 코드는 `MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Bot/VariableNodes.cs` 기준으로 확장해야 한다.
+`BotVariables`는 `MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Bot/BotVariableAttribute.cs`에 정의되어 있다.
+Getter/Setter 메서드는 이 클래스에 추가하고 `BotVariableAttribute`로 노출한다. `VariableNodes.cs`는 등록된 접근자를 실행하는 노드 구현이다.
 
 ### Gemini 설정
 

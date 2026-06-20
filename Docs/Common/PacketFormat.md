@@ -5,7 +5,7 @@
 
 ---
 
-## 기본 헤더 구조 (`df_HEADER_SIZE = 3 bytes`)
+## 기본 헤더 구조 (`df_HEADER_SIZE = 5 bytes`)
 
 ```
 Offset  Size  Field          설명
@@ -15,6 +15,7 @@ Offset  Size  Field          설명
                              수신 측에서 0번 바이트로 패킷 시작 여부 확인.
   1      2B   PayloadLength  헤더 이후 페이로드의 바이트 수 (little-endian).
                              = m_iWrite - df_HEADER_SIZE + (암호화 시 AUTH_TAG_SIZE 추가)
+  3      2B   Reserved       레거시 RandCode/Checksum 위치. 현재 RUDP 암호화 경로에서는 별도 필드로 해석하지 않음.
 ─────────────────────────────────────────────────────
 ```
 
@@ -25,17 +26,17 @@ Offset  Size  Field          설명
 ```
 Offset  Size  Field          암호화  설명
 ─────────────────────────────────────────────────────────────────────
-  0      3B   Header         ─ AAD  HeaderCode + PayloadLength
-  3      1B   PacketType     ─ AAD  PACKET_TYPE::SEND_TYPE (0x03)
-  4      8B   Sequence       ─ AAD  uint64, 단조 증가. Nonce 생성에도 사용.
- 12      4B   PacketId       ← ENC  uint32. PACKET_ID enum 값.
- 16      NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
- 16+N   16B   AuthTag        (후미)  AES-GCM 인증 태그. 암호화 성공 시 버퍼 끝에 추가.
+  0      5B   Header         ─ AAD  HeaderCode + PayloadLength + Reserved
+  5      1B   PacketType     ─ AAD  PACKET_TYPE::SEND_TYPE (0x03)
+  6      8B   Sequence       ─ AAD  uint64, 단조 증가. Nonce 생성에도 사용.
+ 14      4B   PacketId       ← ENC  uint32. PACKET_ID enum 값.
+ 18      NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
+ 18+N   16B   AuthTag        (후미)  AES-GCM 인증 태그. 암호화 성공 시 버퍼 끝에 추가.
 ─────────────────────────────────────────────────────────────────────
 
-AAD (Additional Authenticated Data) = Offset 0 ~ 11 (12 bytes)
+AAD (Additional Authenticated Data) = Offset 0 ~ 13 (14 bytes)
   → 암호화되지 않지만 AuthTag 계산에 포함 → 위변조 감지
-ENC (Encrypted) = Offset 12 ~ 16+N-1 (PacketId + Payload)
+ENC (Encrypted) = Offset 14 ~ 18+N-1 (PacketId + Payload)
   → AES-128-GCM으로 in-place 암호화
 ```
 
@@ -49,11 +50,11 @@ PacketId 필드가 없다.
 ```
 Offset  Size  Field          암호화  설명
 ─────────────────────────────────────────────────────────────────────
-  0      3B   Header         ─ AAD
-  3      1B   PacketType     ─ AAD  CONNECT=0x01, DISCONNECT=0x02 등
-  4      8B   Sequence       ─ AAD
- 12     NB   Payload        ← ENC  패킷 종류별 페이로드 (아래 참조)
- 12+N  16B   AuthTag        (후미)
+  0      5B   Header         ─ AAD
+  5      1B   PacketType     ─ AAD  CONNECT=0x01, DISCONNECT=0x02 등
+  6      8B   Sequence       ─ AAD
+ 14     NB   Payload        ← ENC  패킷 종류별 페이로드 (아래 참조)
+ 14+N  16B   AuthTag        (후미)
 ─────────────────────────────────────────────────────────────────────
 ```
 
@@ -168,10 +169,10 @@ static const unsigned int bodyOffsetWithNotHeaderForCorePacket =
 ```cpp
 // PacketCryptoHelper::EncodePacket / DecodePacket
 constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
-// = 3 + 1 + 8 = 12 bytes
+// = 5 + 1 + 8 = 14 bytes
 
 const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
-// → 버퍼의 첫 12 바이트 = Header(3) + PacketType(1) + Sequence(8)
+// → 버퍼의 첫 14 바이트 = Header(5) + PacketType(1) + Sequence(8)
 ```
 
 **AAD를 포함한 인증의 의미:**
@@ -222,22 +223,24 @@ PING 패킷 (PingPacket, 페이로드 없음, PacketId=1):
 ```
 암호화 전:
 Offset  Hex   설명
-  0     89    HeaderCode (PACKET_CODE=0x89)
-  1     16    PayloadLength 하위 바이트 (22 = 0x16)
+  0     77    HeaderCode (현재 샘플 PACKET_CODE=119=0x77)
+  1     0D    PayloadLength 하위 바이트 (13 = 0x0D)
   2     00    PayloadLength 상위 바이트
-  3     03    PacketType = SEND_TYPE
-  4-11  01 00 00 00 00 00 00 00  Sequence = 1
- 12-15  01 00 00 00  PacketId = 1 (PING)
+  3-4   00 00 Reserved
+  5     03    PacketType = SEND_TYPE
+  6-13  01 00 00 00 00 00 00 00  Sequence = 1
+ 14-17  01 00 00 00  PacketId = 1 (PING)
 (페이로드 없음)
 
 암호화 후 (PacketId 이후 암호화):
-  0     89
-  1     26    PayloadLength = 22 + 16(AuthTag) = 38 = 0x26
+  0     77
+  1     1D    PayloadLength = 13 + 16(AuthTag) = 29 = 0x1D
   2     00
-  3     03    (AAD - 평문)
-  4-11  01 00 00 00 00 00 00 00  (AAD - 평문)
- 12-15  XX XX XX XX  (암호화된 PacketId)
- 16-31  XX...XX  (AuthTag 16B)
+  3-4   00 00 (AAD - Reserved)
+  5     03    (AAD - 평문)
+  6-13  01 00 00 00 00 00 00 00  (AAD - 평문)
+ 14-17  XX XX XX XX  (암호화된 PacketId)
+ 18-33  XX...XX  (AuthTag 16B)
 
 총 크기: 3 + 1 + 8 + 4 + 16 = 32 bytes
 ```

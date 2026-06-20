@@ -12,7 +12,7 @@
 
 | 항목 | ENet | SLikeNet | GameNetworkingSockets | MultiSocketRUDP |
 |---|---|---|---|---|
-| 기준 파일 | [`enet_rtt.cpp`](C:/Users/KimHyeongJin/Desktop/비교군/enet-1.3.18/examples/enet_rtt.cpp) | [`Ping.cpp`](C:/Users/KimHyeongJin/Desktop/비교군/SLikeNet-master/SLikeNet-master/Samples/Ping/Ping.cpp) | [`example_rtt.cpp`](C:/Users/KimHyeongJin/Desktop/비교군/GameNetworkingSockets-master/GameNetworkingSockets-master/examples/example_rtt.cpp) | [`BotActionGraph.botgraph.json`](C:/Users/KimHyeongJin/source/repos/MultiSocketRUDP/MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/BotActionGraph.botgraph.json), [`Client.cs`](C:/Users/KimHyeongJin/source/repos/MultiSocketRUDP/MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Contents/Client/Client.cs), [`RUDPSession.cpp`](C:/Users/KimHyeongJin/source/repos/MultiSocketRUDP/MultiSocketRUDP/MultiSocketRUDPServer/RUDPSession.cpp) |
+| 기준 파일 | `enet-1.3.18/examples/enet_rtt.cpp` (외부 비교군) | `SLikeNet/Samples/Ping/Ping.cpp` (외부 비교군) | `GameNetworkingSockets/examples/example_rtt.cpp` (외부 비교군) | 런타임 생성 파일 `bin/BotActionGraph.botgraph.json`, [`Client.cs`](../MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Contents/Client/Client.cs), [`RUDPSession.cpp`](../MultiSocketRUDP/MultiSocketRUDPServer/RUDPSession.cpp) |
 | 측정 목표 | 라이브러리 raw RTT에 가깝게 단순화 | 라이브러리 raw RTT에 가깝게 단순화 | 라이브러리 RTT 비교, 단 내부 처리 포함 | bot + 앱 프로토콜 + 서버 구조 포함 closed-loop |
 | 기본 루프 구조 | `Ping -> Pong -> next Ping` | `Ping -> Pong -> next Ping` | `Ping -> Pong -> next Ping` | `SendPacketNode(Ping) -> WaitForPacketNode(Pong)` |
 | 클라이언트 루프 방식 | 코드에서 직접 다음 ping 전송 | 코드에서 직접 다음 ping 전송 | 코드에서 직접 다음 ping 전송 | action graph가 노드 체인 실행 |

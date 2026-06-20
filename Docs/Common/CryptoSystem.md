@@ -35,7 +35,7 @@
  ├─────────────────────────────────────────────────────────┤
  │ CryptoHelper (thread_local)  ← BCrypt 원시 연산        │
  │   EncryptAESGCM() / DecryptAESGCM()                    │
- │   GenerateNonce() / GetSymmetricKeyHandle()             │
+ │   FillNonce() / GetSymmetricKeyHandle()                 │
  ├─────────────────────────────────────────────────────────┤
  │ Windows BCrypt API (OS 제공)                            │
  │   BCryptEncrypt / BCryptDecrypt                         │
@@ -165,32 +165,35 @@ Byte 0 = (0b10 << 6) | (0xA5 & 0x3F)
 ```
 
 ```cpp
-// CryptoHelper::GenerateNonce 구현
-std::vector<unsigned char> CryptoHelper::GenerateNonce(
+// CryptoHelper::FillNonce 구현
+bool CryptoHelper::FillNonce(
     const unsigned char* sessionSalt,
     size_t sessionSaltSize,
     PacketSequence packetSequence,
-    PACKET_DIRECTION direction)
+    PACKET_DIRECTION direction,
+    unsigned char* outNonce,
+    size_t nonceSize)
 {
-    constexpr size_t NONCE_SIZE = 12;
-    std::vector<unsigned char> nonce(NONCE_SIZE, 0);
-
-    // Byte 0: 방향 비트 + 솔트 하위 6비트
-    nonce[0] = (static_cast<unsigned char>(direction) << 6)
-             | (sessionSalt[0] & 0x3F);
-
-    // Byte 1-3: sessionSalt[1..3]
-    nonce[1] = sessionSalt[1];
-    nonce[2] = sessionSalt[2];
-    nonce[3] = sessionSalt[3];
-
-    // Byte 4-11: packetSequence big-endian
-    for (int i = 0; i < 8; ++i) {
-        nonce[11 - i] = static_cast<unsigned char>(packetSequence & 0xFF);
-        packetSequence >>= 8;
+    if (sessionSalt == nullptr || sessionSaltSize != SESSION_SALT_SIZE ||
+        outNonce == nullptr || nonceSize != NONCE_SIZE) {
+        return false;
     }
 
-    return nonce;
+    // Byte 0: 방향 비트 + 솔트 하위 6비트
+    outNonce[0] = (static_cast<unsigned char>(direction) << 6)
+                | (sessionSalt[0] & 0x3F);
+
+    // Byte 1-3: sessionSalt[1..3]
+    outNonce[1] = sessionSalt[1];
+    outNonce[2] = sessionSalt[2];
+    outNonce[3] = sessionSalt[3];
+
+    // Byte 4-11: packetSequence big-endian
+    outNonce[4] = (packetSequence >> 56) & 0xFF;
+    // ... 같은 방식으로 outNonce[5..10] 기록
+    outNonce[11] = packetSequence & 0xFF;
+
+    return true;
 }
 ```
 
@@ -215,39 +218,39 @@ std::vector<unsigned char> CryptoHelper::GenerateNonce(
 ### 일반 데이터 패킷 (`isCorePacket = false`)
 
 ```
-바이트 위치:   0    1  2  3    4      12     16      16+N    16+N+16
+바이트 위치:   0    1  2  3  4  5    6      14     18      18+N    18+N+16
               ┌───┬─────┬────┬──────────┬──────────┬────────┬──────────┐
               │ H │PayLen│ T │ Sequence │ PacketId │Payload │ AuthTag  │
-              │3B │     │1B │   8 B    │   4 B    │  N B   │  16 B    │
+              │5B │     │1B │   8 B    │   4 B    │  N B   │  16 B    │
               └───┴─────┴────┴──────────┴──────────┴────────┴──────────┘
-              ←────── AAD (12 bytes) ──────→
+              ←────── AAD (14 bytes) ──────→
                                            ←── AES-GCM 암호화 ──────→
 ```
 
-- **AAD 범위**: `[0..11]` = Header(3B) + PacketType(1B) + Sequence(8B)
-- **암호화 범위**: `[16..]` = PacketId(4B) + Payload(NB) → 결과는 제자리(in-place)
+- **AAD 범위**: `[0..13]` = Header(5B) + PacketType(1B) + Sequence(8B)
+- **암호화 범위**: `[18..]` = PacketId(4B) + Payload(NB) → 결과는 제자리(in-place)
 - **AuthTag**: 암호화 완료 후 버퍼 끝에 추가 (16B)
 
 ### 코어 패킷 (`isCorePacket = true`)
 
 ```
-               0    1  2  3    4      12     12+N    12+N+16
+               0    1  2  3  4  5    6      14     14+N    14+N+16
               ┌───┬─────┬────┬──────────┬─────────┬──────────┐
               │ H │PayLen│ T │ Sequence │ Payload │ AuthTag  │
-              │3B │     │1B │   8 B    │  N B    │  16 B    │
+              │5B │     │1B │   8 B    │  N B    │  16 B    │
               └───┴─────┴────┴──────────┴─────────┴──────────┘
-              ←────── AAD (12 bytes) ──────→
+              ←────── AAD (14 bytes) ──────→
                                            ← 암호화 ──────────→
 ```
 
 - PacketId 필드 없음 (CONNECT, DISCONNECT, HEARTBEAT 등은 PacketId 불필요)
-- **암호화 시작 오프셋**: `HEADER(3) + TYPE(1) + SEQ(8)` = 12B
+- **암호화 시작 오프셋**: `HEADER(5) + TYPE(1) + SEQ(8)` = 14B
 
 ### 오프셋 상수
 
 ```cpp
-// CryptoType.h 또는 PacketCryptoHelper.h
-constexpr size_t HEADER_SIZE     = df_HEADER_SIZE;         // 3 bytes
+// Common/etc/CoreConstants.h와 PacketCryptoHelper.h
+constexpr size_t HEADER_SIZE     = df_HEADER_SIZE;         // 5 bytes
 constexpr size_t PACKET_TYPE_SIZE = sizeof(PACKET_TYPE);   // 1 byte
 constexpr size_t SEQUENCE_SIZE    = sizeof(PacketSequence); // 8 bytes
 constexpr size_t PACKET_ID_SIZE   = sizeof(PacketId);       // 4 bytes
@@ -259,7 +262,7 @@ constexpr size_t bodyOffsetWithHeaderForCorePacket
 
 // 일반 패킷 body 시작 오프셋 (헤더 포함)
 constexpr size_t bodyOffsetWithHeader
-    = bodyOffsetWithHeaderForCorePacket + PACKET_ID_SIZE;  // 12+4 = 16
+    = bodyOffsetWithHeaderForCorePacket + PACKET_ID_SIZE;  // 14+4 = 18
 ```
 
 ---
@@ -270,7 +273,7 @@ AAD는 **암호화하지 않지만** GCM 인증 태그 계산에 포함된다.
 수신 측에서 AAD가 조금이라도 변조되면 `DecryptAESGCM`이 `false`를 반환한다.
 
 ```
-AAD = [HeaderCode 1B][PayloadLength 2B][PacketType 1B][PacketSequence 8B]
+AAD = [HeaderCode 1B][PayloadLength 2B][Reserved 2B][PacketType 1B][PacketSequence 8B]
     = 총 12 bytes
 ```
 
@@ -329,25 +332,25 @@ Step 1. 헤더 완성 (SetHeader)
   m_iWriteLast = m_iWrite + AUTH_TAG_SIZE   ← AuthTag 공간 예약
 
 Step 2. AAD 추출
-  aad = buffer[0..11]
+  aad = buffer[0..13]
 
 Step 3. Nonce 생성
-  nonce = CryptoHelper::GenerateNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction)
-  // SESSION_SALT_SIZE = 16. GenerateNonce 내부에서 sessionSaltSize != SESSION_SALT_SIZE 이면 빈 벡터 반환
-  // 12 bytes
+  unsigned char nonce[NONCE_SIZE]
+  CryptoHelper::FillNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction, nonce, NONCE_SIZE)
+  // SESSION_SALT_SIZE=16 또는 NONCE_SIZE=12가 아니면 false 반환
 
 Step 4. 암호화 범위 결정
   if isCorePacket:
-    bodyStart = 12  (Header+Type+Seq)
+    bodyStart = 14  (Header+Type+Seq)
   else:
-    bodyStart = 16  (Header+Type+Seq+PacketId)
+    bodyStart = 18  (Header+Type+Seq+PacketId)
   bodySize = m_iWrite - bodyStart
 
 Step 5. AES-GCM 암호화 (in-place)
   authTag[16] 버퍼 준비
   CryptoHelper::EncryptAESGCM(
     nonce.data(), 12,
-    aad, 12,
+    aad, 14,
     buffer[bodyStart], bodySize,   ← 평문 (수정됨)
     buffer[bodyStart], bodySize,   ← 암호문 (같은 위치에 덮어씀)
     authTag,
@@ -389,22 +392,23 @@ Step 3. AuthTag 위치 계산
 
 Step 4. body 범위 결정
   if isCorePacket:
-    bodyStart = HEADER(3) + TYPE(1) + SEQ(8) = 12
+    bodyStart = HEADER(5) + TYPE(1) + SEQ(8) = 14
   else:
-    bodyStart = HEADER(3) + TYPE(1) + SEQ(8) + PACKETID(4) = 16
+    bodyStart = HEADER(5) + TYPE(1) + SEQ(8) + PACKETID(4) = 18
   bodySize = authTagOffset - bodyStart
 
 Step 5. AAD 추출
-  aad = buffer[0..11]
+  aad = buffer[0..13]
 
 Step 6. Nonce 생성 (수신 측에서 동일하게 재현)
-  nonce = CryptoHelper::GenerateNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction)
-  // SESSION_SALT_SIZE = 16. GenerateNonce 내부에서 sessionSaltSize != SESSION_SALT_SIZE 이면 빈 벡터 반환
+  unsigned char nonce[NONCE_SIZE]
+  CryptoHelper::FillNonce(sessionSalt, SESSION_SALT_SIZE, packetSequence, direction, nonce, NONCE_SIZE)
+  // 인자 포인터나 크기가 유효하지 않으면 false 반환
 
 Step 7. AES-GCM 복호화 + 태그 검증 (in-place)
   ok = CryptoHelper::DecryptAESGCM(
     nonce.data(), 12,
-    aad, 12,
+    aad, 14,
     buffer[bodyStart], bodySize,   ← 암호문
     authTag,                       ← 태그 검증
     buffer[bodyStart], bodySize,   ← 평문 (같은 위치에 복원)
@@ -479,18 +483,19 @@ ACK와 데이터도 분리하는 이유: 같은 시퀀스로 ACK와 데이터가
 
 ## 12. C# 클라이언트와의 호환성
 
-C# 클라이언트(`RudpSession_CS.cs`)는 `AesGcm` 클래스를 사용한다.
+C# BotTester의 `ClientCore/CryptoHelper.cs`와 `Buffer/NetBuffer.cs`는 `AesGcm` 클래스를 사용한다.
 
 ```csharp
 // C# 클라이언트 AES-GCM 복호화
-var nonce = GenerateNonce(sessionSalt, packetSequence, direction);
+Span<byte> nonce = stackalloc byte[CryptoHelper.NonceSize];
+CryptoHelper.WriteNonce(nonce, sessionSalt, packetSequence, direction);
 var aesGcm = new AesGcm(sessionKey, AES_TAG_SIZE);
 aesGcm.Decrypt(
     nonce,          // 12 bytes
     ciphertext,     // 암호문
     tag,            // 16 bytes
     plaintext,      // 복호화 결과
-    aad             // 12 bytes
+    aad             // 14 bytes
 );
 ```
 
@@ -541,7 +546,7 @@ direction enum 값:
 
 #### `CryptoHelper::EncryptAESGCM`
 #### `CryptoHelper::DecryptAESGCM`
-#### `CryptoHelper::GenerateNonce`
+#### `CryptoHelper::FillNonce`
 #### `CryptoHelper::GenerateSecureRandomBytes`
 #### `CryptoHelper::GetSymmetricKeyHandle`
 - 실제 암복호화와 nonce 생성, 세션 키 핸들 생성을 담당한다.

@@ -25,8 +25,8 @@
 일반 패킷은 `PacketId`와 payload를 암호화한다.
 
 ```text
-[Header 3B][PacketType 1B][Sequence 8B][PacketId 4B][Payload N][AuthTag 16B]
-|<---------------- AAD 12B ---------------->|<------ encrypted ------>|
+[Header 5B][PacketType 1B][Sequence 8B][PacketId 4B][Payload N][AuthTag 16B]
+|<---------------- AAD 14B ---------------->|<------ encrypted ------>|
 ```
 
 ### Core packet
@@ -34,8 +34,8 @@
 CONNECT, DISCONNECT, SEND_REPLY, HEARTBEAT 계열 core packet에는 `PacketId`가 없다.
 
 ```text
-[Header 3B][PacketType 1B][Sequence 8B][Payload N][AuthTag 16B]
-|<---------------- AAD 12B ---------------->|<- encrypted ->|
+[Header 5B][PacketType 1B][Sequence 8B][Payload N][AuthTag 16B]
+|<---------------- AAD 14B ---------------->|<- encrypted ->|
 ```
 
 ---
@@ -147,7 +147,7 @@ bodyOffsetWithNotHeaderForCorePacket =
 
 - `PACKET_DIRECTION`은 송신자와 수신자가 동일하게 해석해야 한다. 방향이 다르면 nonce가 달라져 복호화가 실패한다.
 - 일반 패킷과 core packet은 `PacketId` 존재 여부가 다르므로 `isCorePacket`을 잘못 넘기면 body 오프셋이 틀어진다.
-- AAD 범위는 항상 header 3B, packet type 1B, sequence 8B를 합친 12B다.
+- AAD 범위는 항상 header 5B, packet type 1B, sequence 8B를 합친 14B다.
 - AuthTag는 암호문 뒤 16B이며, payload length에도 포함된다.
 
 ---

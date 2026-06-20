@@ -86,7 +86,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
    ├─ ioHandler = make_unique<RUDPIOHandler>(...)
    └─ rioManager->Initialize(numOfSockets, numOfWorkerThread)
         └─ LoadRIOFunctionTable() (WSAIoctl WSAID_MULTIPLE_RIO)
-        └─ for i in 0..N: RIOCreateCompletionQueue(numOfSockets/N * MAX_SEND_BUFFER_SIZE)
+        └─ for i in 0..N: RIOCreateCompletionQueue(numOfSockets/N * MAX_OUTSTANDING_RECEIVE)
 
 8. RunAllThreads()
    ├─ recvLogicThreadEventStopHandle = CreateEvent(manual, FALSE)
@@ -313,7 +313,7 @@ bool IsServerStopped() const;
 
 // 현재 연결된 세션 수 (CONNECTED 상태)
 unsigned short GetNowSessionCount() const;
-// → sessionManager->GetConnectedCount() → connectedUserCount.load()
+// → sessionManager->GetNowSessionCount() → connectedUserCount.load()
 
 // 현재 미사용 세션 수
 unsigned short GetUnusedSessionCount() const;
@@ -547,32 +547,42 @@ RIOCreateRequestQueue(
 
 ## 8. 옵션 파일 설정값 전체
 
-### CoreOption.ini
+### `ServerOptionFile/CoreOption.txt`
 
 ```ini
-[CORE]
-THREAD_COUNT=4                    ; IO/Logic/Retransmission 워커 스레드 수 (N)
-NUM_OF_SOCKET=1000                ; 세션 풀 크기 = 최대 동시 접속 수
-MAX_PACKET_RETRANSMISSION_COUNT=15 ; 재전송 횟수 초과 시 강제 종료
-WORKER_THREAD_ONE_FRAME_MS=1      ; IO Worker 프레임 슬립 (0이면 비활성)
-RETRANSMISSION_MS=200             ; 패킷 미ACK 시 재전송 간격 (ms)
-RETRANSMISSION_THREAD_SLEEP_MS=50 ; 재전송 스레드 슬립 간격 (ms)
-HEARTBEAT_THREAD_SLEEP_MS=3000    ; 하트비트 전송 주기 (ms)
-TIMER_TICK_MS=16                  ; Ticker 틱 간격 (~60fps)
-MAX_HOLDING_PACKET_QUEUE_SIZE=32  ; 순서 보장용 홀딩 큐 크기
+:CORE
+{
+    THREAD_COUNT = 4
+    NUM_OF_SOCKET = 500
+    MAX_PACKET_RETRANSMISSION_COUNT = 16
+    WORKER_THREAD_ONE_FRAME_MS = 16
+    RETRANSMISSION_MS = 50
+    RETRANSMISSION_THREAD_SLEEP_MS = 50
+    HEARTBEAT_THREAD_SLEEP_MS = 5000
+    TIMER_TICK_MS = 100
+    MAX_HOLDING_PACKET_QUEUE_SIZE = 32
+    SIMULATED_PACKET_LOSS_PERCENT = 0
+    SIMULATED_PACKET_LOSS_SEED = 12345
+}
 
-[SERIALIZEBUF]
-PACKET_CODE=0x89    ; 헤더 코드 (클라이언트와 반드시 동일)
-PACKET_KEY=0x99     ; XOR 키
+:SERIALIZEBUF
+{
+    PACKET_CODE = 119
+    PACKET_KEY = 50
+}
 ```
 
-### SessionBrokerOption.ini
+### `ServerOptionFile/SessionBrokerOption.txt`
 
 ```ini
-[SESSION_BROKER]
-CORE_IP=192.168.1.100    ; 클라이언트에게 알릴 UDP 서버 IP
-SESSION_BROKER_PORT=10001 ; 세션 브로커 리스닝 포트 (TCP)
+:SESSION_BROKER
+{
+    CORE_IP = "127.0.0.1"
+    SESSION_BROKER_PORT = 11011
+}
 ```
+
+위 값은 현재 샘플 옵션 파일의 기본값이다. 배포 환경에서는 `CORE_IP`와 포트를 실제 접근 가능한 주소로 변경한다.
 
 ### 설정값 선택 가이드
 

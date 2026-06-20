@@ -77,7 +77,7 @@ ConfigUi.SaveButton(onClick)          // Save 버튼
 #### `NodeConfigPanelRegistry(createDynamicPorts)`
 - 사용할 패널 목록을 등록하고, 랜덤 분기 노드 같은 동적 포트 생성 의존성을 주입한다.
 
-#### `GetPanel(NodeVisual node)`
+#### `Find(NodeVisual node)`
 - 등록된 패널 목록을 순서대로 검사해 현재 노드를 설정할 수 있는 첫 번째 패널을 반환한다.
 
 ### 패널 공통 규칙
@@ -85,8 +85,9 @@ ConfigUi.SaveButton(onClick)          // Save 버튼
 #### `CanConfigure(NodeVisual node)`
 - 패널이 특정 노드 타입을 처리할 수 있는지 판단한다.
 
-#### `CreatePanel(NodeVisual node, Action onSaved)`
-- 실제 WPF 설정 UI를 만들고, 저장 시 `NodeConfiguration`을 갱신한다.
+#### `Build(StackPanel stack, NodeVisual node, Action<string> log, Action closeDialog)`
+- 전달받은 `StackPanel`에 WPF 설정 UI를 구성한다.
+- 저장 시 `NodeConfiguration`을 갱신하고 로그 기록 및 다이얼로그 종료 콜백을 호출한다.
 
 ### `ConfigUi`
 

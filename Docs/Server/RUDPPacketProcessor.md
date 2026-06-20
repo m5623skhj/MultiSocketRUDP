@@ -124,7 +124,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
         }
 
         constexpr bool isCorePacket = true;
-        auto dir = CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER;
+        auto dir = PACKET_DIRECTION::CLIENT_TO_SERVER;
         DECODE_PACKET()  // 실패 시 break
 
         if (!session.TryConnect(recvPacket, clientAddr)) {
@@ -145,7 +145,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
         if (!session.CanProcessPacket(clientAddr)) break;
 
         constexpr bool isCorePacket = true;
-        auto dir = CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER;
+        auto dir = PACKET_DIRECTION::CLIENT_TO_SERVER;
         DECODE_PACKET()
 
         session.DoDisconnect(DISCONNECT_REASON::NORMAL);
@@ -161,7 +161,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
         if (session.IsReleasing()) break;
 
         constexpr bool isCorePacket = false;  // PacketId 포함
-        auto dir = CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER;
+        auto dir = PACKET_DIRECTION::CLIENT_TO_SERVER;
         DECODE_PACKET()
 
         if (!session.OnRecvPacket(recvPacket)) {
@@ -182,7 +182,7 @@ void RUDPPacketProcessor::ProcessByPacketType(
         if (!session.CanProcessPacket(clientAddr)) break;
 
         constexpr bool isCorePacket = true;
-        auto dir = CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY;
+        auto dir = PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY;
         DECODE_PACKET()
 
         session.OnSendReply(recvPacket);
@@ -312,7 +312,7 @@ std::thread monitor([&]() {
 
         int32_t tps = core.GetTPS();
         core.ResetTPS();
-        uint16_t sessions = core.GetConnectedUserCount();
+        uint16_t sessions = core.GetNowSessionCount();
 
         LOG_DEBUG(std::format("TPS={}, Sessions={}", tps, sessions));
     }

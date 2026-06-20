@@ -103,14 +103,15 @@ bool RUDPClientCore::Start(
    → bind(INADDR_ANY, port=0)
    → serverAddr 초기화 {serverIp, serverPort}
 
-6. CreateEventHandles()
+6. RunThreads()
    → sendEventHandles[0] = CreateSemaphore(0, LONG_MAX)  ← 패킷 대기
    → sendEventHandles[1] = CreateEvent(manual, FALSE)     ← 종료 신호
 
-7. 스레드 시작
    → recvThread = thread([this] { RunRecvThread(); })
    → sendThread = thread([this] { RunSendThread(); })
    → retransmissionThread = thread([this] { RunRetransmissionThread(); })
+
+7. Sleep(1000)으로 송수신 스레드 초기화 대기
 
 8. ShouldSendConnectPacketOnStart()가 true이면 SendConnectPacket()
    → CONNECT_TYPE | seq=0 | sessionId
@@ -371,7 +372,7 @@ void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
     // ① AES-GCM 암호화
     PacketCryptoHelper::EncodePacket(
         *buf, seq,
-        CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER,
+        PACKET_DIRECTION::CLIENT_TO_SERVER,
         sessionSalt, SESSION_SALT_SIZE,
         sessionKeyHandle, isCorePacket
     );
@@ -448,18 +449,17 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
         // ② 순서가 맞지 않음 → 아직 앞 패킷이 안 왔음
         if (topSeq != nextRecvPacketSequence) return nullptr;
 
+        ++nextRecvPacketSequence;
+        recvPacketHoldingQueue.pop();
+
         // ③ HEARTBEAT_TYPE → 응답만 보내고 버림
+        // ACK는 ProcessRecvPacket에서 이미 전송됐다.
         if (topType == PACKET_TYPE::HEARTBEAT_TYPE) {
-            SendHeartbeatReply(topSeq);
-            recvPacketHoldingQueue.pop();
             NetBuffer::Free(topBuf);
-            ++nextRecvPacketSequence;
             continue;
         }
 
         // ④ 정상 데이터 패킷 → 반환
-        recvPacketHoldingQueue.pop();
-        ++nextRecvPacketSequence;
         return topBuf;  // 호출자가 NetBuffer::Free() 책임
     }
 }
@@ -574,7 +574,7 @@ void ProcessRecvPacket(NetBuffer& recvBuffer)
         if (!PacketCryptoHelper::DecodePacket(
                 recvBuffer, sessionSalt, SESSION_SALT_SIZE,
                 sessionKeyHandle, false,
-                CryptoHelper::PACKET_DIRECTION::SERVER_TO_CLIENT)) {
+                PACKET_DIRECTION::SERVER_TO_CLIENT)) {
             LOG_ERROR("DecodePacket failed (SEND_TYPE)");
             break;
         }
@@ -598,7 +598,7 @@ void ProcessRecvPacket(NetBuffer& recvBuffer)
         if (!PacketCryptoHelper::DecodePacket(
                 recvBuffer, sessionSalt, SESSION_SALT_SIZE,
                 sessionKeyHandle, true,
-                CryptoHelper::PACKET_DIRECTION::SERVER_TO_CLIENT)) break;
+                PACKET_DIRECTION::SERVER_TO_CLIENT)) break;
 
         PacketSequence seq;
         memcpy(&seq,
@@ -619,7 +619,7 @@ void ProcessRecvPacket(NetBuffer& recvBuffer)
         if (!PacketCryptoHelper::DecodePacket(
                 recvBuffer, sessionSalt, SESSION_SALT_SIZE,
                 sessionKeyHandle, true,
-                CryptoHelper::PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY)) break;
+                PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY)) break;
 
         OnSendReply(recvBuffer);
         break;
@@ -645,7 +645,7 @@ void SendReplyToServer(PacketSequence ackedSeq)
 
     PacketCryptoHelper::EncodePacket(
         *buf, ackedSeq,
-        CryptoHelper::PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
+        PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
         sessionSalt, SESSION_SALT_SIZE,
         sessionKeyHandle, true
     );
@@ -840,26 +840,34 @@ void TryFlushPendingQueue()
 
 ## 14. 옵션 파일 설정값
 
-### clientCoreOptionFile (CoreOption.ini)
+### clientCoreOptionFile (`ClientOptionFile/CoreOption.txt`)
 
 ```ini
-[CORE]
-MAX_PACKET_RETRANSMISSION_COUNT=15   ; 재전송 한계 초과 시 클라이언트 종료
-RETRANSMISSION_MS=200                ; 재전송 타임아웃 (ms)
-SERVER_ALIVE_CHECK_MS=5000           ; 서버 생존 확인 주기 (ms)
+:CORE
+{
+    MAX_PACKET_RETRANSMISSION_COUNT = 16
+    RETRANSMISSION_MS = 50
+    SERVER_ALIVE_CHECK_MS = 15000
+}
 ```
 
-### sessionGetterOptionFilePath (SessionGetterOption.ini)
+### sessionGetterOptionFilePath (`ClientOptionFile/SessionGetterOption.txt`)
 
 ```ini
-[SESSION_BROKER]
-IP=192.168.1.100       ; SessionBroker 서버 IP
-PORT=10001             ; SessionBroker 포트 (TCP)
+:SESSION_BROKER
+{
+    IP = "127.0.0.1"
+    PORT = 11011
+}
 
-[SERIALIZEBUF]
-PACKET_CODE=0x89       ; 헤더 코드 (서버와 반드시 동일)
-PACKET_KEY=0x99        ; XOR 키 (서버와 반드시 동일)
+:SERIALIZEBUF
+{
+    PACKET_CODE = 119
+    PACKET_KEY = 50
+}
 ```
+
+위 값은 현재 샘플 옵션 파일의 기본값이다. `PACKET_CODE`와 `PACKET_KEY`는 서버 설정과 동일해야 한다.
 
 ---
 

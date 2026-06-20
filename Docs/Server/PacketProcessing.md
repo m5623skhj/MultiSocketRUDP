@@ -374,32 +374,43 @@ AES-GCM 인증 실패는 다음 중 하나를 의미한다:
 
 ```cpp
 bool PacketCryptoHelper::DecodePacket(
-    NetBuffer& buffer,
+    NetBuffer& packet,
     const unsigned char* sessionSalt,
-    size_t saltSize,
-    const BCRYPT_KEY_HANDLE& keyHandle,
+    const size_t sessionSaltSize,
+    const BCRYPT_KEY_HANDLE& sessionKeyHandle,
     bool isCorePacket,
-    CryptoHelper::DIRECTION direction)
+    PACKET_DIRECTION direction)
 {
-    // ① 시퀀스 번호 추출 (암호화 범위 밖)
-    PacketSequence sequence;
-    memcpy(&sequence, buffer.m_pSerializeBuffer + CRYPTO_START_OFFSET + PACKET_TYPE_SIZE,
-           sizeof(PacketSequence));
+    constexpr int packetSequenceOffset = df_HEADER_SIZE + sizeof(PACKET_TYPE);
+    PacketSequence packetSequence = 0;
+    memcpy(&packetSequence, &packet.m_pSerializeBuffer[packetSequenceOffset],
+           sizeof(packetSequence));
 
-    // ② Nonce 생성
-    auto nonce = CryptoHelper::GetTLSInstance().GenerateNonce(
-        sessionSalt, saltSize, sequence, direction);
+    const int bodyOffset = isCorePacket
+        ? df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence)
+        : df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+    const size_t authTagOffset = packet.m_iWrite - AUTH_TAG_SIZE;
+    constexpr int sizeOfHeaderWithPacketType = df_HEADER_SIZE + sizeof(PACKET_TYPE);
+    const size_t bodySize = packet.GetUseSize() + sizeOfHeaderWithPacketType
+        - AUTH_TAG_SIZE - bodyOffset;
 
-    // ③ AAD 설정 (PacketType 1B + Sequence 8B = 9B)
-    auto aad = std::span(buffer.m_pSerializeBuffer + CRYPTO_START_OFFSET,
-                         PACKET_TYPE_SIZE + sizeof(PacketSequence));
+    const unsigned char* authTag = reinterpret_cast<const unsigned char*>(
+        &packet.m_pSerializeBuffer[authTagOffset]);
+    constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
+    const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSerializeBuffer);
 
-    // ④ AES-GCM 복호화 + 태그 검증
-    // isCorePacket=false → PacketId(4B)도 암호화 범위에 포함
-    // isCorePacket=true  → PacketId 없음 (CONNECT, HEARTBEAT 등)
+    unsigned char nonce[NONCE_SIZE];
+    if (!CryptoHelper::FillNonce(sessionSalt, sessionSaltSize, packetSequence,
+        direction, nonce, NONCE_SIZE)) {
+        return false;
+    }
 
-    return CryptoHelper::GetTLSInstance().DecryptAESGCM(
-        buffer, nonce, aad, isCorePacket);
+    return CryptoHelper::DecryptAESGCM(
+        nonce, NONCE_SIZE, aad, aadSize,
+        &packet.m_pSerializeBuffer[bodyOffset], bodySize,
+        authTag,
+        &packet.m_pSerializeBuffer[bodyOffset], bodySize,
+        sessionKeyHandle);
 }
 ```
 

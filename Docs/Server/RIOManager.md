@@ -68,8 +68,8 @@ Session N-1,2N-1,...→ rioCompletionQueues[N-1] → IO Worker Thread N-1
 
 ```cpp
 bool RIOManager::Initialize(
-    unsigned short numOfSockets,    // 전체 세션 수
-    unsigned char numOfWorkerThread // IO Worker Thread 수 (= N)
+    size_t numOfSockets,          // 전체 세션 수
+    size_t numOfWorkerThreads    // IO Worker Thread 수 (= N)
 )
 ```
 
@@ -79,14 +79,12 @@ bool RIOManager::Initialize(
     if (!LoadRIOFunctionTable()) return false;
 
     // ② 스레드당 완료 큐 생성
-    for (unsigned char i = 0; i < numOfWorkerThread; ++i) {
-        // 각 큐의 크기 = (세션 수 / 스레드 수) × 최대 Send 버퍼 배수
-        DWORD cqSize = static_cast<DWORD>(
-            std::ceil(static_cast<double>(numOfSockets) / numOfWorkerThread))
-            * MAX_SEND_BUFFER_SIZE;
-        // MAX_SEND_BUFFER_SIZE = 32 (한 번의 배치 전송에 포함되는 최대 패킷 수)
+    const size_t queueSize = numOfSockets / numOfWorkerThreads
+        * MAX_OUTSTANDING_RECEIVE;
+    for (size_t i = 0; i < numOfWorkerThreads; ++i) {
 
-        RIO_CQ cq = rioFunctionTable.RIOCreateCompletionQueue(cqSize, nullptr);
+        RIO_CQ cq = rioFunctionTable.RIOCreateCompletionQueue(
+            static_cast<ULONG>(queueSize), nullptr);
         if (cq == RIO_INVALID_CQ) {
             LOG_ERROR(std::format("RIOCreateCompletionQueue failed for thread {}", i));
             return false;
@@ -188,11 +186,13 @@ bool RIOManager::InitializeSessionRIO(
 **세션 내부 `InitializeRIO` 흐름:**
 
 ```cpp
-// RUDPSession::InitializeRIO (sessionDelegate를 통해 호출)
-bool InitializeRIO(
+// SessionRIOContext::Initialize (sessionDelegate를 통해 호출)
+bool Initialize(
+    RUDPSession& session,
     const RIO_EXTENSION_FUNCTION_TABLE& rioFunc,
     RIO_CQ recvCQ,
-    RIO_CQ sendCQ)
+    RIO_CQ sendCQ,
+    size_t pendingQueueCapacity)
 {
     // ① RecvContext 초기화
     rioContext.GetRecvBuffer().Initialize(rioFunc, sessionId, this);
@@ -207,9 +207,9 @@ bool InitializeRIO(
     // ③ RIO Request Queue 생성
     rioRQ = rioFunc.RIOCreateRequestQueue(
         socket,     // 세션 소켓
-        1,          // MaxOutstandingReceive (한 번에 1개 recv만 등록)
+        RECV_OUTSTANDING_COUNT, // MaxOutstandingReceive (현재 8)
         1,          // MaxReceiveDataBuffers
-        MAX_SEND_BUFFER_SIZE,  // MaxOutstandingSend (32개까지 배치 전송)
+        1,          // MaxOutstandingSend
         1,          // MaxSendDataBuffers
         recvCQ,     // 수신 완료 큐
         sendCQ,     // 송신 완료 큐
@@ -221,15 +221,7 @@ bool InitializeRIO(
 }
 ```
 
-**`MaxOutstandingReceive = 1` 이유:**  
-UDP는 데이터그램 기반이므로 하나의 `RIOReceiveEx`가 하나의 완전한 패킷을 수신.  
-TCP처럼 스트림을 조각내 받지 않으므로 1개 등록으로 충분하다.  
-수신 완료 직후 `RecvIOCompleted`에서 즉시 다음 `DoRecv`를 호출해 연속 수신을 유지한다.
-
-**`MaxOutstandingSend = MAX_SEND_BUFFER_SIZE = 32` 이유:**  
-`MakeSendStream`에서 32KB send 버퍼에 여러 패킷을 묶어 보내므로,  
-실제로는 1번의 `RIOSend` 호출로 처리된다. 이 값은 `MakeSendStream`의  
-배치 한도와 일치시켜야 한다.
+`RECV_OUTSTANDING_COUNT`는 세션 요청 큐가 동시에 유지할 수 있는 수신 작업 수다. 현재 값은 8이다. 송신은 32KB `MAX_SEND_BUFFER_SIZE` 버퍼에 여러 패킷을 묶더라도 하나의 `RIOSendEx` 작업으로 등록하므로 `MaxOutstandingSend`는 1이다. 버퍼의 바이트 크기와 outstanding 작업 개수는 서로 다른 단위다.
 
 ---
 
@@ -307,7 +299,7 @@ RIO_BUFFERID clientAddrBufferId = rioFunc.RIORegisterBuffer(
 // 세션 send 버퍼 (32KB)
 RIO_BUFFERID sendBufferId = rioFunc.RIORegisterBuffer(
     rioSendBuffer,
-    MAX_SEND_BUFFER_SIZE_BYTES
+    MAX_SEND_BUFFER_SIZE
 );
 ```
 
@@ -332,13 +324,12 @@ rioFunc.RIODeregisterBuffer(sendBufferId);
 ## 8. 완료 큐 크기 계산
 
 ```
-CQ 크기 = ceil(numOfSockets / numOfWorkerThread) × MAX_SEND_BUFFER_SIZE
+CQ 크기 = (numOfSockets / numOfWorkerThreads) × MAX_OUTSTANDING_RECEIVE
 
-예: numOfSockets=1000, numOfWorkerThread=4, MAX_SEND_BUFFER_SIZE=32
-  → ceil(1000/4) × 32 = 250 × 32 = 8000
+현재 샘플: numOfSockets=500, numOfWorkerThreads=4, MAX_OUTSTANDING_RECEIVE=1000
+  → (500/4) × 1000 = 125000
 
-의미: 각 IO Worker Thread가 담당하는 최대 세션(250개)에서
-      한꺼번에 최대 32개의 Send 완료가 발생해도 수용 가능
+구현은 정수 나눗셈을 사용한다. 이 크기는 각 IO Worker Thread의 RIO 완료 결과를 수용하는 CQ 용량으로 전달된다.
 ```
 
 **CQ 크기가 너무 작으면:**  

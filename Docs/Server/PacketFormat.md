@@ -9,7 +9,7 @@
 ## 목차
 
 1. [NetBuffer 내부 구조](#1-netbuffer-내부-구조)
-2. [헤더 구조 (3 bytes)](#2-헤더-구조-3-bytes)
+2. [헤더 구조 (5 bytes)](#2-헤더-구조-5-bytes)
 3. [일반 데이터 패킷 전체 레이아웃](#3-일반-데이터-패킷-전체-레이아웃)
 4. [코어 패킷 레이아웃](#4-코어-패킷-레이아웃)
 5. [PacketType별 페이로드 정의](#5-packettype별-페이로드-정의)
@@ -23,12 +23,12 @@
 
 ## 1. NetBuffer 내부 구조
 
-패킷 데이터는 `NetBuffer` 객체 내부의 고정 배열에 저장된다.
+패킷 데이터는 `NetBuffer`가 소유한 동적 버퍼에 저장된다. 기본 용량은 1024바이트이며 `Resize()`로 최대 16384바이트까지 확장할 수 있다.
 
 ```cpp
 class NetBuffer {
 public:
-    char m_pSerializeBuffer[BUFFER_DEFAULT_SIZE];  // 최대 8192 bytes
+    char* m_pSerializeBuffer;  // 기본 1024 bytes, BUFFFER_MAX=16384
 
     WORD m_iRead;       // 읽기 커서 (Serialize >> 연산이 여기서 읽음)
     WORD m_iWrite;      // 쓰기 커서 (Serialize << 연산이 여기에 씀)
@@ -52,20 +52,21 @@ EncodePacket 후: m_iWrite = m_iWriteLast  (AuthTag 포함)
 
 ---
 
-## 2. 헤더 구조 (3 bytes)
+## 2. 헤더 구조 (5 bytes)
 
 ```
 오프셋  크기   필드         값
 ─────────────────────────────────────
   0     1B    HeaderCode   NetBuffer::m_byHeaderCode (옵션 파일 PACKET_CODE)
   1     2B    PayloadLen   (m_iWrite - HEADER_SIZE + AUTH_TAG_SIZE) as uint16_t LE
+  3     2B    Reserved     레거시 RandCode/Checksum 위치
 ─────────────────────────────────────
-합계: df_HEADER_SIZE = 3 bytes
+합계: df_HEADER_SIZE = 5 bytes
 ```
 
 **PayloadLen 계산:**
 ```
-PayloadLen = 총 패킷 크기 - 헤더(3B)
+PayloadLen = 총 패킷 크기 - 헤더(5B)
            = Type(1) + Sequence(8) + [PacketId(4)] + Payload(N) + AuthTag(16)
 ```
 
@@ -84,7 +85,7 @@ static void PacketCryptoHelper::SetHeader(OUT NetBuffer& buf, int extraSize = 0)
 
 ## 3. 일반 데이터 패킷 전체 레이아웃
 
-`SEND_TYPE`, `SEND_REPLY_TYPE` (isCorePacket = false)
+`SEND_TYPE` (isCorePacket = false)
 
 ```
 Byte
@@ -93,27 +94,29 @@ Byte
  1      ├──────────────┤
         │ PayloadLen   │  2 B  (uint16_t, little-endian)
  3      ├──────────────┤
+        │ Reserved     │  2 B
+ 5      ├──────────────┤
         │ PacketType   │  1 B  (PACKET_TYPE enum)
- 4      ├──────────────┤
+ 6      ├──────────────┤
         │              │
         │ PacketSeq    │  8 B  (uint64_t)
         │              │
-12      ├──────────────┤  ← AES-GCM 암호화 시작
+14      ├──────────────┤  ← AES-GCM 암호화 시작
         │              │
         │ PacketId     │  4 B  (uint32_t)
         │              │
-16      ├──────────────┤
+18      ├──────────────┤
         │              │
         │ Payload      │  N B  (콘텐츠 데이터)
         │              │
-16+N    ├──────────────┤
+18+N    ├──────────────┤
         │              │
         │ AuthTag      │  16 B  (GCM 인증 태그)
         │              │
-16+N+16 └──────────────┘
+18+N+16 └──────────────┘
 
-← AAD 범위: [0 .. 11] (Header 3B + PacketType 1B + Sequence 8B) →
-←───────── AES-GCM 암호화 범위: [12 .. 16+N-1] ──────────────────→
+← AAD 범위: [0 .. 13] (Header 5B + PacketType 1B + Sequence 8B) →
+←───────── AES-GCM 암호화 범위: [14 .. 18+N-1] ──────────────────→
 ```
 
 ---
@@ -130,17 +133,19 @@ Byte
  1    ├──────────────┤
       │ PayloadLen   │  2 B
  3    ├──────────────┤
+      │ Reserved     │  2 B
+ 5    ├──────────────┤
       │ PacketType   │  1 B
- 4    ├──────────────┤
+ 6    ├──────────────┤
       │ PacketSeq    │  8 B
-12    ├──────────────┤  ← AES-GCM 암호화 시작
+14    ├──────────────┤  ← AES-GCM 암호화 시작
       │ Payload      │  N B  (PacketId 없음)
-12+N  ├──────────────┤
+14+N  ├──────────────┤
       │ AuthTag      │  16 B
-12+N+16 └──────────────┘
+14+N+16 └──────────────┘
 
-← AAD: [0 .. 11] →
-← AES-GCM: [12 .. 12+N-1] →
+← AAD: [0 .. 13] →
+← AES-GCM: [14 .. 14+N-1] →
 ```
 
 ---
@@ -150,7 +155,7 @@ Byte
 ### CONNECT_TYPE (C→S, isCorePacket=true)
 
 ```cpp
-// RUDPClientCore::Start() 또는 RudpSession_CS.cs
+// RUDPClientCore::Start() 또는 BotTester ClientCore/RUDPSession.cs
 NetBuffer buf;
 auto connectType = PACKET_TYPE::CONNECT_TYPE;
 PacketSequence seq = LOGIN_PACKET_SEQUENCE;  // 항상 0
@@ -286,25 +291,25 @@ enum class PACKET_DIRECTION : BYTE {
 ## 8. 오프셋 상수 전체
 
 ```cpp
-// CryptoType.h / PacketCryptoHelper.h
+// Common/etc/CoreConstants.h / PacketCryptoHelper.h
 
 // 개별 필드 크기
-constexpr size_t df_HEADER_SIZE         = 3;   // HeaderCode(1) + PayloadLen(2)
+constexpr size_t df_HEADER_SIZE         = 5;   // HeaderCode(1) + PayloadLen(2) + Reserved(2)
 constexpr size_t PACKET_TYPE_SIZE       = 1;   // sizeof(PACKET_TYPE)
 constexpr size_t SEQUENCE_SIZE          = 8;   // sizeof(PacketSequence) = sizeof(uint64_t)
 constexpr size_t PACKET_ID_SIZE         = 4;   // sizeof(PacketId) = sizeof(uint32_t)
 constexpr size_t AUTH_TAG_SIZE          = 16;  // AES-GCM 인증 태그
 
-// AAD 범위 (항상 12 bytes)
-constexpr size_t AAD_SIZE = df_HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE; // = 12
+// AAD 범위 (항상 14 bytes)
+constexpr size_t AAD_SIZE = df_HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE; // = 14
 
 // 코어 패킷 body 오프셋 (헤더 포함)
 constexpr size_t bodyOffsetWithHeaderForCorePacket
-    = df_HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE;  // = 12
+    = df_HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE;  // = 14
 
 // 일반 패킷 body 오프셋 (헤더 포함)
 constexpr size_t bodyOffsetWithHeader
-    = bodyOffsetWithHeaderForCorePacket + PACKET_ID_SIZE; // = 16
+    = bodyOffsetWithHeaderForCorePacket + PACKET_ID_SIZE; // = 18
 
 // 코어 패킷 body 오프셋 (m_iRead 기준, 헤더 제외)
 constexpr size_t bodyOffsetWithNotHeaderForCorePacket
@@ -315,7 +320,7 @@ constexpr size_t bodyOffsetWithNotHeader
     = bodyOffsetWithNotHeaderForCorePacket + PACKET_ID_SIZE; // = 13
 
 // Crypto 시작 오프셋 (= df_HEADER_SIZE)
-constexpr size_t CRYPTO_START_OFFSET = df_HEADER_SIZE; // = 3
+constexpr size_t CRYPTO_START_OFFSET = df_HEADER_SIZE; // = 5
 ```
 
 ---
@@ -357,7 +362,7 @@ ARM 또는 big-endian 플랫폼에서 클라이언트를 구현할 때는 명시
 ## 10. 버퍼 크기 제한
 
 ```cpp
-// NetBuffer::BUFFER_DEFAULT_SIZE = 8192 bytes (내부 배열 크기)
+// NetBuffer: dfDEFAULTSIZE=1024 bytes, BUFFFER_MAX=16384 bytes
 
 // RIO recv 버퍼 (세션당 고정)
 constexpr DWORD RECV_BUFFER_SIZE     = 1024 * 16;   // 16KB
@@ -368,11 +373,11 @@ constexpr DWORD MAX_SEND_BUFFER_SIZE = 1024 * 32;   // 32KB
 
 **최대 단일 패킷 크기:**
 ```
-Header(3) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 16384 (RECV_BUFFER_SIZE)
-→ N <= 16384 - 32 = 16352 bytes
+Header(5) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 16384 (RECV_BUFFER_SIZE)
+→ N <= 16384 - 34 = 16350 bytes
 ```
 
-> 단일 패킷 페이로드가 16352 bytes를 초과하면 `RecvIOCompleted`의 `memcpy_s`에서 잘린다.  
+> 단일 패킷 페이로드가 16350 bytes를 초과하면 수신 버퍼 한도를 넘으므로 정상 패킷으로 처리할 수 없다.
 > 대용량 데이터는 애플리케이션 레이어에서 분할 전송해야 한다.
 
 ---

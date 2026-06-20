@@ -412,7 +412,7 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) c
             } else if (session->IsReserved()) {
                 // ② RESERVED 세션: 30초 타임아웃 체크
                 if (sessionDelegate.CheckReservedSessionTimeout(*session, now)) {
-                    // RESERVED_SESSION_TIMEOUT_MS = 30000ms
+                    // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
                     sessionDelegate.AbortReservedSession(*session);
                     // → TryAbortReserved() CAS: RESERVED → RELEASING
                     // → CloseSocket(), InitializeSession()

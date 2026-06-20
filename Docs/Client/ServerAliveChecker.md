@@ -260,9 +260,9 @@ if (serverAliveCheckThread.get_id() == std::this_thread::get_id()) {
 **`detach` 후 스레드 상태:**
 
 ```
-detach 호출 시점: coreStopFunction() 내부 (= RunServerAliveCheck 내)
+detach 호출 시점: coreStopFunction() 내부 (= RunServerAliveCheckerThread 내)
   → isStopped = true (exchange에서 설정)
-  → RunServerAliveCheck의 break 직전
+  → RunServerAliveCheckerThread의 break 직전
   → 스레드가 곧 return으로 자연 종료됨
   → detach된 스레드는 백그라운드에서 종료
 
@@ -286,10 +286,10 @@ if (isStopped.exchange(true)) return;  // 이미 true였으면 즉시 반환
 
 ```ini
 ; 서버 설정
-HEARTBEAT_THREAD_SLEEP_MS=3000   ; 서버가 3초마다 HEARTBEAT 전송
+HEARTBEAT_THREAD_SLEEP_MS=5000   ; 현재 샘플 서버 기본값
 
 ; 클라이언트 설정
-SERVER_ALIVE_CHECK_MS=5000       ; 5초마다 시퀀스 변화 확인
+SERVER_ALIVE_CHECK_MS=15000      ; 현재 샘플 클라이언트 기본값
 ```
 
 **최소 요구 관계:**
@@ -298,11 +298,11 @@ SERVER_ALIVE_CHECK_MS=5000       ; 5초마다 시퀀스 변화 확인
 SERVER_ALIVE_CHECK_MS > HEARTBEAT_THREAD_SLEEP_MS
 
 이유:
-  서버가 3초마다 HEARTBEAT를 보냄
-  클라이언트가 5초마다 확인하면 → 최소 1개의 HEARTBEAT가 수신됨
+  서버가 5초마다 HEARTBEAT를 보냄
+  클라이언트가 15초마다 확인하면 → 최소 1개의 HEARTBEAT가 수신됨
   → 정상 감지
 
-  5초 < 3초 설정 시:
+  생존 확인 주기 < 하트비트 주기로 설정 시:
   → HEARTBEAT 오기 전에 이미 체크 → 오탐으로 Stop()
 ```
 
@@ -311,7 +311,7 @@ SERVER_ALIVE_CHECK_MS > HEARTBEAT_THREAD_SLEEP_MS
 ```
 SERVER_ALIVE_CHECK_MS >= HEARTBEAT_THREAD_SLEEP_MS × 2
 
-예: 서버 3000ms → 클라이언트 6000ms 이상
+예: 서버 5000ms → 클라이언트 10000ms 이상
   → 네트워크 지연 + 재전송으로 HEARTBEAT가 한 번 늦게 도착해도 오탐 없음
 ```
 
@@ -356,7 +356,7 @@ RUDPClientCore::Stop()
                    → isStopped=true (exchange)
                    → detach()
 
-[RunServerAliveCheck]
+[RunServerAliveCheckerThread]
   break → return → 스레드 자연 종료
 ```
 
@@ -392,5 +392,4 @@ RUDPClientCore::Stop()
 
 ### 현재 코드 기준 주의사항
 
-- 현재 헤더의 내부 스레드 함수 이름은 `RunServerAliveCheckerThread()`다.
-- 문서에 남아 있던 `RunServerAliveCheck()` 표기는 현재 코드와 맞지 않는다.
+- 내부 스레드 함수 이름은 `RunServerAliveCheckerThread()`다.

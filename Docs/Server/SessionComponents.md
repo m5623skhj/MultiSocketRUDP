@@ -302,7 +302,7 @@ bool SessionRecvContext::Initialize(
 ```cpp
 class SessionSendContext {
     // ─── RIO send 버퍼 (배치 전송용) ────────────────────────────────
-    char rioSendBuffer[MAX_SEND_BUFFER_SIZE_BYTES]; // 32KB
+    char rioSendBuffer[MAX_SEND_BUFFER_SIZE]; // 32KB
     RIO_BUFFERID sendBufferId;
 
     // ─── 재전송 추적 ─────────────────────────────────────────────────
@@ -328,9 +328,7 @@ public:
     char* GetRIOSendBuffer()    { return rioSendBuffer; }
     RIO_BUFFERID GetSendBufferId() { return sendBufferId; }
 
-    IO_MODE GetIOMode() const   { return ioMode.load(memory_order_acquire); }
-    bool TrySetIOSending();     // CAS: NONE_SENDING → SENDING
-    void SetIONoneSending();    // store: SENDING → NONE_SENDING
+    std::atomic<IO_MODE>& GetIOMode();
 
     // sendPacketInfoMap 접근
     void InsertSendPacketInfo(PacketSequence seq, SendPacketInfo* info);

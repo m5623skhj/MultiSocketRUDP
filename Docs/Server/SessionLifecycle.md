@@ -182,7 +182,7 @@ bool RUDPSession::TryConnect(
 // RUDPSession::CheckReservedSessionTimeout (세션 멤버 함수)
 bool CheckReservedSessionTimeout(unsigned long long now) const {
     return stateMachine.IsReserved()
-        && (now - sessionReservedTime >= RESERVED_SESSION_TIMEOUT_MS);  // 30000ms
+        && (now - sessionReservedTime >= reservedSessionTimeoutMs);  // 기본 30000ms
 }
 
 // RUDPSession::AbortReservedSession (세션 멤버 함수)

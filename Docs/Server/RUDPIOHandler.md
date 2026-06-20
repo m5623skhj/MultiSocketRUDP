@@ -223,7 +223,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
     for (auto* info : pendingInfos) {
         int packetSize = info->buffer->m_iWriteLast;
 
-        if (offset + packetSize > MAX_SEND_BUFFER_SIZE_BYTES) break;  // 32KB 초과
+        if (offset + packetSize > MAX_SEND_BUFFER_SIZE) break;  // 32KB 초과
         memcpy(streamBuffer + offset,
                info->buffer->m_pSerializeBuffer,
                packetSize);
@@ -262,7 +262,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 **32KB 한계:**
 
 ```
-MAX_SEND_BUFFER_SIZE_BYTES = 32768 bytes
+MAX_SEND_BUFFER_SIZE = 32768 bytes
 일반 패킷 크기 ≈ 100~500 bytes
 → 한 배치에 최대 65~327개 패킷
 
@@ -294,11 +294,11 @@ void RUDPIOHandler::IOCompleted(
 ```cpp
 {
     switch (context->ioType) {
-    case IO_TYPE::RECV:
+    case RIO_OPERATION_TYPE::OP_RECV:
         RecvIOCompleted(context, bytesTransferred, threadId);
         break;
 
-    case IO_TYPE::SEND:
+    case RIO_OPERATION_TYPE::OP_SEND:
         SendIOCompleted(context, threadId);
         break;
 
@@ -313,7 +313,7 @@ void RUDPIOHandler::IOCompleted(
 
 ```cpp
 struct IOContext {
-    IO_TYPE   ioType;         // RECV 또는 SEND
+    RIO_OPERATION_TYPE ioType; // OP_RECV 또는 OP_SEND
     RUDPSession* session;     // 소유 세션 (GetIOCompletedContext에서 설정)
     SessionIdType ownerSessionId;  // 세션 ID (소유권 확인용)
 
@@ -422,10 +422,10 @@ SendPacket()
 
 RIO 완료 큐에서 SEND 완료 디큐
   → SendIOCompleted
-       → NONE_SENDING 복원
+       → IO_NONE_SENDING 복원
        → DoSend(session, threadId) 재호출
             → 새 패킷이 있으면 다시 전송
-            → 없으면 즉시 NONE_SENDING 복원
+            → 없으면 즉시 IO_NONE_SENDING 복원
 
 [병행 시나리오]
 SendPacket() (다른 스레드):

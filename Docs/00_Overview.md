@@ -75,6 +75,7 @@
 | [[Troubleshooting]] | 연결/패킷/암호화/성능 문제 해결 |
 | [[PerformanceTuning]] | 스레드/흐름제어/재전송 파라미터 최적화 |
 | [[GettingStarted]] | 빠른 시작 (서버+BotTester) |
+| [[Testing]] | 유닛·통합·프로토콜 테스트와 PR CI 운영 |
 | [[Glossary]] | 용어집 |
 
 ## BotTester/
