@@ -394,13 +394,13 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	}
 
 	const unsigned int beforeSendSize = totalSendSize;
-	totalSendSize += useSize;
-	if (totalSendSize >= MAX_SEND_BUFFER_SIZE)
+	if (beforeSendSize + useSize > MAX_SEND_BUFFER_SIZE)
 	{
 		sessionDelegate.SetReservedSendPacketInfo(session, sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL;
 	}
 
+	totalSendSize += useSize;
 	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
 	{
 		SendPacketInfo::Free(sendPacketInfo);
