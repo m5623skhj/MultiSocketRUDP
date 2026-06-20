@@ -71,6 +71,12 @@ jobs:
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
 
+      - name: Build C# protocol interop test
+        run: dotnet build MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug
+
+      - name: Run C# protocol interop test
+        run: dotnet run --project MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug --no-build
+
       - name: Run GTests with Retry
         shell: pwsh
         run: |
