@@ -18,6 +18,12 @@ namespace MultiSocketRUDPBotTester.Bot
             return nextNode;
         }
 
+        private string? execCountKey;
+        private string? metricFullKey;
+
+        internal string ExecCountKey => execCountKey ??= "__exec_" + Name;
+        internal string MetricFullKey => metricFullKey ??= "__metric_" + Name + "_time";
+        
         private static volatile NodeStatsTracker? _statsTracker;
         public static void SetStatsTracker(NodeStatsTracker? tracker) => _statsTracker = tracker;
         internal static NodeStatsTracker? GetStatsTracker() => _statsTracker;

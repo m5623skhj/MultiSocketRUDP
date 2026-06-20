@@ -75,12 +75,12 @@ namespace MultiSocketRUDPBotTester.Bot
 
             foreach (var node in candidates.Where(n => n.Trigger?.Matches(triggerType, packetId, buffer) == true))
             {
-                Log.Information("Triggering node: {NodeName} (Type: {TriggerType})", node.Name, triggerType);
+                Log.Debug("Triggering node: {NodeName} (Type: {TriggerType})", node.Name, triggerType);
                 try
                 {
                     var visited = new HashSet<ActionNodeBase>();
                     NodeExecutionHelper.ExecuteChainWithStats(client, node, buffer, visited);
-                    Log.Information("Node executed successfully: {NodeName}", node.Name);
+                    Log.Debug("Node executed successfully: {NodeName}", node.Name);
                 }
                 catch (Exception ex)
                 {
