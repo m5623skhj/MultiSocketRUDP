@@ -2,6 +2,23 @@
 #include <gtest/gtest.h>
 
 #include "../MultiSocketRUDPServer/SessionSocketContext.h"
+#include "../MultiSocketRUDPServer/RUDPSession.h"
+#include "../MultiSocketRUDPServer/MultiSocketRUDPCore.h"
+
+namespace
+{
+	class SessionBehaviorTestSession final : public RUDPSession
+	{
+	public:
+		explicit SessionBehaviorTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
+	};
+
+	class NoOpPacket final : public IPacket
+	{
+	public:
+		PacketId GetPacketId() const override { return 1; }
+	};
+}
 
 class SessionSocketContextTest : public ::testing::Test
 {
@@ -49,4 +66,16 @@ TEST_F(SessionSocketContextTest, GetSocketMutex_ReturnsStableReference)
 	auto& second = context.GetSocketMutex();
 
 	EXPECT_EQ(&first, &second);
+}
+
+TEST(RUDPSessionBehaviorTest, DisconnectedSessionRejectsSendAndDisconnectTransition)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	NoOpPacket packet;
+
+	EXPECT_FALSE(session.SendPacket(packet));
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::DISCONNECTED);
+	EXPECT_FALSE(session.IsReleasing());
 }

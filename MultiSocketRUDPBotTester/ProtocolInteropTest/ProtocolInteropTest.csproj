@@ -11,4 +11,7 @@
     <Compile Include="..\MultiSocketRUDPBotTester\ClientCore\CryptoHelper.cs" Link="ClientCore\CryptoHelper.cs" />
     <Compile Include="..\MultiSocketRUDPBotTester\Buffer\NetBuffer.cs" Link="Buffer\NetBuffer.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="ProtocolInteropVector.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

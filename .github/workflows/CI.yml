@@ -1,0 +1,91 @@
+name: PR CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  classify_changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.filter.outputs.server }}
+      bot_tester: ${{ steps.filter.outputs.bot_tester }}
+
+    steps:
+      - name: Classify changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            server:
+              - 'MultiSocketRUDP/**'
+              - 'CoreTest/**'
+              - 'external/CommonCode/**'
+              - '.gitmodules'
+              - '.github/workflows/GoogleTest.yml'
+              - '.github/workflows/CI.yml'
+              - 'MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json'
+            bot_tester:
+              - 'MultiSocketRUDPBotTester/**'
+              - '.github/workflows/BotTester.yml'
+              - '.github/workflows/CI.yml'
+
+  native_gtest:
+    name: Native GTest
+    needs: classify_changes
+    if: needs.classify_changes.outputs.server == 'true'
+    uses: ./.github/workflows/GoogleTest.yml
+    secrets: inherit
+
+  bot_tester:
+    name: BotTester Protocol Interop
+    needs: classify_changes
+    if: needs.classify_changes.outputs.bot_tester == 'true'
+    uses: ./.github/workflows/BotTester.yml
+
+  ci_gate:
+    name: CI Gate
+    if: always()
+    needs: [classify_changes, native_gtest, bot_tester]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify required CI results
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify_changes.result }}
+          SERVER_CHANGED: ${{ needs.classify_changes.outputs.server }}
+          BOT_TESTER_CHANGED: ${{ needs.classify_changes.outputs.bot_tester }}
+          NATIVE_RESULT: ${{ needs.native_gtest.result }}
+          BOT_TESTER_RESULT: ${{ needs.bot_tester.result }}
+        run: |
+          if [ "$CLASSIFIER_RESULT" != "success" ]; then
+            echo "Change classification failed: $CLASSIFIER_RESULT"
+            exit 1
+          fi
+
+          if [ "$SERVER_CHANGED" = "true" ] && [ "$NATIVE_RESULT" != "success" ]; then
+            echo "Native GTest was required but did not succeed: $NATIVE_RESULT"
+            exit 1
+          fi
+
+          if [ "$BOT_TESTER_CHANGED" = "true" ] && [ "$BOT_TESTER_RESULT" != "success" ]; then
+            echo "BotTester test was required but did not succeed: $BOT_TESTER_RESULT"
+            exit 1
+          fi
+
+          if [ "$SERVER_CHANGED" != "true" ] && [ "$NATIVE_RESULT" != "skipped" ]; then
+            echo "Native GTest was not required but returned: $NATIVE_RESULT"
+            exit 1
+          fi
+
+          if [ "$BOT_TESTER_CHANGED" != "true" ] && [ "$BOT_TESTER_RESULT" != "skipped" ]; then
+            echo "BotTester test was not required but returned: $BOT_TESTER_RESULT"
+            exit 1
+          fi
+
+          echo "All applicable CI workflows succeeded."

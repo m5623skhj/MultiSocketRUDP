@@ -1,22 +1,29 @@
 using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.ClientCore;
 using System.Security.Cryptography;
+using System.Text.Json;
 
-const ulong sequence = 0x0102030405060708UL;
-var key = Enumerable.Range(1, 16).Select(value => (byte)value).ToArray();
-var salt = Enumerable.Range(0, 16).Select(value => (byte)(0xA0 + value)).ToArray();
+var vectorPath = Path.Combine(AppContext.BaseDirectory, "ProtocolInteropVector.json");
+var testVector = JsonSerializer.Deserialize<ProtocolInteropVector>(
+    File.ReadAllText(vectorPath),
+    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+    ?? throw new InvalidOperationException("Protocol interop vector is empty.");
+
+var key = Convert.FromHexString(testVector.KeyHex);
+var salt = Convert.FromHexString(testVector.SaltHex);
+var plaintext = Convert.FromHexString(testVector.PlaintextHex);
 
 NetBuffer.HeaderCode = 0xCC;
 var packet = new NetBuffer(128);
 packet.ReserveHeader();
-packet.WriteBytes([0xDE, 0xAD, 0xBE, 0xEF]);
-packet.InsertPacketType(PacketType.SendType);
-packet.InsertPacketSequence(sequence);
-packet.InsertPacketId((PacketId)0x4D);
+packet.WriteBytes(plaintext);
+packet.InsertPacketType((PacketType)testVector.PacketType);
+packet.InsertPacketSequence(testVector.Sequence);
+packet.InsertPacketId((PacketId)testVector.PacketId);
 
 using var aes = new AesGcm(key, CryptoHelper.AuthTagSize);
-NetBuffer.EncodePacket(aes, packet, sequence, PacketDirection.ServerToClient, salt, false);
-const string expectedPacketHex = "CC210000000308070605040302014D0000000F36689548DC6A5962DE6CAA96BDA1A957E7E28B";
+NetBuffer.EncodePacket(aes, packet, testVector.Sequence, PacketDirection.ServerToClient, salt, false);
+var expectedPacketHex = testVector.EncodedPacketHex.ToUpperInvariant();
 var actualPacketHex = Convert.ToHexString(packet.GetPacketBuffer());
 if (actualPacketHex != expectedPacketHex)
 {
@@ -29,3 +36,12 @@ if (!NetBuffer.DecodePacket(aes, packet, false, salt, PacketDirection.ServerToCl
 }
 
 Console.WriteLine("C# protocol interop vector passed.");
+
+internal sealed record ProtocolInteropVector(
+    ulong Sequence,
+    string KeyHex,
+    string SaltHex,
+    byte PacketType,
+    uint PacketId,
+    string PlaintextHex,
+    string EncodedPacketHex);

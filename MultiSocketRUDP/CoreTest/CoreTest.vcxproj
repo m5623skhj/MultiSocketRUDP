@@ -22,6 +22,7 @@
     <ClCompile Include="..\..\CoreTest\subhook\subhook.c" />
     <ClCompile Include="GoogleTest.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="CryptoHelperTest.cpp" />
     <ClCompile Include="PacketManagerTest.cpp" />
     <ClCompile Include="RUDPFlowControllerTest.cpp" />
     <ClCompile Include="RUDPFlowManagerTest.cpp" />
@@ -29,13 +30,20 @@
     <ClCompile Include="RUDPPacketProcessorTest.cpp" />
     <ClCompile Include="RUDPReceiveWindowTest.cpp" />
     <ClCompile Include="RUDPSessionTest.cpp" />
+    <ClCompile Include="RUDPSessionManagerTest.cpp" />
     <ClCompile Include="SessionCryptoContextTest.cpp" />
     <ClCompile Include="SessionPacketOrdererTest.cpp" />
     <ClCompile Include="SessionStateMachineTest.cpp" />
+    <ClCompile Include="SessionSendContextTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile Include="..\..\external\CommonCode\Common\googletest-main\googletest\src\gtest-all.cc" />
