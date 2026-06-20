@@ -1,0 +1,26 @@
+name: BotTester Protocol Interop
+
+on:
+  workflow_call:
+
+jobs:
+  protocol-interop:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build BotTester solution
+        run: dotnet build MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.sln --configuration Debug
+
+      - name: Build C# protocol interop test
+        run: dotnet build MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug
+
+      - name: Run C# protocol interop test
+        run: dotnet run --project MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug --no-build

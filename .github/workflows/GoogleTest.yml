@@ -1,8 +1,10 @@
-name: Native PR CI - GTest
+name: Native GTest
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_call:
+    secrets:
+      SUBMODULE_ACCESS_TOKEN:
+        required: false
 
 jobs:
   build-and-test:
@@ -18,7 +20,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN }}
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN || github.token }}
 
       - name: Cache NuGet
         uses: actions/cache@v4
@@ -71,13 +73,7 @@ jobs:
       - name: Build Solution (x64 Debug)
         run: msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /p:Configuration=Debug /p:Platform=x64
 
-      - name: Build C# protocol interop test
-        run: dotnet build MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug
-
-      - name: Run C# protocol interop test
-        run: dotnet run --project MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug --no-build
-
-      - name: Run GTests with Retry
+      - name: Run native GTests with Retry
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
@@ -87,8 +83,8 @@ jobs:
           $crashedRuns = @()
 
           function Parse-XmlFailures($xmlPath, [ref]$failedList) {
-              if (!(Test-Path $xmlPath)) { return }
-              try { [xml]$xml = Get-Content $xmlPath } catch { return }
+              if (!(Test-Path $xmlPath)) { return $false }
+              try { [xml]$xml = Get-Content $xmlPath -Raw -ErrorAction Stop } catch { return $false }
 
               if ($xml.testsuites -and $xml.testsuites.testsuite) {
                   foreach ($suite in @($xml.testsuites.testsuite)) {
@@ -99,23 +95,32 @@ jobs:
                       }
                   }
               }
+              return $true
           }
 
-          Get-ChildItem -Recurse -Filter "*Test.exe" |
-          Where-Object { $_.FullName -match "Debug" } |
-          ForEach-Object {
-              $exePath = $_.FullName
-              $xmlPath = Join-Path $_.DirectoryName "test_result.xml"
+          $gtestExecutables = @(Get-ChildItem -Recurse -Filter "*Test.exe" |
+            Where-Object {
+              $_.Name -in @("CoreTest.exe", "IntegrationTest.exe") -and
+              $_.FullName -match "x64\\Debug"
+            })
+
+          if ($gtestExecutables.Count -ne 2) {
+              $crashedRuns += "Expected 2 native GTest executables, found $($gtestExecutables.Count)"
+          }
+
+          foreach ($testExecutable in $gtestExecutables) {
+              $exePath = $testExecutable.FullName
+              $xmlPath = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_test_result.xml"
+              Remove-Item $xmlPath -Force -ErrorAction SilentlyContinue
 
               & $exePath --gtest_output=xml:$xmlPath
               $exeExitCode = $LASTEXITCODE
 
-              if (!(Test-Path $xmlPath)) {
-                $crashedRuns += "$($_.Name) (exit=$exeExitCode, result SML not produced)"
-              }
-
               $temp = @()
-              Parse-XmlFailures $xmlPath ([ref]$temp)
+              $xmlValid = Parse-XmlFailures $xmlPath ([ref]$temp)
+              if (-not $xmlValid -or $exeExitCode -notin @(0, 1) -or ($exeExitCode -ne 0 -and $temp.Count -eq 0)) {
+                  $crashedRuns += "$($testExecutable.Name) (exit=$exeExitCode, valid result XML=$xmlValid)"
+              }
 
               foreach ($t in $temp) {
                   $failedTests += "$($t.classname).$($t.name)"
@@ -125,19 +130,21 @@ jobs:
           if ($failedTests.Count -gt 0) {
               $filter = $failedTests -join ":"
 
-              Get-ChildItem -Recurse -Filter "*Test.exe" |
-              Where-Object { $_.FullName -match "Debug" } |
-              ForEach-Object {
-                  $exePath = $_.FullName
-                  $retryXml = Join-Path $_.DirectoryName "retry_result.xml"
+              foreach ($testExecutable in $gtestExecutables) {
+                  $exePath = $testExecutable.FullName
+                  $retryXml = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_retry_result.xml"
+                  Remove-Item $retryXml -Force -ErrorAction SilentlyContinue
 
                   & $exePath --gtest_filter=$filter --gtest_output=xml:$retryXml
                   $retryExitCode = $LASTEXITCODE
 
-                  if (!(Test-Path $retryXml)) {
-                    $crashedRuns += "$($_.Name) retry (exit=$retryExitCode, result XML not produced)"
+                  $retryFailures = @()
+                  $retryXmlValid = Parse-XmlFailures $retryXml ([ref]$retryFailures)
+                  if (-not $retryXmlValid -or $retryExitCode -notin @(0, 1) -or ($retryExitCode -ne 0 -and $retryFailures.Count -eq 0)) {
+                      $crashedRuns += "$($testExecutable.Name) retry (exit=$retryExitCode, valid result XML=$retryXmlValid)"
                   }
-                  Parse-XmlFailures $retryXml ([ref]$finalFailed)
+
+                  $finalFailed += $retryFailures
               }
           }
 
