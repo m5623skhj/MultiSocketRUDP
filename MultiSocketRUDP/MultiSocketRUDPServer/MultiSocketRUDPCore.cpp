@@ -92,12 +92,14 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	if (sessionManager == nullptr)
 	{
 		LOG_ERROR("Session manager creation failed");
+		StopServer();
 		return false;
 	}
 
 	if (not sessionManager->Initialize(numOfWorkerThread, std::move(factoryFunc)))
 	{
 		LOG_ERROR("Session factory function is not set");
+		StopServer();
 		return false;
 	}
 
