@@ -79,6 +79,7 @@ public:
 private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
 	void PushToDisconnectTargetSession(RUDPSession& session) override;
+	void StopLoggerThread();
 
 private:
 	void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);

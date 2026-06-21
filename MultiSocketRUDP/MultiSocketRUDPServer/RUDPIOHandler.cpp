@@ -231,6 +231,7 @@ bool RUDPIOHandler::TryRIOSend(RUDPSession& session, IOContext* context) const
 		if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
 		{
 			releaseIOSending();
+			contextPool.Free(context);
 			return false;
 		}
 

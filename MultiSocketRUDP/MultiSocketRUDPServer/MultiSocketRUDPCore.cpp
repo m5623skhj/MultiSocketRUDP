@@ -76,6 +76,7 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	if (not ReadOptionFile(coreOptionFilePath, sessionBrokerOptionFilePath))
 	{
 		LOG_ERROR("Option file read failed");
+		StopLoggerThread();
 		return false;
 	}
 
@@ -164,11 +165,7 @@ void MultiSocketRUDPCore::StopServer()
 
 	ClearAllSession();
 	MultiSocketRUDPCoreFunctionDelegate::Instance().Clear(*this);
-
-	const auto log = Logger::MakeLogObject<ServerLog>();
-	log->logString = "Server stop";
-	Logger::GetInstance().WriteLog(log);
-	Logger::GetInstance().StopLoggerThread();
+	StopLoggerThread();
 
 	WSACleanup();
 	isServerStopped = true;
@@ -308,6 +305,14 @@ void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 	session.onSessionReleaseTime = GetTickCount64();
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 	SetEvent(sessionReleaseEventHandle);
+}
+
+void MultiSocketRUDPCore::StopLoggerThread()
+{
+	const auto log = Logger::MakeLogObject<ServerLog>();
+	log->logString = "Server stop";
+	Logger::GetInstance().WriteLog(log);
+	Logger::GetInstance().StopLoggerThread();
 }
 
 void MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, const BYTE threadId)
