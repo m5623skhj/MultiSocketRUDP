@@ -1,4 +1,4 @@
-﻿using static MultiSocketRUDPBotTester.BotActionGraphWindow;
+using static MultiSocketRUDPBotTester.BotActionGraphWindow;
 using System.Windows.Controls;
 using System.Windows;
 

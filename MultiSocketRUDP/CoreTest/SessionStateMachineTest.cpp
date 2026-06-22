@@ -2,25 +2,25 @@
 #include "SessionStateMachine.h"
 
 // ============================================================
-// SessionStateMachine ´ÜÀ§ Å×½ºÆ®
+// SessionStateMachine ë‹¨ìœ„ í…ŒìŠ¤íŠ¸
 //
-// »óÅÂ ÀüÀÌµµ:
+// ìƒíƒœ ì „ì´ë„:
 //
 //   [DISCONNECTED]
-//	   ¦¢
-//	   ¦¢ SetReserved()
-//	   ¡å
-//   [RESERVED] ¦¡¦¡TryAbortReserved() ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
-//	   ¦¢										 ¦¢
-//	   ¦¢ TryTransitionToConnected()			 ¦¢
-//	   ¡å										 ¡å
-//   [CONNECTED] ¦¡¦¡TryTransitionToReleasing()¦¡¦¡¢º[RELEASING]
-//	   ¦¢										 ¦¢
-//	   ¦¦¦¡¦¡TryTransitionToReleasing()¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
-//												 ¦¢
+//	   â”‚
+//	   â”‚ SetReserved()
+//	   â–¼
+//   [RESERVED] â”€â”€TryAbortReserved() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//	   â”‚										 â”‚
+//	   â”‚ TryTransitionToConnected()			 â”‚
+//	   â–¼										 â–¼
+//   [CONNECTED] â”€â”€TryTransitionToReleasing()â”€â”€â–¶[RELEASING]
+//	   â”‚										 â”‚
+//	   â””â”€â”€TryTransitionToReleasing()â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//												 â”‚
 //										  SetDisconnected()
-//												 ¦¢
-//												 ¡å
+//												 â”‚
+//												 â–¼
 //										   [DISCONNECTED]
 // ============================================================
 
@@ -31,7 +31,7 @@ protected:
 };
 
 // ------------------------------------------------------------
-// 1. ÃÊ±â »óÅÂ
+// 1. ì´ˆê¸° ìƒíƒœ
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, InitialState_IsDisconnected)
 {
@@ -43,7 +43,7 @@ TEST_F(SessionStateMachineTest, InitialState_IsDisconnected)
 }
 
 // ------------------------------------------------------------
-// 2. DISCONNECTED ¡æ RESERVED
+// 2. DISCONNECTED â†’ RESERVED
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, SetReserved_TransitionsToReserved)
 {
@@ -57,7 +57,7 @@ TEST_F(SessionStateMachineTest, SetReserved_TransitionsToReserved)
 }
 
 // ------------------------------------------------------------
-// 3. RESERVED ¡æ CONNECTED
+// 3. RESERVED â†’ CONNECTED
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, TryTransitionToConnected_FromReserved_Succeeds)
 {
@@ -92,7 +92,7 @@ TEST_F(SessionStateMachineTest, TryTransitionToConnected_AlreadyConnected_Fails)
 }
 
 // ------------------------------------------------------------
-// 4. RESERVED/CONNECTED ¡æ RELEASING (TryTransitionToReleasing)
+// 4. RESERVED/CONNECTED â†’ RELEASING (TryTransitionToReleasing)
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, TryTransitionToReleasing_FromReserved_Succeeds)
 {
@@ -137,8 +137,8 @@ TEST_F(SessionStateMachineTest, TryTransitionToReleasing_AlreadyReleasing_Fails)
 }
 
 // ------------------------------------------------------------
-// 5. RESERVED ¡æ RELEASING (TryAbortReserved)
-//	RESERVED »óÅÂ¿¡¼­¸¸ ¼º°ø
+// 5. RESERVED â†’ RELEASING (TryAbortReserved)
+//	RESERVED ìƒíƒœì—ì„œë§Œ ì„±ê³µ
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, TryAbortReserved_FromReserved_Succeeds)
 {
@@ -169,7 +169,7 @@ TEST_F(SessionStateMachineTest, TryAbortReserved_FromDisconnected_Fails)
 }
 
 // ------------------------------------------------------------
-// 6. RELEASING ¡æ DISCONNECTED (SetDisconnected)
+// 6. RELEASING â†’ DISCONNECTED (SetDisconnected)
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, SetDisconnected_AfterReleasing_TransitionsToDisconnected)
 {
@@ -208,7 +208,7 @@ TEST_F(SessionStateMachineTest, Reset_FromReleasing_ResetsToDisconnected)
 }
 
 // ------------------------------------------------------------
-// 8. IsUsingSession: RESERVED || CONNECTED¸¸ true
+// 8. IsUsingSession: RESERVED || CONNECTEDë§Œ true
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, IsUsingSession_TrueOnlyForReservedAndConnected)
 {
@@ -228,7 +228,7 @@ TEST_F(SessionStateMachineTest, IsUsingSession_TrueOnlyForReservedAndConnected)
 }
 
 // ------------------------------------------------------------
-// 9. ÀüÃ¼ »ı¸íÁÖ±â ½Ã³ª¸®¿À
+// 9. ì „ì²´ ìƒëª…ì£¼ê¸° ì‹œë‚˜ë¦¬ì˜¤
 // ------------------------------------------------------------
 TEST_F(SessionStateMachineTest, FullLifecycle_ReserveConnectRelease)
 {

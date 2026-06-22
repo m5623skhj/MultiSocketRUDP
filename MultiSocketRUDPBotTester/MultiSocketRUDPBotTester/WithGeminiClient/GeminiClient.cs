@@ -1,4 +1,4 @@
-﻿using Google.GenAI;
+using Google.GenAI;
 using Google.GenAI.Types;
 using Microsoft.Extensions.Configuration;
 

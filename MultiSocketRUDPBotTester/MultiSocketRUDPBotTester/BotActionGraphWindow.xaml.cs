@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Win32;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.CanvasRenderer;

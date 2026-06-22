@@ -1,4 +1,4 @@
-﻿using System.CodeDom;
+using System.CodeDom;
 using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot

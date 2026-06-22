@@ -1,4 +1,4 @@
-﻿// Global usings
+// Global usings
 global using SessionIdType = ushort;
 
 // Global constants

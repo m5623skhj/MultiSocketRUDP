@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
+using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.Contents.Client;
 using System.CodeDom;
 using System.Collections.Concurrent;

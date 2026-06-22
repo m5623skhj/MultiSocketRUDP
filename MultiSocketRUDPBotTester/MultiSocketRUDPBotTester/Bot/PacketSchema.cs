@@ -1,4 +1,4 @@
-﻿namespace MultiSocketRUDPBotTester.Bot
+namespace MultiSocketRUDPBotTester.Bot
 {
     public enum FieldType
     {

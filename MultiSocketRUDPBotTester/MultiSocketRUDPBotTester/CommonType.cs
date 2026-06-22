@@ -1,4 +1,4 @@
-﻿global using PacketSequence = ulong;
+global using PacketSequence = ulong;
 global using PacketRetransmissionCount = ushort;
 
 public enum PacketType : byte

@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
+using MultiSocketRUDPBotTester.Buffer;
 
 namespace MultiSocketRUDPBotTester.Contents.Client.Action
 {

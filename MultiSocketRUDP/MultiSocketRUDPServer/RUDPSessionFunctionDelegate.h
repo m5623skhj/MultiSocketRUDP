@@ -20,7 +20,7 @@ class RUDPIOHandler;
 class RUDPSessionBroker;
 
 // ----------------------------------------
-// @brief RUDPSession Å¬·¡½ºÀÇ Æ¯Á¤ private/protected ¸Ş¼­µå¿¡ ´ëÇÑ Á¢±ÙÀ» À§ÀÓÇÏ´Â Å¬·¡½ºÀÔ´Ï´Ù.
+// @brief RUDPSession í´ë˜ìŠ¤ì˜ íŠ¹ì • private/protected ë©”ì„œë“œì— ëŒ€í•œ ì ‘ê·¼ì„ ìœ„ì„í•˜ëŠ” í´ë˜ìŠ¤ì…ë‹ˆë‹¤.
 // ----------------------------------------
 class RUDPSessionFunctionDelegate : public ISessionDelegate
 {

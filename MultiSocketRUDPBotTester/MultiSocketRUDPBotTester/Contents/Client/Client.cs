@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.ClientCore;
 using Serilog;

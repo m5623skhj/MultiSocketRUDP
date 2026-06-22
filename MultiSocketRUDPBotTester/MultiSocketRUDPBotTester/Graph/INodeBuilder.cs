@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.Bot;
 
 namespace MultiSocketRUDPBotTester.Graph
 {

@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.Graph;
 

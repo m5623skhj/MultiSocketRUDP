@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.Bot;
 using System.Globalization;
 
 namespace MultiSocketRUDPBotTester.Evaluation

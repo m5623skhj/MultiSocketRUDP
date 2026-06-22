@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using MultiSocketRUDPBotTester.Buffer;
 using System.Net;
 using System.Net.Sockets;

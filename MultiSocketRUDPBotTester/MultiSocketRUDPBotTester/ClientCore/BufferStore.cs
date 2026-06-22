@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Buffer;
+using MultiSocketRUDPBotTester.Buffer;
 
 public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSequence)
 {

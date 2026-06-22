@@ -1,4 +1,4 @@
-﻿using System.Net.Security;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 

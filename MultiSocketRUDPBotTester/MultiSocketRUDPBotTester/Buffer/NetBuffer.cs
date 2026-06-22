@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.ClientCore;
+using MultiSocketRUDPBotTester.ClientCore;
 using System.Security.Cryptography;
 
 namespace MultiSocketRUDPBotTester.Buffer

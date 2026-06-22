@@ -1,4 +1,4 @@
-﻿using MultiSocketRUDPBotTester.Bot;
+using MultiSocketRUDPBotTester.Bot;
 using System.Windows;
 using System.Windows.Controls;
 using static System.Enum;

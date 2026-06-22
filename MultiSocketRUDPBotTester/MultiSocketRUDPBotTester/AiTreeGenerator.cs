@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using MultiSocketRUDPBotTester.AI;
 using MultiSocketRUDPBotTester.Bot;
 using WpfCanvas = System.Windows.Controls.Canvas;
