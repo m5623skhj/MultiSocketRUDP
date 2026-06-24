@@ -69,6 +69,10 @@ TEST_F(RUDPSessionManagerTest, ConcurrentAcquireNeverReturnsDuplicateSession)
 	EXPECT_EQ(uniqueIds.size(), maxSessions);
 }
 
+// 주어진 세션 ID가 유효하지 않을 때 RUDPSessionManager의 ReleaseSession 메서드가 실패하는지 테스트합니다.
+// 세션이 해제되지 않으므로 GetUnusedSessionCount는 초기 maxSessions 값을 유지해야 합니다.
+// 실패 조건: ReleaseSession은 유효하지 않은 세션 ID에 대해 false를 반환합니다.
+// 상태 변화: GetUnusedSessionCount는 변경되지 않고 maxSessions와 동일하게 유지됩니다.
 TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsInvalidSessionId)
 {
 	constexpr unsigned short maxSessions = 2;
@@ -79,6 +83,10 @@ TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsInvalidSessionId)
 	EXPECT_EQ(manager.GetUnusedSessionCount(), maxSessions);
 }
 
+// 세션이 해제 대기 중이 아닐 때 RUDPSessionManager의 ReleaseSession 메서드가 세션을 해제하지 못하는지 테스트합니다.
+// 세션을 획득한 후 ReleaseSession을 호출하면 실패해야 하며, 사용 중인 세션 수는 변경되지 않아야 합니다.
+// 실패 조건: ReleaseSession은 해제 대기 중이 아닌 세션 ID에 대해 false를 반환합니다.
+// 상태 변화: AcquireSession 호출 후 GetUnusedSessionCount는 0을 유지하며, ReleaseSession 호출에 의해 변경되지 않습니다.
 TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsSessionThatIsNotReleasing)
 {
 	constexpr unsigned short maxSessions = 1;
@@ -92,6 +100,10 @@ TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsSessionThatIsNotReleasing)
 	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
 }
 
+// 재전송으로 인한 연결 끊김 발생 시 RUDPSessionManager의 연결 통계가 정확하게 갱신되는지 확인합니다.
+// IncrementConnectedCount 호출 후 DISCONNECT_REASON::BY_RETRANSMISSION으로 DecrementConnectedCount를 호출하면,
+// 현재 세션 수는 0으로, 총 연결 수는 1로, 총 연결 끊김 수는 1로, 재전송으로 인한 연결 끊김 수는 1로 기록되어야 합니다.
+// 상태 변화: GetNowSessionCount는 0이 되고, GetAllConnectedCount는 1u로, GetAllDisconnectedCount는 1u로, GetAllDisconnectedByRetransmissionCount는 1u로 업데이트됩니다.
 TEST_F(RUDPSessionManagerTest, DecrementConnectedCountTracksRetransmissionDisconnect)
 {
 	RUDPSessionManager manager{ 0, core, delegate };
@@ -105,6 +117,10 @@ TEST_F(RUDPSessionManagerTest, DecrementConnectedCountTracksRetransmissionDiscon
 	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 1u);
 }
 
+// DISCONNECT_REASON::BY_ABORT_RESERVED가 RUDPSessionManager의 세션 수 감소에 영향을 미치지 않는지 확인합니다.
+// 이 종료 사유는 현재 세션 수에 영향을 주지 않아야 합니다.
+// 상태 변화: IncrementConnectedCount 호출 후 DecrementConnectedCount(BY_ABORT_RESERVED)를 호출해도 GetNowSessionCount는 1을 유지하며,
+// 연결 끊김 관련 통계는 업데이트되지 않습니다.
 TEST_F(RUDPSessionManagerTest, DecrementConnectedCountIgnoresAbortReserved)
 {
 	RUDPSessionManager manager{ 0, core, delegate };
