@@ -1076,7 +1076,12 @@ def main():
     log.info("=" * 50)
 
     if fail_count > 0:
-        set_status("failure", "AI processing partially failed", commit_sha)
+        log.warning(
+            "AI review completed with %d failed batch(es). "
+            "Keeping status successful because Gemini availability is external to CI.",
+            fail_count
+        )
+        set_status("success", "AI review partially completed", commit_sha)
     else:
         set_status("success", "AI comment generation completed", commit_sha)
 
