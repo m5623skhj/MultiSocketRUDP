@@ -1,11 +1,20 @@
 #include "PreCompile.h"
 #include <gtest/gtest.h>
 
+#include <array>
+#include <format>
+#include <vector>
+
 #include "RUDPPacketProcessor.h"
 #include "RUDPSessionManager.h"
 #include "MultiSocketRUDPCore.h"
 #include "MockSessionDelegate.h"
 #include "NetServerSerializeBuffer.h"
+#include "../Common/Crypto/CryptoHelper.h"
+#ifndef LOG_ERROR
+#define LOG_ERROR(...) ((void)0)
+#endif
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 // ============================================================
 // 테스트용 최소 RUDPSession 서브클래스
@@ -17,6 +26,43 @@ public:
     explicit PacketProcessorTestSession(MultiSocketRUDPCore& inCore)
         : RUDPSession(inCore) {
     }
+};
+
+class PacketProcessorTestKey
+{
+public:
+    PacketProcessorTestKey()
+    {
+        for (size_t i = 0; i < key.size(); ++i)
+        {
+            key[i] = static_cast<unsigned char>(i + 1);
+        }
+
+        keyObject.resize(CryptoHelper::GetTLSInstance().GetKeyObjectSize());
+        handle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObject.data(), key.data());
+    }
+
+    ~PacketProcessorTestKey()
+    {
+        CryptoHelper::DestroySymmetricKeyHandle(handle);
+    }
+
+    [[nodiscard]]
+    BCRYPT_KEY_HANDLE Get() const
+    {
+        return handle;
+    }
+
+    [[nodiscard]]
+    const unsigned char* GetRawKey() const
+    {
+        return key.data();
+    }
+
+private:
+    std::array<unsigned char, SESSION_KEY_SIZE> key{};
+    std::vector<unsigned char> keyObject;
+    BCRYPT_KEY_HANDLE handle{};
 };
 
 // ============================================================
@@ -173,10 +219,57 @@ protected:
     // ProcessByPacketType 의 null keyHandle 검사를 통과시킨다.
     // dummyKeyHandle = reinterpret_cast<BCRYPT_KEY_HANDLE>(1) — non-null 포인터
     // BCrypt 는 minimumSize 체크 이전에 호출되지 않으므로 crash 없음 (상단 설명 참조)
+    static NetBuffer* MakeHeaderOnlyReceiveBuffer()
+    {
+        NetBuffer* buf = NetBuffer::Alloc();
+        buf->m_iRead = df_HEADER_SIZE;
+        buf->m_iWrite = df_HEADER_SIZE;
+        *reinterpret_cast<WORD*>(&buf->m_pSerializeBuffer[1]) = 0;
+        return buf;
+    }
+
+    static NetBuffer* MakeEncryptedReceiveBuffer(
+        const PACKET_TYPE packetType,
+        const PacketSequence packetSequence,
+        const PacketId packetId,
+        const BCRYPT_KEY_HANDLE keyHandle,
+        const unsigned char* salt,
+        const bool isCorePacket,
+        const PACKET_DIRECTION direction)
+    {
+        NetBuffer* buf = NetBuffer::Alloc();
+        *buf << packetType << packetSequence;
+        if (not isCorePacket)
+        {
+            *buf << packetId;
+        }
+
+        PacketCryptoHelper::EncodePacket(
+            *buf,
+            packetSequence,
+            direction,
+            salt,
+            SESSION_SALT_SIZE,
+            keyHandle,
+            isCorePacket
+        );
+        buf->m_iRead = df_HEADER_SIZE;
+        return buf;
+    }
+
     void SetupFakeKeyHandle()
     {
         mockDelegate.dummyKeyHandle = reinterpret_cast<BCRYPT_KEY_HANDLE>(1);
     }
+
+    void SetupRealCrypto()
+    {
+        ASSERT_NE(testKey.Get(), nullptr);
+        mockDelegate.SetSessionKey(session, testKey.GetRawKey());
+        mockDelegate.dummyKeyHandle = testKey.Get();
+    }
+
+    PacketProcessorTestKey testKey;
 };
 
 // ============================================================
@@ -281,7 +374,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_SizeMismatch_NoCrash)
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_TpsNotIncremented)
 {
-    NetBuffer* buf = MakePassthroughBuffer();  // size 체크 확실히 통과
+    NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
     const auto smallAddr = MakeTooSmallAddrBuffer();
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(smallAddr));
@@ -292,7 +385,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_TpsNotIncremente
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_NoDelegateMethodsCalled)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
     const auto smallAddr = MakeTooSmallAddrBuffer();
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(smallAddr));
@@ -304,7 +397,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_NoDelegateMethod
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_EmptyAddrBuffer_EarlyReturn)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
     const std::vector<unsigned char> emptyAddr{};
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(emptyAddr));
@@ -322,7 +415,7 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_EmptyAddrBuffer_EarlyReturn)
 
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_AddrBuffer_OneLessThanRequired_EarlyReturn)
 {
-    NetBuffer* buf = MakePassthroughBuffer();
+    NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
     const std::vector<unsigned char> oneLess(sizeof(sockaddr_in) - 1, 0);
 
     processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(oneLess));
@@ -525,6 +618,50 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_CanProcessPacketTru
 //     ② CanProcessPacket = true  → DECODE_PACKET 실패 → break → Disconnect 미호출
 // ============================================================
 
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_DecryptSucceeds_OnRecvCalledAndTpsIncremented)
+{
+    SetupRealCrypto();
+    mockDelegate.canProcessReturn = true;
+    mockDelegate.onRecvPacketReturn = true;
+    NetBuffer* buf = MakeEncryptedReceiveBuffer(
+        PACKET_TYPE::SEND_TYPE,
+        7,
+        11,
+        testKey.Get(),
+        mockDelegate.dummySalt,
+        false,
+        PACKET_DIRECTION::CLIENT_TO_SERVER);
+    const auto validAddr = MakeValidAddrBuffer();
+
+    processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+    EXPECT_EQ(mockDelegate.onRecvPacketCount, 1);
+    EXPECT_EQ(processor->GetTPS(), 1);
+    NetBuffer::Free(buf);
+}
+
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_OnRecvFails_TpsNotIncremented)
+{
+    SetupRealCrypto();
+    mockDelegate.canProcessReturn = true;
+    mockDelegate.onRecvPacketReturn = false;
+    NetBuffer* buf = MakeEncryptedReceiveBuffer(
+        PACKET_TYPE::SEND_TYPE,
+        8,
+        12,
+        testKey.Get(),
+        mockDelegate.dummySalt,
+        false,
+        PACKET_DIRECTION::CLIENT_TO_SERVER);
+    const auto validAddr = MakeValidAddrBuffer();
+
+    processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+    EXPECT_EQ(mockDelegate.onRecvPacketCount, 1);
+    EXPECT_EQ(processor->GetTPS(), 0);
+    NetBuffer::Free(buf);
+}
+
 TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_DisconnectType_CanProcessPacketFalse_DisconnectNotCalled)
 {
     SetupFakeKeyHandle();
@@ -589,6 +726,27 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendReplyType_CanProcessPack
 //     ① CanProcessPacket = false → break
 //     ② CanProcessPacket = true  → DECODE_PACKET 실패 → break
 // ============================================================
+
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendReplyType_DecryptSucceeds_OnSendReplyCalled)
+{
+    SetupRealCrypto();
+    mockDelegate.canProcessReturn = true;
+    NetBuffer* buf = MakeEncryptedReceiveBuffer(
+        PACKET_TYPE::SEND_REPLY_TYPE,
+        9,
+        0,
+        testKey.Get(),
+        mockDelegate.dummySalt,
+        true,
+        PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY);
+    const auto validAddr = MakeValidAddrBuffer();
+
+    processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+    EXPECT_EQ(mockDelegate.onSendReplyCount, 1);
+    EXPECT_EQ(processor->GetTPS(), 0);
+    NetBuffer::Free(buf);
+}
 
 TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_HeartbeatReplyType_CanProcessPacketFalse_OnSendReplyNotCalled)
 {

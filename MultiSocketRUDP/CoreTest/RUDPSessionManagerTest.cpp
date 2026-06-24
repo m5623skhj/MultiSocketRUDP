@@ -68,3 +68,52 @@ TEST_F(RUDPSessionManagerTest, ConcurrentAcquireNeverReturnsDuplicateSession)
 	EXPECT_EQ(ids.size(), maxSessions);
 	EXPECT_EQ(uniqueIds.size(), maxSessions);
 }
+
+TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsInvalidSessionId)
+{
+	constexpr unsigned short maxSessions = 2;
+	RUDPSessionManager manager{ maxSessions, core, delegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+
+	EXPECT_FALSE(manager.ReleaseSession(maxSessions));
+	EXPECT_EQ(manager.GetUnusedSessionCount(), maxSessions);
+}
+
+TEST_F(RUDPSessionManagerTest, ReleaseSessionRejectsSessionThatIsNotReleasing)
+{
+	constexpr unsigned short maxSessions = 1;
+	RUDPSessionManager manager{ maxSessions, core, delegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+
+	auto* session = manager.AcquireSession();
+	ASSERT_NE(session, nullptr);
+
+	EXPECT_FALSE(manager.ReleaseSession(session->GetSessionId()));
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+}
+
+TEST_F(RUDPSessionManagerTest, DecrementConnectedCountTracksRetransmissionDisconnect)
+{
+	RUDPSessionManager manager{ 0, core, delegate };
+	manager.IncrementConnectedCount();
+
+	manager.DecrementConnectedCount(DISCONNECT_REASON::BY_RETRANSMISSION);
+
+	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+	EXPECT_EQ(manager.GetAllConnectedCount(), 1u);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 1u);
+	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 1u);
+}
+
+TEST_F(RUDPSessionManagerTest, DecrementConnectedCountIgnoresAbortReserved)
+{
+	RUDPSessionManager manager{ 0, core, delegate };
+	manager.IncrementConnectedCount();
+
+	manager.DecrementConnectedCount(DISCONNECT_REASON::BY_ABORT_RESERVED);
+
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
+	EXPECT_EQ(manager.GetAllConnectedCount(), 1u);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 0u);
+	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 0u);
+}

@@ -11,10 +11,14 @@
             "id": "d68527863d5119d9",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Server/Ticker.md",
+                "mode": "preview",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "새 탭"
+              "title": "Ticker"
             }
           }
         ]
@@ -181,6 +185,9 @@
   },
   "active": "d68527863d5119d9",
   "lastOpenFiles": [
+    "Server/ThreadModel.md",
+    "Server/Ticker.md",
+    "Troubleshooting.md",
     "Tools/PacketGenerator.md",
     "00_Overview.md",
     "BotTester/AI/AiTreeGenerator.md",
