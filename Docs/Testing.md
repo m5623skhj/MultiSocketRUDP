@@ -48,6 +48,19 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 - `SessionStateMachineTest`
 - `TickerTimerEventTest`
 
+최근 보강된 `CoreTest` 검증 포인트:
+
+- `RUDPPacketProcessorTest`
+  - `PacketCryptoHelper`의 실제 AES-GCM encode/decode 경로를 사용해 `SEND_TYPE` 수신 성공 시 `OnRecvPacket` 호출과 TPS 증가를 검증한다.
+  - `SEND_TYPE` 복호화가 성공했더라도 세션의 `OnRecvPacket` 처리 결과가 실패이면 TPS가 증가하지 않는지 검증한다.
+  - `SEND_REPLY_TYPE` 복호화 성공 시 `OnSendReply`로 전달되는지 검증한다.
+  - UDP 주소 버퍼가 `sockaddr_in`보다 짧은 경우, 패킷 본문 처리 전에 조기 반환되는지 검증한다.
+- `RUDPSessionManagerTest`
+  - 유효하지 않은 `sessionId` 반환 요청을 거부한다.
+  - `RELEASING` 상태가 아닌 세션 반환 요청을 거부한다.
+  - `BY_RETRANSMISSION` disconnect가 전체 disconnect 및 retransmission disconnect 통계를 함께 증가시키는지 검증한다.
+  - `BY_ABORT_RESERVED`는 연결된 세션의 disconnect 통계로 계산하지 않는지 검증한다.
+
 빌드:
 
 ```powershell
@@ -86,6 +99,8 @@ MultiSocketRUDP/IntegrationClientHarness/IntegrationClientHarness.vcxproj
   - 서버가 마지막 echo payload를 정확히 기록했는지 확인
 - `drop-ack`
   - 클라이언트가 데이터 패킷 ACK 자동 응답을 끈 뒤 서버 재전송 실패 disconnect를 검증
+
+직접 `DisconnectClient()`를 호출하는 통합 테스트는 현재 기본 시나리오에 포함하지 않는다. 서버 측 disconnect/release 통계 검증 자체는 유효하지만, 별도 프로세스 하네스 종료 시점에 클라이언트 코어 백그라운드 스레드와 종료 정리가 경합하면서 `0xC0000005` 접근 위반이 발생할 수 있다. 해당 경로를 테스트하려면 먼저 `RUDPClientCore::Disconnect()` 이후의 스레드 종료 순서를 안정화한 뒤 하네스 시나리오를 추가한다.
 
 빌드:
 
