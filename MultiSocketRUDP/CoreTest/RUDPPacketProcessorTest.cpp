@@ -371,7 +371,6 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_SizeMismatch_NoCrash)
 //    clientAddrBuffer.size() < sizeof(sockaddr_in)  →  반환
 //    ※ size 체크는 이미 통과한 상태(MakePassthroughBuffer 사용)
 // ============================================================
-
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_TpsNotIncremented)
 {
     NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
@@ -383,6 +382,10 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_TpsNotIncremente
     NetBuffer::Free(buf);
 }
 
+// 이 테스트는 `OnRecvPacket` 함수가 `clientAddrBuffer`의 크기가 `sizeof(sockaddr_in)`보다 작아 조기 반환될 경우,
+// `MockSessionDelegate`의 어떠한 델리게이트 메서드도 호출되지 않음을 검증합니다. 
+// `MakeHeaderOnlyReceiveBuffer()`와 `MakeTooSmallAddrBuffer()`를 사용하여 `NetBuffer`와 주소 버퍼를 설정하며, 
+// `onRecvPacketCount`와 `tryConnectCount`가 모두 0임을 확인하여 `MockSessionDelegate`의 상태 변화가 없음을 입증합니다.
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_NoDelegateMethodsCalled)
 {
     NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
@@ -395,6 +398,9 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_TooSmallAddrBuffer_NoDelegateMethod
     NetBuffer::Free(buf);
 }
 
+// 이 테스트는 `OnRecvPacket` 함수에 빈 `clientAddrBuffer`(`emptyAddr`)가 전달될 경우 조기 반환하는지 확인합니다.
+// `MakeHeaderOnlyReceiveBuffer()`로 `NetBuffer`의 초기 크기 검사는 통과시키고, 이후 빈 주소 버퍼에 대한 검증을 수행합니다.
+// 이로 인해 `RUDPPacketProcessor`의 TPS 카운터는 0으로 유지되며, `mockDelegate.onRecvPacketCount`와 같은 델리게이트 메서드는 호출되지 않아 어떠한 추가적인 패킷 처리나 상태 변화도 발생하지 않습니다.
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_EmptyAddrBuffer_EarlyReturn)
 {
     NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
@@ -412,7 +418,6 @@ TEST_F(RUDPPacketProcessorTest, OnRecvPacket_EmptyAddrBuffer_EarlyReturn)
 //    sizeof(sockaddr_in) - 1 : 실패
 //    sizeof(sockaddr_in)     : 통과 (ProcessByPacketType 진입, null keyHandle 에서 반환)
 // ============================================================
-
 TEST_F(RUDPPacketProcessorTest, OnRecvPacket_AddrBuffer_OneLessThanRequired_EarlyReturn)
 {
     NetBuffer* buf = MakeHeaderOnlyReceiveBuffer();
@@ -617,7 +622,6 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_CanProcessPacketTru
 //     ① CanProcessPacket = false → break → Disconnect 미호출
 //     ② CanProcessPacket = true  → DECODE_PACKET 실패 → break → Disconnect 미호출
 // ============================================================
-
 TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_DecryptSucceeds_OnRecvCalledAndTpsIncremented)
 {
     SetupRealCrypto();
@@ -640,6 +644,14 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_DecryptSucceeds_OnR
     NetBuffer::Free(buf);
 }
 
+// ============================================================
+// 이 테스트는 `SEND_TYPE` 패킷이 성공적으로 복호화된 후 `onRecvPacket` 델리게이트가 호출되지만, 델리게이트가 처리 실패를 반환(`false`)할 경우 TPS(Transactions Per Second) 카운터가 증가하지 않는지 검증합니다.
+// - 암호화 설정 후, `mockDelegate.onRecvPacketReturn`을 `false`로 설정하여 `onRecvPacket`이 실패를 반환하도록 모의합니다.
+// - 유효한 암호화 키와 솔트를 사용하여 `SEND_TYPE` 패킷을 생성하고 `processor- > OnRecvPacket`을 호출합니다.
+// - **기대 상태 변화 : **`mockDelegate.onRecvPacketCount`는 1로 증가하지만, `processor- > GetTPS()`는 0을 유지합니다.
+// - **실패 조건 : **`onRecvPacket`이 실패를 반환했음에도 불구하고 TPS 카운터가 증가하는 경우.
+// - **Side Effect : **`onRecvPacket` 델리게이트는 호출되지만, 그 반환 값에 따라 TPS 카운터 증가는 발생하지 않습니다.
+// ============================================================
 TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendType_OnRecvFails_TpsNotIncremented)
 {
     SetupRealCrypto();
@@ -726,7 +738,6 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendReplyType_CanProcessPack
 //     ① CanProcessPacket = false → break
 //     ② CanProcessPacket = true  → DECODE_PACKET 실패 → break
 // ============================================================
-
 TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_SendReplyType_DecryptSucceeds_OnSendReplyCalled)
 {
     SetupRealCrypto();
