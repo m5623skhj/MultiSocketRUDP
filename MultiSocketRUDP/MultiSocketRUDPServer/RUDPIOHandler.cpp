@@ -430,6 +430,12 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 	}
 
 	auto& scheduler = *retransmissionSchedulers[threadId];
+	const auto now = std::chrono::steady_clock::now();
+	const unsigned int rtoMs = sendPacketInfo->IsOwnerValid()
+		? sendPacketInfo->owner->GetRetransmissionTimeoutMs()
+		: retransmissionMs;
+	const auto deadline = now + std::chrono::milliseconds(rtoMs);
+	sendPacketInfo->MarkSentForRttSample(now);
 	{
 		std::scoped_lock lock(scheduler.lock);
 		if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
@@ -437,7 +443,6 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 			return false;
 		}
 
-		const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(retransmissionMs);
 		PushRetransmissionSchedule(scheduler, *sendPacketInfo, deadline);
 	}
 

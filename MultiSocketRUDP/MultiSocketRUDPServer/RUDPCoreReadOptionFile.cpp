@@ -28,7 +28,18 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
-	if (g_Paser.GetValue_Int(buffer, L"CORE", L"RETRANSMISSION_THREAD_SLEEP_MS", reinterpret_cast<int*>(&retransmissionThreadSleepMs)) == false)
+	const bool hasMinRetransmissionMs = g_Paser.GetValue_Int(buffer, L"CORE", L"MIN_RETRANSMISSION_MS", reinterpret_cast<int*>(&minRetransmissionMs));
+	const bool hasMaxRetransmissionMs = g_Paser.GetValue_Int(buffer, L"CORE", L"MAX_RETRANSMISSION_MS", reinterpret_cast<int*>(&maxRetransmissionMs));
+	if (hasMinRetransmissionMs != hasMaxRetransmissionMs)
+	{
+		return false;
+	}
+	if (hasMinRetransmissionMs == false)
+	{
+		minRetransmissionMs = retransmissionMs;
+		maxRetransmissionMs = retransmissionMs;
+	}
+	if (minRetransmissionMs == 0 || minRetransmissionMs > retransmissionMs || retransmissionMs > maxRetransmissionMs)
 	{
 		return false;
 	}

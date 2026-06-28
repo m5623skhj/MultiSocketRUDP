@@ -141,6 +141,9 @@
     <ClCompile Include="..\..\external\CommonCode\Common\Parse.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="RetransmissionTimeoutEstimator.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h">
@@ -192,6 +195,9 @@
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="RetransmissionScheduler.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RetransmissionTimeoutEstimator.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="RUDPIOHandler.h">

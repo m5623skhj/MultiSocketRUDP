@@ -29,10 +29,12 @@
     <ClCompile Include="RUDPIOHandlerTest.cpp" />
     <ClCompile Include="RUDPPacketProcessorTest.cpp" />
     <ClCompile Include="RUDPReceiveWindowTest.cpp" />
+    <ClCompile Include="RetransmissionTimeoutEstimatorTest.cpp" />
     <ClCompile Include="RUDPSessionTest.cpp" />
     <ClCompile Include="RUDPSessionManagerTest.cpp" />
     <ClCompile Include="SessionCryptoContextTest.cpp" />
     <ClCompile Include="SessionPacketOrdererTest.cpp" />
+    <ClCompile Include="SendPacketInfoTest.cpp" />
     <ClCompile Include="SessionStateMachineTest.cpp" />
     <ClCompile Include="SessionSendContextTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />

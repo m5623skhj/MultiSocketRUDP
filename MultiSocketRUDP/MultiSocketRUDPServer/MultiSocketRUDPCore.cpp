@@ -353,6 +353,21 @@ unsigned int MultiSocketRUDPCore::GetHeartbeatThreadSleepMs() const
 	return heartbeatThreadSleepMs;
 }
 
+unsigned int MultiSocketRUDPCore::GetInitialRetransmissionMs() const
+{
+	return retransmissionMs;
+}
+
+unsigned int MultiSocketRUDPCore::GetMinRetransmissionMs() const
+{
+	return minRetransmissionMs;
+}
+
+unsigned int MultiSocketRUDPCore::GetMaxRetransmissionMs() const
+{
+	return maxRetransmissionMs;
+}
+
 void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTargetSessionId) const
 {
 	if (not sessionManager->ReleaseSession(disconnectTargetSessionId))
@@ -715,6 +730,7 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 					break;
 				}
 
+				top.info->InvalidateRttSample();
 				dueList.push_back(top.info);
 				scheduler.heap.pop();
 			}

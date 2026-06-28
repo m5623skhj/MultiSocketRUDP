@@ -9,6 +9,7 @@
 #include "SessionSocketContext.h"
 #include "SessionRIOContext.h"
 #include "SessionStateMachine.h"
+#include "RetransmissionTimeoutEstimator.h"
 
 namespace MultiSocketRUDP
 {
@@ -118,6 +119,7 @@ private:
 	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
 	void OnRetransmissionTimeout() noexcept;
+	void OnRttSample(std::chrono::steady_clock::duration sample);
 
 private:
 	[[nodiscard]]
@@ -157,6 +159,12 @@ public:
 	// ----------------------------------------
 	[[nodiscard]]
 	bool IsUsingSession() const;
+	// ----------------------------------------
+	// @brief Returns current retransmission timeout calculated for this session.
+	// @return RTO in milliseconds.
+	// ----------------------------------------
+	[[nodiscard]]
+	unsigned int GetRetransmissionTimeoutMs() const noexcept;
 	// ----------------------------------------
 	// @brief 현재 세션의 상태를 반환합니다.
 	// @return 현재 세션의 SESSION_STATE 값
@@ -244,6 +252,7 @@ private:
 
 private:
 	RUDPFlowManager flowManager;
+	RetransmissionTimeoutEstimator retransmissionTimeoutEstimator;
 	SessionCryptoContext cryptoContext;
 	SessionPacketOrderer sessionPacketOrderer;
 	SessionSocketContext socketContext;

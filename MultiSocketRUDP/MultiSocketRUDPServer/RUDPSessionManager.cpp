@@ -274,6 +274,7 @@ bool RUDPSessionManager::CreateSessionPool()
 
 			sessionDelegate.SetSessionId(*session, static_cast<SessionIdType>(sessionIndex));
 			sessionDelegate.SetThreadId(*session, sessionIndex % numOfWorkerThreads);
+			sessionDelegate.InitializeSession(*session);
 			sessionList.emplace_back(session);
 			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(sessionIndex));
 			unusedSessionIdSet.emplace(static_cast<SessionIdType>(sessionIndex));
