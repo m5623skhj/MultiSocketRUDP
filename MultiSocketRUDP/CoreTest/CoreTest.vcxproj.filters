@@ -63,6 +63,12 @@
     <ClCompile Include="RUDPPacketProcessorTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
+    <ClCompile Include="RetransmissionTimeoutEstimatorTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="SendPacketInfoTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h">

@@ -59,6 +59,10 @@ void RUDPSession::InitializeSession()
 	onSessionReleaseTime = {};
 	lastReceivedPacketTime.store(0, std::memory_order_relaxed);
 
+	retransmissionTimeoutEstimator.Configure(
+		core.GetInitialRetransmissionMs(),
+		core.GetMinRetransmissionMs(),
+		core.GetMaxRetransmissionMs());
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
 	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
@@ -518,13 +522,26 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 
 	flowManager.OnAckReceived(packetSequence);
 	core.MarkSendPacketInfoErased(sendPacketInfo, threadId);
+	std::chrono::steady_clock::duration rttSample{};
+	if (sendPacketInfo->TryGetRttSample(std::chrono::steady_clock::now(), rttSample))
+	{
+		OnRttSample(rttSample);
+	}
 	SendPacketInfo::Free(sendPacketInfo);
 	TryFlushPendingQueue();
 }
 
 void RUDPSession::OnRetransmissionTimeout() noexcept
 {
-	flowManager.OnTimeout();
+	if (retransmissionTimeoutEstimator.OnTimeout(std::chrono::steady_clock::now()))
+	{
+		flowManager.OnTimeout();
+	}
+}
+
+void RUDPSession::OnRttSample(const std::chrono::steady_clock::duration sample)
+{
+	retransmissionTimeoutEstimator.OnRttSample(sample);
 }
 
 std::shared_mutex& RUDPSession::GetSocketMutex() const
@@ -570,6 +587,11 @@ bool RUDPSession::IsReserved() const
 bool RUDPSession::IsUsingSession() const
 {
 	return stateMachine.IsUsingSession();
+}
+
+unsigned int RUDPSession::GetRetransmissionTimeoutMs() const noexcept
+{
+	return retransmissionTimeoutEstimator.GetRtoMs();
 }
 
 SESSION_STATE RUDPSession::GetSessionState() const

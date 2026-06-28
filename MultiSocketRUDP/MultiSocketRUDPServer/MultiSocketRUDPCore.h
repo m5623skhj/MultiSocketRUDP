@@ -76,6 +76,18 @@ public:
 	int32_t GetTPS() const;
 	void ResetTPS() const;
 	unsigned int GetHeartbeatThreadSleepMs() const;
+	// ----------------------------------------
+	// @brief Returns initial RTO used before any valid RTT sample exists.
+	// ----------------------------------------
+	unsigned int GetInitialRetransmissionMs() const;
+	// ----------------------------------------
+	// @brief Returns lower bound for dynamic retransmission timeout.
+	// ----------------------------------------
+	unsigned int GetMinRetransmissionMs() const;
+	// ----------------------------------------
+	// @brief Returns upper bound for dynamic retransmission timeout and backoff.
+	// ----------------------------------------
+	unsigned int GetMaxRetransmissionMs() const;
 
 private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
@@ -138,7 +150,8 @@ private:
 	PacketRetransmissionCount maxPacketRetransmissionCount{};
 	unsigned int workerThreadOneFrameMs{};
 	unsigned int retransmissionMs{};
-	unsigned int retransmissionThreadSleepMs{};
+	unsigned int minRetransmissionMs{};
+	unsigned int maxRetransmissionMs{};
 	unsigned int heartbeatThreadSleepMs{};
 	unsigned int timerTickMs{};
 	BYTE maxHoldingPacketQueueSize{};

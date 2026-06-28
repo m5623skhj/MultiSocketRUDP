@@ -654,15 +654,17 @@ namespace
 
 	TEST_F(IntegrationFixture, MissingReplyAckTriggersServerRetransmissionDisconnect)
 	{
+		// Drop SEND_REPLY ACKs so the server exercises the real dead-heap
+		// retransmission path, including dynamic RTO backoff and final disconnect.
 		ClientHarnessProcess process;
 		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"drop-ack" })));
 
-		EXPECT_TRUE(WaitUntil(8s, [this]()
+		EXPECT_TRUE(WaitUntil(30s, [this]()
 		{
 			return server->GetAllDisconnectedByRetransmissionCount() == 1;
 		}));
 
-		const auto result = process.Wait(12s);
+		const auto result = process.Wait(35s);
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}

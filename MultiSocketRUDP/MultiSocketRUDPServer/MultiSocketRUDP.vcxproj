@@ -39,6 +39,7 @@
     <ClCompile Include="RUDPSessionFunctionDelegate.cpp" />
     <ClCompile Include="RUDPSessionManager.cpp" />
     <ClCompile Include="RUDPThreadManager.cpp" />
+    <ClCompile Include="RetransmissionTimeoutEstimator.cpp" />
     <ClCompile Include="SendPacketInfo.cpp" />
     <ClCompile Include="SessionCryptoContext.cpp" />
     <ClCompile Include="SessionPacketOrderer.cpp" />
@@ -74,6 +75,7 @@
     <ClInclude Include="RUDPSessionManager.h" />
     <ClInclude Include="RUDPThreadManager.h" />
     <ClInclude Include="RetransmissionScheduler.h" />
+    <ClInclude Include="RetransmissionTimeoutEstimator.h" />
     <ClInclude Include="SendPacketInfo.h" />
     <ClInclude Include="SessionCryptoContext.h" />
     <ClInclude Include="SessionPacketOrderer.h" />

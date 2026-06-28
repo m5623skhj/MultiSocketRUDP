@@ -30,8 +30,6 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/obj/
 MultiSocketRUDP/Tool/PacketUploader/credentials.json
 MultiSocketRUDP/CoreTest/x64/
 .vs/
-*.cpp
-!MultiSocketRUDP/CoreTest/*Test.cpp
 MultiSocketRUDPBotTester/ProtocolInteropTest/bin/
 MultiSocketRUDPBotTester/ProtocolInteropTest/obj/
 .dotnet-cli/

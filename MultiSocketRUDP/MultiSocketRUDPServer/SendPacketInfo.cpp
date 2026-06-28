@@ -14,6 +14,8 @@ SendPacketInfo::~SendPacketInfo()
 	sendPacketSequence = {};
 	scheduleVersion = {};
 	isErasedPacketInfo = {};
+	lastSendTime = {};
+	canUseRttSample.store(false, std::memory_order_relaxed);
 	buffer = {};
 	isReplyType = {};
 }
@@ -33,6 +35,8 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	retransmissionCount = {};
 	scheduleVersion = {};
 	isErasedPacketInfo = {};
+	lastSendTime = {};
+	canUseRttSample.store(not inIsReplyType, std::memory_order_relaxed);
 
 	refCount.store(1, std::memory_order_release);
 }
@@ -49,6 +53,51 @@ void SendPacketInfo::AddRefCount()
 	{
 		LOG_ERROR(std::format("SendPacketInfo refCount is invalid before AddRefCount. prev is {}", prev));
 	}
+}
+
+void SendPacketInfo::MarkSentForRttSample(const std::chrono::steady_clock::time_point now)
+{
+	if (isReplyType)
+	{
+		return;
+	}
+
+	std::scoped_lock lock(rttSampleLock);
+	lastSendTime = now;
+}
+
+void SendPacketInfo::InvalidateRttSample()
+{
+	canUseRttSample.store(false, std::memory_order_relaxed);
+}
+
+bool SendPacketInfo::TryGetRttSample(
+	const std::chrono::steady_clock::time_point now,
+	OUT std::chrono::steady_clock::duration& outSample) const
+{
+	if (isReplyType || canUseRttSample.load(std::memory_order_relaxed) == false)
+	{
+		return false;
+	}
+
+	std::chrono::steady_clock::time_point capturedSendTime{};
+	{
+		std::scoped_lock lock(rttSampleLock);
+		if (lastSendTime.time_since_epoch().count() == 0)
+		{
+			return false;
+		}
+
+		capturedSendTime = lastSendTime;
+	}
+
+	if (canUseRttSample.load(std::memory_order_relaxed) == false)
+	{
+		return false;
+	}
+
+	outSample = now - capturedSendTime;
+	return outSample.count() > 0;
 }
 
 void SendPacketInfo::Free(SendPacketInfo* deleteTarget)
