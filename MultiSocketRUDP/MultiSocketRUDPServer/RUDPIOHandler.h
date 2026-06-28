@@ -1,7 +1,7 @@
 #pragma once
 #include "IIOHandler.h"
+#include "RetransmissionScheduler.h"
 #include <vector>
-#include <list>
 #include <mutex>
 #include <memory>
 #include <set>
@@ -69,8 +69,7 @@ public:
 	RUDPIOHandler(IRIOManager& inRioManager
 		, ISessionDelegate& inSessionDelegate
 		, CTLSMemoryPool<IOContext>& contextPool
-		, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
-		, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
+		, std::vector<std::unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers
 		, BYTE inMaxHoldingPacketQueueSize
 		, unsigned int inRetransmissionMs
 		, unsigned int inSimulatedPacketLossPercent = 0
@@ -122,8 +121,7 @@ private:
 	IRIOManager& rioManager;
 	ISessionDelegate& sessionDelegate;
 	CTLSMemoryPool<IOContext>& contextPool;
-	std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList;
-	std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock;
+	std::vector<std::unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers;
 
 	unsigned int retransmissionMs {};
 

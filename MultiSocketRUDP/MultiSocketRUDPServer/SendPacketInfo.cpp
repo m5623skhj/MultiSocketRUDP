@@ -12,8 +12,7 @@ SendPacketInfo::~SendPacketInfo()
 	ownerGeneration = {};
 	retransmissionCount = {};
 	sendPacketSequence = {};
-	retransmissionTimeStamp = {};
-	listItor = {};
+	scheduleVersion = {};
 	isErasedPacketInfo = {};
 	buffer = {};
 	isReplyType = {};
@@ -32,9 +31,8 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	isReplyType = inIsReplyType;
 
 	retransmissionCount = {};
-	retransmissionTimeStamp = {};
+	scheduleVersion = {};
 	isErasedPacketInfo = {};
-	isInSendPacketInfoList = {};
 
 	refCount.store(1, std::memory_order_release);
 }
@@ -46,7 +44,11 @@ bool SendPacketInfo::IsOwnerValid() const
 
 void SendPacketInfo::AddRefCount()
 {
-	refCount.fetch_add(1, std::memory_order_relaxed);
+	const int32_t prev = refCount.fetch_add(1, std::memory_order_relaxed);
+	if (prev <= 0)
+	{
+		LOG_ERROR(std::format("SendPacketInfo refCount is invalid before AddRefCount. prev is {}", prev));
+	}
 }
 
 void SendPacketInfo::Free(SendPacketInfo* deleteTarget)
@@ -56,7 +58,7 @@ void SendPacketInfo::Free(SendPacketInfo* deleteTarget)
 		return;
 	}
 
-	const int prev = deleteTarget->refCount.fetch_sub(1, std::memory_order_acq_rel);
+	const int32_t prev = deleteTarget->refCount.fetch_sub(1, std::memory_order_acq_rel);
 	if (prev <= 0)
 	{
 		LOG_ERROR(std::format("SendPacketInfo refCount is invalid prev is {}", prev));

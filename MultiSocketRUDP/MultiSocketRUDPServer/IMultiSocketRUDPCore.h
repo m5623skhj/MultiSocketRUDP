@@ -14,8 +14,7 @@ public:
 	[[nodiscard]]
 	virtual bool SendPacket(SendPacketInfo* sendPacketInfo) const = 0;
 	virtual void PushToDisconnectTargetSession(RUDPSession& session) = 0;
-	[[nodiscard]]
-	virtual bool EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) = 0;
+	virtual void MarkSendPacketInfoErased(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) = 0;
 
 	virtual void DisconnectSession(SessionIdType disconnectTargetSessionId) const = 0;
 

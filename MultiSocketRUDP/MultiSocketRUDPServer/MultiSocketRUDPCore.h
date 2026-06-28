@@ -1,6 +1,8 @@
 #pragma once
 #include "IMultiSocketRUDPCore.h"
+#include "RetransmissionScheduler.h"
 #include <list>
+#include <memory>
 #include <thread>
 #include <MSWSock.h>
 #include "../Common/TLS/TLSHelper.h"
@@ -56,8 +58,7 @@ public:
 
 public:
 	bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
-	[[nodiscard]]
-	bool EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
+	void MarkSendPacketInfoErased(OUT SendPacketInfo* eraseTarget, ThreadIdType threadId) override;
 	RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const override;
 
 	// ----------------------------------------
@@ -113,8 +114,7 @@ private:
 	inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 
 private:
-	std::vector<std::list<SendPacketInfo*>> sendPacketInfoList;
-	std::vector<std::unique_ptr<std::mutex>> sendPacketInfoListLock;
+	std::vector<std::unique_ptr<RetransmissionScheduler>> retransmissionSchedulers;
 
 private:
 	[[nodiscard]]
@@ -129,6 +129,7 @@ private:
 	void RunIOWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void RunRecvLogicWorkerThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void RunRetransmissionThread(const std::stop_token& stopToken, ThreadIdType threadId);
+	void ProcessRetransmission(SendPacketInfo* sendPacketInfo, ThreadIdType threadId);
 	void RunSessionReleaseThread(const std::stop_token& stopToken);
 	void RunHeartbeatThread(const std::stop_token& stopToken) const;
 
@@ -151,6 +152,7 @@ private:
 	std::vector<HANDLE> recvLogicThreadEventHandles;
 	HANDLE sessionReleaseStopEventHandle{};
 	HANDLE sessionReleaseEventHandle{};
+	HANDLE retransmissionStopEventHandle{};
 
 	// objects
 	std::vector<CListBaseQueue<RecvIOCompletedContext*>> recvIOCompletedContexts;

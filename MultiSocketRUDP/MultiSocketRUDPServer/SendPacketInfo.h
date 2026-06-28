@@ -1,6 +1,6 @@
 #pragma once
-#include <list>
 #include <atomic>
+#include <cstdint>
 #include <NetServerSerializeBuffer.h>
 
 #include "../Common/etc/CoreType.h"
@@ -17,12 +17,10 @@ struct SendPacketInfo
 	uint32_t ownerGeneration{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
-	unsigned long long retransmissionTimeStamp{};
+	uint64_t scheduleVersion{};
 	std::atomic_bool isErasedPacketInfo{};
-	bool isInSendPacketInfoList{};
 	bool isReplyType{};
-	std::list<SendPacketInfo*>::iterator listItor;
-	std::atomic_int8_t refCount{};
+	std::atomic_int32_t refCount{};
 
 	SendPacketInfo() = default;
 	~SendPacketInfo();
