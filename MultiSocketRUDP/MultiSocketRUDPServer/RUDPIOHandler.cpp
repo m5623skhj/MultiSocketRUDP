@@ -13,8 +13,7 @@
 RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, ISessionDelegate& inSessionDelegate
 	, CTLSMemoryPool<IOContext>& contextPool
-	, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList
-	, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock
+	, std::vector<std::unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers
 	, const BYTE inMaxHoldingPacketQueueSize
 	, const unsigned int inRetransmissionMs
 	, const unsigned int inSimulatedPacketLossPercent
@@ -22,8 +21,7 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	: rioManager(inRioManager)
 	, sessionDelegate(inSessionDelegate)
 	, contextPool(contextPool)
-	, sendPacketInfoList(sendPacketInfoList)
-	, sendPacketInfoListLock(sendPacketInfoListLock)
+	, retransmissionSchedulers(retransmissionSchedulers)
 	, retransmissionMs(inRetransmissionMs)
 {
 	if (inSimulatedPacketLossPercent > 0)
@@ -431,21 +429,21 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 		return true;
 	}
 
+	auto& scheduler = *retransmissionSchedulers[threadId];
 	{
-		std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
-		if (sendPacketInfo->isErasedPacketInfo == true)
+		std::scoped_lock lock(scheduler.lock);
+		if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
 		{
-			sendPacketInfo = nullptr;
 			return false;
 		}
 
-		sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
-		if (sendPacketInfo->isInSendPacketInfoList)
-		{
-			sendPacketInfoList[threadId].erase(sendPacketInfo->listItor);
-		}
-		sendPacketInfo->listItor = sendPacketInfoList[threadId].emplace(sendPacketInfoList[threadId].end(), sendPacketInfo);
-		sendPacketInfo->isInSendPacketInfoList = true;
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(retransmissionMs);
+		PushRetransmissionSchedule(scheduler, *sendPacketInfo, deadline);
+	}
+
+	if (not SignalRetransmissionWakeEvent(scheduler))
+	{
+		LOG_ERROR(std::format("Retransmission wake event signal failed. error is {}", GetLastError()));
 	}
 
 	return true;

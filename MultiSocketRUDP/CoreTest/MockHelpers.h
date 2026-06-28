@@ -69,12 +69,10 @@ public:
 		return sendPacketReturn;
 	}
 
-	[[nodiscard]]
-	bool EraseSendPacketInfo(SendPacketInfo* target, const ThreadIdType _) override
+	void MarkSendPacketInfoErased(SendPacketInfo* target, const ThreadIdType _) override
 	{
 		++eraseSendPacketInfoCount;
 		lastErasedPacketInfo = target;
-		return eraseSendPacketInfoReturn;
 	}
 
 	[[nodiscard]]
@@ -114,7 +112,6 @@ public:
 
 	int eraseSendPacketInfoCount = 0;
 	SendPacketInfo* lastErasedPacketInfo = nullptr;
-	bool eraseSendPacketInfoReturn = true;
 
 	bool sendPacketReturn = true;
 	int  sendPacketCount = 0;

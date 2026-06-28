@@ -13,9 +13,40 @@
 #include "RUDPThreadManager.h"
 #include "RUDPPacketProcessor.h"
 #include "RUDPIOHandler.h"
+#include <chrono>
+
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
 
 namespace
 {
+	[[nodiscard]]
+	bool ArmRetransmissionTimer(const HANDLE timerHandle, const std::chrono::steady_clock::time_point deadline)
+	{
+		const auto now = std::chrono::steady_clock::now();
+
+		LARGE_INTEGER dueTime;
+		if (deadline <= now)
+		{
+			dueTime.QuadPart = -1;
+		}
+		else
+		{
+			using HundredNanoseconds = std::chrono::duration<long long, std::ratio<1, 10'000'000>>;
+			const long long remaining = std::chrono::duration_cast<HundredNanoseconds>(deadline - now).count();
+			dueTime.QuadPart = -(remaining > 0 ? remaining : 1);
+		}
+
+		if (SetWaitableTimer(timerHandle, &dueTime, 0, nullptr, nullptr, FALSE) == FALSE)
+		{
+			LOG_ERROR(std::format("SetWaitableTimer failed. error is {}", GetLastError()));
+			return false;
+		}
+
+		return true;
+	}
+
 	FORCEINLINE void SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigned int intervalMs)
 	{
 		const UINT64 now = GetTickCount64();
@@ -132,10 +163,17 @@ void MultiSocketRUDPCore::StopServer()
 	{
 		SetEvent(recvLogicThreadEventStopHandle);
 	}
+
 	if (sessionReleaseStopEventHandle != NULL)
 	{
 		SetEvent(sessionReleaseStopEventHandle);
 	}
+
+	if (retransmissionStopEventHandle != NULL)
+	{
+		SetEvent(retransmissionStopEventHandle);
+	}
+
 	StopAllThreads();
 
 	for (auto const recvLogicThreadEventHandle : recvLogicThreadEventHandles)
@@ -147,21 +185,52 @@ void MultiSocketRUDPCore::StopServer()
 
 		CloseHandle(recvLogicThreadEventHandle);
 	}
+	recvLogicThreadEventHandles.clear();
 
 	if (recvLogicThreadEventStopHandle != NULL)
 	{
 		CloseHandle(recvLogicThreadEventStopHandle);
+		recvLogicThreadEventStopHandle = NULL;
 	}
 
 	if (sessionReleaseEventHandle != NULL)
 	{
 		CloseHandle(sessionReleaseEventHandle);
+		sessionReleaseEventHandle = NULL;
 	}
 
 	if (sessionReleaseStopEventHandle != NULL)
 	{
 		CloseHandle(sessionReleaseStopEventHandle);
+		sessionReleaseStopEventHandle = NULL;
 	}
+
+	if (retransmissionStopEventHandle != NULL)
+	{
+		CloseHandle(retransmissionStopEventHandle);
+		retransmissionStopEventHandle = NULL;
+	}
+
+	for (const auto& scheduler : retransmissionSchedulers)
+	{
+		if (scheduler == nullptr)
+		{
+			continue;
+		}
+
+		if (scheduler->timerHandle != NULL)
+		{
+			CloseHandle(scheduler->timerHandle);
+			scheduler->timerHandle = NULL;
+		}
+
+		if (scheduler->wakeEventHandle != NULL)
+		{
+			CloseHandle(scheduler->wakeEventHandle);
+			scheduler->wakeEventHandle = NULL;
+		}
+	}
+	retransmissionSchedulers.clear();
 
 	Ticker::GetInstance().Stop();
 
@@ -240,32 +309,28 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 	return true;
 }
 
-bool MultiSocketRUDPCore::EraseSendPacketInfo(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
+void MultiSocketRUDPCore::MarkSendPacketInfoErased(OUT SendPacketInfo* eraseTarget, const ThreadIdType threadId)
 {
 	if (eraseTarget == nullptr || eraseTarget->isErasedPacketInfo.load(std::memory_order_acquire))
 	{
-		return false;
+		return;
 	}
-	bool didFreeRef = false;
+
+	if (threadId >= retransmissionSchedulers.size() || retransmissionSchedulers[threadId] == nullptr)
 	{
-		std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
+		eraseTarget->isErasedPacketInfo.store(true, std::memory_order_release);
+		return;
+	}
+
+	{
+		std::scoped_lock lock(retransmissionSchedulers[threadId]->lock);
 		if (eraseTarget->isErasedPacketInfo.load(std::memory_order_acquire))
 		{
-			return false;
+			return;
 		}
-		if (eraseTarget->isInSendPacketInfoList)
-		{
-			sendPacketInfoList[threadId].erase(eraseTarget->listItor);
-			eraseTarget->isInSendPacketInfoList = false;
-			didFreeRef = true;
-		}
+
 		eraseTarget->isErasedPacketInfo.store(true, std::memory_order_release);
 	}
-	if (didFreeRef == true)
-	{
-		SendPacketInfo::Free(eraseTarget);
-	}
-	return didFreeRef;
 }
 
 RIO_EXTENSION_FUNCTION_TABLE MultiSocketRUDPCore::GetRIOFunctionTable() const
@@ -358,7 +423,7 @@ bool MultiSocketRUDPCore::InitRIO()
 	do
 	{
 		rioManager = std::make_unique<RIOManager>(sessionDelegate);
-		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, sessionDelegate, contextPool, sendPacketInfoList, sendPacketInfoListLock, maxHoldingPacketQueueSize, retransmissionMs,
+		ioHandler = std::make_unique<RUDPIOHandler>(*rioManager, sessionDelegate, contextPool, retransmissionSchedulers, maxHoldingPacketQueueSize, retransmissionMs,
 			simulatedPacketLossPercent, simulatedPacketLossSeed);
 		if (rioManager == nullptr || ioHandler == nullptr)
 		{
@@ -388,12 +453,21 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		return false;
 	}
 
-	sendPacketInfoList.reserve(numOfWorkerThread);
-	sendPacketInfoListLock.reserve(numOfWorkerThread);
+	retransmissionSchedulers.reserve(numOfWorkerThread);
 
 	recvLogicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	sessionReleaseStopEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	sessionReleaseEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	retransmissionStopEventHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (recvLogicThreadEventStopHandle == NULL
+		|| sessionReleaseStopEventHandle == NULL
+		|| sessionReleaseEventHandle == NULL
+		|| retransmissionStopEventHandle == NULL)
+	{
+		LOG_ERROR(std::format("Thread event handle creation failed. error is {}", GetLastError()));
+		return false;
+	}
+
 	recvIOCompletedContexts.reserve(numOfWorkerThread);
 
 	Ticker::GetInstance().Start(timerTickMs);
@@ -402,8 +476,31 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		recvIOCompletedContexts.emplace_back();
 
 		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
-		sendPacketInfoList.emplace_back();
-		sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
+
+		auto scheduler = std::make_unique<RetransmissionScheduler>();
+		scheduler->timerHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+		if (scheduler->timerHandle == nullptr)
+		{
+			scheduler->timerHandle = CreateWaitableTimerExW(nullptr, nullptr, 0, TIMER_ALL_ACCESS);
+		}
+		scheduler->wakeEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (scheduler->timerHandle == nullptr || scheduler->wakeEventHandle == nullptr)
+		{
+			LOG_ERROR("Retransmission scheduler handle creation failed");
+			if (scheduler->timerHandle != NULL)
+			{
+				CloseHandle(scheduler->timerHandle);
+				scheduler->timerHandle = NULL;
+			}
+			if (scheduler->wakeEventHandle != NULL)
+			{
+				CloseHandle(scheduler->wakeEventHandle);
+				scheduler->wakeEventHandle = NULL;
+			}
+			return false;
+		}
+
+		retransmissionSchedulers.push_back(std::move(scheduler));
 	}
 
 	threadManager->StartThreads(THREAD_GROUP::SESSION_RELEASE_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunSessionReleaseThread(stopToken); }, 1);
@@ -587,84 +684,148 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopTo
 
 void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopToken, const ThreadIdType threadId)
 {
-	TickSet tickSet;
-	tickSet.nowTick = GetTickCount64();
+	auto& scheduler = *retransmissionSchedulers[threadId];
+	const HANDLE waitHandles[3] = { scheduler.timerHandle, scheduler.wakeEventHandle, retransmissionStopEventHandle };
+	const HANDLE emptyWaitHandles[2] = { scheduler.wakeEventHandle, retransmissionStopEventHandle };
 
-	auto& thisThreadSendPacketInfoList = sendPacketInfoList[threadId];
-	auto& thisThreadSendPacketInfoListLock = *sendPacketInfoListLock[threadId];
-
-	std::list<SendPacketInfo*> copyList;
+	std::vector<SendPacketInfo*> dueList;
 	while (not stopToken.stop_requested())
 	{
+		dueList.clear();
+		bool hasNext = false;
+		std::chrono::steady_clock::time_point nextDeadline{};
 		{
-			std::scoped_lock lock(thisThreadSendPacketInfoListLock);
-			copyList.clear();
-			for (auto* info : thisThreadSendPacketInfoList)
+			std::scoped_lock lock(scheduler.lock);
+			const auto now = std::chrono::steady_clock::now();
+			while (not scheduler.heap.empty())
 			{
-				if (info->retransmissionTimeStamp > tickSet.nowTick || info->isErasedPacketInfo == true)
+				const RetransmissionHeapEntry& top = scheduler.heap.top();
+				if (top.info->isErasedPacketInfo.load(std::memory_order_acquire) || top.version != top.info->scheduleVersion)
 				{
+					SendPacketInfo* staleInfo = top.info;
+					scheduler.heap.pop();
+					SendPacketInfo::Free(staleInfo);
 					continue;
 				}
 
-				info->AddRefCount();
-				copyList.push_back(info);
+				if (top.deadline > now)
+				{
+					hasNext = true;
+					nextDeadline = top.deadline;
+					break;
+				}
+
+				dueList.push_back(top.info);
+				scheduler.heap.pop();
 			}
 		}
-		
-		for (const auto& sendPacketInfo : copyList)
+
+		for (auto* sendPacketInfo : dueList)
 		{
-			bool shouldDisconnect = false;
-			bool shouldSkip = false;
-			{
-				std::scoped_lock lock(thisThreadSendPacketInfoListLock);
-				if (sendPacketInfo->isErasedPacketInfo)
-				{
-					shouldSkip = true;
-				}
-				else if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
-				{
-					shouldDisconnect = true;
-				}
-				else
-				{
-					sendPacketInfo->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
-				}
-			}
-
-			if (shouldSkip == true)
-			{
-				SendPacketInfo::Free(sendPacketInfo);
-				continue;
-			}
-
-			if (shouldDisconnect == true)
-			{
-				if (not sendPacketInfo->IsOwnerValid())
-				{
-					SendPacketInfo::Free(sendPacketInfo);
-					continue;
-				}
-
-				sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
-				SendPacketInfo::Free(sendPacketInfo);
-				continue;
-			}
-
-			if (sendPacketInfo->IsOwnerValid())
-			{
-				sendPacketInfo->owner->OnRetransmissionTimeout();
-			}
-
-			if (not SendPacket(sendPacketInfo) && sendPacketInfo->IsOwnerValid())
-			{
-				sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
-			}
-
-			SendPacketInfo::Free(sendPacketInfo);
+			ProcessRetransmission(sendPacketInfo, threadId);
 		}
 
-		SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+		if (not dueList.empty())
+		{
+			continue;
+		}
+
+		if (hasNext)
+		{
+			if (not ArmRetransmissionTimer(scheduler.timerHandle, nextDeadline))
+			{
+				Sleep(1);
+				continue;
+			}
+
+			const DWORD waitResult = WaitForMultipleObjects(3, waitHandles, FALSE, INFINITE);
+			if (waitResult == WAIT_OBJECT_0 + 2)
+			{
+				break;
+			}
+			if (waitResult == WAIT_FAILED)
+			{
+				LOG_ERROR(std::format("Retransmission wait failed. error is {}", GetLastError()));
+				break;
+			}
+			if (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_OBJECT_0 + 1)
+			{
+				LOG_ERROR(std::format("Retransmission wait returned unexpected result {}", waitResult));
+				break;
+			}
+		}
+		else
+		{
+			const DWORD waitResult = WaitForMultipleObjects(2, emptyWaitHandles, FALSE, INFINITE);
+			if (waitResult == WAIT_OBJECT_0 + 1)
+			{
+				break;
+			}
+			if (waitResult == WAIT_FAILED)
+			{
+				LOG_ERROR(std::format("Empty retransmission wait failed. error is {}", GetLastError()));
+				break;
+			}
+			if (waitResult != WAIT_OBJECT_0)
+			{
+				LOG_ERROR(std::format("Empty retransmission wait returned unexpected result {}", waitResult));
+				break;
+			}
+		}
 	}
+
+	{
+		std::scoped_lock lock(scheduler.lock);
+		while (not scheduler.heap.empty())
+		{
+			SendPacketInfo* info = scheduler.heap.top().info;
+			scheduler.heap.pop();
+			SendPacketInfo::Free(info);
+		}
+	}
+}
+
+void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, const ThreadIdType threadId)
+{
+	auto& scheduler = *retransmissionSchedulers[threadId];
+
+	bool shouldDisconnect = false;
+	{
+		std::scoped_lock lock(scheduler.lock);
+		if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
+		{
+			SendPacketInfo::Free(sendPacketInfo);
+			return;
+		}
+
+		if (++sendPacketInfo->retransmissionCount >= maxPacketRetransmissionCount)
+		{
+			shouldDisconnect = true;
+		}
+	}
+
+	if (shouldDisconnect)
+	{
+		if (sendPacketInfo->IsOwnerValid())
+		{
+			sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
+		}
+
+		SendPacketInfo::Free(sendPacketInfo);
+		return;
+	}
+
+	if (sendPacketInfo->IsOwnerValid())
+	{
+		sendPacketInfo->owner->OnRetransmissionTimeout();
+	}
+
+	if (not SendPacket(sendPacketInfo) && sendPacketInfo->IsOwnerValid())
+	{
+		sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+	}
+
+	SendPacketInfo::Free(sendPacketInfo);
 }
 
 void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopToken)

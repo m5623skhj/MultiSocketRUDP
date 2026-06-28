@@ -73,6 +73,7 @@
     <ClInclude Include="RUDPSessionFunctionDelegate.h" />
     <ClInclude Include="RUDPSessionManager.h" />
     <ClInclude Include="RUDPThreadManager.h" />
+    <ClInclude Include="RetransmissionScheduler.h" />
     <ClInclude Include="SendPacketInfo.h" />
     <ClInclude Include="SessionCryptoContext.h" />
     <ClInclude Include="SessionPacketOrderer.h" />

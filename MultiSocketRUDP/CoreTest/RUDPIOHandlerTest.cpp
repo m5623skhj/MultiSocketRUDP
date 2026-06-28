@@ -5,6 +5,7 @@
 #include "MultiSocketRUDPCore.h"
 #include "IOContext.h"
 #include "SendPacketInfo.h"
+#include "RetransmissionScheduler.h"
 #include "MockRIOManager.h"
 #include "MockSessionDelegate.h"
 
@@ -41,7 +42,7 @@ public:
 //   MockRIOManager      - RIOReceiveEx / RIOSendEx 반환값 제어
 //   MockSessionDelegate - 소켓, RecvContext, SendContext 등 제어
 //   CTLSMemoryPool<IOContext> - IOContext 풀 (OP_SEND 테스트에서 직접 사용)
-//   sendPacketInfoList / sendPacketInfoListLock - 재전송 목록 (threadId 0 전용)
+//   retransmissionSchedulers - 재전송 스케줄러 (threadId 0 전용)
 // ============================================================
 class RUDPIOHandlerTest : public ::testing::Test
 {
@@ -52,15 +53,15 @@ protected:
 
     void SetUp() override
     {
-        sendPacketInfoList.emplace_back();
-        sendPacketInfoListLock.push_back(std::make_unique<std::mutex>());
+        auto scheduler = std::make_unique<RetransmissionScheduler>();
+        scheduler->wakeEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        retransmissionSchedulers.push_back(std::move(scheduler));
 
         handler = std::make_unique<RUDPIOHandler>(
             mockRIO,
             mockDelegate,
             contextPool,
-            sendPacketInfoList,
-            sendPacketInfoListLock,
+            retransmissionSchedulers,
             MAX_HOLDING_SIZE,
             RETRANSMIT_MS);
     }
@@ -68,6 +69,13 @@ protected:
     void TearDown() override
     {
         handler.reset();
+        for (const auto& scheduler : retransmissionSchedulers)
+        {
+            if (scheduler != nullptr && scheduler->wakeEventHandle != NULL)
+            {
+                CloseHandle(scheduler->wakeEventHandle);
+            }
+        }
     }
 
     // ── 의존성 ──────────────────────────────────────────────
@@ -75,8 +83,7 @@ protected:
     MockSessionDelegate mockDelegate;
     CTLSMemoryPool<IOContext> contextPool{ 8, false };
 
-    std::vector<std::list<SendPacketInfo*>>   sendPacketInfoList;
-    std::vector<std::unique_ptr<std::mutex>>  sendPacketInfoListLock;
+    std::vector<std::unique_ptr<RetransmissionScheduler>> retransmissionSchedulers;
 
     std::unique_ptr<RUDPIOHandler> handler;
 
@@ -105,6 +112,16 @@ protected:
         ctx->session = &session;
         return ctx;
     }
+
+    SendPacketInfo* AllocSendPacketInfo(const PacketSequence sequence = 1)
+    {
+        NetBuffer* buffer = NetBuffer::Alloc();
+        SendPacketInfo* info = sendPacketInfoPool->Alloc();
+        EXPECT_NE(buffer, nullptr);
+        EXPECT_NE(info, nullptr);
+        info->Initialize(nullptr, 0, buffer, sequence, false);
+        return info;
+    }
 };
 
 // ============================================================
@@ -113,10 +130,11 @@ protected:
 
 TEST_F(RUDPIOHandlerTest, Handler_CreateAndDestroy_NoCrash)
 {
-    std::vector<std::list<SendPacketInfo*>>  infoList;
-    std::vector<std::unique_ptr<std::mutex>> lockList;
-    infoList.emplace_back();
-    lockList.push_back(std::make_unique<std::mutex>());
+    std::vector<std::unique_ptr<RetransmissionScheduler>> localSchedulers;
+    auto scheduler = std::make_unique<RetransmissionScheduler>();
+    scheduler->wakeEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    HANDLE wakeEventHandle = scheduler->wakeEventHandle;
+    localSchedulers.push_back(std::move(scheduler));
 
     MockRIOManager      localRIO;
     MockSessionDelegate localDelegate;
@@ -125,14 +143,103 @@ TEST_F(RUDPIOHandlerTest, Handler_CreateAndDestroy_NoCrash)
     EXPECT_NO_THROW({
         RUDPIOHandler localHandler(
             localRIO, localDelegate, localPool,
-            infoList, lockList,
+            localSchedulers,
             MAX_HOLDING_SIZE, RETRANSMIT_MS);
         });
+
+    if (wakeEventHandle != NULL)
+    {
+        CloseHandle(wakeEventHandle);
+    }
 }
 
 // ============================================================
 // 2. IOCompleted — null context
 // ============================================================
+
+TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_PushAddsReferenceAndSignalsWakeEvent)
+{
+    SendPacketInfo* info = AllocSendPacketInfo();
+
+    auto& scheduler = *retransmissionSchedulers[THREAD_ID];
+    {
+        std::scoped_lock lock(scheduler.lock);
+        PushRetransmissionSchedule(scheduler, *info, std::chrono::steady_clock::now());
+        ASSERT_EQ(scheduler.heap.size(), 1);
+        EXPECT_EQ(scheduler.heap.top().info, info);
+        EXPECT_EQ(scheduler.heap.top().version, info->scheduleVersion);
+    }
+    EXPECT_TRUE(SignalRetransmissionWakeEvent(scheduler));
+    EXPECT_EQ(info->refCount.load(std::memory_order_acquire), 2);
+    EXPECT_EQ(WaitForSingleObject(scheduler.wakeEventHandle, 0), WAIT_OBJECT_0);
+
+    {
+        std::scoped_lock lock(scheduler.lock);
+        SendPacketInfo::Free(scheduler.heap.top().info);
+        scheduler.heap.pop();
+    }
+    SendPacketInfo::Free(info);
+}
+
+TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_RequeueMarksOlderHeapEntryStaleByVersion)
+{
+    SendPacketInfo* info = AllocSendPacketInfo();
+    auto& scheduler = *retransmissionSchedulers[THREAD_ID];
+
+    {
+        std::scoped_lock lock(scheduler.lock);
+        PushRetransmissionSchedule(scheduler, *info, std::chrono::steady_clock::now());
+        PushRetransmissionSchedule(scheduler, *info, std::chrono::steady_clock::now());
+    }
+
+    size_t staleCount = 0;
+    size_t currentCount = 0;
+    {
+        std::scoped_lock lock(scheduler.lock);
+        ASSERT_EQ(scheduler.heap.size(), 2);
+        while (not scheduler.heap.empty())
+        {
+            const auto entry = scheduler.heap.top();
+            scheduler.heap.pop();
+            if (entry.version == entry.info->scheduleVersion)
+            {
+                ++currentCount;
+            }
+            else
+            {
+                ++staleCount;
+            }
+            SendPacketInfo::Free(entry.info);
+        }
+    }
+
+    EXPECT_EQ(staleCount, 1);
+    EXPECT_EQ(currentCount, 1);
+    SendPacketInfo::Free(info);
+}
+
+TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_ErasedPacketEntryReturnsHeapReference)
+{
+    SendPacketInfo* info = AllocSendPacketInfo();
+    auto& scheduler = *retransmissionSchedulers[THREAD_ID];
+
+    {
+        std::scoped_lock lock(scheduler.lock);
+        PushRetransmissionSchedule(scheduler, *info, std::chrono::steady_clock::now());
+        info->isErasedPacketInfo.store(true, std::memory_order_release);
+    }
+
+    {
+        std::scoped_lock lock(scheduler.lock);
+        ASSERT_EQ(scheduler.heap.size(), 1);
+        SendPacketInfo* erasedInfo = scheduler.heap.top().info;
+        scheduler.heap.pop();
+        EXPECT_TRUE(erasedInfo->isErasedPacketInfo.load(std::memory_order_acquire));
+        SendPacketInfo::Free(erasedInfo);
+    }
+    EXPECT_EQ(info->refCount.load(std::memory_order_acquire), 1);
+    SendPacketInfo::Free(info);
+}
 
 TEST_F(RUDPIOHandlerTest, IOCompleted_NullContext_ReturnsFalse)
 {

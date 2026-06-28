@@ -191,6 +191,9 @@
     <ClInclude Include="SendPacketInfo.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RetransmissionScheduler.h">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClInclude>
     <ClInclude Include="RUDPIOHandler.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core\CoreComponent</Filter>
     </ClInclude>
