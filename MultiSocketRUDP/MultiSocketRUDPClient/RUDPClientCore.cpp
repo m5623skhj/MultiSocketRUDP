@@ -682,6 +682,9 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 
 void RUDPClientCore::Disconnect()
 {
+	serverAliveChecker.StopServerAliveCheck();
+	isConnected = false;
+
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -703,13 +706,18 @@ void RUDPClientCore::Disconnect()
 		true
 	);
 
+	if (sendEventHandles[0] == nullptr)
+	{
+		NetBuffer::Free(buffer);
+		return;
+	}
+
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
 		sendBufferQueue.Enqueue(buffer);
 	}
 
 	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
-	isConnected = false;
 }
 
 #if _DEBUG
