@@ -93,6 +93,7 @@ private:
 	std::atomic_bool threadStopFlag{};
 	std::atomic_bool isConnected{};
 	std::atomic_bool hasClientProcessReference{};
+	std::mutex lifecycleLock;
 
 #pragma region SessionGetter
 #if USE_IOCP_SESSION_GETTER

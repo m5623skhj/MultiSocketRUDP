@@ -90,40 +90,46 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 
 void RUDPClientCore::Stop()
 {
-	if (isStopped.exchange(true, std::memory_order_acq_rel))
 	{
-		return;
-	}
+		std::scoped_lock lock(lifecycleLock);
+		if (isStopped.exchange(true, std::memory_order_acq_rel))
+		{
+			return;
+		}
 
-	if (sessionBrokerSocket != INVALID_SOCKET)
-	{
-		closesocket(sessionBrokerSocket);
-		sessionBrokerSocket = INVALID_SOCKET;
-	}
+		if (sessionBrokerSocket != INVALID_SOCKET)
+		{
+			closesocket(sessionBrokerSocket);
+			sessionBrokerSocket = INVALID_SOCKET;
+		}
 
-	threadStopFlag = true;
-	if (sendEventHandles[1] != nullptr)
-	{
-		SetEvent(sendEventHandles[1]);
-	}
+		threadStopFlag = true;
+		if (sendEventHandles[1] != nullptr)
+		{
+			SetEvent(sendEventHandles[1]);
+		}
 
-	if (rudpSocket != INVALID_SOCKET)
-	{
-		closesocket(rudpSocket);
-		rudpSocket = INVALID_SOCKET;
+		if (rudpSocket != INVALID_SOCKET)
+		{
+			closesocket(rudpSocket);
+			rudpSocket = INVALID_SOCKET;
+		}
 	}
 
 	JoinThreads();
 
-	if (sendEventHandles[0] != nullptr)
 	{
-		CloseHandle(sendEventHandles[0]);
-		sendEventHandles[0] = nullptr;
-	}
-	if (sendEventHandles[1] != nullptr)
-	{
-		CloseHandle(sendEventHandles[1]);
-		sendEventHandles[1] = nullptr;
+		std::scoped_lock lock(lifecycleLock);
+		if (sendEventHandles[0] != nullptr)
+		{
+			CloseHandle(sendEventHandles[0]);
+			sendEventHandles[0] = nullptr;
+		}
+		if (sendEventHandles[1] != nullptr)
+		{
+			CloseHandle(sendEventHandles[1]);
+			sendEventHandles[1] = nullptr;
+		}
 	}
 
 	{
@@ -683,6 +689,12 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 void RUDPClientCore::Disconnect()
 {
 	serverAliveChecker.StopServerAliveCheck();
+	std::scoped_lock lock(lifecycleLock);
+	if (isStopped.load(std::memory_order_acquire))
+	{
+		return;
+	}
+
 	isConnected = false;
 
 	NetBuffer* buffer = NetBuffer::Alloc();
