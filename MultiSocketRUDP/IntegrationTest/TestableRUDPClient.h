@@ -11,6 +11,7 @@ struct ReceivedAppPacket
 {
 	PACKET_ID packetId{ PACKET_ID::INVALID_PACKET_ID };
 	std::string echoText{};
+	int order{};
 };
 
 class TestableRUDPClient
@@ -25,11 +26,13 @@ public:
 	void SetAutoReplyDataPackets(bool shouldAutoReply);
 	void SendPingPacket();
 	void SendEchoRequestPacket(const std::string& text);
+	void SendOrderedPacket(int order);
 	void DisconnectClient();
 
 	bool WaitForConnected(std::chrono::milliseconds timeout);
 	bool WaitForPong(std::chrono::milliseconds timeout);
 	bool WaitForEcho(std::string_view expectedText, std::chrono::milliseconds timeout);
+	bool WaitForOrderedResponse(int expectedOrder, std::chrono::milliseconds timeout);
 
 private:
 	class Impl;

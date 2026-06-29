@@ -23,6 +23,7 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
     if (not sendContext.Initialize(rioFunctionTable, pendingQueueCapacity))
     {
         LOG_ERROR("SessionRIOContext: sendContext.Initialize failed");
+        recvContext.Cleanup(rioFunctionTable);
         return false;
     }
 
@@ -30,6 +31,7 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
     if (rioRQ == RIO_INVALID_RQ)
     {
         LOG_ERROR(std::format("RIOCreateRequestQueue failed with error {}", WSAGetLastError()));
+        Cleanup(rioFunctionTable);
         return false;
     }
 

@@ -28,6 +28,7 @@ class RUDPSession
 {
 	friend MultiSocketRUDPCore;
 	friend RUDPSessionFunctionDelegate;
+	friend class RUDPSessionBehaviorAccess;
 
 protected:
 	explicit RUDPSession(MultiSocketRUDPCore& inCore);

@@ -29,46 +29,54 @@ RUDPClientCore::RUDPClientCore()
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
 	threadStopFlag = false;
+	isConnected = false;
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
 	if (not ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath))
 	{
+		Logger::GetInstance().StopLoggerThread();
 		return false;
 	}
 
+	if (not AcquireClientProcessReference())
 	{
-		std::scoped_lock lock(clientCountInThisProcessLock);
-		if (clientCountInThisProcess == 0)
-		{
-			WSADATA wsaData;
-			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-			{
-				LOG_ERROR(std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError()));
-				WSACleanup();
-				return false;
-			}
-		}
-
-		++clientCountInThisProcess;
+		Logger::GetInstance().StopLoggerThread();
+		return false;
 	}
 
 #if USE_IOCP_SESSION_GETTER
 	if (not sessionGetter.Start(optionFilePath))
 	{
+		ReleaseClientProcessReference();
+		Logger::GetInstance().StopLoggerThread();
 		return false;
 	}
 #else
 	if (not RunGetSessionFromServer(sessionGetterOptionFilePath))
 	{
+		ReleaseClientProcessReference();
+		Logger::GetInstance().StopLoggerThread();
 		return false;
 	}
 #endif
 
 	if (not CreateRUDPSocket())
 	{
+		ReleaseClientProcessReference();
+		Logger::GetInstance().StopLoggerThread();
 		return false;
 	}
-	RunThreads();
+	if (not RunThreads())
+	{
+		if (rudpSocket != INVALID_SOCKET)
+		{
+			closesocket(rudpSocket);
+			rudpSocket = INVALID_SOCKET;
+		}
+		ReleaseClientProcessReference();
+		Logger::GetInstance().StopLoggerThread();
+		return false;
+	}
 	Sleep(1000);
 
 	if (ShouldSendConnectPacketOnStart())
@@ -76,11 +84,17 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 		SendConnectPacket();
 	}
 
+	isStopped.store(false, std::memory_order_release);
 	return true;
 }
 
 void RUDPClientCore::Stop()
 {
+	if (isStopped.exchange(true, std::memory_order_acq_rel))
+	{
+		return;
+	}
+
 	if (sessionBrokerSocket != INVALID_SOCKET)
 	{
 		closesocket(sessionBrokerSocket);
@@ -88,7 +102,10 @@ void RUDPClientCore::Stop()
 	}
 
 	threadStopFlag = true;
-	SetEvent(sendEventHandles[1]);
+	if (sendEventHandles[1] != nullptr)
+	{
+		SetEvent(sendEventHandles[1]);
+	}
 
 	if (rudpSocket != INVALID_SOCKET)
 	{
@@ -128,15 +145,7 @@ void RUDPClientCore::Stop()
 		}
 	}
 	
-	{
-		std::scoped_lock lock(clientCountInThisProcessLock);
-		--clientCountInThisProcess;
-		if (clientCountInThisProcess == 0)
-		{
-			WSACleanup();
-		}
-	}
-	isStopped = true;
+	ReleaseClientProcessReference();
 
 	if (sessionKeyHandle != nullptr)
 	{
@@ -148,6 +157,44 @@ void RUDPClientCore::Stop()
 	{
 		delete[] keyObjectBuffer;
 		keyObjectBuffer = nullptr;
+	}
+}
+
+bool RUDPClientCore::AcquireClientProcessReference()
+{
+	std::scoped_lock lock(clientCountInThisProcessLock);
+	if (clientCountInThisProcess == 0)
+	{
+		WSADATA wsaData;
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+		{
+			LOG_ERROR(std::format("WSAStartup failed GetSessionFromServer() with error code {}", WSAGetLastError()));
+			return false;
+		}
+	}
+
+	++clientCountInThisProcess;
+	hasClientProcessReference.store(true, std::memory_order_release);
+	return true;
+}
+
+void RUDPClientCore::ReleaseClientProcessReference()
+{
+	if (not hasClientProcessReference.exchange(false, std::memory_order_acq_rel))
+	{
+		return;
+	}
+
+	std::scoped_lock lock(clientCountInThisProcessLock);
+	if (clientCountInThisProcess == 0)
+	{
+		return;
+	}
+
+	--clientCountInThisProcess;
+	if (clientCountInThisProcess == 0)
+	{
+		WSACleanup();
 	}
 }
 
@@ -190,6 +237,7 @@ bool RUDPClientCore::CreateRUDPSocket()
 	{
 		LOG_ERROR(std::format("bind() failed with error {}", WSAGetLastError()));
 		closesocket(rudpSocket);
+		rudpSocket = INVALID_SOCKET;
 		return false;
 	}
 
@@ -206,14 +254,30 @@ void RUDPClientCore::SendConnectPacket()
 	SendPacket(connectPacket, packetSequence, true);
 }
 
-void RUDPClientCore::RunThreads()
+bool RUDPClientCore::RunThreads()
 {
 	sendEventHandles[0] = CreateSemaphore(nullptr, 0, LONG_MAX, nullptr);
 	sendEventHandles[1] = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (sendEventHandles[0] == nullptr || sendEventHandles[1] == nullptr)
+	{
+		if (sendEventHandles[0] != nullptr)
+		{
+			CloseHandle(sendEventHandles[0]);
+			sendEventHandles[0] = nullptr;
+		}
+		if (sendEventHandles[1] != nullptr)
+		{
+			CloseHandle(sendEventHandles[1]);
+			sendEventHandles[1] = nullptr;
+		}
+
+		return false;
+	}
 
 	recvThread = std::jthread([this]() { this->RunRecvThread(); });
 	sendThread = std::jthread([this]() { this->RunSendThread(); });
 	retransmissionThread = std::jthread([this]() { this->RunRetransmissionThread(); });
+	return true;
 }
 
 void RUDPClientCore::RunRecvThread()

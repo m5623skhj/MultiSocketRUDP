@@ -13,18 +13,23 @@ ServerAliveChecker::ServerAliveChecker(const std::function<void()>& inCoreStopFu
 void ServerAliveChecker::StartServerAliveCheck(const unsigned int inCheckIntervalMs)
 {
 	checkIntervalMs = inCheckIntervalMs;
+	isStopped.store(false, std::memory_order_release);
 	serverAliveCheckThread = std::jthread(&ServerAliveChecker::RunServerAliveCheckerThread, this);
 }
 
 void ServerAliveChecker::StopServerAliveCheck()
 {
-	if (isStopped)
+	if (isStopped.exchange(true, std::memory_order_acq_rel))
 	{
 		return;
 	}
 
-	isStopped = true;
-	if (serverAliveCheckThread.joinable() && serverAliveCheckThread.get_id() != std::this_thread::get_id())
+	if (not serverAliveCheckThread.joinable())
+	{
+		return;
+	}
+
+	if (serverAliveCheckThread.get_id() != std::this_thread::get_id())
 	{
 		serverAliveCheckThread.join();
 	}

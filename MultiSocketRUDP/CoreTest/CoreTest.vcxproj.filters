@@ -51,7 +51,7 @@
     <ClCompile Include="SessionStateMachineTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
-    <ClCompile Include="SessionPacketOrderer.cpp">
+    <ClCompile Include="SessionPacketOrdererTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\CoreTest\subhook\subhook.c">
@@ -67,6 +67,15 @@
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
     <ClCompile Include="SendPacketInfoTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="RingBufferTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPThreadManagerTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionRIOContextTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
   </ItemGroup>

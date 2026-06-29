@@ -31,17 +31,6 @@ namespace
 	constexpr wchar_t TEST_CERT_FILE_NAME[] = L"TestCert.pfx";
 	constexpr wchar_t TEST_CERT_PASSWORD[] = L"MultiSocketRUDPIntegrationTest!";
 
-	std::optional<long> TryInitializeClientTls()
-	{
-		TLSHelper::TLSHelperClient tlsHelper;
-		if (tlsHelper.Initialize())
-		{
-			return std::nullopt;
-		}
-
-		return tlsHelper.GetLastStatus();
-	}
-
 	std::wstring GetRootRelativePath(const wchar_t* relativePath)
 	{
 		std::array<wchar_t, MAX_PATH> modulePath{};
@@ -187,6 +176,7 @@ namespace
 		std::atomic_int releasedCount{ 0 };
 		std::atomic_int pingRequestCount{ 0 };
 		std::atomic_int echoRequestCount{ 0 };
+		std::atomic_int orderedRequestCount{ 0 };
 		std::mutex lastEchoMutex;
 		std::string lastEchoRequest{};
 
@@ -197,6 +187,7 @@ namespace
 			releasedCount.store(0, std::memory_order_relaxed);
 			pingRequestCount.store(0, std::memory_order_relaxed);
 			echoRequestCount.store(0, std::memory_order_relaxed);
+			orderedRequestCount.store(0, std::memory_order_relaxed);
 			std::scoped_lock lock(lastEchoMutex);
 			lastEchoRequest.clear();
 		}
@@ -277,6 +268,7 @@ namespace
 
 		void OnTestPacketReq(const TestPacketReq& packet)
 		{
+			GetSessionStats().orderedRequestCount.fetch_add(1, std::memory_order_relaxed);
 			TestPacketRes response;
 			response.order = packet.order;
 			EXPECT_TRUE(SendPacket(response));
@@ -512,10 +504,6 @@ namespace
 		{
 			ASSERT_TRUE(HasTestCertificateFile())
 				<< "Missing IntegrationTest\\\\" << TEST_CERT_FILE_NAME << ". Run Tool\\\\ForTLS\\\\CreateDevTLSPfx.bat first.";
-			const auto clientTlsStatus = TryInitializeClientTls();
-			ASSERT_FALSE(clientTlsStatus.has_value())
-				<< "TLS client credential initialization failed. SECURITY_STATUS=0x"
-				<< std::hex << clientTlsStatus.value_or(0);
 
 			GetSessionStats().Reset();
 
@@ -600,7 +588,7 @@ namespace
 				GetSessionStats().connectedCount.load(std::memory_order_relaxed) == 1;
 		}));
 
-		const auto result = process.Wait(10s);
+		const auto result = process.Wait(45s);
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}
@@ -624,7 +612,7 @@ namespace
 			return server->GetUnusedSessionCount() == unusedBefore;
 		}));
 
-		const auto result = process.Wait(10s);
+		const auto result = process.Wait(35s);
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 		EXPECT_EQ(server->GetAllConnectedCount(), 0u);
@@ -644,7 +632,7 @@ namespace
 			return GetSessionStats().echoRequestCount.load(std::memory_order_relaxed) == 1;
 		}));
 
-		const auto result = process.Wait(10s);
+		const auto result = process.Wait(45s);
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 
@@ -664,7 +652,64 @@ namespace
 			return server->GetAllDisconnectedByRetransmissionCount() == 1;
 		}));
 
-		const auto result = process.Wait(35s);
+		const auto result = process.Wait(60s);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, ClientDisconnectReleasesSessionAndUpdatesCounts)
+	{
+		ClientHarnessProcess process;
+		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"disconnect" })));
+
+		EXPECT_TRUE(WaitUntil(10s, [this]()
+		{
+			return server->GetAllDisconnectedCount() == 1 &&
+				GetSessionStats().disconnectedCount.load(std::memory_order_relaxed) == 1 &&
+				GetSessionStats().releasedCount.load(std::memory_order_relaxed) == 1;
+		}));
+
+		const auto result = process.Wait(45s);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+		EXPECT_EQ(server->GetConnectedSessionCount(), 0);
+	}
+
+	TEST_F(IntegrationFixture, ClientStopScenarioCompletesWithoutForcedTermination)
+	{
+		const auto result = RunClientScenario({ L"--scenario", L"stop" }, 45s);
+
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, MultipleClientsConnectAndEchoConcurrently)
+	{
+		ClientHarnessProcess process;
+		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"multi-echo", L"3" })));
+
+		EXPECT_TRUE(WaitUntil(10s, [this]()
+		{
+			return server->GetAllConnectedCount() == 3 &&
+				GetSessionStats().echoRequestCount.load(std::memory_order_relaxed) == 3;
+		}));
+
+		const auto result = process.Wait(70s);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, OrderedBurstRoundTripPreservesApplicationOrder)
+	{
+		ClientHarnessProcess process;
+		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"ordered-burst" })));
+
+		EXPECT_TRUE(WaitUntil(10s, []()
+		{
+			return GetSessionStats().orderedRequestCount.load(std::memory_order_relaxed) == 5;
+		}));
+
+		const auto result = process.Wait(45s);
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}

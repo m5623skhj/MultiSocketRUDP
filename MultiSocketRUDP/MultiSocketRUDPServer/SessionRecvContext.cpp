@@ -35,6 +35,7 @@ bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
             context->clientAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID ||
             context->localAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
         {
+            Cleanup(rioFunctionTable);
             return false;
         }
 
@@ -50,7 +51,7 @@ void SessionRecvContext::Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunction
     {
         if (slot.recvContext == nullptr)
         {
-            return;
+            continue;
         }
 
         const auto& context = slot.recvContext;

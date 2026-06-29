@@ -2,6 +2,7 @@
 #include "NetServerSerializeBuffer.h"
 #include "BuildConfig.h"
 #include "../Common/etc/CoreType.h"
+#include <atomic>
 #include <thread>
 #include <mutex>
 #include <array>
@@ -78,17 +79,20 @@ protected:
 	virtual bool ShouldSendReplyToServer(PacketSequence inRecvPacketSequence, unsigned int inPacketId) const { return true; }
 
 public:
-	bool IsStopped() const { return isStopped; }
+	bool IsStopped() const { return isStopped.load(std::memory_order_acquire); }
 	bool IsConnected() const { return isConnected; }
 
 private:
 	bool CreateRUDPSocket();
 	void SendConnectPacket();
+	bool AcquireClientProcessReference();
+	void ReleaseClientProcessReference();
 
 private:
-	bool isStopped{};
+	std::atomic_bool isStopped{ true };
 	std::atomic_bool threadStopFlag{};
 	std::atomic_bool isConnected{};
+	std::atomic_bool hasClientProcessReference{};
 
 #pragma region SessionGetter
 #if USE_IOCP_SESSION_GETTER
@@ -120,7 +124,7 @@ private:
 	WCHAR sessionBrokerIP[16]{};
 	PortType sessionBrokerPort{};
 
-	SOCKET sessionBrokerSocket{};
+	SOCKET sessionBrokerSocket{ INVALID_SOCKET };
 
 #endif
 
@@ -142,7 +146,7 @@ private:
 
 #pragma region RUDP
 private:
-	void RunThreads();
+	bool RunThreads();
 	void RunRecvThread();
 	void RunSendThread();
 	void RunRetransmissionThread();
@@ -157,7 +161,7 @@ private:
 	PacketSequence GetNextRecvPacketSequence() const { return nextRecvPacketSequence; }
 
 private:
-	SOCKET rudpSocket{};
+	SOCKET rudpSocket{ INVALID_SOCKET };
 	sockaddr_in serverAddr{};
 
 	std::jthread recvThread{};
@@ -246,7 +250,7 @@ private:
 
 private:
 	static inline unsigned short clientCountInThisProcess{};
-	std::mutex clientCountInThisProcessLock;
+	static inline std::mutex clientCountInThisProcessLock;
 };
 
 static auto sendPacketInfoPool = new CTLSMemoryPool<SendPacketInfo>(2, true);

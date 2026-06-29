@@ -4,6 +4,7 @@
 #include "../MultiSocketRUDPServer/SessionSocketContext.h"
 #include "../MultiSocketRUDPServer/RUDPSession.h"
 #include "../MultiSocketRUDPServer/MultiSocketRUDPCore.h"
+#include "../MultiSocketRUDPServer/SendPacketInfo.h"
 
 namespace
 {
@@ -19,6 +20,35 @@ namespace
 		PacketId GetPacketId() const override { return 1; }
 	};
 }
+
+class RUDPSessionBehaviorAccess
+{
+public:
+	static bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket)
+	{
+		return session.OnRecvPacket(recvPacket);
+	}
+
+	static void OnSendReply(RUDPSession& session, NetBuffer& recvPacket)
+	{
+		session.OnSendReply(recvPacket);
+	}
+
+	static SessionSendContext& GetSendContext(RUDPSession& session)
+	{
+		return session.GetSendContext();
+	}
+
+	static void InitializeSession(RUDPSession& session)
+	{
+		session.InitializeSession();
+	}
+
+	static void SetMaximumPacketHoldingQueueSize(const BYTE size)
+	{
+		RUDPSession::SetMaximumPacketHoldingQueueSize(size);
+	}
+};
 
 class SessionSocketContextTest : public ::testing::Test
 {
@@ -78,4 +108,44 @@ TEST(RUDPSessionBehaviorTest, DisconnectedSessionRejectsSendAndDisconnectTransit
 	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
 	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::DISCONNECTED);
 	EXPECT_FALSE(session.IsReleasing());
+}
+
+TEST(RUDPSessionBehaviorTest, OnRecvPacketUnknownPacketIdReturnsFalse)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	RUDPSessionBehaviorAccess::SetMaximumPacketHoldingQueueSize(4);
+	SessionBehaviorTestSession session{ core };
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	NetBuffer* buffer = NetBuffer::Alloc();
+	ASSERT_NE(buffer, nullptr);
+
+	*buffer << PacketSequence{ 0 } << PacketId{ 9999 };
+
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *buffer));
+
+	NetBuffer::Free(buffer);
+}
+
+TEST(RUDPSessionBehaviorTest, OnSendReplyErasesTrackedSendPacketInfo)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	NetBuffer* sendBuffer = NetBuffer::Alloc();
+	SendPacketInfo* info = sendPacketInfoPool->Alloc();
+	ASSERT_NE(sendBuffer, nullptr);
+	ASSERT_NE(info, nullptr);
+
+	constexpr PacketSequence sequence = 0;
+	info->Initialize(&session, session.GetSessionGeneration(), sendBuffer, sequence, false);
+	RUDPSessionBehaviorAccess::GetSendContext(session).InsertSendPacketInfo(sequence, info);
+	ASSERT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(sequence), info);
+
+	NetBuffer reply;
+	reply << sequence << BYTE{ 1 };
+	RUDPSessionBehaviorAccess::OnSendReply(session, reply);
+
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(sequence), nullptr);
+	EXPECT_TRUE(info->isErasedPacketInfo.load(std::memory_order_acquire));
+
+	SendPacketInfo::Free(info);
 }
