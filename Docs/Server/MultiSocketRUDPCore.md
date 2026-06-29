@@ -9,13 +9,13 @@
 
 ## 목차
 
-1. [서버 시작 — StartServer](#1-서버-시작--startserver)
-2. [서버 종료 — StopServer](#2-서버-종료--stopserver)
+1. [서버 시작 — `StartServer`](#1-서버-시작-startserver)
+2. [서버 종료 — `StopServer`](#2-서버-종료-stopserver)
 3. [함수 설명](#3-함수-설명)
 4. [콘텐츠 서버 API](#4-콘텐츠-서버-api)
-5. [내부 동작 — 패킷 전송 경로](#5-내부-동작--패킷-전송-경로)
-6. [내부 동작 — 세션 해제 경로](#6-내부-동작--세션-해제-경로)
-7. [내부 동작 — InitReserveSession](#7-내부-동작--initreservesession)
+5. [내부 동작 — 패킷 전송 경로](#5-내부-동작-패킷-전송-경로)
+6. [내부 동작 — 세션 해제 경로](#6-내부-동작-세션-해제-경로)
+7. [내부 동작 — `InitReserveSession`](#7-내부-동작-initreservesession)
 8. [옵션 파일 설정값 전체](#8-옵션-파일-설정값-전체)
 9. [멀티소켓 구조의 의미](#9-멀티소켓-구조의-의미)
 10. [의존 컴포넌트](#10-의존-컴포넌트)
@@ -253,14 +253,34 @@ void StopServer();
 #### `unsigned int GetAllDisconnectedByRetransmissionCount() const`
 - 재전송 한도 초과로 종료된 누적 세션 수를 반환한다.
 
-#### `bool SendPacket(SendPacketInfo* sendPacketInfo) const`
+#### `SendPacket`
+
+```cpp
+bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
+```
+
 - 세션이 조립한 `SendPacketInfo`를 IO 계층으로 전달해 실제 송신을 시작한다.
+### `SendPacket`
+
+```cpp
+bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
+```
+
+`SendPacketInfo`를 사용하여 패킷 전송을 수행한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `sendPacketInfo` | `SendPacketInfo*` | 전송할 패킷 정보 |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 전송 성공 |
+| `false` | 전송 실패 |
 
 #### `bool EraseSendPacketInfo(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
 - 스레드별 전송 추적 목록에서 특정 `SendPacketInfo`를 제거한다.
 - ACK 수신 후 정리나 송신 실패 정리 흐름에서 호출된다.
 - 제거에 성공하면 `true`, 대상이 없거나 처리할 수 없으면 `false`를 반환한다.
-
 #### `RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const`
 - 초기화된 RIO 함수 테이블을 반환한다.
 - 세션 RIO 초기화에서 사용된다.

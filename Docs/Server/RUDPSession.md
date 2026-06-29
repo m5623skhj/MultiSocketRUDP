@@ -124,6 +124,24 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 
 ---
 
+
+---
+
+### `OnRttSample`
+
+```cpp
+void OnRttSample(std::chrono::steady_clock::duration sample);
+```
+
+유효한 RTT 샘플을 사용하여 SRTT(Smoothed Round Trip Time), RTTVAR(Round Trip Time Variation), RTO(Retransmission TimeOut)를 갱신한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `sample` | `std::chrono::steady_clock::duration` | 재전송된 적이 없는 패킷으로부터 측정된 RTT |
+
+**전제 조건**:
+- `sample`은 재전송되지 않은 패킷으로부터 측정된 유효한 값이어야 한다.
+
 ## 관련 문서
 
 - [[GettingStarted]] - 최소 서버 구축
