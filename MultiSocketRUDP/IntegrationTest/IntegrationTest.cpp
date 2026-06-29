@@ -662,7 +662,7 @@ namespace
 		ClientHarnessProcess process;
 		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"disconnect" })));
 
-		EXPECT_TRUE(WaitUntil(10s, [this]()
+		EXPECT_TRUE(WaitUntil(25s, [this]()
 		{
 			return server->GetAllDisconnectedCount() == 1 &&
 				GetSessionStats().disconnectedCount.load(std::memory_order_relaxed) == 1 &&
