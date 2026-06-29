@@ -705,8 +705,8 @@ void RUDPClientCore::Disconnect()
 	}
 
 	constexpr auto packetType = PACKET_TYPE::DISCONNECT_TYPE;
-	constexpr PacketSequence packetSequence = 0;
-	*buffer << packetType;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
+	*buffer << packetType << packetSequence;
 
 	PacketCryptoHelper::EncodePacket(
 		*buffer,
