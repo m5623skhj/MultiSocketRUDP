@@ -55,6 +55,11 @@ void ServerAliveChecker::RunServerAliveCheckerThread()
 	while (not isStopped)
 	{
 		Sleep(checkIntervalMs);
+		if (isStopped.load(std::memory_order_acquire))
+		{
+			break;
+		}
+
 		if (not IsServerAlive(getNextRecvSequenceFunction()))
 		{
 			const auto log = Logger::MakeLogObject<ClientLog>();
