@@ -56,9 +56,9 @@
   <rect x="420" y="170" width="420" height="100" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
   <text x="440" y="190" font-size="11" font-weight="700" fill="#fbbf24">Retransmission Thread × N</text>
   <rect x="440" y="200" width="160" height="56" rx="6" fill="#78350f"/>
-  <text x="520" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">타임아웃 스캔</text>
-  <text x="520" y="234" text-anchor="middle" font-size="9" fill="#fde68a">sendPacketInfoList[id]</text>
-  <text x="520" y="248" text-anchor="middle" font-size="9" fill="#fcd34d">retransmissionTimeStamp 비교</text>
+  <text x="520" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">deadline 대기</text>
+  <text x="520" y="234" text-anchor="middle" font-size="9" fill="#fde68a">RetransmissionScheduler[id]</text>
+  <text x="520" y="248" text-anchor="middle" font-size="9" fill="#fcd34d">heap + waitable timer</text>
 
   <rect x="616" y="200" width="204" height="56" rx="6" fill="#78350f"/>
   <text x="718" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">재전송 / 연결 해제</text>
@@ -106,11 +106,11 @@
   <text x="127" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">스레드 ID별 분리</text>
 
   <rect x="230" y="430" width="175" height="96" rx="6" fill="#1a2744"/>
-  <text x="317" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">sendPacketInfoList</text>
-  <text x="317" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">list[N] + mutex[N]</text>
+  <text x="317" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">retransmissionSchedulers</text>
+  <text x="317" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">heap[N] + timer[N]</text>
   <text x="317" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">IOHandler ↔ Retrans</text>
-  <text x="317" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">재전송 타임스탬프 관리</text>
-  <text x="317" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">isErasedPacketInfo(atomic)</text>
+  <text x="317" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">deadline schedule 관리</text>
+  <text x="317" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">scheduleVersion stale 처리</text>
 
   <rect x="420" y="430" width="175" height="96" rx="6" fill="#1a2744"/>
   <text x="507" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">releaseSessionIdList</text>
@@ -132,9 +132,9 @@
   <!-- recvIOCompletedContexts → Logic Worker -->
   <line x1="127" y1="400" x2="170" y2="268" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-g)"/>
 
-  <!-- Arrows: IOHandler → sendPacketInfoList -->
+  <!-- Arrows: IOHandler → retransmissionSchedulers -->
   <line x1="317" y1="283" x2="317" y2="428" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-y)"/>
 
-  <!-- Retrans → sendPacketInfoList -->
+  <!-- Retrans → retransmissionSchedulers -->
   <line x1="520" y1="270" x2="340" y2="428" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-y)"/>
 </svg>

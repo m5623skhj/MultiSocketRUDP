@@ -28,8 +28,9 @@ RUDPIOHandler
  ├── IRIOManager&           ← RIOReceiveEx / RIOSend 호출
  ├── ISessionDelegate&      ← 세션 내부 접근 (shared_ptr 없이 인터페이스)
  ├── CTLSMemoryPool<IOContext>&  ← Send IOContext TLS 풀 (lock-free)
- ├── vector<list<SendPacketInfo*>>& sendPacketInfoList[N]   ← 스레드별 재전송 목록
- └── vector<unique_ptr<mutex>>&  sendPacketInfoListLock[N]  ← 목록 보호 뮤텍스
+ ├── vector<unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers[N]
+ │    └── thread별 재전송 heap, waitable timer, wake event
+ └── DatagramLossSimulator(optional) ← 테스트용 송수신 datagram 손실 시뮬레이션
 ```
 
 ---
@@ -38,9 +39,9 @@ RUDPIOHandler
 
 ### 공개 함수
 
-#### `RUDPIOHandler(IRIOManager& inRioManager, ISessionDelegate& inSessionDelegate, CTLSMemoryPool<IOContext>& contextPool, std::vector<std::list<SendPacketInfo*>>& sendPacketInfoList, std::vector<std::unique_ptr<std::mutex>>& sendPacketInfoListLock, BYTE inMaxHoldingPacketQueueSize, unsigned int inRetransmissionMs)`
-- RIO 매니저, 세션 delegate, IOContext 풀, 스레드별 전송 추적 목록과 락을 주입받는다.
-- 보류 큐 크기와 재전송 주기 같은 정책값도 생성 시점에 고정된다.
+#### `RUDPIOHandler(IRIOManager& inRioManager, ISessionDelegate& inSessionDelegate, CTLSMemoryPool<IOContext>& contextPool, std::vector<std::unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers, BYTE inMaxHoldingPacketQueueSize, unsigned int inRetransmissionMs, unsigned int inSimulatedPacketLossPercent, int inSimulatedPacketLossSeed)`
+- RIO 매니저, 세션 delegate, IOContext 풀, 스레드별 재전송 scheduler를 주입받는다.
+- 재전송 기본 주기와 테스트용 datagram 손실 시뮬레이션 설정도 생성 시점에 고정된다.
 
 #### `bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const`
 - IO Worker에서 호출되는 완료 분기 진입점이다.
@@ -80,10 +81,10 @@ bool DoRecv(RUDPSession& session) const override;
 - 예약/보류 성격의 송신 후보를 스트림 버퍼에 적재한다.
 
 #### `SEND_PACKET_INFO_TO_STREAM_RETURN StoredSendPacketInfoToStream(...) const`
-- 재전송 추적 목록에 저장된 송신 후보를 스트림 버퍼에 적재한다.
+- 세션 send queue에서 꺼낸 송신 후보를 스트림 버퍼에 적재한다.
 
 #### `bool RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPacketInfo, ThreadIdType threadId) const`
-- 재전송 타임스탬프와 스레드별 추적 목록 상태를 갱신한다.
+- 데이터 패킷의 RTO deadline을 계산하고 thread별 `RetransmissionScheduler` heap에 schedule entry를 등록한다.
 
 ---
 
@@ -196,52 +197,26 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 
 ```cpp
 {
-    auto& sendCtx = session.rioContext.GetSendBuffer();
-    char* streamBuffer = sendCtx.GetRIOSendBuffer();  // 32KB
-    int offset = 0;
+    auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
+    packetSequenceSet.clear();
 
-    // ① 재전송 목록에서 미전송/타임아웃 패킷 수집
-    std::vector<SendPacketInfo*> pendingInfos;
-    {
-        std::shared_lock lock(*sendPacketInfoListLock[threadId]);
-        for (auto* info : sendPacketInfoList[threadId]) {
-            if (info->isErasedPacketInfo.load(std::memory_order_acquire)) continue;
-            if (info->owner != &session) continue;
+    unsigned int totalSendSize = 0;
+    const size_t bufferCount = sessionDelegate.GetSendPacketInfoQueueSize(session);
 
-            // 중복 방지 (cachedSequenceSet)
-            if (!sendCtx.cachedSequenceSet.insert(info->sendPacketSequence).second)
-                continue;
-
-            pendingInfos.push_back(info);
-        }
-    }
-    sendCtx.cachedSequenceSet.clear();
-
-    if (pendingInfos.empty()) return false;
-
-    // ② 패킷들을 스트림 버퍼에 순서대로 복사
-    for (auto* info : pendingInfos) {
-        int packetSize = info->buffer->m_iWriteLast;
-
-        if (offset + packetSize > MAX_SEND_BUFFER_SIZE) break;  // 32KB 초과
-        memcpy(streamBuffer + offset,
-               info->buffer->m_pSerializeBuffer,
-               packetSize);
-
-        // ③ 재전송 타임스탬프 갱신
-        RefreshRetransmissionSendPacketInfo(info, threadId);
-
-        offset += packetSize;
+    // ① reserved slot에 남은 패킷을 먼저 적재
+    if (ReservedSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId)
+        == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR) {
+        return { false, 0 };
     }
 
-    if (offset == 0) return false;
+    // ② 현재 send queue 크기만큼 front에서 pop하며 적재
+    for (size_t i = 0; i < bufferCount; ++i) {
+        auto result = StoredSendPacketInfoToStream(session, packetSequenceSet, totalSendSize, threadId);
+        if (result == SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR) return { false, 0 };
+        if (result == SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL) break;
+    }
 
-    // ④ 송신 컨텍스트를 준비한 뒤 TryRIOSend로 실제 RIO 송신 시도
-    auto [ok, context] = MakeSendContext(session, threadId);
-    if (!ok) return false;
-    if (!TryRIOSend(session, context)) return false;
-
-    return true;
+    return { true, totalSendSize };
 }
 ```
 
@@ -275,8 +250,10 @@ MAX_SEND_BUFFER_SIZE = 32768 bytes
 
 - 현재 구현은 스트림 적재 책임을 두 함수로 분리한다.
 - `ReservedSendPacketInfoToStream()`은 아직 즉시 송신되지 않은 후보를,
-- `StoredSendPacketInfoToStream()`은 재전송 추적 목록에 있는 후보를 수집한다.
-- 두 함수 모두 중복 sequence 제거, erased 상태 검사, 버퍼 용량 한계 검사를 담당한다.
+- `StoredSendPacketInfoToStream()`은 세션 송신 큐의 front를 꺼내 스트림 버퍼에 적재한다.
+- `ReservedSendPacketInfoToStream()`은 reserved slot의 패킷을 먼저 적재하고 cache에 등록한다.
+- `StoredSendPacketInfoToStream()`은 송신 큐 front를 적재하면서 중복 sequence 제거, erased 상태 검사, 버퍼 용량 한계 검사, 재전송 schedule 갱신을 담당한다.
+- 스트림 용량을 넘는 패킷은 `SetReservedSendPacketInfo()`로 보류해 다음 send 완료 후 이어서 처리한다.
 
 ---
 
@@ -414,10 +391,11 @@ void RUDPIOHandler::SendIOCompleted(
 [전송 흐름]
 
 SendPacket()
-  → RegisterSendPacketInfo → sendPacketInfoList에 추가
+  → RegisterSendPacketInfo → send queue에 추가
   → core.SendPacket() → DoSend(session, threadId)
        → CAS NONE→SENDING 성공
        → MakeSendStream (패킷 10개)
+       → RefreshRetransmissionSendPacketInfo에서 데이터 패킷 schedule 등록
        → RIOSend (스트림)
 
 RIO 완료 큐에서 SEND 완료 디큐
@@ -440,44 +418,59 @@ SendPacket() (다른 스레드):
 ## 10. RefreshRetransmissionSendPacketInfo
 
 ```cpp
-void RUDPIOHandler::RefreshRetransmissionSendPacketInfo(
-    SendPacketInfo& info,
-    ThreadIdType threadId,
-    unsigned long long newTimestamp)
+bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(
+    SendPacketInfo* sendPacketInfo,
+    ThreadIdType threadId) const
 ```
 
 ```cpp
 {
-    // ① 타임스탬프 갱신
-    info.retransmissionTimeStamp = newTimestamp;
-
-    // ② 재전송 목록에서 이터레이터 위치 갱신 (O(1) 삭제 위해)
-    if (!info.isInSendPacketInfoList) {
-        // 처음 등록: list의 끝에 추가하고 이터레이터 저장
-        std::scoped_lock lock(*sendPacketInfoListLock[threadId]);
-        info.listItor = sendPacketInfoList[threadId].insert(
-            sendPacketInfoList[threadId].end(), &info);
-        info.isInSendPacketInfoList = true;
+    if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire)) {
+        return false;
     }
-    // 이미 등록된 경우: listItor가 여전히 유효 (list는 삽입/삭제 시 다른 이터레이터 무효화 없음)
+
+    if (sendPacketInfo->isReplyType == true) {
+        return true;
+    }
+
+    auto& scheduler = *retransmissionSchedulers[threadId];
+    const auto now = std::chrono::steady_clock::now();
+    const unsigned int rtoMs = sendPacketInfo->IsOwnerValid()
+        ? sendPacketInfo->owner->GetRetransmissionTimeoutMs()
+        : retransmissionMs;
+    const auto deadline = now + std::chrono::milliseconds(rtoMs);
+
+    sendPacketInfo->MarkSentForRttSample(now);
+    {
+        std::scoped_lock lock(scheduler.lock);
+        if (sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire)) {
+            return false;
+        }
+
+        PushRetransmissionSchedule(scheduler, *sendPacketInfo, deadline);
+    }
+
+    SignalRetransmissionWakeEvent(scheduler);
+    return true;
 }
 ```
 
-**이터레이터 저장으로 O(1) 삭제:**
+**heap schedule 방식:**
 
 ```
-sendPacketInfoList[threadId]: std::list<SendPacketInfo*>
-  → 임의 위치 erase는 이터레이터가 있으면 O(1)
-  → 이터레이터 없이 찾으려면 O(N) 순회
+RetransmissionScheduler[threadId]
+  ├─ priority_queue<RetransmissionHeapEntry> heap
+  ├─ waitable timer
+  └─ wake event
 
-info.listItor 저장:
-  → EraseSendPacketInfo에서 sendPacketInfoList[threadId].erase(info.listItor)
-  → O(1) 삭제
+PushRetransmissionSchedule:
+  → ++sendPacketInfo.scheduleVersion
+  → sendPacketInfo.AddRefCount()
+  → heap.push(deadline, version, info)
 
-std::vector가 아닌 std::list 이유:
-  → erase(iterator) → O(1) (이웃 포인터만 변경)
-  → vector.erase(pos) → O(N) (뒤 요소 이동)
-  → 재전송 스레드가 자주 이 목록을 순회하고 삭제하므로 list가 적합
+RunRetransmissionThread:
+  → 가장 빠른 deadline만 timer로 대기
+  → pop 시 erased/version mismatch는 stale entry로 폐기
 ```
 
 ---
@@ -487,8 +480,8 @@ std::vector가 아닌 std::list 이유:
 
 ### `ShouldDropReceivedDatagram`
 
-```csharp
-public bool ShouldDropReceivedDatagram()
+```cpp
+bool ShouldDropReceivedDatagram()
 ```
 
 패킷 손실 시뮬레이션 활성화 여부와 설정된 손실률에 따라 수신된 데이터그램을 폐기할지 결정한다.
@@ -500,15 +493,15 @@ public bool ShouldDropReceivedDatagram()
 | `true` | 시뮬레이션이 활성화되어 있고, 무작위 확률에 따라 폐기 대상으로 결정됨 |
 | `false` | 시뮬레이션이 비활성화되어 있거나, 폐기하지 않기로 결정됨 |
 
-> **주의:** 내부적으로 `receivedLock`을 사용하여 스레드 안전하게 처리된다. `lossRate` 및 `isEnabled` 상태에 따라 결과가 달라지므로 호출 시점에 따라 반환값이 변할 수 있다.
+> **주의:** 내부적으로 `recvLock`을 사용하여 난수 엔진 접근을 보호한다.
 
 
 ---
 
 ### `ShouldDropSendingDatagram`
 
-```csharp
-public bool ShouldDropSendingDatagram();
+```cpp
+bool ShouldDropSendingDatagram()
 ```
 
 패킷 손실 시뮬레이션이 활성화된 경우, 설정된 `lossRate`에 따라 데이터그램을 드롭해야 하는지 결정한다.
@@ -518,11 +511,11 @@ public bool ShouldDropSendingDatagram();
 | `true` | 패킷 손실 시뮬레이션 활성 상태이며, 난수 발생 결과에 따라 드롭함 |
 | `false` | 시뮬레이션 비활성 상태이거나, 난수 발생 결과 드롭하지 않음 |
 
-> **주의:** 내부적으로 `sendLock`을 사용하여 동시성을 보호한다. 패킷 전송 로직의 임계 구역 안에서 호출 시 데드락 발생 가능성을 고려해야 한다.
+> **주의:** 내부적으로 `sendLock`을 사용하여 난수 엔진 접근을 보호한다.
 
 ## 관련 문서
 - [[ThreadModel]] — IO Worker Thread에서 IOCompleted 호출
 - [[PacketProcessing]] — RecvIOCompleted → RecvLogic Worker 경로
 - [[RIOManager]] — RIOReceiveEx / RIOSend API 상세
-- [[SendPacketInfo]] — listItor O(1) 삭제, isErasedPacketInfo
+- [[SendPacketInfo]] — scheduleVersion, isErasedPacketInfo, RTT 샘플링
 - [[SessionComponents]] — SessionSendContext의 ioMode SpinLock

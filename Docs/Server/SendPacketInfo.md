@@ -1,8 +1,8 @@
 # SendPacketInfo
 
-> **재전송 추적과 참조 카운팅을 담당하는 핵심 구조체.**  
-> CONNECTED 세션에서 전송된 데이터 패킷은 ACK를 받을 때까지 이 구조체로 추적된다.  
-> TLS(Thread-Local Storage) 메모리 풀을 사용해 lock-free 할당/해제를 지원한다.
+> **재전송 추적, RTT 샘플링, 참조 카운팅을 담당하는 핵심 구조체.**
+> CONNECTED 세션에서 전송된 데이터 패킷은 ACK를 받을 때까지 이 구조체로 추적된다.
+> TLS(Thread-Local Storage) 메모리 풀을 사용해 할당/해제를 수행한다.
 
 ---
 
@@ -11,10 +11,10 @@
 1. [구조체 필드 전체](#1-구조체-필드-전체)
 2. [생명주기 — Alloc에서 Free까지](#2-생명주기--alloc에서-free까지)
 3. [참조 카운팅 설계](#3-참조-카운팅-설계)
-4. [isErasedPacketInfo — 이중 처리 방지](#4-iserasepacketinfo--이중-처리-방지)
-5. [listItor — O(1) 삭제 설계](#5-listitor--o1-삭제-설계)
+4. [isErasedPacketInfo — 이중 처리 방지](#4-iserasedpacketinfo--이중-처리-방지)
+5. [scheduleVersion — stale heap entry 방지](#5-scheduleversion--stale-heap-entry-방지)
 6. [isReplyType — ACK 패킷 분리](#6-isreplytype--ack-패킷-분리)
-7. [TLS 메모리 풀](#7-tls-메모리-풀)
+7. [RTT 샘플링](#7-rtt-샘플링)
 8. [재전송 스레드와의 동시성 시나리오](#8-재전송-스레드와의-동시성-시나리오)
 
 ---
@@ -24,60 +24,35 @@
 ```cpp
 struct SendPacketInfo
 {
-    // ─── 핵심 데이터 ──────────────────────────────────────────────
-    NetBuffer* buffer = nullptr;
-    // 전송할 패킷 버퍼 포인터. EncodePacket으로 이미 AES-GCM 암호화된 상태.
-    // 재전송 시 이 버퍼를 그대로 재전송 (재암호화 없음).
-    // 같은 Nonce(시퀀스+방향)로 암호화됐으므로 재전송도 일관성 있음.
-
-    RUDPSession* owner = nullptr;
-    // 소유 세션 포인터.
-    // 재전송 횟수 초과 시 owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION) 호출에 사용.
-
-    PacketRetransmissionCount retransmissionCount = 0;
-    // 재전송 횟수 카운터. 타입: unsigned short 또는 int8_t.
-    // RunRetransmissionThread에서 ++retransmissionCount >= maxPacketRetransmissionCount
-    // 이면 강제 종료.
-
-    PacketSequence sendPacketSequence = 0;
-    // 이 패킷의 시퀀스 번호.
-    // sendPacketInfoMap[sendPacketSequence] = this 로 ACK와 대조.
-    // EraseSendPacketInfo(sequence) 호출 시 이 값으로 map.erase().
-
-    unsigned long long retransmissionTimeStamp = 0;
-    // 다음 재전송 시각 (GetTickCount64() 기준, ms).
-    // 초기값: 0 (Initialize에서)
-    // 갱신: RefreshRetransmissionSendPacketInfo에서
-    //        retransmissionTimeStamp = GetTickCount64() + retransmissionMs
-
-    // ─── 상태 플래그 ──────────────────────────────────────────────
-    std::atomic_bool isErasedPacketInfo{ false };
-    // ACK 수신 또는 세션 해제로 EraseSendPacketInfo()가 호출됐음을 표시.
-    // 재전송 스레드가 copyList 처리 중 ACK가 도착해도 이중 처리 방지.
-    // memory_order: acq_rel (쓰기)/acquire (읽기) 사용.
-
-    bool isInSendPacketInfoList = false;
-    // sendPacketInfoList[threadId]에 등록된 여부.
-    // false이면 listItor가 무효 → EraseSendPacketInfo에서 erase 시도 안 함.
-
-    bool isReplyType = false;
-    // true: ACK/Reply 패킷 (SEND_REPLY_TYPE, HEARTBEAT_REPLY_TYPE)
-    //       → 재전송 목록 등록 안 함, 손실 시 클라이언트가 재전송 유발
-    // false: 데이터 패킷 (SEND_TYPE, HEARTBEAT_TYPE)
-    //        → 재전송 목록 등록, ACK 추적 필요
-
-    // ─── 반복자 ───────────────────────────────────────────────────
-    std::list<SendPacketInfo*>::iterator listItor;
-    // sendPacketInfoList[threadId]에서 이 항목의 위치.
-    // std::list<>의 iterator는 erase 후에도 다른 요소에 무효화 영향 없음 → O(1) 삭제.
-    // isInSendPacketInfoList=false 상태에서 이 값은 무효(dangling).
-
-    // ─── 참조 카운팅 ──────────────────────────────────────────────
-    std::atomic<int8_t> refCount{ 0 };
-    // int8_t: -128~127 범위로 충분 (최대 3개 참조자)
-    // 0 도달 시 NetBuffer::Free + pool.Free 호출
+    NetBuffer* buffer{};
+    RUDPSession* owner{};
+    uint32_t ownerGeneration{};
+    PacketRetransmissionCount retransmissionCount{};
+    PacketSequence sendPacketSequence{};
+    uint64_t scheduleVersion{};
+    std::atomic_bool isErasedPacketInfo{};
+    bool isReplyType{};
+    std::atomic_int32_t refCount{};
+    mutable std::mutex rttSampleLock;
+    std::chrono::steady_clock::time_point lastSendTime{};
+    std::atomic_bool canUseRttSample{};
 };
 ```
+
+| 필드 | 역할 |
+|------|------|
+| `buffer` | 전송할 암호화된 패킷 버퍼. 재전송 시 같은 버퍼를 재사용한다. |
+| `owner` | 패킷을 소유한 세션. 재전송 실패 시 disconnect 처리에 사용한다. |
+| `ownerGeneration` | 세션 재사용 후 오래된 패킷이 새 세션을 건드리지 않도록 세션 generation을 저장한다. |
+| `retransmissionCount` | 재전송 횟수. `maxPacketRetransmissionCount` 이상이면 `BY_RETRANSMISSION`으로 disconnect한다. |
+| `sendPacketSequence` | ACK와 매칭할 패킷 시퀀스 번호. |
+| `scheduleVersion` | 재전송 heap에 같은 패킷이 여러 번 들어갈 때 최신 schedule만 유효하게 구분한다. |
+| `isErasedPacketInfo` | ACK 수신 또는 세션 해제로 추적 대상에서 제거됐음을 표시한다. |
+| `isReplyType` | ACK/Reply 패킷 여부. reply 패킷은 재전송 schedule에 등록하지 않는다. |
+| `refCount` | map, send queue, retransmission heap entry가 공유하는 수명 참조 카운터. |
+| `rttSampleLock` | `lastSendTime` 읽기/쓰기를 보호한다. |
+| `lastSendTime` | 가장 최근 실제 송신 시각. RTT 샘플 계산에 사용한다. |
+| `canUseRttSample` | 재전송이 발생하지 않은 패킷만 RTO 추정 샘플로 사용하기 위한 플래그. |
 
 ---
 
@@ -86,45 +61,29 @@ struct SendPacketInfo
 ```
 [RUDPSession::SendPacketImmediate]
 
-① sendPacketInfoPool->Alloc()       → refCount=0 (초기화 안 됨)
-② sendPacketInfo->Initialize(...)   → refCount=1, isErasedPacketInfo=false
-③ InsertSendPacketInfo(seq, info)    → refCount=2 (map 참조)
-④ core.SendPacket(info)
-     → refCount 추가 변경 없음 (SendContext 큐에 포인터만 복사)
-     → DoSend → MakeSendStream → RIOSend
-⑤ SendIOCompleted
-     → io_mode 복원
-     → (info는 sendPacketInfoMap에 유지)
-⑥ ACK 수신 → OnSendReply(sequence)
-     → FindAndEraseSendPacketInfo(sequence) → refCount=1 (map에서 제거)
-     → core.EraseSendPacketInfo(info, threadId)
-          → sendPacketInfoList[threadId].erase(listItor) → refCount=1
-          → SendPacketInfo::Free(info) → refCount=0 → 실제 해제
+1. sendPacketInfoPool->Alloc()
+2. Initialize(owner, ownerGeneration, buffer, sequence, isReplyType)
+   - refCount = 1
+   - canUseRttSample = !isReplyType
+3. InsertSendPacketInfo(sequence, info)
+   - sendPacketInfoMap에 ACK 대기 항목으로 저장
+   - map 참조를 위해 AddRefCount()
+4. core.SendPacket(info)
+   - 세션 send queue 또는 reserved slot을 거쳐 DoSend에서 전송
+5. RUDPIOHandler::RefreshRetransmissionSendPacketInfo()
+   - reply 패킷이면 schedule하지 않음
+   - 데이터 패킷이면 scheduler heap에 deadline/version/info를 push
+   - heap entry 참조를 위해 AddRefCount()
+6. ACK 수신
+   - FindAndEraseSendPacketInfo(sequence)
+   - core.MarkSendPacketInfoErased(info, threadId)
+   - SendPacketInfo::Free(info)
+7. 마지막 참조가 사라지면
+   - NetBuffer::Free(buffer)
+   - sendPacketInfoPool->Free(info)
 ```
 
-**예외: 재전송 스레드가 먼저 접근하는 경우:**
-
-```
-③ 이후 retransmissionTimeStamp 도달
-
-재전송 스레드:
-  lock(sendPacketInfoListLock[threadId])
-    info->AddRefCount()         → refCount=3
-  unlock
-
-  → 처리 중 ACK 도착 가능:
-      info->isErasedPacketInfo = true
-      core.EraseSendPacketInfo(info, threadId)
-          → sendPacketInfoList.erase (refCount 감소 없음, 단지 list에서 제거)
-          → Free(info) → refCount=3-1=2 → 아직 해제 안 됨
-
-  → 재전송 스레드 처리 계속:
-      isErasedPacketInfo=true 확인 → 재전송 스킵
-      Free(info) → refCount=2-1=1
-
-  → sendPacketInfoMap에서 제거 (ACK 처리에서):
-      Free(info) → refCount=1-1=0 → 실제 해제
-```
+재전송 heap은 `std::priority_queue` 기반이다. heap entry는 제거가 아니라 새 entry를 추가하는 방식으로 갱신되며, 오래된 entry는 pop 시 `scheduleVersion` 비교로 폐기한다.
 
 ---
 
@@ -133,158 +92,128 @@ struct SendPacketInfo
 ```cpp
 void SendPacketInfo::AddRefCount()
 {
-    refCount.fetch_add(1, std::memory_order_acq_rel);
+    const int32_t prev = refCount.fetch_add(1, std::memory_order_relaxed);
+    if (prev <= 0) {
+        LOG_ERROR(...);
+    }
 }
 
-static void SendPacketInfo::Free(SendPacketInfo* target)
+void SendPacketInfo::Free(SendPacketInfo* target)
 {
     if (target == nullptr) return;
 
-    // fetch_sub: 이전 값 반환 (감소 전 값)
-    if (target->refCount.fetch_sub(1, std::memory_order_release) == 1) {
-        // 이전 값이 1이었음 → 이제 0 → 마지막 참조자
-        std::atomic_thread_fence(std::memory_order_acquire);
-        // ↑ 다른 스레드의 모든 쓰기가 이 시점 전에 완료됐음을 보장
-
-        NetBuffer::Free(target->buffer);        // 패킷 버퍼 반환
-        sendPacketInfoPool->Free(target);        // 구조체 반환
+    const int32_t prev = target->refCount.fetch_sub(1, std::memory_order_acq_rel);
+    if (prev <= 0) {
+        LOG_ERROR(...);
+        return;
     }
-    // refCount가 1보다 크면 아직 다른 참조자 있음 → 해제 안 함
+
+    if (prev == 1) {
+        NetBuffer::Free(target->buffer);
+        sendPacketInfoPool->Free(target);
+    }
 }
 ```
 
-**`release/acquire` 메모리 순서 이유:**
+`refCount`는 현재 `std::atomic_int32_t`다. 이전 문서의 `int8_t` 설명은 현재 코드 기준이 아니다.
 
-```
-스레드 A: info 쓰기 완료 (fetch_sub(..., release))
-스레드 B: info 읽기 (fetch_sub 결과 0 확인 후 fence(acquire))
-→ B의 acquire fence가 A의 release 이후에 위치함을 보장
-→ B가 info를 Free할 때 A의 모든 쓰기가 완료됐음이 보장
-```
+참조자는 대표적으로 다음과 같다.
+
+| 참조자 | 설명 |
+|--------|------|
+| 생성/호출자 | `Initialize()` 직후의 기본 참조 |
+| `sendPacketInfoMap` | ACK 수신 전까지 sequence로 찾기 위한 참조 |
+| 송신 큐/reserved slot | 실제 RIO send stream에 실릴 때까지 유지되는 참조 |
+| 재전송 heap entry | deadline에 도달했을 때 재전송 처리를 위해 유지되는 참조 |
 
 ---
 
 ## 4. `isErasedPacketInfo` — 이중 처리 방지
 
-두 가지 상황에서 같은 `SendPacketInfo`에 접근할 수 있다:
+두 가지 상황에서 같은 `SendPacketInfo`에 접근할 수 있다.
 
 ```
-상황: ACK와 재전송이 거의 동시에 발생
-
-[RecvLogic Worker Thread]          [Retransmission Thread]
-  OnSendReply(seq)                   copyList에 info 추가 (refCount++)
-  isErasedPacketInfo = true    ←→    isErasedPacketInfo 확인
-  EraseSendPacketInfo(info)          if true: 재전송 스킵
-  Free(info) → refCount 감소         Free(info) → refCount 감소
-
-결과: 두 번 Free가 호출되지만 refCount 덕분에 실제 해제는 한 번만
-      isErasedPacketInfo로 재전송은 스킵됨
+[RecvLogic Worker]             [Retransmission Thread]
+ACK 수신                         heap top pop
+MarkSendPacketInfoErased()        isErasedPacketInfo 확인
+Free(info)                        true이면 stale entry로 보고 Free(info)
 ```
 
-**`atomic_bool` 이유:**
+재전송 thread는 heap에서 꺼낸 entry가 다음 조건 중 하나에 해당하면 stale로 보고 재전송하지 않는다.
 
 ```cpp
-// ACK 처리 (RecvLogic Worker)
-info->isErasedPacketInfo.store(true, std::memory_order_release);
-
-// 재전송 스레드
-bool erased = info->isErasedPacketInfo.load(std::memory_order_acquire);
-// → release/acquire 짝으로 순서 보장
+if (top.info->isErasedPacketInfo.load(std::memory_order_acquire) ||
+    top.version != top.info->scheduleVersion)
+{
+    SendPacketInfo::Free(top.info);
+    continue;
+}
 ```
 
 ---
 
-## 5. `listItor` — O(1) 삭제 설계
+## 5. `scheduleVersion` — stale heap entry 방지
 
-`std::list`는 임의 위치 삭제가 O(1)이지만, 삭제할 이터레이터를 알아야 한다.
+재전송 deadline은 패킷이 실제 send stream에 실릴 때마다 새로 계산된다.
 
 ```cpp
-// sendPacketInfoList[threadId]: std::list<SendPacketInfo*>
-
-// 등록 시: listItor 저장
-info->listItor = sendPacketInfoList[threadId].insert(
-    sendPacketInfoList[threadId].end(), info);
-info->isInSendPacketInfoList = true;
-
-// 삭제 시: 이터레이터로 O(1) 삭제
-if (info->isInSendPacketInfoList) {
-    sendPacketInfoList[threadId].erase(info->listItor);
-    info->isInSendPacketInfoList = false;
+inline void PushRetransmissionSchedule(
+    RetransmissionScheduler& scheduler,
+    SendPacketInfo& sendPacketInfo,
+    std::chrono::steady_clock::time_point deadline)
+{
+    ++sendPacketInfo.scheduleVersion;
+    sendPacketInfo.AddRefCount();
+    scheduler.heap.push({ deadline, sendPacketInfo.scheduleVersion, &sendPacketInfo });
 }
 ```
 
-**`std::vector`를 사용하지 않는 이유:**
+`std::priority_queue`는 중간 entry 삭제가 어렵다. 따라서 기존 entry를 지우지 않고 새 entry를 추가하며, 이전 entry는 pop 시 version mismatch로 폐기한다.
 
 ```
-vector: erase(pos) → O(N) (뒤 요소를 앞으로 이동)
-list:   erase(iter) → O(1) (링크 포인터만 변경)
+version 1 entry push
+재전송 또는 재송신으로 version 2 entry push
 
-재전송 스레드가 리스트를 자주 순회하므로 삭제가 빠른 list가 적합.
-단, 캐시 지역성은 vector가 더 좋음.
+heap pop version 1:
+  top.version != info.scheduleVersion
+  → stale entry
+  → Free(info)
+
+heap pop version 2:
+  최신 entry
+  → ProcessRetransmission(info)
 ```
 
 ---
 
 ## 6. `isReplyType` — ACK 패킷 분리
 
-| `isReplyType` | 패킷 예시 | 재전송 목록 등록 | 손실 시 |
+| `isReplyType` | 패킷 예시 | 재전송 schedule | 손실 시 |
 |---------------|-----------|-----------------|---------|
-| `false` | SEND_TYPE, HEARTBEAT_TYPE | ✅ | 서버가 자동 재전송 |
-| `true` | SEND_REPLY_TYPE, HEARTBEAT_REPLY_TYPE | ❌ | 클라이언트가 원본 재전송 |
+| `false` | `SEND_TYPE`, `HEARTBEAT_TYPE` | 등록 | 서버가 재전송하고 한계 초과 시 disconnect |
+| `true` | `SEND_REPLY_TYPE`, `HEARTBEAT_REPLY_TYPE` | 미등록 | 상대가 원본을 재전송하면 다시 reply |
 
-**ACK 패킷 재전송 추적이 불필요한 이유:**
-
-```
-클라이언트가 패킷 N을 보냄 → 서버 처리 → ACK(N) 전송
-ACK(N) 유실됨 → 클라이언트가 패킷 N을 재전송
-서버: 패킷 N을 다시 받음 → 순서 보장 로직이 중복으로 감지 → 재ACK(N) 전송
-
-→ 클라이언트가 재전송을 유발하므로 서버가 ACK를 재전송 추적할 필요 없음
-```
-
-**HEARTBEAT_TYPE은 isReplyType=false인 이유:**
-
-```
-HEARTBEAT_TYPE: 서버 → 클라이언트 (데이터처럼 재전송 추적)
-  → 클라이언트 응답(HEARTBEAT_REPLY) 없으면 재전송 카운트 증가 → 연결 종료 감지
-
-HEARTBEAT_REPLY_TYPE: 클라이언트 → 서버 (Reply = isReplyType=true)
-  → 서버가 추적 불필요 (클라이언트가 HEARTBEAT를 다시 받아 다시 응답)
-```
+ACK 패킷을 서버가 별도로 재전송 추적하지 않는 이유는 원본 패킷 송신자가 ACK 유실을 감지해 원본을 재전송하기 때문이다.
 
 ---
 
-## 7. TLS 메모리 풀
+## 7. RTT 샘플링
+
+재전송 timeout 추정은 재전송되지 않은 데이터 패킷의 RTT만 사용한다.
 
 ```cpp
-// SendPacketInfo.cpp
-CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool
-    = new CTLSMemoryPool<SendPacketInfo>(
-        2,     // 초기 청크 크기 (SendPacketInfo 2개 = 작게 시작)
-        true   // 동적 확장 허용
-    );
+void MarkSentForRttSample(std::chrono::steady_clock::time_point now);
+void InvalidateRttSample();
+bool TryGetRttSample(std::chrono::steady_clock::time_point now,
+                     std::chrono::steady_clock::duration& outSample) const;
 ```
 
-**`CTLSMemoryPool<T>` 동작:**
+동작 기준:
 
-```
-스레드 A (IO Worker 0):
-  sendPacketInfoPool->Alloc()
-  → 스레드 A 전용 청크에서 할당 → 락 없음
-
-스레드 B (IO Worker 1):
-  sendPacketInfoPool->Alloc()
-  → 스레드 B 전용 청크에서 할당 → 락 없음
-
-→ 서로 다른 청크이므로 동시 접근 시에도 경쟁 없음
-→ 단, 스레드 A가 할당하고 스레드 B가 Free하면 스레드 A의 청크로 반환됨
-   (TLS 풀의 cross-thread free는 내부적으로 처리됨)
-```
-
-**초기 청크 크기를 2로 하는 이유:**
-
-세션당 최소 1개, 최대 수십 개의 `SendPacketInfo`가 동시에 활성화된다.  
-첫 접근 시 동적 확장으로 필요한 만큼 늘어나므로, 초기값은 작아도 된다.
+- `Initialize()`는 데이터 패킷에 대해서만 `canUseRttSample = true`로 둔다.
+- `RefreshRetransmissionSendPacketInfo()`는 실제 송신 시각을 `MarkSentForRttSample(now)`로 기록한다.
+- 재전송 timeout이 발생하면 `InvalidateRttSample()`로 해당 패킷의 RTT 샘플을 폐기한다.
+- ACK 수신 시 `TryGetRttSample()`이 성공하면 세션의 RTO estimator에 샘플을 반영한다.
 
 ---
 
@@ -293,71 +222,60 @@ CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool
 ### 시나리오 1: 정상 ACK 수신
 
 ```
-[RecvLogic Worker]          [Retransmission Thread]
-                             lock(listLock)
-                               for info in list:
-                                 if timestamp > now: skip  ← 아직 타임아웃 안 됨
-                             unlock
-                             sleep(retransmissionMs)
-OnSendReply(seq):
-  FindAndErase(seq) from map
-  isErasedPacketInfo = true
-  EraseSendPacketInfo:
-    lock(listLock)
-      erase(listItor)
-    unlock
-    Free(info) → refCount 감소
+RUDPIOHandler
+  → PushRetransmissionSchedule(deadline, version=N)
 
-                             → 다음 순회 시 info 없음 (erase됨)
+RecvLogic Worker
+  → ACK 수신
+  → sendPacketInfoMap에서 제거
+  → core.MarkSendPacketInfoErased(info, threadId)
+  → Free(info)
+
+Retransmission Thread
+  → heap에서 entry pop
+  → isErasedPacketInfo == true 확인
+  → stale entry로 폐기
+  → Free(info)
 ```
 
-### 시나리오 2: 재전송 중 ACK 도착
+### 시나리오 2: schedule 갱신 후 오래된 heap entry 도착
 
 ```
-[RecvLogic Worker]          [Retransmission Thread]
-                             lock(listLock)
-                               info->AddRefCount()  → refCount=2
-                             unlock
-                             (처리 시작)
+첫 송신:
+  scheduleVersion = 1
+  heap push(version=1)
 
-OnSendReply(seq):
-  isErasedPacketInfo = true
-  EraseSendPacketInfo:
-    lock(listLock)
-      erase(listItor)
-    unlock
-    Free(info) → refCount=2-1=1  (아직 재전송 스레드 참조 중)
+다시 송신:
+  scheduleVersion = 2
+  heap push(version=2)
 
-                             isErasedPacketInfo.load() → true → 스킵
-                             Free(info) → refCount=1-1=0 → 실제 해제
+Retransmission Thread:
+  pop(version=1)
+  version != scheduleVersion
+  → stale entry로 폐기
 ```
 
 ### 시나리오 3: 타임아웃 초과 → DoDisconnect
 
 ```
-[Retransmission Thread]
-  info->AddRefCount() → refCount=2
-  ++info->retransmissionCount >= max
-  info->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
-    → RELEASING 전이
-    → PushToDisconnectTargetSession
-  Free(info) → refCount=2-1=1
+Retransmission Thread
+  → 최신 heap entry pop
+  → ++retransmissionCount >= maxPacketRetransmissionCount
+  → owner가 generation까지 유효하면
+       owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
+  → Free(info)
 
-[Session Release Thread]
-  session->Disconnect()
-    → ForEachAndClearSendPacketInfoMap:
-        for each info in map:
-          isErasedPacketInfo = true
-          core.EraseSendPacketInfo(info, threadId)
-            → erase(listItor) (이미 없을 수도 있음, isInSendPacketInfoList 체크)
-            → Free(info) → refCount=1-1=0 → 실제 해제
+Session Release Thread
+  → PushToDisconnectTargetSession으로 받은 세션 정리
+  → sendPacketInfoMap의 잔여 info를 MarkSendPacketInfoErased 처리
+  → 각 info Free
 ```
 
 ---
 
 ## 관련 문서
-- [[RUDPSession]] — InsertSendPacketInfo, FindAndEraseSendPacketInfo 사용처
-- [[MultiSocketRUDPCore]] — EraseSendPacketInfo 구현, sendPacketInfoList[N]
-- [[RUDPIOHandler]] — RefreshRetransmissionSendPacketInfo에서 listItor 갱신
+- [[RUDPSession]] — `InsertSendPacketInfo`, `FindAndEraseSendPacketInfo`, RTT 샘플 반영
+- [[MultiSocketRUDPCore]] — `RunRetransmissionThread`, `ProcessRetransmission`
+- [[RUDPIOHandler]] — `RefreshRetransmissionSendPacketInfo`
 - [[ThreadModel]] — 재전송 스레드 전체 흐름
-- [[SessionComponents]] — SessionSendContext 내 sendPacketInfoMap
+- [[SessionComponents]] — `SessionSendContext` 내 `sendPacketInfoMap`

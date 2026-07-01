@@ -301,28 +301,36 @@ bool SessionRecvContext::Initialize(
 
 ```cpp
 class SessionSendContext {
+    SendPacketInfo* reservedSendPacketInfo;
+
     // ─── RIO send 버퍼 (배치 전송용) ────────────────────────────────
     char rioSendBuffer[MAX_SEND_BUFFER_SIZE]; // 32KB
     RIO_BUFFERID sendBufferId;
 
-    // ─── 재전송 추적 ─────────────────────────────────────────────────
-    std::unordered_map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+    // ─── 송신 큐 ───────────────────────────────────────────────────
+    std::mutex sendPacketInfoQueueLock;
+    std::queue<SendPacketInfo*> sendPacketInfoQueue;
+
+    // ─── ACK 대기 추적 ──────────────────────────────────────────────
+    std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
     mutable std::shared_mutex sendPacketInfoMapLock;
-    // 읽기(재전송 스레드): shared_lock
-    // 쓰기(ACK 수신, 세션 해제): unique_lock
+    // Insert/Erase/FindAndErase/ForEachAndClear에서 보호
 
     // ─── I/O 모드 제어 ───────────────────────────────────────────────
     std::atomic<IO_MODE> ioMode{ IO_MODE::IO_NONE_SENDING };
     // IO_NONE_SENDING: 현재 RIO Send 없음
     // IO_SENDING:      RIO Send 진행 중
 
-    // ─── 보류 큐 (흐름 제어) ─────────────────────────────────────────
-    std::queue<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue;
-    mutable std::mutex pendingQueueLock;
-    bool pendingQueueEmpty = true;  // 빠른 확인용
+    // ─── 패킷 시퀀스 ────────────────────────────────────────────────
+    std::atomic<PacketSequence> lastSendPacketSequence;
 
     // ─── 시퀀스 캐시 (중복 전송 방지) ────────────────────────────────
-    std::unordered_set<PacketSequence> cachedSequenceSet;
+    std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
+    std::mutex cachedSequenceSetLock;
+
+    // ─── 보류 큐 (흐름 제어) ─────────────────────────────────────────
+    RingBuffer<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue;
+    std::mutex pendingPacketQueueLock;
 
 public:
     char* GetRIOSendBuffer()    { return rioSendBuffer; }
@@ -338,9 +346,9 @@ public:
 
     // pendingPacketQueue 접근
     bool PushToPendingQueue(PacketSequence seq, NetBuffer* buf);
-    bool PopFromPendingQueue(PacketSequence& seq, NetBuffer*& buf);
-    bool IsPendingQueueEmpty() const { return pendingQueueEmpty; }
-    std::mutex& GetPendingQueueLock() { return pendingQueueLock; }
+    bool PopFromPendingQueue(std::pair<PacketSequence, NetBuffer*>& item);
+    bool IsPendingQueueEmpty() const noexcept;
+    std::mutex& GetPendingQueueLock() { return pendingPacketQueueLock; }
 };
 ```
 
@@ -348,36 +356,40 @@ public:
 
 ```cpp
 // MakeSendStream 내부 (RUDPIOHandler)
-for (auto* info : sendPacketInfosToSend) {
-    // 이미 이번 배치에 포함됐는가?
-    if (!sendContext.cachedSequenceSet.insert(info->sendPacketSequence).second) {
-        continue;  // 중복 → 스킵
-    }
-    // 배치 버퍼에 복사
-    memcpy(rioSendBuffer + offset, info->buffer->m_pSerializeBuffer, packetSize);
-    offset += packetSize;
+auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
+packetSequenceSet.clear();
+
+const MultiSocketRUDP::PacketSequenceSetKey key{ info->isReplyType, info->sendPacketSequence };
+if (packetSequenceSet.contains(key)) {
+    SendPacketInfo::Free(info);
+    return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
 }
-sendContext.cachedSequenceSet.clear();  // 배치 완료 후 초기화
+
+packetSequenceSet.insert(key);
+memcpy_s(&rioSendBuffer[beforeSendSize],
+         MAX_SEND_BUFFER_SIZE - beforeSendSize,
+         info->buffer->GetBufferPtr(),
+         useSize);
 ```
 
 **왜 중복이 발생하는가:**
 
-재전송 스레드가 같은 패킷을 `sendPacketInfoList`에 여러 번 추가하거나,  
-ACK 수신 전 `MakeSendStream`이 두 번 호출되는 경우  
+송신 큐의 front와 reserved slot이 같은 송신 배치에서 함께 처리되거나,
+ACK 수신 전 같은 sequence가 다시 schedule되는 경우
 같은 sequence의 패킷이 스트림에 두 번 포함될 수 있다.
+재전송 schedule 자체의 중복 entry는 `SendPacketInfo::scheduleVersion`으로 stale 처리된다.
 
 **`sendPacketInfoMap shared_mutex` 패턴:**
 
 ```cpp
-// 재전송 스레드 (읽기)
+// 송신 등록
 {
-    std::shared_lock lock(sendPacketInfoMapLock);
-    for (auto& [seq, info] : sendPacketInfoMap) {
-        // 타임아웃 확인, 재전송
-    }
+    std::unique_lock lock(sendPacketInfoMapLock);
+    info->AddRefCount();
+    sendPacketInfoMap.insert({ sequence, info });
 }
 
-// ACK 수신 (쓰기)
+// ACK 수신
 SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq) {
     std::unique_lock lock(sendPacketInfoMapLock);
     auto it = sendPacketInfoMap.find(seq);
@@ -386,6 +398,9 @@ SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq) {
     sendPacketInfoMap.erase(it);
     return info;
 }
+
+// 세션 해제
+ForEachAndClearSendPacketInfoMap(func);
 ```
 
 ---

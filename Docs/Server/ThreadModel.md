@@ -221,8 +221,8 @@ Logic Worker의 `store(false, seq_cst)`보다 먼저 읽힐 수 없음을 보장
 
 ### 역할
 
-일정 주기마다 재전송 목록을 순회하며 타임아웃된 패킷을 재전송한다.  
-재전송 횟수가 한계를 초과하면 세션을 강제 종료한다.
+스레드별 `RetransmissionScheduler`의 min-heap에서 가장 빠른 deadline을 기다렸다가 타임아웃된 패킷을 재전송한다.
+재전송 횟수가 한계를 초과하면 세션을 `BY_RETRANSMISSION`으로 강제 종료한다.
 
 ### 코드 해석
 
@@ -230,51 +230,59 @@ Logic Worker의 `store(false, seq_cst)`보다 먼저 읽힐 수 없음을 보장
 void MultiSocketRUDPCore::RunRetransmissionThread(
     const std::stop_token& stopToken, ThreadIdType threadId)
 {
-    auto& myList  = sendPacketInfoList[threadId];
-    auto& myLock  = *sendPacketInfoListLock[threadId];
-    TickSet tickSet;
+    auto& scheduler = *retransmissionSchedulers[threadId];
+    const HANDLE waitHandles[3] = {
+        scheduler.timerHandle,
+        scheduler.wakeEventHandle,
+        retransmissionStopEventHandle
+    };
 
+    std::vector<SendPacketInfo*> dueList;
     while (!stopToken.stop_requested()) {
-        // ① 타임아웃된 항목 수집 (Lock 보유 시간 최소화)
-        std::vector<SendPacketInfo*> copyList;
+        dueList.clear();
+        bool hasNext = false;
+        std::chrono::steady_clock::time_point nextDeadline{};
+
         {
-            std::scoped_lock lock(myLock);
-            for (auto* info : myList) {
-                if (info->retransmissionTimeStamp > tickSet.nowTick) continue;
-                if (info->isErasedPacketInfo.load(acquire))          continue;
-                info->AddRefCount();    // Free 시 삭제되지 않도록
-                copyList.push_back(info);
+            std::scoped_lock lock(scheduler.lock);
+            const auto now = std::chrono::steady_clock::now();
+
+            while (!scheduler.heap.empty()) {
+                const auto& top = scheduler.heap.top();
+                if (top.info->isErasedPacketInfo.load(std::memory_order_acquire) ||
+                    top.version != top.info->scheduleVersion) {
+                    SendPacketInfo::Free(top.info);
+                    scheduler.heap.pop();
+                    continue;
+                }
+
+                if (top.deadline > now) {
+                    hasNext = true;
+                    nextDeadline = top.deadline;
+                    break;
+                }
+
+                top.info->InvalidateRttSample();
+                dueList.push_back(top.info);
+                scheduler.heap.pop();
             }
         }
-        // Lock 해제
 
-        // ② Lock 없이 재전송 (시간이 걸리는 작업)
-        for (auto* info : copyList) {
-            // Lock 해제 중 ACK가 와서 이미 제거됐을 수 있음
-            if (info->isErasedPacketInfo.load(acquire)) {
-                SendPacketInfo::Free(info);
-                continue;
-            }
-
-            if (++info->retransmissionCount >= maxPacketRetransmissionCount) {
-                LOG_DEBUG(std::format("Max retransmission count. SessionId={}",
-                    info->owner->GetSessionId()));
-                info->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
-                SendPacketInfo::Free(info);
-                continue;
-            }
-
-            // 재전송: 기존 버퍼 그대로 재사용 (이미 암호화됨)
-            core.SendPacket(info);
-
-            // 다음 재전송 타임스탬프 갱신
-            info->retransmissionTimeStamp =
-                GetTickCount64() + retransmissionThreadSleepMs;
-
-            SendPacketInfo::Free(info);
+        for (auto* info : dueList) {
+            ProcessRetransmission(info, threadId);
         }
 
-        SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+        if (!dueList.empty()) {
+            continue;
+        }
+
+        if (hasNext) {
+            ArmRetransmissionTimer(scheduler.timerHandle, nextDeadline);
+            WaitForMultipleObjects(3, waitHandles, FALSE, INFINITE);
+        }
+        else {
+            WaitForMultipleObjects(2, emptyWaitHandles, FALSE, INFINITE);
+        }
     }
 }
 ```
@@ -283,26 +291,29 @@ void MultiSocketRUDPCore::RunRetransmissionThread(
 
 ```cpp
 struct SendPacketInfo {
-    std::atomic<int> refCount = 0;
+    std::atomic_int32_t refCount = 0;
+    uint64_t scheduleVersion = 0;
 
     void AddRefCount() {
-        refCount.fetch_add(1, std::memory_order_acq_rel);
+        refCount.fetch_add(1, std::memory_order_relaxed);
     }
 
     static void Free(SendPacketInfo* info) {
         if (info->refCount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            // 마지막 참조 → 실제 메모리 풀 반환
+            NetBuffer::Free(info->buffer);
             sendPacketInfoPool->Free(info);
         }
-        // refCount > 1이면 다른 곳에서 아직 사용 중 → 반환하지 않음
     }
 };
 ```
 
+`PushRetransmissionSchedule()`은 heap entry를 추가할 때 `scheduleVersion`을 증가시키고 `AddRefCount()`를 호출한다.
+ACK 처리나 재송신으로 인해 오래된 heap entry가 남아도, pop 시 `isErasedPacketInfo` 또는 version mismatch를 확인해 stale entry로 폐기한다.
+
 **참조 카운팅이 필요한 이유:**  
-재전송 스레드가 `SendPacketInfo`를 `copyList`에 넣은 직후,  
-Logic Worker가 ACK를 받아 `EraseSendPacketInfo()`를 호출할 수 있다.  
-RefCount가 1보다 크면 메모리를 실제로 해제하지 않아 use-after-free를 방지한다.
+재전송 scheduler heap entry가 `SendPacketInfo`를 들고 있는 동안,
+Logic Worker가 ACK를 받아 `sendPacketInfoMap`에서 같은 객체를 제거할 수 있다.
+RefCount가 1보다 크면 메모리를 실제로 해제하지 않아 heap entry 처리 중 use-after-free를 방지한다.
 
 ---
 
@@ -470,7 +481,7 @@ SendHeartbeatPacket()
    └─ 이유: IO Worker의 Semaphore Release에 응답 준비
 
 7. RETRANSMISSION_THREAD × N 시작
-   └─ 이유: 이 시점에 sendPacketInfoList가 초기화됨
+   └─ 이유: 이 시점에 retransmissionSchedulers와 wake/timer handle이 초기화됨
 
 8. Sleep(1000)
    └─ 이유: 모든 스레드가 완전히 실행 상태가 될 때까지 대기
@@ -545,15 +556,16 @@ SendHeartbeatPacket()
   │
   └─ OnSendReply 수신 시:
       → sendPacketInfoMap.FindAndErase(sequence)
-      → core.EraseSendPacketInfo(info, threadId=0)      ← 아래 목록에서 제거
-          → sendPacketInfoList[0].erase(listItor)
+      → core.MarkSendPacketInfoErased(info, threadId)   ← heap entry는 pop 시 stale 처리
+      → SendPacketInfo::Free(info)
       → TryFlushPendingQueue()
 
 [Retransmission Thread thread=0]
   │
-  └─ sendPacketInfoList[0] 순회 (sendPacketInfoListLock[0] 보호)
-      → isErasedPacketInfo 확인 (ACK 이미 받았으면 skip)
-      → 타임아웃 확인
+  └─ RetransmissionScheduler[0].heap 대기
+      → waitable timer로 가장 빠른 deadline까지 대기
+      → isErasedPacketInfo 또는 scheduleVersion mismatch 확인
+      → stale entry면 Free 후 skip
       → core.SendPacket(info)                           ← 재전송
       → retransmissionCount >= max → session.DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
 
@@ -569,7 +581,8 @@ SendHeartbeatPacket()
   └─ 안전 확인 후 session.Disconnect()
       → CloseSocket()
       → ForEachAndClearSendPacketInfoMap
-          → core.EraseSendPacketInfo(info, threadId)    ← 각 스레드 목록에서 제거
+          → core.MarkSendPacketInfoErased(info, threadId)
+          → SendPacketInfo::Free(info)
       → OnReleased()
       → InitializeSession()
       → SetDisconnected()
@@ -580,7 +593,7 @@ SendHeartbeatPacket()
   │
   └─ session.SendHeartbeatPacket()
       → HEARTBEAT_TYPE 패킷 전송
-      → sendPacketInfoList[session.threadId]에 등록
+      → retransmissionSchedulers[session.threadId]에 schedule 등록
       → Retransmission Thread가 추적
 ```
 

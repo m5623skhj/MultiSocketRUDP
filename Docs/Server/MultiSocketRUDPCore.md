@@ -98,8 +98,9 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
    ├─ for id in 0..N:
    │    recvIOCompletedContexts.emplace_back()
    │    recvLogicThreadEventHandles.push_back(CreateSemaphore(0, LONG_MAX))
-   │    sendPacketInfoList.emplace_back()
-   │    sendPacketInfoListLock.push_back(make_unique<mutex>())
+   │    retransmissionSchedulers.emplace_back()
+   │    scheduler.timerHandle = CreateWaitableTimerExW(...)
+   │    scheduler.wakeEventHandle = CreateEvent(auto, FALSE)
    │
    ├─ SESSION_RELEASE_THREAD × 1 시작
    ├─ HEARTBEAT_THREAD × 1 시작
@@ -277,10 +278,10 @@ bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
 | `true` | 전송 성공 |
 | `false` | 전송 실패 |
 
-#### `bool EraseSendPacketInfo(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
-- 스레드별 전송 추적 목록에서 특정 `SendPacketInfo`를 제거한다.
-- ACK 수신 후 정리나 송신 실패 정리 흐름에서 호출된다.
-- 제거에 성공하면 `true`, 대상이 없거나 처리할 수 없으면 `false`를 반환한다.
+#### `void MarkSendPacketInfoErased(SendPacketInfo* eraseTarget, ThreadIdType threadId)`
+- ACK 수신 후 특정 `SendPacketInfo`를 erased 상태로 표시한다.
+- 대상 thread의 `RetransmissionScheduler`가 존재하면 scheduler lock 안에서 `isErasedPacketInfo`를 설정한다.
+- heap에 이미 들어간 entry는 즉시 제거하지 않고, 재전송 스레드가 pop할 때 stale entry로 폐기한다.
 #### `RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const`
 - 초기화된 RIO 함수 테이블을 반환한다.
 - 세션 RIO 초기화에서 사용된다.
@@ -486,7 +487,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
     ├─ nowInProcessingRecvPacket? → remainList 보관, SetEvent 재시도
     └─ 안전 확인 완료 → session->Disconnect()
             ↓ CloseSocket() (unique_lock)
-            ↓ ForEachAndClearSendPacketInfoMap → EraseSendPacketInfo
+            ↓ ForEachAndClearSendPacketInfoMap → MarkSendPacketInfoErased 후 Free
             ↓ OnReleased() 콘텐츠 훅
             ↓ InitializeSession() 상태 초기화
             ↓ stateMachine.SetDisconnected()
@@ -669,8 +670,11 @@ MultiSocketRUDPCore
  │
  ├── vector<CListBaseQueue<RecvIOCompletedContext*>> recvIOCompletedContexts[N]
  ├── vector<HANDLE> recvLogicThreadEventHandles[N]  ← Semaphore
- ├── vector<list<SendPacketInfo*>> sendPacketInfoList[N]
- └── vector<unique_ptr<mutex>> sendPacketInfoListLock[N]
+ ├── vector<unique_ptr<RetransmissionScheduler>> retransmissionSchedulers[N]
+ │    ├── priority_queue<RetransmissionHeapEntry> heap
+ │    ├── HANDLE timerHandle
+ │    └── HANDLE wakeEventHandle
+ └── list<SessionIdType> releaseSessionIdList
 ```
 
 ### `MultiSocketRUDPCoreFunctionDelegate` 의 역할
