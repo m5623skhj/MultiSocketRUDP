@@ -474,7 +474,6 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 ```
 [어디서든] session->DoDisconnect()
     ↓ TryTransitionToReleasing() CAS
-    ↓ OnDisconnected() 콘텐츠 훅
     ↓ PushToDisconnectTargetSession(session)
          ↓ nowInReleaseThread = true
          ↓ releaseSessionIdList.push_back(sessionId)
@@ -486,13 +485,13 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
     ├─ IO_SENDING 중? → remainList 보관, SetEvent 재시도
     ├─ nowInProcessingRecvPacket? → remainList 보관, SetEvent 재시도
     └─ 안전 확인 완료 → session->Disconnect()
+            ↓ OnDisconnected() 콘텐츠 훅
             ↓ CloseSocket() (unique_lock)
             ↓ ForEachAndClearSendPacketInfoMap → MarkSendPacketInfoErased 후 Free
             ↓ OnReleased() 콘텐츠 훅
-            ↓ InitializeSession() 상태 초기화
-            ↓ stateMachine.SetDisconnected()
             ↓ DisconnectSession(id)
                  ↓ RUDPSessionManager::ReleaseSession(id)
+                      ↓ InitializeSession() / stateMachine.SetDisconnected()
                       ↓ unusedSessionIdList.push_back(id)
                       ↓ connectedUserCount--
 ```

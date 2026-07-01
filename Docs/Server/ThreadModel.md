@@ -366,8 +366,8 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 
             // 안전 확인 완료 → 실제 해제
             session->Disconnect();
-            // → CloseSocket(), InitializeSession(), SetDisconnected()
-            // → DisconnectSession(id) → unusedSessionIdList.push_back(id)
+            // → OnDisconnected(), CloseSocket(), OnReleased()
+            // → DisconnectSession(id) → ReleaseSession에서 InitializeSession()/SetDisconnected()
         }
 
         // 아직 바쁜 세션 → 재시도
@@ -426,8 +426,8 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) c
                     // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
                     sessionDelegate.AbortReservedSession(*session);
                     // → TryAbortReserved() CAS: RESERVED → RELEASING
-                    // → CloseSocket(), InitializeSession()
-                    // → DisconnectSession(id) → 풀 반환
+                    // → CloseSocket()
+                    // → DisconnectSession(id) → ReleaseSession에서 InitializeSession()/SetDisconnected()
                 }
             }
         }
@@ -579,14 +579,15 @@ SendHeartbeatPacket()
   │   → nowInProcessingRecvPacket 체크 (Logic Worker 상태)
   │
   └─ 안전 확인 후 session.Disconnect()
+      → OnDisconnected()
       → CloseSocket()
       → ForEachAndClearSendPacketInfoMap
           → core.MarkSendPacketInfoErased(info, threadId)
           → SendPacketInfo::Free(info)
       → OnReleased()
-      → InitializeSession()
-      → SetDisconnected()
       → sessionManager.ReleaseSession(id)
+          → InitializeSession()
+          → SetDisconnected()
           → unusedSessionIdList.push_back(id)
 
 [Heartbeat Thread]

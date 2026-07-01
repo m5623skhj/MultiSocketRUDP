@@ -197,10 +197,7 @@ void AbortReservedSession() {
     // 소켓 닫기 (RIO Cleanup + socketContext.CloseSocket())
     CloseSocket();
 
-    // 세션 내부 상태 초기화
-    // (DoDisconnect 경로와 달리 Session Release Thread를 거치지 않고 즉시 처리)
-    // SetDisconnected() 호출 없음 — 다음 AcquireSession() 시 SetReserved()로 덮어씀
-    InitializeSession();
+    // reserved 세션은 Release Thread를 거치지 않고 즉시 풀 반환 요청
     MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
     // → unusedSessionIdList.push_back(id)
 }
@@ -237,8 +234,6 @@ void RUDPSession::DoDisconnect(const DISCONNECT_REASON reason)
     nowInReleaseThread.store(true, std::memory_order_seq_cst);
 
     // ③ 콘텐츠 훅
-    OnDisconnected();   // ← 콘텐츠 서버가 구현
-
     // ④ Session Release Thread에 알림
     MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
     // → releaseSessionIdList.push_back(sessionId)
@@ -294,8 +289,10 @@ session.Disconnect();
 ```cpp
 void RUDPSession::Disconnect()
 {
+    OnDisconnected();
+
     // ① 소켓 닫기 (unique_lock)
-    sessionDelegate.CloseSocket(*this);
+    CloseSocket();
     // → unique_lock(socketLock) → closesocket() → INVALID_SOCKET
 
     // ② 미처리 sendPacketInfo 전체 정리
@@ -308,22 +305,11 @@ void RUDPSession::Disconnect()
     // ③ 콘텐츠 훅
     OnReleased();   // ← 콘텐츠 서버가 구현
 
-    // ④ 세션 내부 상태 초기화
-    InitializeSession();
-    // → sessionId = INVALID_SESSION_ID
-    // → cryptoContext.Initialize() (키 핸들 파괴)
-    // → clientAddr/clientSockAddrInet/sessionReservedTime 초기화
-    // → nowInReleaseThread = false
-    // → flowManager.Initialize(maximumHoldingPacketQueueSize)
-    // → rioContext.GetSendContext().Reset()
-    // → sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize)
-
-    // ⑤ 상태 전이 완료
-    stateMachine.SetDisconnected();
-    // → store: RELEASING → DISCONNECTED
-
-    // ⑥ 풀 반환
-    DisconnectSession(GetSessionId());
+    // ④ 풀 반환 요청
+    const SessionIdType disconnectTargetSessionId = sessionId;
+    MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
+    // → RUDPSessionManager::ReleaseSession(id)
+    // → InitializeSession() / stateMachine.SetDisconnected()
     // → connectedUserCount--
     // → unusedSessionIdList.push_back(sessionId)
 }
@@ -402,22 +388,22 @@ public:
 | 훅 | 호출 시점 | 순서 보장 |
 |----|-----------|-----------|
 | `OnConnected()` | `TryConnect()` → ACK 전송 **전** | CONNECTED 전이 직후, 단 1회 |
-| `OnDisconnected()` | `DoDisconnect()` → `PushToDisconnect` **전** | RELEASING 전이 직후, 단 1회 |
-| `OnReleased()` | `Disconnect()` → `InitializeSession()` **전** | `OnDisconnected` 이후 반드시 호출 |
+| `OnDisconnected()` | `Disconnect()` → `CloseSocket()` **전** | Release Thread에서 실제 정리를 시작할 때 단 1회 |
+| `OnReleased()` | `Disconnect()` → `DisconnectSession(id)` **전** | `OnDisconnected` 이후 반드시 호출 |
 
 **`OnDisconnected → OnReleased` 순서 보장:**
 
 ```
 DoDisconnect():
-  TryTransitionToReleasing() → OnDisconnected() → PushToDisconnectTargetSession
+  TryTransitionToReleasing() → PushToDisconnectTargetSession
 
 (Session Release Thread)
   IO 완료 대기 → Disconnect():
-    CloseSocket() → OnReleased() → InitializeSession() → SetDisconnected()
+    OnDisconnected() → CloseSocket() → OnReleased() → DisconnectSession(id)
+      → ReleaseSession(id)에서 InitializeSession() / SetDisconnected()
 ```
 
-`OnDisconnected`는 DoDisconnect를 호출한 스레드에서 동기적으로 실행된다.  
-`OnReleased`는 항상 Session Release Thread에서 실행된다.  
+`OnDisconnected`와 `OnReleased`는 모두 Session Release Thread의 `Disconnect()` 경로에서 순서대로 실행된다.
 두 훅이 다른 스레드에서 실행될 수 있으므로 공유 자원 접근 시 주의해야 한다.
 
 ---
@@ -432,7 +418,6 @@ DoDisconnect()              DoDisconnect()
   TryTransitionToReleasing   TryTransitionToReleasing
     CONNECTED → RELEASING       이미 RELEASING → CAS 실패
     (성공)                       return (no-op)
-  OnDisconnected()
   PushToDisconnect()
 ```
 
@@ -460,7 +445,7 @@ RecvLogic Worker:
 다른 스레드:
   DoDisconnect()
     TryTransitionToReleasing: CONNECTED → RELEASING (성공)
-    OnDisconnected() 호출
+    PushToDisconnectTargetSession 호출
 
 RecvLogic Worker:
   OnConnected() 완료 후 SendReplyToClient

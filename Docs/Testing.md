@@ -43,6 +43,7 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 - `RUDPThreadManagerTest`
 - `RetransmissionTimeoutEstimatorTest`
 - `RingBufferTest`
+- `SendPacketInfoTest`
 - `RUDPSessionTest`
 - `RUDPSessionManagerTest`
 - `SessionCryptoContextTest`

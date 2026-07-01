@@ -123,9 +123,8 @@ public:
 **`Initialize()` 호출 시점:**
 
 ```cpp
-// Session Release Thread → Disconnect() → InitializeSession()
+// RUDPSessionManager::ReleaseSession() → InitializeSession()
 void RUDPSession::InitializeSession() {
-    sessionId = INVALID_SESSION_ID;
     cryptoContext.Initialize();                              // ← 키 핸들 파괴 + 버퍼 해제
     clientAddr = {};
     clientSockAddrInet = {};
@@ -492,20 +491,22 @@ sessionPacketOrderer
 **해제 순서 (Disconnect — Session Release Thread 경유):**
 
 ```
-1. CloseSocket()                     ← 소켓 먼저 닫기
-2. rioContext.GetSendContext()
+1. OnDisconnected() 콘텐츠 훅
+2. CloseSocket()                     ← 소켓 먼저 닫기
+3. rioContext.GetSendContext()
    .ForEachAndClearSendPacketInfoMap()  ← SendPacketInfo 정리
-3. OnReleased() 콘텐츠 훅
-4. InitializeSession()
-   ├─ sessionId = INVALID_SESSION_ID
+4. OnReleased() 콘텐츠 훅
+5. DisconnectSession(id)
+   ├─ RUDPSessionManager::ReleaseSession(id)
+   ├─ InitializeSession()
    ├─ cryptoContext.Initialize()        ← 키 핸들 파괴
    ├─ clientAddr/clientSockAddrInet/sessionReservedTime 초기화
    ├─ nowInReleaseThread = false
    ├─ flowManager.Initialize(maxHoldingQueueSize)
    ├─ rioContext.GetSendContext().Reset()
    └─ sessionPacketOrderer.Initialize(maxHoldingQueueSize)
-5. stateMachine.SetDisconnected()
-6. DisconnectSession(id) → unusedSessionIdList.push_back(id)
+6. InitializeSession() 내부에서 stateMachine.SetDisconnected()
+7. unusedSessionIdList.push_back(id)
 ```
 
 **해제 순서 (AbortReservedSession — HeartbeatThread 직접 처리):**
@@ -513,9 +514,8 @@ sessionPacketOrderer
 ```
 1. nowInReleaseThread = true
 2. CloseSocket()           ← rioContext.Cleanup() + socketContext.CloseSocket()
-3. InitializeSession()     ← OnReleased() 없이 바로 초기화
-4. DisconnectSession(id)   ← SetDisconnected() 없이 바로 풀 반환
-   (다음 AcquireSession → SetReserved()에서 상태 갱신됨)
+3. DisconnectSession(id)
+4. RUDPSessionManager::ReleaseSession(id)에서 InitializeSession() / stateMachine.SetDisconnected()
 ```
 
 ---
