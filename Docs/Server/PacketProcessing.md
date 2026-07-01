@@ -317,9 +317,11 @@ case PACKET_TYPE::SEND_REPLY_TYPE:
     DECODE_PACKET()
 
     session.OnSendReply(recvPacket);
-    // → sendPacketInfoMap에서 제거
+    // → FindAndEraseSendPacketInfo()
     // → flowManager.OnAckReceived()
-    // → EraseSendPacketInfo()
+    // → core.MarkSendPacketInfoErased()
+    // → TryGetRttSample() 성공 시 OnRttSample()
+    // → SendPacketInfo::Free()
     // → TryFlushPendingQueue()
 }
 break;

@@ -300,9 +300,9 @@ void RUDPSession::Disconnect()
 
     // ② 미처리 sendPacketInfo 전체 정리
     rioContext.GetSendContext().ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info) {
-        core.EraseSendPacketInfo(info, threadId);
-        // → sendPacketInfoList[threadId]에서 제거
-        // → SendPacketInfo::Free(info)
+        core.MarkSendPacketInfoErased(info, threadId);
+        // → retransmission heap에 남은 entry는 pop 시 stale 처리
+        SendPacketInfo::Free(info);
     });
 
     // ③ 콘텐츠 훅

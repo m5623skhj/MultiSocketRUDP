@@ -378,16 +378,23 @@ void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
     );
 
     // ② 흐름 제어 확인
-    {
-        std::scoped_lock lock(pendingQueueLock);
-        bool overflow = !pendingPacketQueue.empty()
-                     || sendPacketInfoMap.size() >= remoteAdvertisedWindow.load();
+    const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
+    if (window == 0) {
+        std::scoped_lock lock(pendingPacketQueueLock);
+        pendingPacketQueue.push({ seq, buf });
+        return;
+    }
 
-        if (overflow) {
-            // 보류 큐에 보관
-            pendingPacketQueue.emplace(seq, buf);
-            return;
-        }
+    BYTE outstanding;
+    {
+        std::scoped_lock lock(sendPacketInfoMapLock);
+        outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
+    }
+
+    if (outstanding >= window) {
+        std::scoped_lock lock(pendingPacketQueueLock);
+        pendingPacketQueue.push({ seq, buf });
+        return;
     }
 
     // ③ 재전송 등록 + 송신 큐에 삽입
@@ -398,23 +405,21 @@ void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
 ### `RegisterSendPacketInfo`
 
 ```cpp
-void RegisterSendPacketInfo(NetBuffer* buf, PacketSequence seq)
+void RegisterSendPacketInfo(NetBuffer& buf, PacketSequence seq)
 {
     // ① SendPacketInfo 할당
     auto* info = sendPacketInfoPool->Alloc();
-    info->buffer = buf;
-    info->sequence = seq;
-    info->retransmissionCount = 0;
+    info->Initialize(&buf, seq);
     info->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
 
     // ② 재전송 맵에 등록
     {
-        std::scoped_lock lock(sendPacketInfoLock);
-        sendPacketInfoMap[seq] = info;
+        std::unique_lock lock(sendPacketInfoMapLock);
+        sendPacketInfoMap.insert({ seq, info });
     }
 
     // ③ send 큐에 삽입
-    sendBufferQueue.Enqueue(buf);
+    sendBufferQueue.Enqueue(&buf);
 
     // ④ send 스레드 깨우기
     ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
@@ -692,7 +697,7 @@ void OnSendReply(NetBuffer& recvBuffer)
 
     // ⑤ 재전송 맵에서 제거
     {
-        std::scoped_lock lock(sendPacketInfoLock);
+        std::scoped_lock lock(sendPacketInfoMapLock);
         auto it = sendPacketInfoMap.find(ackedSeq);
         if (it != sendPacketInfoMap.end()) {
             NetBuffer::Free(it->second->buffer);
@@ -761,7 +766,7 @@ void RunRetransmissionThread()
         tickSet.UpdateTick();
 
         {
-            std::scoped_lock lock(sendPacketInfoLock);
+            std::scoped_lock lock(sendPacketInfoMapLock);
 
             for (auto& [seq, info] : sendPacketInfoMap) {
                 if (info->retransmissionTimeStamp > tickSet.nowTick) continue;
@@ -809,26 +814,20 @@ void TryFlushPendingQueue()
     BYTE window = remoteAdvertisedWindow.load(std::memory_order_acquire);
     if (window == 0) return;
 
-    std::scoped_lock pendingLock(pendingQueueLock);
-    std::scoped_lock infoLock(sendPacketInfoLock);
+    std::scoped_lock pendingLock(pendingPacketQueueLock);
 
     while (!pendingPacketQueue.empty()) {
-        // outstanding >= window → 전송 불가
-        if (sendPacketInfoMap.size() >= static_cast<size_t>(window)) break;
+        {
+            std::scoped_lock infoLock(sendPacketInfoMapLock);
+            // outstanding >= window → 전송 불가
+            if (sendPacketInfoMap.size() >= static_cast<size_t>(window)) break;
+        }
 
         auto [seq, buf] = pendingPacketQueue.top();
         pendingPacketQueue.pop();
 
         // 재전송 등록 + 송신 큐
-        auto* info = sendPacketInfoPool->Alloc();
-        info->buffer = buf;
-        info->sequence = seq;
-        info->retransmissionCount = 0;
-        info->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
-
-        sendPacketInfoMap[seq] = info;
-        sendBufferQueue.Enqueue(buf);
-        ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+        RegisterSendPacketInfo(*buf, seq);
     }
 }
 ```
@@ -888,10 +887,10 @@ void TryFlushPendingQueue()
 | `remoteAdvertisedWindow` | `atomic<BYTE>` | 서버 수신 윈도우 크기 |
 | `isConnected` | `bool` | sequence=0 ACK 수신 후 true |
 | `threadStopFlag` | `bool` | 전체 스레드 종료 플래그 |
-| `sendPacketInfoMap` | `unordered_map<seq, info*>` | 재전송 추적 맵 |
-| `sendPacketInfoLock` | `mutex` | sendPacketInfoMap 보호 |
+| `sendPacketInfoMap` | `map<seq, info*>` | 재전송 추적 맵 |
+| `sendPacketInfoMapLock` | `mutex` | sendPacketInfoMap 보호 |
 | `pendingPacketQueue` | `priority_queue<seq, buf>` | 흐름 제어 보류 큐 |
-| `pendingQueueLock` | `mutex` | pendingPacketQueue 보호 |
+| `pendingPacketQueueLock` | `mutex` | pendingPacketQueue 보호 |
 | `recvPacketHoldingQueue` | `priority_queue<seq, type, buf>` | 순서 보장 홀딩 큐 |
 | `recvPacketHoldingQueueLock` | `mutex` | recvPacketHoldingQueue 보호 |
 | `sendBufferQueue` | `CListBaseQueue<NetBuffer*>` | sendThread에 전달할 버퍼 큐 |
