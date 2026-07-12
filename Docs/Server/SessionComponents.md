@@ -154,7 +154,6 @@ BCryptGenerateSymmetricKey는 비용이 크다 (수백 μs).
 ```cpp
 class SessionSocketContext {
     SOCKET socket = INVALID_SOCKET;
-    sockaddr_in clientAddr{};        // 연결된 클라이언트 주소 (TryConnect에서 설정)
     WORD serverPort = 0;             // 이 세션 소켓의 로컬 포트 (bind 후 설정)
     mutable std::shared_mutex socketLock;
     // DoRecv/DoSend: shared_lock (동시 실행 가능)
@@ -163,8 +162,6 @@ class SessionSocketContext {
 public:
     void SetSocket(SOCKET s) { socket = s; }
     SOCKET GetSocket() const { return socket; }
-    void SetClientAddr(const sockaddr_in& addr) { clientAddr = addr; }
-    const sockaddr_in& GetClientAddr() const { return clientAddr; }
     void SetServerPort(WORD port) { serverPort = port; }
     WORD GetServerPort() const { return serverPort; }
     std::shared_mutex& GetSocketMutex() const { return socketLock; }
@@ -435,13 +432,13 @@ public:
 
 ```cpp
 // TryConnect() 성공 시
-flowManager.Reset(LOGIN_PACKET_SEQUENCE);  // = 0
+flowManager.Reset(LOGIN_PACKET_SEQUENCE + 1);  // = 1
 
 // Reset 내부:
 // flowController.Reset():
 //   cwnd = INITIAL_CWND(4), lastReplySequence = 0, inRecovery = false
-// receiveWindow.Reset(0):
-//   windowStart = 0, startIndex = 0, usedCount = 0
+// receiveWindow.Reset(1):
+//   windowStart = 1, startIndex = 0, usedCount = 0
 //   receivedFlags.fill(0)
 // (lastAckedSequence は flowController 내부에서 관리)
 ```
@@ -460,8 +457,11 @@ cryptoContext
 
 socketContext
   → DoRecv/DoSend: GetSocket() + GetSocketMutex()
-  → TryConnect: SetClientAddr()
-  → CanProcessPacket: GetClientAddr() 비교
+  → socket과 local serverPort의 동기화된 접근
+
+clientAddr (RUDPSession)
+  → TryConnect에서 저장
+  → CanProcessPacket에서 비교
 
 rioContext (RecvContext + SendContext)
   → RecvContext: DoRecv에서 RIO 버퍼 전달

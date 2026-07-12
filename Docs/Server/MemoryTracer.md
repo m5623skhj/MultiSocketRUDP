@@ -10,9 +10,10 @@
 static void Enable();
 static void Disable();
 static bool IsEnabled();
+static void Clear();
 
-static void TrackObject(void* ptr, const std::string& typeName, const char* file, int line, const std::string& note = "");
-static void UntrackObject(void* ptr, const char* file, int line);
+static void TrackObject(void* ptr, const std::string& typeName, const std::string& file, int line, const std::string& note = "");
+static void UntrackObject(void* ptr, const std::string& file, int line);
 static void AddNote(void* ptr, const std::string& note);
 
 static void GenerateReport();
@@ -22,6 +23,8 @@ static size_t GetActiveObjectCount();
 static void GetObjectHistory(void* ptr);
 static void GetThreadStatistics();
 
+static void SetOutputFile(const std::string& filename);
+static void CloseOutputFile();
 static void GetObjectHistoryToFile(void* ptr, const std::string& filename = "");
 static void GetThreadStatisticsToFile(const std::string& filename = "");
 ```

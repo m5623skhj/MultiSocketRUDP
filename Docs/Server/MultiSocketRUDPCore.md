@@ -296,6 +296,17 @@ bool SendPacket(SendPacketInfo* sendPacketInfo) const override;
 #### `void ResetTPS() const`
 - TPS 카운터를 0으로 초기화한다.
 
+#### 전송 타이밍 조회
+
+```cpp
+unsigned int GetHeartbeatThreadSleepMs() const;
+unsigned int GetInitialRetransmissionMs() const;
+unsigned int GetMinRetransmissionMs() const;
+unsigned int GetMaxRetransmissionMs() const;
+```
+
+- heartbeat 주기와 초기/최소/최대 재전송 timeout(RTO)을 반환한다.
+
 ### 비공개 함수
 
 #### `void DisconnectSession(SessionIdType disconnectTargetSessionId) const`
@@ -379,36 +390,7 @@ std::thread monitorThread([&]() {
 
 ### 세션 접근
 
-```cpp
-// sessionId로 CONNECTED 또는 RESERVED 세션 접근
-RUDPSession* GetUsingSession(SessionIdType sessionId) const;
-
-// sessionId로 RELEASING 세션 접근 (세션 해제 스레드 내부에서 사용)
-RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
-```
-
-**GetUsingSession 사용 패턴:**
-
-```cpp
-// 다른 세션에게 패킷 전송
-void GameRoom::NotifyPlayerLeft(SessionIdType leaveId) {
-    auto* leavePlayer = static_cast<Player*>(
-        core.GetUsingSession(leaveId));
-
-    for (auto id : memberIds) {
-        auto* member = static_cast<Player*>(core.GetUsingSession(id));
-        if (member && member->IsConnected()) {
-            PlayerLeftPacket pkt;
-            pkt.sessionId = leaveId;
-            member->SendPacket(pkt);
-        }
-    }
-}
-```
-
-> **주의:** `GetUsingSession()`이 nullptr을 반환하지 않더라도, 그 직후 세션이  
-> `DoDisconnect()`를 호출할 수 있다. `IsConnected()`로 상태를 재확인하거나,  
-> `SendPacket()`의 반환값으로 처리 성공 여부를 확인해야 한다.
+`GetUsingSession()`과 `GetReleasingSession()`은 현재 `private` 함수다. 콘텐츠 서버 코드는 세션을 직접 조회하지 않고, 보유한 세션 참조와 공개 송신 API를 사용해야 한다.
 
 ### 특정 세션 강제 종료 (내부 API — `private`)
 
@@ -548,7 +530,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 ```cpp
 RIOCreateRequestQueue(
     sock,          // 세션 소켓
-    1,             // MaxOutstandingReceive (한 번에 등록 가능한 recv 수)
+    RECV_OUTSTANDING_COUNT, // MaxOutstandingReceive (현재 8)
     1,             // MaxReceiveDataBuffers
     1,             // MaxOutstandingSend
     1,             // MaxSendDataBuffers
@@ -558,10 +540,8 @@ RIOCreateRequestQueue(
 );
 ```
 
-> **MaxOutstandingReceive = 1인 이유:**  
-> 하나의 UDP 소켓에서는 한 번에 하나의 데이터그램만 수신 대기하면 충분하다.  
-> UDP는 한 번의 recvfrom이 하나의 완전한 데이터그램을 반환하므로  
-> TCP처럼 여러 버퍼를 미리 등록할 필요가 없다.
+> **MaxOutstandingReceive = `RECV_OUTSTANDING_COUNT` (현재 8):**
+> `DoRecv()`는 사용 가능한 수신 context를 모두 등록해, 처리 중인 데이터그램이 있어도 다음 수신을 이어간다.
 
 ---
 
@@ -577,7 +557,8 @@ RIOCreateRequestQueue(
     MAX_PACKET_RETRANSMISSION_COUNT = 16
     WORKER_THREAD_ONE_FRAME_MS = 16
     RETRANSMISSION_MS = 50
-    RETRANSMISSION_THREAD_SLEEP_MS = 50
+    MIN_RETRANSMISSION_MS = 16
+    MAX_RETRANSMISSION_MS = 100
     HEARTBEAT_THREAD_SLEEP_MS = 5000
     TIMER_TICK_MS = 100
     MAX_HOLDING_PACKET_QUEUE_SIZE = 32

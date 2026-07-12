@@ -53,8 +53,9 @@ while true:
   payloadLength = BitConverter.ToUInt16(buffer, PayloadPosition)  // offset 2
   if totalBytes >= payloadLength + PacketHeaderSize → break
 
-sessionGetter.Close()
 new Client(buffer[PacketHeaderSize..totalBytes])
+  → BotTesterCore에서 ActionGraph 적용 및 세션 등록
+  → sessionGetter.Close()
 ```
 
 ### `ConnectAsync`

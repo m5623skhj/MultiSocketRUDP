@@ -128,16 +128,9 @@ if (ackedSeq == LOGIN_PACKET_SEQUENCE && !isConnected) {
 ```cpp
 void ServerAliveChecker::StartServerAliveCheck(unsigned int inCheckIntervalMs)
 {
-    if (isStopped) return;  // 이미 종료됨
-
     checkIntervalMs = inCheckIntervalMs;
-
-    // 초기 기준값 설정
-    beforeCheckSequence = getNextRecvSequenceFunction();
-
-    serverAliveCheckThread = std::jthread([this] {
-        RunServerAliveCheckerThread();
-    });
+    isStopped.store(false, std::memory_order_release);
+    serverAliveCheckThread = std::jthread(&ServerAliveChecker::RunServerAliveCheckerThread, this);
 }
 ```
 
@@ -187,13 +180,7 @@ void ServerAliveChecker::StopServerAliveCheck()
 void ServerAliveChecker::RunServerAliveCheckerThread()
 {
     while (!isStopped) {
-        // checkIntervalMs 동안 대기 (분할 sleep으로 stop 신호 빠르게 감지)
-        const int sleepStep = 100;  // 100ms씩 나눠 sleep
-        for (int elapsed = 0;
-             elapsed < static_cast<int>(checkIntervalMs) && !isStopped;
-             elapsed += sleepStep) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleepStep));
-        }
+        Sleep(checkIntervalMs);
 
         if (isStopped) break;
 
@@ -216,16 +203,12 @@ void ServerAliveChecker::RunServerAliveCheckerThread()
 }
 ```
 
-**분할 sleep의 이유:**
+**종료 대기 시간:**
 
 ```
-단순 sleep_for(checkIntervalMs):
-  Stop() 호출 시 최대 checkIntervalMs(5000ms)까지 대기
-  → 클라이언트 종료 지연
-
-100ms씩 나눠 sleep:
-  isStopped 확인 주기 = 100ms
-  → Stop() 후 최대 100ms 안에 스레드 종료
+Sleep(checkIntervalMs) 중에는 stop 신호를 확인하지 않는다.
+따라서 다른 스레드에서 StopServerAliveCheck()를 호출하면
+join()은 최대 checkIntervalMs까지 대기할 수 있다.
 ```
 
 ---

@@ -187,25 +187,28 @@ TLSHelperClient::Handshake(sessionBrokerSocket)
   → InitializeSecurityContext 루프
   → ClientHello / ServerHello / Certificate / Finished 교환
 
-TrySetTargetSessionInfo(sessionBrokerSocket, tlsHelper)
+TrySetTargetSessionInfo()
   → recv 루프 + DecryptDataStream
-  → SetTargetSessionInfo(plainBuffer, plainSize)
+  → payload 완료와 close_notify 확인
+  → SetTargetSessionInfo(recvBuffer)
 ```
 
 ### `TrySetTargetSessionInfo` — TLS 스트림 수신 루프
 
 ```cpp
-bool TrySetTargetSessionInfo(SOCKET socket, TLSHelperClient& tls)
+bool TrySetTargetSessionInfo()
 {
-    std::vector<unsigned char> encryptedStream;
+    auto& recvBuffer = *NetBuffer::Alloc();
+    std::vector<char> encryptedStream;
     char plainBuffer[MAX_TLS_PACKET_SIZE];
-    size_t totalPlainReceived = 0;
+    int totalPlainReceived = 0;
+    BYTE code = 0;
     WORD payloadLength = 0;
     bool payloadComplete = false;
 
     while (true) {
         char tlsRecvBuf[MAX_TLS_PACKET_SIZE];
-        int bytes = recv(socket, tlsRecvBuf, MAX_TLS_PACKET_SIZE, 0);
+        int bytes = recv(sessionBrokerSocket, tlsRecvBuf, MAX_TLS_PACKET_SIZE, 0);
         if (bytes <= 0) break;
 
         // 암호화 스트림에 누적
@@ -213,92 +216,77 @@ bool TrySetTargetSessionInfo(SOCKET socket, TLSHelperClient& tls)
                                tlsRecvBuf, tlsRecvBuf + bytes);
 
         size_t plainSize = 0;
-        auto result = tls.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
-
-        switch (result) {
-        case TlsDecryptResult::Error:
+        auto result = tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
+        if (result == TLSHelper::TlsDecryptResult::Error) {
             return false;
+        }
 
-        case TlsDecryptResult::CloseNotify:
-            // 서버가 close_notify 전송 → 세션 정보 전송 완료
-            if (payloadComplete) return true;
-            return false;   // 데이터 덜 받았는데 닫힘
+        if (plainSize > 0) {
+            recvBuffer.m_iWrite = 0;
+            recvBuffer.WriteBuffer(plainBuffer, static_cast<int>(plainSize));
+            totalPlainReceived += static_cast<int>(plainSize);
+        }
 
-        case TlsDecryptResult::PlainData:
-            // 첫 수신 시 헤더 파싱
-            if (totalPlainReceived == 0 && plainSize >= df_HEADER_SIZE) {
-                WORD payLen;
-                memcpy(&payLen, &plainBuffer[1], sizeof(WORD));
-                payloadLength = payLen;
-            }
+        if (totalPlainReceived < df_HEADER_SIZE) continue;
 
-            totalPlainReceived += plainSize;
+        if (payloadLength == 0) {
+            recvBuffer >> code >> payloadLength;
+        }
 
-            if (totalPlainReceived >= payloadLength + df_HEADER_SIZE) {
-                payloadComplete = true;
-                // 세션 정보 파싱
-                if (!SetTargetSessionInfo(plainBuffer, totalPlainReceived))
-                    return false;
-            }
+        if (totalPlainReceived >= payloadLength + df_HEADER_SIZE) {
+            payloadComplete = true;
+        }
+
+        if (payloadComplete && result == TLSHelper::TlsDecryptResult::CloseNotify) {
             break;
-
-        case TlsDecryptResult::None:
-            continue;   // TLS 레코드 불완전 또는 아직 plaintext 없음
         }
     }
 
-    return payloadComplete;
+    shutdown(sessionBrokerSocket, SD_BOTH);
+    closesocket(sessionBrokerSocket);
+    sessionBrokerSocket = INVALID_SOCKET;
+
+    if (!payloadComplete) {
+        NetBuffer::Free(&recvBuffer);
+        return false;
+    }
+
+    recvBuffer.m_iRead = df_HEADER_SIZE;
+    const bool result = SetTargetSessionInfo(recvBuffer);
+    NetBuffer::Free(&recvBuffer);
+    return result;
 }
 ```
 
 ### `SetTargetSessionInfo` — 세션 정보 파싱
 
 ```cpp
-bool SetTargetSessionInfo(const char* buffer, size_t size)
+bool SetTargetSessionInfo(NetBuffer& receivedBuffer)
 {
-    NetBuffer netBuf;
-    memcpy(netBuf.m_pSerializeBuffer, buffer, size);
-    netBuf.m_iWrite = static_cast<WORD>(size);
-    netBuf.m_iRead  = df_HEADER_SIZE;  // 헤더 스킵
+    char connectResultCode;
+    receivedBuffer >> connectResultCode;
 
-    CONNECT_RESULT_CODE resultCode;
-    netBuf >> resultCode;
-
-    if (resultCode != CONNECT_RESULT_CODE::SUCCESS) {
-        LOG_ERROR(std::format("Session broker returned error: {}", static_cast<int>(resultCode)));
+    if (connectResultCode != 0) {
+        LOG_ERROR("Session broker returned error");
         return false;
     }
 
-    // 서버 UDP 주소
-    std::string serverIpStr;
-    WORD serverUdpPort;
-    netBuf >> serverIpStr >> serverUdpPort;
+    // 서버 UDP 주소, 세션 식별 정보, 암호화 키/솔트
+    receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
 
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port   = htons(serverUdpPort);
-    inet_pton(AF_INET, serverIpStr.c_str(), &serverAddr.sin_addr);
-
-    // 세션 식별 정보
-    netBuf >> sessionId;
-
-    // 암호화 키/솔트 (raw 바이트)
-    netBuf.GetBuffer(sessionKey, SESSION_KEY_SIZE);
-    netBuf.GetBuffer(sessionSalt, SESSION_SALT_SIZE);
-
-    // BCrypt 키 핸들 생성
-    auto& crypto = CryptoHelper::GetTLSInstance();
-    ULONG keyObjSize = crypto.GetKeyObjectSize();
-    keyObjectBuffer = new unsigned char[keyObjSize];
-
-    sessionKeyHandle = crypto.GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
-    if (sessionKeyHandle == nullptr) {
-        LOG_ERROR("GetSymmetricKeyHandle failed");
-        return false;
+    if (keyObjectBuffer == nullptr) {
+        keyObjectBuffer = new unsigned char[
+            CryptoHelper::GetTLSInstance().GetKeyObjectSize()];
     }
 
-    LOG_DEBUG(std::format("Session info received. SessionId={}, Port={}",
-        sessionId, serverUdpPort));
-    return true;
+    if (sessionKeyHandle != nullptr) {
+        CryptoHelper::DestroySymmetricKeyHandle(sessionKeyHandle);
+        sessionKeyHandle = nullptr;
+    }
+
+    sessionKeyHandle = CryptoHelper::GetTLSInstance()
+        .GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
+    return sessionKeyHandle != nullptr;
 }
 ```
 

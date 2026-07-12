@@ -33,10 +33,10 @@
            *buffer,
            span(context->clientAddrBuffer, sizeof(sockaddr_in)))
               │
-              └─ ProcessByPacketType(session, buffer, clientAddrBuffer)
+              └─ ProcessByPacketType(session, clientAddr, buffer)
 ```
 
-`RUDPPacketProcessor`는 `MultiSocketRUDPCore`가 `unique_ptr`로 소유.
+`RUDPPacketProcessor`는 `MultiSocketRUDPCore`가 `unique_ptr`로 소유한다. `OnRecvPacket()`은 검증과 분기만 수행하며, `NetBuffer` 해제는 호출자인 `MultiSocketRUDPCore::OnRecvPacket()`에서 수행한다.
 
 ---
 
@@ -46,43 +46,39 @@
 void RUDPPacketProcessor::OnRecvPacket(
     RUDPSession& session,
     NetBuffer& buffer,
-    std::span<char> clientAddrBuffer)
+    std::span<const unsigned char> clientAddrBuffer)
 {
-    // ① 클라이언트 주소 버퍼 최소 크기 확인
-    if (clientAddrBuffer.size() < sizeof(sockaddr_in)) {
-        LOG_ERROR("clientAddrBuffer too small");
-        NetBuffer::Free(&buffer);
+    // ① 헤더 최소 크기 확인
+    if (buffer.GetUseSize() < df_HEADER_SIZE) {
         return;
     }
 
     // ② 헤더 기반 페이로드 길이 일치 확인
-    //    GetPayloadLength: buffer[1..2]에서 PayloadLen 읽기 + df_HEADER_SIZE 더함
     if (buffer.GetUseSize() != GetPayloadLength(buffer)) {
-        LOG_ERROR(std::format(
-            "Packet size mismatch. expected={}, actual={}",
-            GetPayloadLength(buffer), buffer.GetUseSize()));
-        NetBuffer::Free(&buffer);
         return;
     }
 
-    // ③ PacketType 추출 (m_iRead += 1)
-    BYTE packetType = 0;
-    buffer >> packetType;
+    // ③ 클라이언트 주소 버퍼 최소 크기 확인
+    if (clientAddrBuffer.size() < sizeof(sockaddr_in)) {
+        return;
+    }
 
-    // ④ 클라이언트 주소 캐스팅
-    const auto& clientAddr =
-        *reinterpret_cast<const sockaddr_in*>(clientAddrBuffer.data());
+    // ④ 클라이언트 주소 복사
+    sockaddr_in clientAddr{};
+    std::ignore = memcpy_s(
+        &clientAddr, sizeof(clientAddr),
+        clientAddrBuffer.data(), sizeof(clientAddr));
 
-    ProcessByPacketType(session, buffer, clientAddr, packetType);
+    // ⑤ 타입별 처리 (ProcessByPacketType 내부에서 PacketType 추출)
+    ProcessByPacketType(session, clientAddr, buffer);
 
-    NetBuffer::Free(&buffer);
 }
 ```
 
 **`GetPayloadLength` 구현:**
 
 ```cpp
-WORD GetPayloadLength(const NetBuffer& buffer) const
+static WORD GetPayloadLength(const NetBuffer& buffer)
 {
     // buffer[0] = HeaderCode (1B)
     // buffer[1..2] = PayloadLen (2B, uint16_t LE)
@@ -325,42 +321,21 @@ std::thread monitor([&]() {
 
 ```cpp
 class RUDPPacketProcessor {
+    RUDPSessionManager& sessionManager;
     ISessionDelegate& sessionDelegate;
-    IRUDPSessionManager& sessionManager;
-    IPacketCryptoHelper* cryptoHelper;  // 테스트 시 Mock 교체 가능
 
     std::atomic<int32_t> tps{ 0 };
 public:
     RUDPPacketProcessor(
-        ISessionDelegate& sessionDelegate,
-        IRUDPSessionManager& sessionManager,
-        IPacketCryptoHelper* cryptoHelper = nullptr)
-        : sessionDelegate(sessionDelegate)
-        , sessionManager(sessionManager)
-        , cryptoHelper(cryptoHelper
-            ? cryptoHelper
-            : new PacketCryptoHelperAdapter())
+        RUDPSessionManager& inSessionManager,
+        ISessionDelegate& inSessionDelegate)
+        : sessionManager(inSessionManager)
+        , sessionDelegate(inSessionDelegate)
     {}
 };
 ```
 
-**`IPacketCryptoHelper` 주입 이유:**
-
-단위 테스트에서 실제 BCrypt 없이 패킷 처리 로직을 테스트할 수 있다.
-
-```cpp
-// 테스트 코드 예시
-struct AlwaysSuccessCrypto : IPacketCryptoHelper {
-    bool DecodePacket(...) override { return true; }  // 항상 성공
-    void EncodePacket(...) override {}
-    void SetHeader(OUT NetBuffer& buf, int) override {
-        // 최소 헤더 설정
-        buf.m_pSerializeBuffer[0] = NetBuffer::m_byHeaderCode;
-    }
-};
-
-RUDPPacketProcessor processor(sessionDelegate, sessionManager, new AlwaysSuccessCrypto{});
-```
+암호화는 `PacketCryptoHelper` 정적 경로를 통해 처리하며, 현재 생성자에서 crypto helper를 주입하지 않는다.
 
 ---
 

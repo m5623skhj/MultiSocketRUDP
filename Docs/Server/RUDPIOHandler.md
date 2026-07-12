@@ -126,13 +126,12 @@ bool DoRecv(RUDPSession& session) const override;
 | 시점 | 호출 코드 | 이유 |
 |------|-----------|------|
 | 세션 준비 | `InitReserveSession()` | 최초 수신 등록 |
-| 수신 완료 후 | `RecvIOCompleted()` 내 `DoRecv()` | 연속 수신 (1→완료→재등록) |
+| 수신 완료 후 | `RecvIOCompleted()` 내 `DoRecv()` | 사용 가능한 recv context 재등록 |
 
-**`MaxOutstandingReceive = 1` 이유:**
+**`MaxOutstandingReceive = RECV_OUTSTANDING_COUNT` (현재 8):**
 
-UDP 데이터그램은 하나의 `RIOReceiveEx`가 완전한 패킷 1개를 수신한다.  
-수신 완료 즉시 다음 `DoRecv`를 호출해 연속 수신을 유지하므로  
-한 번에 1개만 등록해도 충분하다.
+`DoRecv()`는 사용 가능한 recv context를 모두 `RIOReceiveEx`에 등록한다.
+수신 완료 뒤에는 해제된 context를 다시 등록해 동시 수신 대기 수를 유지한다.
 
 > 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ## 4. DoSend — 송신 시도 (SpinLock 방식)

@@ -146,7 +146,7 @@ struct RIO_EXTENSION_FUNCTION_TABLE {
     LPFN_RIORECEIVE          RIOReceive;
     LPFN_RIORECEIVEEX        RIOReceiveEx;       // 주소 버퍼 포함
     LPFN_RIOSEND             RIOSend;
-    LPFN_RIOSENDEX           RIOSendEx;          // 현재 미사용 (RIOSend 사용)
+    LPFN_RIOSENDEX           RIOSendEx;          // 현재 송신 경로에서 사용
     LPFN_RIOCLOSECOMPLETIONQUEUE RIOCloseCompletionQueue;
     LPFN_RIOCREATECOMPLETIONQUEUE RIOCreateCompletionQueue;
     LPFN_RIOCREATEREQUESTQUEUE    RIOCreateRequestQueue;

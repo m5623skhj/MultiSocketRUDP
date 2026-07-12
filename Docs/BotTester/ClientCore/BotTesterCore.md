@@ -55,6 +55,8 @@ void ClearSavedGraphVisuals()
 List<NodeVisual>? GetSavedGraphVisuals()  // 에디터 재오픈 시 복원
 
 async Task StartBotTest(ushort numOfBot)
+Task<RttTestSummary> StartRttTest(int sampleCount, int timeoutMs)
+Task<RttTestSummary> StartRttTest(int sampleCount, int timeoutMs, double lossRate, int lossSeed)
 void StopBotTest()                        // 전체 Client.Disconnect()
 int GetActiveBotCount()                   // IsConnected() == true 개수
 ```
@@ -80,6 +82,10 @@ int GetActiveBotCount()                   // IsConnected() == true 개수
 
 #### `Task StartBotTest(ushort numOfBot)`
 - 지정한 수만큼 SessionBroker에서 세션 정보를 받아 `Client` 인스턴스를 만들고 행동 그래프를 적용한다.
+
+#### `Task<RttTestSummary> StartRttTest(...)`
+- SessionBroker에서 단일 세션을 받아 RTT 모드로 전환한 뒤, 지정한 표본 수와 timeout으로 RTT 테스트를 실행한다.
+- 두 번째 overload는 양방향 패킷 손실률과 난수 seed를 함께 지정한다.
 
 #### `void StopBotTest()`
 - 현재 관리 중인 모든 클라이언트 봇을 정리하고 연결을 끊는다.

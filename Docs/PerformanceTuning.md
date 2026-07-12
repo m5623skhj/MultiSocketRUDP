@@ -32,10 +32,11 @@
 ## 재전송 관련
 
 - `RETRANSMISSION_MS`
-- `RETRANSMISSION_THREAD_SLEEP_MS`
+- `MIN_RETRANSMISSION_MS`
+- `MAX_RETRANSMISSION_MS`
 - `MAX_PACKET_RETRANSMISSION_COUNT`
 
-이 세 값은 함께 튜닝해야 한다.  
+서버 `CoreOption.txt`의 `RETRANSMISSION_MS`는 초기 RTO이고, 최소/최대 RTO는 동적 재전송 timeout 범위를 제한한다. C++ 클라이언트 `CoreOption.txt`에서는 `RETRANSMISSION_MS`가 재전송 worker의 sleep interval이다. 이 값들은 재전송 횟수와 함께 튜닝해야 한다.
 너무 공격적으로 줄이면 정상 지연도 끊김으로 판단할 수 있고, 너무 늘리면 실패 감지가 느려진다.
 
 ---

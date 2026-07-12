@@ -69,13 +69,13 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 빌드:
 
 ```powershell
-msbuild .\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x64
+msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x64
 ```
 
 실행:
 
 ```powershell
-.\x64\Debug\CoreTest.exe
+.\MultiSocketRUDP\x64\Debug\CoreTest.exe
 ```
 
 ---
@@ -116,19 +116,19 @@ MultiSocketRUDP/IntegrationClientHarness/IntegrationClientHarness.vcxproj
 빌드:
 
 ```powershell
-msbuild .\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuration=Debug /p:Platform=x64
+msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuration=Debug /p:Platform=x64
 ```
 
 실행:
 
 ```powershell
-.\x64\Debug\IntegrationTest.exe
+.\MultiSocketRUDP\x64\Debug\IntegrationTest.exe
 ```
 
 또는 빌드와 인증서 생성을 포함한 스크립트를 사용한다.
 
 ```powershell
-.\Tool\BuildIntegrationTestAndRun.bat
+.\MultiSocketRUDP\Tool\BuildIntegrationTestAndRun.bat
 ```
 
 ---
@@ -163,7 +163,7 @@ MultiSocketRUDP/IntegrationTest/TestCert.pfx
 이 파일은 저장소에 커밋하지 않는다. 필요할 때 아래 스크립트로 생성한다.
 
 ```powershell
-.\Tool\ForTLS\CreateDevTLSPfx.bat
+.\MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
 ```
 
 GitHub Actions에서는 `GoogleTest.yml`에서 테스트 전에 이 스크립트를 실행한다.
@@ -184,6 +184,13 @@ PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 .github/workflows/CI.yml          # 변경 경로 분류 및 최종 상태 집계
 .github/workflows/GoogleTest.yml  # C++ Native 테스트
 .github/workflows/BotTester.yml   # C# BotTester 빌드 및 프로토콜 테스트
+```
+
+별도 PR 자동화 workflow도 있다.
+
+```text
+.github/workflows/GeminiPRCommoentBot.yml # PR AI 리뷰 status
+.github/workflows/docs-bot.yml             # schedule/label/manual 문서 자동화
 ```
 
 `CI.yml`은 모든 PR에서 실행되고 변경 파일을 기준으로 필요한 workflow만 호출한다.
@@ -272,7 +279,7 @@ error C1083: Cannot open source file
 - 실패 재현 시에는 단일 테스트 필터로 먼저 확인한다.
 
 ```powershell
-.\x64\Debug\IntegrationTest.exe --gtest_filter=IntegrationFixture.RequestResponseRoundTripReturnsExpectedPayload
+.\MultiSocketRUDP\x64\Debug\IntegrationTest.exe --gtest_filter=IntegrationFixture.RequestResponseRoundTripReturnsExpectedPayload
 ```
 
 ---

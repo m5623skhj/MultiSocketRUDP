@@ -147,11 +147,11 @@ enum class PACKET_DIRECTION : uint8_t {
 // 패킷 구조를 이해하는 모든 오프셋은 여기에 집중
 static const unsigned int bodyOffsetWithHeader =
     df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
-// = 3 + 1 + 8 + 4 = 16 (일반 패킷, 암호화 시작 위치, 헤더 포함)
+// = 5 + 1 + 8 + 4 = 18 (일반 패킷, 암호화 시작 위치, 헤더 포함)
 
 static const unsigned int bodyOffsetWithHeaderForCorePacket =
     df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
-// = 3 + 1 + 8 = 12 (코어 패킷, 암호화 시작 위치)
+// = 5 + 1 + 8 = 14 (코어 패킷, 암호화 시작 위치)
 
 static const unsigned int bodyOffsetWithNotHeader =
     sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
@@ -242,7 +242,7 @@ Offset  Hex   설명
  14-17  XX XX XX XX  (암호화된 PacketId)
  18-33  XX...XX  (AuthTag 16B)
 
-총 크기: 3 + 1 + 8 + 4 + 16 = 32 bytes
+총 크기: 5 + 1 + 8 + 4 + 16 = 34 bytes
 ```
 
 ---

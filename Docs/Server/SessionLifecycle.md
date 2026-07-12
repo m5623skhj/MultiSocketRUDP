@@ -146,11 +146,11 @@ bool RUDPSession::TryConnect(
     // → 이미 CONNECTED이거나 RELEASING이면 실패
 
     // ④ 클라이언트 주소 저장
-    socketContext.SetClientAddr(clientAddr);
+    this->clientAddr = clientAddr;
 
     // ⑤ 흐름 제어 초기화
-    flowManager.Reset(LOGIN_PACKET_SEQUENCE);
-    // → sendController.Reset(0), receiveWindow.Reset(1, windowSize)
+    flowManager.Reset(LOGIN_PACKET_SEQUENCE + 1);
+    // → sendController.Reset(1), receiveWindow.Reset(1, windowSize)
 
     // ⑥ 콘텐츠 훅
     OnConnected();   // ← 콘텐츠 서버가 구현

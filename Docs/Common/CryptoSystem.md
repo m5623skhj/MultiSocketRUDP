@@ -258,7 +258,7 @@ constexpr size_t AUTH_TAG_SIZE    = 16;                     // bytes
 
 // 코어 패킷 body 시작 오프셋 (헤더 포함)
 constexpr size_t bodyOffsetWithHeaderForCorePacket
-    = HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE;      // 3+1+8 = 12
+    = HEADER_SIZE + PACKET_TYPE_SIZE + SEQUENCE_SIZE;      // 5+1+8 = 14
 
 // 일반 패킷 body 시작 오프셋 (헤더 포함)
 constexpr size_t bodyOffsetWithHeader
@@ -384,7 +384,7 @@ Step 1. 최소 크기 검사
   if buffer.GetUseSize() < minSize → return false
 
 Step 2. PacketSequence 추출 (암호화 범위 밖)
-  offset = HEADER_SIZE + PACKET_TYPE_SIZE  // = 4
+  offset = HEADER_SIZE + PACKET_TYPE_SIZE  // = 6
   memcpy(&packetSequence, buffer[offset], 8)
 
 Step 3. AuthTag 위치 계산

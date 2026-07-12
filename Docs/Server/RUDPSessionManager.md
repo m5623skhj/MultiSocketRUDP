@@ -404,7 +404,7 @@ unusedSessionIdList.push_back(sessionId);
 ---
 
 ## 관련 문서
-- [[MultiSocketRUDPCore]] — Initialize 호출, GetUsingSession API
+- [[MultiSocketRUDPCore]] — Initialize 호출과 세션 관리자 연계
 - [[SessionLifecycle]] — AcquireSession/ReleaseSession 호출 시점
 - [[RUDPSession]] — sessionId 불변식 사용
 - [[ThreadModel]] — HeartbeatThread와 Session Release 흐름

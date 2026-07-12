@@ -54,7 +54,7 @@ C++/C# 프로토콜 상호운용 테스트:
 dotnet run --project .\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug
 ```
 
-PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출된다. BotTester workflow는 메인 솔루션 전체를 빌드한 후 프로토콜 테스트를 실행한다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행된다.
+PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출된다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 프로토콜 테스트를 실행한다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행된다.
 
 1.2.2 노드 통계 창  
 <img width="883" height="584" alt="image" src="https://github.com/user-attachments/assets/115d479e-13cd-4009-810a-b74895efb1fb" />
