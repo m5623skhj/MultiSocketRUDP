@@ -238,7 +238,7 @@ namespace MultiSocketRUDPBotTester.Buffer
             WriteByte((byte)packetType);
             WriteULong(sequence);
         }
-        
+
         private void SetHeader(int extraSize = 0)
         {
             _buffer[0] = HeaderCode;
@@ -251,7 +251,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         {
             return new ReadOnlyMemory<byte>(_buffer, 0, _writePos);
         }
-        
+
         public byte[] GetPacketBuffer()
         {
             var result = new byte[_writePos];

@@ -7,7 +7,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 {
     public sealed class RttTestRunner
     {
-        
+
         private const int DetailedSampleCount = 5;
         private const int ReportInterval = 100000;
         private const double TailLatencyLogThresholdMs = 0.5;
@@ -50,9 +50,9 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                         inLossRate,
                         inLossSeed);
             }
-            
+
             var udpBefore = CaptureUdpStats();
-            
+
             double minRttMs = double.MaxValue;
             double maxRttMs = 0;
             double totalRttMs = 0;
@@ -117,7 +117,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 udpAfter.sent - udpBefore.sent,
                 udpAfter.discarded - udpBefore.discarded,
                 udpAfter.errors - udpBefore.errors);
-            
+
             rttSamples.Sort();
             var summary = new RttTestSummary
             {

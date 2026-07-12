@@ -255,7 +255,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             await client.SendAsync(datagram).ConfigureAwait(false);
         }
-        
+
         public async Task SendPacket(
             NetBuffer packetBuffer,
             PacketId packetId,
@@ -335,7 +335,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     {
                         continue;
                     }
-                    
+
                     try
                     {
                         await ProcessReceivedStreamAsync(result.Buffer).ConfigureAwait(false);

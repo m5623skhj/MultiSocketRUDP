@@ -8,7 +8,6 @@ using MultiSocketRUDPBotTester.Graph;
 using MultiSocketRUDPBotTester.Windows;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -38,18 +37,6 @@ namespace MultiSocketRUDPBotTester
         private Window? statsWindow;
 
         private WithGeminiClient.GeminiClient geminiClient = null!;
-
-        /// <summary>
-        /// 봇 액션 그래프 파일을 직렬화/역직렬화할 때 사용되는 JSON 직렬화 옵션입니다.
-        /// </summary>
-        /// <remarks>
-        /// 이 옵션은 JSON 출력을 가독성 있게 들여쓰기하고, 열거형 값을 문자열로 변환하여 처리하도록 설정합니다.
-        /// </remarks>
-        private static readonly JsonSerializerOptions GraphFileJsonOptions = new()
-        {
-            WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
-        };
 
         public BotActionGraphWindow()
         {
@@ -249,30 +236,19 @@ namespace MultiSocketRUDPBotTester
 
         private FrameworkElement CreateInputPort()
         {
-            var hit = new Grid
-            {
-                Width = 40,
-                Height = 40,
-                Background = Brushes.Transparent,
-                Tag = "input"
-            };
-            var circle = new Ellipse
-            {
-                Width = 24,
-                Height = 24,
-                Fill = Brushes.LightGreen,
-                Stroke = Brushes.White,
-                StrokeThickness = 3,
-                IsHitTestVisible = false
-            };
-
-            hit.Children.Add(circle);
-            Panel.SetZIndex(hit, 1000);
+            var hit = CreatePortVisual("input", Brushes.LightGreen);
             hit.MouseLeftButtonUp += InputPort_MouseUp;
             return hit;
         }
 
         private FrameworkElement CreateOutputPort(string type)
+        {
+            var hit = CreatePortVisual(type, NodeInteractionHandler.GetPortColor(type));
+            hit.MouseLeftButtonDown += (_, _) => interaction.StartConnection(hit, type);
+            return hit;
+        }
+
+        private static Grid CreatePortVisual(string type, Brush fill)
         {
             var hit = new Grid
             {
@@ -285,7 +261,7 @@ namespace MultiSocketRUDPBotTester
             {
                 Width = 24,
                 Height = 24,
-                Fill = NodeInteractionHandler.GetPortColor(type),
+                Fill = fill,
                 Stroke = Brushes.White,
                 StrokeThickness = 3,
                 IsHitTestVisible = false
@@ -293,7 +269,6 @@ namespace MultiSocketRUDPBotTester
 
             hit.Children.Add(circle);
             Panel.SetZIndex(hit, 1000);
-            hit.MouseLeftButtonDown += (_, _) => interaction.StartConnection(hit, type);
             return hit;
         }
 
@@ -334,25 +309,33 @@ namespace MultiSocketRUDPBotTester
                 Configuration = new NodeConfiguration()
             };
 
-            if (t == typeof(RandomChoiceNode))
-            {
-                n.Configuration.IntValue = 2;
-                CreateDynamicPorts(n, 2);
-            }
-            else if (category == NodeCategory.Action)
-            {
-                n.OutputPort = CreateOutputPort("default");
-            }
-            else
-            {
-                n.OutputPortTrue = CreateOutputPort(category == NodeCategory.Condition ? "true" : "continue");
-                n.OutputPortFalse = CreateOutputPort(category == NodeCategory.Condition ? "false" : "exit");
-            }
+            ConfigureNewNodePorts(n);
 
             WpfCanvas.SetLeft(b, GraphScroll.HorizontalOffset + 400);
             WpfCanvas.SetTop(b, GraphScroll.VerticalOffset + 300);
             AddNodeToCanvas(n);
             Log($"Node added: {t.Name}");
+        }
+
+        private void ConfigureNewNodePorts(NodeVisual node)
+        {
+            if (node.NodeType == typeof(RandomChoiceNode))
+            {
+                node.Configuration!.IntValue = 2;
+                CreateDynamicPorts(node, 2);
+                return;
+            }
+
+            if (node.Category == NodeCategory.Action)
+            {
+                node.OutputPort = CreateOutputPort("default");
+                return;
+            }
+
+            node.OutputPortTrue = CreateOutputPort(
+                node.Category == NodeCategory.Condition ? "true" : "continue");
+            node.OutputPortFalse = CreateOutputPort(
+                node.Category == NodeCategory.Condition ? "false" : "exit");
         }
 
         /// <summary>
@@ -382,10 +365,10 @@ namespace MultiSocketRUDPBotTester
             {
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "Bot Graph (*.botgraph.json)|*.botgraph.json|JSON Files (*.json)|*.json",
-                    DefaultExt = ".botgraph.json",
+                    Filter = GraphFileStorage.FileFilter,
+                    DefaultExt = GraphFileStorage.DefaultExtension,
                     AddExtension = true,
-                    FileName = "BotActionGraph.botgraph.json"
+                    FileName = GraphFileStorage.DefaultFileName
                 };
 
                 if (dialog.ShowDialog(this) != true)
@@ -393,9 +376,7 @@ namespace MultiSocketRUDPBotTester
                     return;
                 }
 
-                var graphFile = CreateGraphFileModel();
-                var json = JsonSerializer.Serialize(graphFile, GraphFileJsonOptions);
-                File.WriteAllText(dialog.FileName, json);
+                GraphFileStorage.Save(dialog.FileName, CreateGraphFileModel());
 
                 Log($"Graph saved: {dialog.FileName}");
                 SetStatusText("Graph Saved", Brushes.LightGreen);
@@ -439,7 +420,7 @@ namespace MultiSocketRUDPBotTester
             {
                 var dialog = new OpenFileDialog
                 {
-                    Filter = "Bot Graph (*.botgraph.json)|*.botgraph.json|JSON Files (*.json)|*.json",
+                    Filter = GraphFileStorage.FileFilter,
                     Multiselect = false
                 };
 
@@ -448,12 +429,7 @@ namespace MultiSocketRUDPBotTester
                     return;
                 }
 
-                var json = File.ReadAllText(dialog.FileName);
-                var graphFile = JsonSerializer.Deserialize<GraphFileModel>(json, GraphFileJsonOptions);
-                if (graphFile == null || graphFile.Nodes.Count == 0)
-                {
-                    throw new InvalidOperationException("Graph file is empty or invalid.");
-                }
+                var graphFile = GraphFileStorage.Load(dialog.FileName);
 
                 ClearCurrentGraph();
                 RestoreGraphFromFile(graphFile);
@@ -521,9 +497,9 @@ namespace MultiSocketRUDPBotTester
 
         private void DeleteNode(NodeVisual node)
         {
-            if (node.IsRoot) 
+            if (node.IsRoot)
             {
-                Log("Root node cannot be deleted."); return; 
+                Log("Root node cannot be deleted."); return;
             }
 
             DisconnectIncoming(node);
@@ -1214,11 +1190,11 @@ namespace MultiSocketRUDPBotTester
 
         private void ShowStatsWindow_Click(object sender, RoutedEventArgs e)
         {
-            if (statsWindow?.IsVisible == true) 
-            { 
-                statsWindow.Activate(); return; 
+            if (statsWindow?.IsVisible == true)
+            {
+                statsWindow.Activate(); return;
             }
-            
+
             statsWindow = StatsWindowBuilder.Build(this, statsTracker);
             statsWindow.Closed += (_, _) => statsWindow = null;
             statsWindow.Show();

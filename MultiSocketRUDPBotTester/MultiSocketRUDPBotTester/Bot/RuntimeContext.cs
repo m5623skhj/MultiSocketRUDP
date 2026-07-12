@@ -68,7 +68,7 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             var result = vars.AddOrUpdate(key, delta,
                 (_, existing) => (existing is int i) ? i + delta : delta);
-            
+
             return (int)result;
         }
 

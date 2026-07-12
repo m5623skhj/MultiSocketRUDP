@@ -33,7 +33,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             hostIp = targetIp;
             hostPort = targetPort;
         }
-        
+
         public void SetBotActionGraph(ActionGraph graph)
         {
             botActionGraph = graph;
@@ -93,7 +93,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             return StartRttTest(inSampleCount, inTimeoutMs, 0.0, 0);
         }
-            
+
         public async Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs, double inLossRate, int inLossSeed)
         {
             if (string.IsNullOrEmpty(hostIp) || hostPort == 0)

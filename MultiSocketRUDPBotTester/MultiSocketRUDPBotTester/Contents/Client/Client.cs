@@ -40,7 +40,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
             var waiters = _packetWaiters.GetOrAdd(packetId, _ => new ConcurrentDictionary<long, TaskCompletionSource<NetBuffer?>>());
             waiters[waiterId] = tcs;
-            
+
             try
             {
                 return await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs), cancellationToken).ConfigureAwait(false);

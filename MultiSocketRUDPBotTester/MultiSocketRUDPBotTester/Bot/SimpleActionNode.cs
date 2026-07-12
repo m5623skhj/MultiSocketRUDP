@@ -22,7 +22,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     return;
                 }
-                
+
                 _ = client.SendPacket(buffer, PacketId)
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),

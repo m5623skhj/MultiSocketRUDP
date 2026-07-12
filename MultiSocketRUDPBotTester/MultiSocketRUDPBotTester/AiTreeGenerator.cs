@@ -195,7 +195,7 @@ namespace MultiSocketRUDPBotTester
                 }
 
                 foreach (var port in node.DynamicOutputPorts)
-                { 
+                {
                     GraphCanvas.Children.Remove(port);
                 }
 
