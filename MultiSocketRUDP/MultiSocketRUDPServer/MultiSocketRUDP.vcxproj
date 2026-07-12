@@ -28,7 +28,8 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
     <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
-    <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp" />
+    <ClCompile Include="MultiSocketRUDPCore.Workers.cpp" />
+    <ClCompile Include="MultiSocketRUDPCoreFunctionDelegate.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RIOManager.cpp" />
     <ClCompile Include="RUDPCoreReadOptionFile.cpp" />
@@ -61,7 +62,7 @@
     <ClInclude Include="LogExtension.h" />
     <ClInclude Include="MemoryTracer.h" />
     <ClInclude Include="MultiSocketRUDPCore.h" />
-    <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h" />
+    <ClInclude Include="MultiSocketRUDPCoreFunctionDelegate.h" />
     <ClInclude Include="PacketHandlerUtil.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="PacketSequenceSetKey.h" />

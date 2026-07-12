@@ -84,10 +84,13 @@
     <ClCompile Include="MultiSocketRUDPCore.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
+    <ClCompile Include="MultiSocketRUDPCore.Workers.cpp">
+      <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
+    </ClCompile>
     <ClCompile Include="RUDPCoreReadOptionFile.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
-    <ClCompile Include="MultiSocketRUDPCoreFuntionDeletage.cpp">
+    <ClCompile Include="MultiSocketRUDPCoreFunctionDelegate.cpp">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClCompile>
     <ClCompile Include="SessionCryptoContext.cpp">
@@ -179,7 +182,7 @@
     <ClInclude Include="IOContext.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
-    <ClInclude Include="MultiSocketRUDPCoreFuntionDeletage.h">
+    <ClInclude Include="MultiSocketRUDPCoreFunctionDelegate.h">
       <Filter>소스 파일\MultiSocketRUDPCore\Core</Filter>
     </ClInclude>
     <ClInclude Include="SessionCryptoContext.h">
