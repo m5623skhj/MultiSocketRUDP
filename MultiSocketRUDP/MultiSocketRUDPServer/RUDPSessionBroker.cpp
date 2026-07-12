@@ -4,7 +4,7 @@
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
-#include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "ISessionDelegate.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"

@@ -7,7 +7,7 @@
 #include "LogExtension.h"
 #include "IOContext.h"
 #include "MultiSocketRUDPCore.h"
-#include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "SendPacketInfo.h"
 
 RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager

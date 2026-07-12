@@ -6,7 +6,7 @@
 #include "Logger.h"
 #include "MemoryTracer.h"
 #include "IOContext.h"
-#include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 

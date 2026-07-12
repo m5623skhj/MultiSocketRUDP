@@ -306,6 +306,24 @@ void MemoryTracer::WriteToOutput(const std::string& message, const bool forceCon
 	}
 }
 
+void MemoryTracer::WriteReport(const std::string& filename, const std::string& report)
+{
+	if (filename.empty())
+	{
+		WriteToOutput(report);
+		return;
+	}
+
+	if (std::ofstream file(filename, std::ios::app); file.is_open())
+	{
+		file << report;
+	}
+	else
+	{
+		std::cout << report;
+	}
+}
+
 void MemoryTracer::GenerateReportToFile(const std::string& filename)
 {
 	std::scoped_lock lock(tracerMutex);
@@ -342,22 +360,7 @@ void MemoryTracer::GenerateReportToFile(const std::string& filename)
 	report << "Active objects: " << leakCount << '\n';
 	report << "=========================\n" << '\n';
 
-	if (not filename.empty())
-	{
-		if (std::ofstream file(filename, std::ios::app); file.is_open())
-		{
-			file << report.str();
-			file.close();
-		}
-		else
-		{
-			std::cout << report.str();
-		}
-	}
-	else
-	{
-		WriteToOutput(report.str());
-	}
+	WriteReport(filename, report.str());
 }
 
 void MemoryTracer::GetObjectHistoryToFile(void* ptr, const std::string& filename)
@@ -399,22 +402,7 @@ void MemoryTracer::GetObjectHistoryToFile(void* ptr, const std::string& filename
 		history << "Object not found in tracker at " << GetCurrentTimestamp() << '\n';
 	}
 
-	if (not filename.empty())
-	{
-		if (std::ofstream file(filename, std::ios::app); file.is_open())
-		{
-			file << history.str();
-			file.close();
-		}
-		else
-		{
-			std::cout << history.str();
-		}
-	}
-	else
-	{
-		WriteToOutput(history.str());
-	}
+	WriteReport(filename, history.str());
 }
 
 void MemoryTracer::GetThreadStatisticsToFile(const std::string& filename)
@@ -439,20 +427,5 @@ void MemoryTracer::GetThreadStatisticsToFile(const std::string& filename)
 	}
 	stats << "========================\n" << '\n';
 
-	if (not filename.empty())
-	{
-		if (std::ofstream file(filename, std::ios::app); file.is_open())
-		{
-			file << stats.str();
-			file.close();
-		}
-		else
-		{
-			std::cout << stats.str();
-		}
-	}
-	else
-	{
-		WriteToOutput(stats.str());
-	}
+	WriteReport(filename, stats.str());
 }

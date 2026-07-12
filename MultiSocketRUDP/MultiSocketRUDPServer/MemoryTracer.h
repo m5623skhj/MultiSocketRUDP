@@ -60,5 +60,6 @@ public:
 private:
     static std::string outputFilename;
     static void WriteToOutput(const std::string& message, bool forceConsole = false);
+    static void WriteReport(const std::string& filename, const std::string& report);
     static std::string GetCurrentTimestamp();
 };

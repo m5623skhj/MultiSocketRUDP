@@ -1,5 +1,5 @@
 #include "PreCompile.h"
-#include "MultiSocketRUDPCoreFuntionDeletage.h"
+#include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "MultiSocketRUDPCore.h"
 
 void MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(const IOContext* contextResult, const BYTE threadId)
