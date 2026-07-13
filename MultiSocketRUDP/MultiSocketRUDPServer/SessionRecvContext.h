@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <MSWSock.h>
 #include "../Common/etc/CoreType.h"
 #include "RecvBuffer.h"

@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include "RUDPClientCore.h"
 #include "Logger.h"
 #include "LogExtension.h"

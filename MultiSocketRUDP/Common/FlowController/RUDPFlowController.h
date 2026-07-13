@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../etc/CoreType.h"
 
 class RUDPFlowController
