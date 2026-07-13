@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
@@ -11,6 +11,20 @@
 
 namespace
 {
+	/**
+	* @brief 재전송 타이머를 설정합니다. 지정된 기한까지 타이머를 무장시키거나,
+	*        기한이 현재 시간보다 이르다면 즉시 신호를 발생시키도록 설정합니다.
+	* @param timerHandle 설정할 타이머 객체의 핸들입니다.
+	* @param deadline 타이머가 만료될 절대 시간입니다.
+	* @return 타이머 설정 성공 여부를 반환합니다.
+	* @retval true 타이머가 성공적으로 설정되었습니다.
+	* @retval false SetWaitableTimer 호출이 실패했습니다. (오류 로깅)
+	*
+	* @note 타이머 만료 시간(dueTime)은 100나노초 단위로 계산됩니다.
+	*       deadline이 현재 시간보다 이전이거나 같으면 타이머는 즉시 만료되도록 설정됩니다.
+	*       타이머 설정 실패 시 `GetLastError()`를 통해 오류 코드가 로깅됩니다.
+	*       타이머 설정 실패는 WaitableTimer가 작동하지 않거나 예상치 못한 동작을 야기할 수 있습니다.
+	*/
 	[[nodiscard]]
 	bool ArmRetransmissionTimer(const HANDLE timerHandle, const std::chrono::steady_clock::time_point deadline)
 	{
