@@ -131,87 +131,94 @@ size_t MemoryTracer::GetActiveObjectCount()
 	return count;
 }
 
-void MemoryTracer::GenerateReport()
+void MemoryTracer::WriteLeakReport(std::ostream& output, const bool includeTimestamp)
 {
-	std::scoped_lock lock(tracerMutex);
-
-	std::cout << "\n=== Memory Leak Report ===" << '\n';
-	std::cout << "Total tracked objects: " << allocations.size() << '\n';
+	output << "\n=== Memory Leak Report ===" << '\n';
+	if (includeTimestamp)
+	{
+		output << "Generated at: " << GetCurrentTimestamp() << '\n';
+	}
+	output << "Total tracked objects: " << allocations.size() << '\n';
 
 	int leakCount = 0;
-	for (const auto& pair : allocations)
+	for (const auto& [address, allocationInfo] : allocations)
 	{
-		if (const auto& info = pair.second; not info.isFreed)
+		if (const auto& info = allocationInfo; not info.isFreed)
 		{
 			leakCount++;
-			std::cout << "\n[LEAK #" << leakCount << "]" << '\n';
-			std::cout << "Address: " << pair.first << '\n';
-			std::cout << "Object: " << info.objectName << '\n';
-			std::cout << "Tracked at: " << info.allocLocation << '\n';
-			std::cout << "Thread: " << info.allocThread << '\n';
+			output << "\n[LEAK #" << leakCount << "]" << '\n';
+			output << "Address: " << address << '\n';
+			output << "Object: " << info.objectName << '\n';
+			output << "Tracked at: " << info.allocLocation << '\n';
+			output << "Thread: " << info.allocThread << '\n';
 
 			if (not info.userNote.empty())
 			{
-				std::cout << "Note: " << info.userNote << '\n';
+				output << "Note: " << info.userNote << '\n';
 			}
 
 			auto now = std::chrono::steady_clock::now();
 			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - info.allocTime).count();
-			std::cout << "Alive for: " << duration << " ms" << '\n';
-
-			std::cout << "Stack trace:\n" << info.stackTrace << '\n';
+			output << "Alive for: " << duration << " ms" << '\n';
+			output << "Stack trace:\n" << info.stackTrace << '\n';
 		}
 	}
 
-	std::cout << "Active objects: " << leakCount << '\n';
-	std::cout << "=========================\n" << '\n';
+	output << "Active objects: " << leakCount << '\n';
+	output << "=========================\n" << '\n';
 }
 
-void MemoryTracer::GetObjectHistory(void* ptr)
+void MemoryTracer::WriteObjectHistory(std::ostream& output, void* ptr, const bool includeTimestamp)
 {
-	std::scoped_lock lock(tracerMutex);
-
 	if (const auto it = allocations.find(ptr); it != allocations.end())
 	{
 		const auto& [objectName, allocLocation, stackTrace, allocTime, allocThread, isFreed, freeLocation, freeTime, freeThread, userNote] = it->second;
-		std::cout << "\n=== Object History ===" << '\n';
-		std::cout << "Address: " << ptr << '\n';
-		std::cout << "Object: " << objectName << '\n';
-		std::cout << "Tracked at: " << allocLocation << '\n';
-		std::cout << "Thread: " << allocThread << '\n';
+		output << "\n=== Object History ===" << '\n';
+		if (includeTimestamp)
+		{
+			output << "Timestamp: " << GetCurrentTimestamp() << '\n';
+		}
+		output << "Address: " << ptr << '\n';
+		output << "Object: " << objectName << '\n';
+		output << "Tracked at: " << allocLocation << '\n';
+		output << "Thread: " << allocThread << '\n';
 
 		if (not userNote.empty())
 		{
-			std::cout << "Note: " << userNote << '\n';
+			output << "Note: " << userNote << '\n';
 		}
 
-		std::cout << "Stack trace:\n" << stackTrace << '\n';
+		output << "Stack trace:\n" << stackTrace << '\n';
 
 		if (isFreed)
 		{
-			std::cout << "Untracked at: " << freeLocation << '\n';
-			std::cout << "Untrack thread: " << freeThread << '\n';
+			output << "Untracked at: " << freeLocation << '\n';
+			output << "Untrack thread: " << freeThread << '\n';
 
 			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(freeTime - allocTime).count();
-			std::cout << "Lifetime: " << duration << " ms" << '\n';
+			output << "Lifetime: " << duration << " ms" << '\n';
 		}
 		else
 		{
-			std::cout << "Status: ACTIVE (not untracked)" << '\n';
+			output << "Status: ACTIVE (not untracked)" << '\n';
 		}
-		std::cout << "=====================\n" << '\n';
+		output << "=====================\n" << '\n';
 	}
 	else
 	{
-		std::cout << "Object not found in tracker" << '\n';
+		output << "Object not found in tracker";
+		if (includeTimestamp)
+		{
+			output << " at " << GetCurrentTimestamp();
+		}
+		output << '\n';
 	}
 }
 
-void MemoryTracer::GetThreadStatistics()
+void MemoryTracer::WriteThreadStatistics(std::ostream& output, const bool includeTimestamp)
 {
 	std::unordered_map<std::thread::id, int> threadStats;
 
-	std::scoped_lock lock(tracerMutex);
 	for (const auto& allocation : allocations | std::views::values)
 	{
 		if (not allocation.isFreed)
@@ -220,12 +227,34 @@ void MemoryTracer::GetThreadStatistics()
 		}
 	}
 
-	std::cout << "\n=== Thread Statistics ===" << '\n';
-	for (const auto& stat : threadStats)
+	output << "\n=== Thread Statistics ===" << '\n';
+	if (includeTimestamp)
 	{
-		std::cout << "Thread " << stat.first << ": " << stat.second << " active objects" << '\n';
+		output << "Generated at: " << GetCurrentTimestamp() << '\n';
 	}
-	std::cout << "========================\n" << '\n';
+	for (const auto& [threadId, status] : threadStats)
+	{
+		output << "Thread " << threadId << ": " << status << " active objects" << '\n';
+	}
+	output << "========================\n" << '\n';
+}
+
+void MemoryTracer::GenerateReport()
+{
+	std::scoped_lock lock(tracerMutex);
+	WriteLeakReport(std::cout, false);
+}
+
+void MemoryTracer::GetObjectHistory(void* ptr)
+{
+	std::scoped_lock lock(tracerMutex);
+	WriteObjectHistory(std::cout, ptr, false);
+}
+
+void MemoryTracer::GetThreadStatistics()
+{
+	std::scoped_lock lock(tracerMutex);
+	WriteThreadStatistics(std::cout, false);
 }
 
 void MemoryTracer::Clear()
@@ -327,105 +356,23 @@ void MemoryTracer::WriteReport(const std::string& filename, const std::string& r
 void MemoryTracer::GenerateReportToFile(const std::string& filename)
 {
 	std::scoped_lock lock(tracerMutex);
-
 	std::stringstream report;
-	report << "\n=== Memory Leak Report ===" << '\n';
-	report << "Generated at: " << GetCurrentTimestamp() << '\n';
-	report << "Total tracked objects: " << allocations.size() << '\n';
-
-	int leakCount = 0;
-	for (const auto& [address, allocationInfo] : allocations)
-	{
-		if (const auto& info = allocationInfo; not info.isFreed)
-		{
-			leakCount++;
-			report << "\n[LEAK #" << leakCount << "]" << '\n';
-			report << "Address: " << address << '\n';
-			report << "Object: " << info.objectName << '\n';
-			report << "Tracked at: " << info.allocLocation << '\n';
-			report << "Thread: " << info.allocThread << '\n';
-
-			if (not info.userNote.empty())
-			{
-				report << "Note: " << info.userNote << '\n';
-			}
-
-			auto now = std::chrono::steady_clock::now();
-			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - info.allocTime).count();
-			report << "Alive for: " << duration << " ms" << '\n';
-			report << "Stack trace:\n" << info.stackTrace << '\n';
-		}
-	}
-
-	report << "Active objects: " << leakCount << '\n';
-	report << "=========================\n" << '\n';
-
+	WriteLeakReport(report, true);
 	WriteReport(filename, report.str());
 }
 
 void MemoryTracer::GetObjectHistoryToFile(void* ptr, const std::string& filename)
 {
-	std::stringstream history;
 	std::scoped_lock lock(tracerMutex);
-	if (const auto it = allocations.find(ptr); it != allocations.end())
-	{
-		const auto& [objectName, allocLocation, stackTrace, allocTime, allocThread, isFreed, freeLocation, freeTime, freeThread, userNote] = it->second;
-		history << "\n=== Object History ===" << '\n';
-		history << "Timestamp: " << GetCurrentTimestamp() << '\n';
-		history << "Address: " << ptr << '\n';
-		history << "Object: " << objectName << '\n';
-		history << "Tracked at: " << allocLocation << '\n';
-		history << "Thread: " << allocThread << '\n';
-
-		if (not userNote.empty())
-		{
-			history << "Note: " << userNote << '\n';
-		}
-		history << "Stack trace:\n" << stackTrace << '\n';
-
-		if (isFreed)
-		{
-			history << "Untracked at: " << freeLocation << '\n';
-			history << "Untrack thread: " << freeThread << '\n';
-
-			const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(freeTime - allocTime).count();
-			history << "Lifetime: " << duration << " ms" << '\n';
-		}
-		else
-		{
-			history << "Status: ACTIVE (not untracked)" << '\n';
-		}
-		history << "=====================\n" << '\n';
-	}
-	else
-	{
-		history << "Object not found in tracker at " << GetCurrentTimestamp() << '\n';
-	}
-
+	std::stringstream history;
+	WriteObjectHistory(history, ptr, true);
 	WriteReport(filename, history.str());
 }
 
 void MemoryTracer::GetThreadStatisticsToFile(const std::string& filename)
 {
-	std::unordered_map<std::thread::id, int> threadStats;
 	std::scoped_lock lock(tracerMutex);
-
-	for (const auto& allocation : allocations | std::views::values)
-	{
-		if (not allocation.isFreed)
-		{
-			threadStats[allocation.allocThread]++;
-		}
-	}
-
-	std::stringstream stats;
-	stats << "\n=== Thread Statistics ===" << '\n';
-	stats << "Generated at: " << GetCurrentTimestamp() << '\n';
-	for (const auto& [threadId, status] : threadStats)
-	{
-		stats << "Thread " << threadId << ": " << status << " active objects" << '\n';
-	}
-	stats << "========================\n" << '\n';
-
-	WriteReport(filename, stats.str());
+	std::stringstream statistics;
+	WriteThreadStatistics(statistics, true);
+	WriteReport(filename, statistics.str());
 }

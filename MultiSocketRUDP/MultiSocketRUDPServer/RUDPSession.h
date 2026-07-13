@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <functional>
 #include "../Common/etc/CoreType.h"
 #include <shared_mutex>

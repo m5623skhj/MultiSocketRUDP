@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../Common/etc/CoreType.h"
 
 class RUDPSession;

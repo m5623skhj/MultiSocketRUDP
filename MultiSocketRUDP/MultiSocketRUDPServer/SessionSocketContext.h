@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <shared_mutex>
 #include <winsock2.h>
 #include "../Common/etc/CoreType.h"

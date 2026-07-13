@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <bcrypt.h>
 #include "../Common/etc/CoreType.h"
 

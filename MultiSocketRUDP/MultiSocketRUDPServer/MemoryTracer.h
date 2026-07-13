@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <ostream>
 
 class MemoryTracer
 {
@@ -59,6 +60,9 @@ public:
 
 private:
     static std::string outputFilename;
+    static void WriteLeakReport(std::ostream& output, bool includeTimestamp);
+    static void WriteObjectHistory(std::ostream& output, void* ptr, bool includeTimestamp);
+    static void WriteThreadStatistics(std::ostream& output, bool includeTimestamp);
     static void WriteToOutput(const std::string& message, bool forceConsole = false);
     static void WriteReport(const std::string& filename, const std::string& report);
     static std::string GetCurrentTimestamp();

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "ISessionDelegate.h"
 #include <shared_mutex>
 #include "NetServerSerializeBuffer.h"

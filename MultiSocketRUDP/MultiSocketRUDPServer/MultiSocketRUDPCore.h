@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "IMultiSocketRUDPCore.h"
 #include "RetransmissionScheduler.h"
 #include <list>
@@ -123,7 +123,7 @@ private:
 	RUDPSession* AcquireSession() const;
 	[[nodiscard]]
 	inline RUDPSession* GetUsingSession(SessionIdType sessionId) const;
-	inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
+	RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 
 private:
 	std::vector<std::unique_ptr<RetransmissionScheduler>> retransmissionSchedulers;
