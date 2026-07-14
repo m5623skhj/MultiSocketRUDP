@@ -324,10 +324,17 @@ unsigned int GetMaxRetransmissionMs() const;
 - RESERVED 또는 CONNECTED 상태 세션을 조회한다.
 - 반환 직후 상태가 바뀔 수 있으므로 즉시 검증 후 사용해야 한다.
 
-#### `RUDPSession* GetReleasingSession(SessionIdType sessionId) const`
-- RELEASING 상태 세션을 조회한다.
-- Session Release Thread 내부 로직에서 사용된다.
+#### `GetReleasingSession`
 
+```cpp
+[[nodiscard]]
+inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
+```
+
+RELEASING 상태 세션을 조회한다.
+Session Release Thread 내부 로직에서 사용된다.
+
+반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 #### `CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session) const`
 - 세션 소켓 생성, 세션 RIO 초기화, 첫 `DoRecv()` 등록, RESERVED 상태 전이를 수행한다.
 - SessionBroker가 새 세션을 발급할 때 호출된다.
