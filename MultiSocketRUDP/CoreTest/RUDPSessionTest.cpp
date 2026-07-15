@@ -5,6 +5,7 @@
 #include "../MultiSocketRUDPServer/RUDPSession.h"
 #include "../MultiSocketRUDPServer/MultiSocketRUDPCore.h"
 #include "../MultiSocketRUDPServer/SendPacketInfo.h"
+#include "RUDPSessionTestAccess.h"
 
 namespace
 {
@@ -20,35 +21,6 @@ namespace
 		PacketId GetPacketId() const override { return 1; }
 	};
 }
-
-class RUDPSessionBehaviorAccess
-{
-public:
-	static bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket)
-	{
-		return session.OnRecvPacket(recvPacket);
-	}
-
-	static void OnSendReply(RUDPSession& session, NetBuffer& recvPacket)
-	{
-		session.OnSendReply(recvPacket);
-	}
-
-	static SessionSendContext& GetSendContext(RUDPSession& session)
-	{
-		return session.GetSendContext();
-	}
-
-	static void InitializeSession(RUDPSession& session)
-	{
-		session.InitializeSession();
-	}
-
-	static void SetMaximumPacketHoldingQueueSize(const BYTE size)
-	{
-		RUDPSession::SetMaximumPacketHoldingQueueSize(size);
-	}
-};
 
 class SessionSocketContextTest : public ::testing::Test
 {

@@ -172,18 +172,24 @@ TEST_F(SessionPacketOrdererTest, DuplicateFutureSeq_HeldOnlyOnce)
 // ------------------------------------------------------------
 // 6. ť �뷮 �ʰ�
 // ------------------------------------------------------------
-TEST_F(SessionPacketOrdererTest, QueueFull_ReturnsErrorOccured)
+// ------------------------------------------------------------
+// 보류 큐가 최대 용량인 상태에서 누락 패킷이 도착하면 전체 패킷을 순서대로 처리하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(SessionPacketOrdererTest, QueueAtCapacityProcessesAllPacketsWhenGapCloses)
 {
-	std::vector<AutoBuf> bufs(MAX_QUEUE);
+	std::vector<PacketSequence> processed;
+	auto callback = makeRecorder(processed);
+	AutoBuf buffer;
 	for (BYTE i = 0; i < MAX_QUEUE; ++i)
 	{
-		EXPECT_EQ(orderer.OnReceive(START + 1 + i, bufs[i].get(), successCb),
+		EXPECT_EQ(orderer.OnReceive(START + 1 + i, buffer.get(), callback),
 			ON_RECV_RESULT::PACKET_HELD);
 	}
 
-	AutoBuf extra;
-	EXPECT_EQ(orderer.OnReceive(START + 1 + MAX_QUEUE, extra.get(), successCb),
-		ON_RECV_RESULT::ERROR_OCCURED);
+	AutoBuf first;
+	EXPECT_EQ(orderer.OnReceive(START, first.get(), callback), ON_RECV_RESULT::PROCESSED);
+	EXPECT_EQ(processed.size(), static_cast<size_t>(MAX_QUEUE) + 1);
+	EXPECT_EQ(orderer.GetNextExpected(), START + MAX_QUEUE + 1);
 }
 
 // ------------------------------------------------------------

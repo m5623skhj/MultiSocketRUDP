@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 #include <array>
 #include <filesystem>
@@ -17,9 +17,15 @@ namespace
 {
 	struct ProtocolInteropVector
 	{
+		std::string name;
 		PacketSequence sequence{};
 		std::array<unsigned char, SESSION_KEY_SIZE> key{};
 		std::array<unsigned char, SESSION_SALT_SIZE> salt{};
+		unsigned char headerCode{};
+		PACKET_DIRECTION direction{ PACKET_DIRECTION::INVALID };
+		bool isCorePacket{};
+		PACKET_TYPE packetType{ PACKET_TYPE::INVALID_TYPE };
+		std::optional<PacketId> packetId;
 		std::vector<unsigned char> plaintext;
 		std::vector<unsigned char> encodedPacket;
 	};
@@ -53,7 +59,7 @@ namespace
 		return result;
 	}
 
-	ProtocolInteropVector LoadProtocolInteropVector()
+	std::vector<ProtocolInteropVector> LoadProtocolInteropVectors()
 	{
 		std::array<wchar_t, MAX_PATH> executablePath{};
 		const DWORD pathLength = GetModuleFileNameW(nullptr, executablePath.data(), static_cast<DWORD>(executablePath.size()));
@@ -72,13 +78,28 @@ namespace
 		nlohmann::json json;
 		vectorFile >> json;
 
-		ProtocolInteropVector result;
-		result.sequence = json.at("sequence").get<PacketSequence>();
-		result.key = HexToArray<SESSION_KEY_SIZE>(json.at("keyHex").get<std::string>());
-		result.salt = HexToArray<SESSION_SALT_SIZE>(json.at("saltHex").get<std::string>());
-		result.plaintext = HexToBytes(json.at("plaintextHex").get<std::string>());
-		result.encodedPacket = HexToBytes(json.at("encodedPacketHex").get<std::string>());
-		return result;
+		std::vector<ProtocolInteropVector> results;
+		results.reserve(json.size());
+		for (const auto& item : json)
+		{
+			ProtocolInteropVector result;
+			result.name = item.at("name").get<std::string>();
+			result.sequence = item.at("sequence").get<PacketSequence>();
+			result.key = HexToArray<SESSION_KEY_SIZE>(item.at("keyHex").get<std::string>());
+			result.salt = HexToArray<SESSION_SALT_SIZE>(item.at("saltHex").get<std::string>());
+			result.headerCode = item.at("headerCode").get<unsigned char>();
+			result.direction = static_cast<PACKET_DIRECTION>(item.at("direction").get<uint8_t>());
+			result.isCorePacket = item.at("isCorePacket").get<bool>();
+			result.packetType = static_cast<PACKET_TYPE>(item.at("packetType").get<uint8_t>());
+			if (item.contains("packetId") && not item.at("packetId").is_null())
+			{
+				result.packetId = item.at("packetId").get<PacketId>();
+			}
+			result.plaintext = HexToBytes(item.at("plaintextHex").get<std::string>());
+			result.encodedPacket = HexToBytes(item.at("encodedPacketHex").get<std::string>());
+			results.push_back(std::move(result));
+		}
+		return results;
 	}
 
 	class SymmetricKey
@@ -246,29 +267,66 @@ TEST(CryptoHelperTest, FillNonceRejectsInvalidArguments)
 	EXPECT_FALSE(CryptoHelper::FillNonce(salt.data(), salt.size(), 0, PACKET_DIRECTION::CLIENT_TO_SERVER, nonce.data(), nonce.size() - 1));
 }
 
-TEST_F(PacketCryptoTest, AesGcmMatchesCppCSharpGoldenVector)
+// ------------------------------------------------------------
+// C++과 C#이 공유하는 8개 골든 벡터의 암호화 와이어 형식과 복호화 결과가 일치하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(PacketCryptoTest, AesGcmMatchesCppCSharpGoldenVectors)
 {
-	const auto testVector = LoadProtocolInteropVector();
-	SymmetricKey vectorKey(testVector.key);
-	std::array<unsigned char, NONCE_SIZE> nonce{};
-	ASSERT_TRUE(CryptoHelper::FillNonce(testVector.salt.data(), testVector.salt.size(), testVector.sequence,
-		PACKET_DIRECTION::SERVER_TO_CLIENT, nonce.data(), nonce.size()));
+	const auto testVectors = LoadProtocolInteropVectors();
+	ASSERT_EQ(testVectors.size(), 8u);
 
-	constexpr size_t aadSize = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence);
-	constexpr size_t bodyOffset = aadSize + sizeof(PacketId);
-	ASSERT_GE(testVector.encodedPacket.size(), bodyOffset + testVector.plaintext.size() + AUTH_TAG_SIZE);
-
-	std::vector<char> plaintext(testVector.plaintext.begin(), testVector.plaintext.end());
-	std::vector<char> ciphertext(plaintext.size());
-	std::array<unsigned char, AUTH_TAG_SIZE> tag{};
-
-	ASSERT_TRUE(CryptoHelper::EncryptAESGCM(nonce.data(), nonce.size(), testVector.encodedPacket.data(), aadSize,
-		plaintext.data(), plaintext.size(), ciphertext.data(), ciphertext.size(), tag.data(), vectorKey.Get()));
-
-	EXPECT_TRUE(std::equal(ciphertext.begin(), ciphertext.end(), testVector.encodedPacket.begin() + bodyOffset,
-		[](const char actual, const unsigned char expected)
+	for (const auto& testVector : testVectors)
+	{
+		SCOPED_TRACE(testVector.name);
+		ASSERT_EQ(testVector.isCorePacket, not testVector.packetId.has_value());
+		ASSERT_FALSE(testVector.encodedPacket.empty());
+		ASSERT_EQ(testVector.headerCode, testVector.encodedPacket.front());
+		SymmetricKey vectorKey(testVector.key);
+		NetBuffer packet;
+		packet.Init();
+		// NetBuffer reserves five header bytes but does not clear the two legacy
+		// random/checksum slots. Initialize the complete AAD explicitly so both
+		// implementations encrypt the same deterministic wire representation.
+		std::fill_n(packet.GetReadBufferPtr() - df_HEADER_SIZE, df_HEADER_SIZE, 0);
+		packet << testVector.packetType << testVector.sequence;
+		if (not testVector.isCorePacket)
 		{
-			return static_cast<unsigned char>(actual) == expected;
-		}));
-	EXPECT_TRUE(std::equal(tag.begin(), tag.end(), testVector.encodedPacket.end() - AUTH_TAG_SIZE));
+			ASSERT_TRUE(testVector.packetId.has_value());
+			packet << *testVector.packetId;
+		}
+		if (not testVector.plaintext.empty())
+		{
+			packet.WriteBuffer(testVector.plaintext.data(), static_cast<int>(testVector.plaintext.size()));
+		}
+
+		PacketCryptoHelper::EncodePacket(packet, testVector.sequence, testVector.direction,
+			testVector.salt.data(), testVector.salt.size(), vectorKey.Get(), testVector.isCorePacket);
+
+		ASSERT_EQ(packet.GetUseSize(), testVector.encodedPacket.size());
+		EXPECT_TRUE(std::equal(testVector.encodedPacket.begin(), testVector.encodedPacket.end(), packet.GetReadBufferPtr(),
+			[](const unsigned char expected, const char actual)
+			{
+				return expected == static_cast<unsigned char>(actual);
+			}));
+
+		AdvanceToPacketBody(packet);
+		ASSERT_TRUE(PacketCryptoHelper::DecodePacket(packet, testVector.salt.data(), testVector.salt.size(),
+			vectorKey.Get(), testVector.isCorePacket, testVector.direction));
+
+		PacketSequence decodedSequence{};
+		packet >> decodedSequence;
+		EXPECT_EQ(decodedSequence, testVector.sequence);
+		if (not testVector.isCorePacket)
+		{
+			PacketId decodedPacketId{};
+			packet >> decodedPacketId;
+			EXPECT_EQ(decodedPacketId, *testVector.packetId);
+		}
+		std::vector<unsigned char> decodedPlaintext(testVector.plaintext.size());
+		if (not decodedPlaintext.empty())
+		{
+			packet.ReadBuffer(reinterpret_cast<char*>(decodedPlaintext.data()), static_cast<int>(decodedPlaintext.size()));
+		}
+		EXPECT_EQ(decodedPlaintext, testVector.plaintext);
+	}
 }

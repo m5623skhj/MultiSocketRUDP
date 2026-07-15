@@ -4,6 +4,8 @@
 #include "MultiSocketRUDPCore.h"
 #include "RUDPSessionFunctionDelegate.h"
 #include "RUDPSessionManager.h"
+#include "MockSessionDelegate.h"
+#include "RUDPSessionTestAccess.h"
 
 namespace
 {
@@ -132,4 +134,144 @@ TEST_F(RUDPSessionManagerTest, DecrementConnectedCountIgnoresAbortReserved)
 	EXPECT_EQ(manager.GetAllConnectedCount(), 1u);
 	EXPECT_EQ(manager.GetAllDisconnectedCount(), 0u);
 	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 0u);
+}
+
+// ------------------------------------------------------------
+// 세션 factory가 없으면 초기화가 실패하고 세션 관리자가 미초기화 상태를 유지하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, InitializeRejectsNullFactoryAndRemainsUninitialized)
+{
+	RUDPSessionManager manager{ 2, core, delegate };
+	SessionFactoryFunc factory;
+
+	EXPECT_FALSE(manager.Initialize(1, std::move(factory)));
+	EXPECT_FALSE(manager.IsInitialized());
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+	EXPECT_EQ(manager.AcquireSession(), nullptr);
+}
+
+// ------------------------------------------------------------
+// 이미 초기화된 관리자를 다시 초기화해도 세션 풀이 중복 생성되지 않는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, RepeatedInitializeDoesNotRecreatePool)
+{
+	RUDPSessionManager manager{ 3, core, delegate };
+	int factoryCallCount = 0;
+	ASSERT_TRUE(manager.Initialize(1, [&](MultiSocketRUDPCore&)
+	{
+		++factoryCallCount;
+		return new ManagerTestSession(core);
+	}));
+
+	EXPECT_TRUE(manager.Initialize(1, [&](MultiSocketRUDPCore&)
+	{
+		++factoryCallCount;
+		return new ManagerTestSession(core);
+	}));
+	EXPECT_EQ(factoryCallCount, 3);
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 3);
+}
+
+// ------------------------------------------------------------
+// 해제 중인 세션이 풀로 반환된 뒤 generation과 상태를 초기화하여 재사용되는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, ReleasingSessionReturnsToPoolAndIsReinitializedForReuse)
+{
+	RUDPSessionManager manager{ 1, core, delegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	RUDPSession* session = manager.AcquireSession();
+	ASSERT_NE(session, nullptr);
+	const auto sessionId = session->GetSessionId();
+	const auto generation = session->GetSessionGeneration();
+	RUDPSessionBehaviorAccess::SetReleasing(*session);
+
+	ASSERT_TRUE(manager.ReleaseSession(sessionId));
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 1);
+	EXPECT_EQ(session->GetSessionState(), SESSION_STATE::DISCONNECTED);
+	EXPECT_GT(session->GetSessionGeneration(), generation);
+
+	RUDPSession* reused = manager.AcquireSession();
+	EXPECT_EQ(reused, session);
+	EXPECT_EQ(reused->GetSessionId(), sessionId);
+}
+
+// ------------------------------------------------------------
+// 전체 종료와 정리가 모든 세션을 방문하고 관리자 상태와 보유 세션을 초기화하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, CloseAndClearVisitEverySessionAndResetManagerState)
+{
+	MockSessionDelegate mockDelegate;
+	RUDPSessionManager manager{ 3, core, mockDelegate };
+	ManagerTestSession::destroyedCount.store(0);
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	manager.IncrementConnectedCount();
+
+	manager.CloseAllSessions();
+	EXPECT_EQ(mockDelegate.closeSocketCount, 3);
+	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+
+	manager.ClearAllSessions();
+	EXPECT_EQ(mockDelegate.recvContextResetCount, 3);
+	EXPECT_EQ(ManagerTestSession::destroyedCount.load(), 3);
+	EXPECT_FALSE(manager.IsInitialized());
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+}
+
+// ------------------------------------------------------------
+// 상태 기반 조회 함수가 사용 중이거나 해제 중인 조건에 맞는 세션만 반환하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, StateFilteredGettersReturnOnlyUsingSessions)
+{
+	RUDPSessionManager manager{ 2, core, delegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	RUDPSession* reserved = manager.AcquireSession();
+	ASSERT_NE(reserved, nullptr);
+	RUDPSessionBehaviorAccess::SetReserved(*reserved);
+	ASSERT_EQ(reserved->GetSessionId(), 0);
+
+	EXPECT_EQ(manager.GetUsingSession(0), reserved);
+	EXPECT_EQ(manager.GetReleasingSession(0), nullptr);
+	EXPECT_EQ(manager.GetUsingSession(2), nullptr);
+	EXPECT_EQ(manager.GetReleasingSession(2), nullptr);
+}
+
+// ------------------------------------------------------------
+// heartbeat 검사가 연결 세션에는 heartbeat를 보내고 만료된 예약 세션은 중단하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, HeartbeatCheckRoutesConnectedAndTimedOutReservedSessions)
+{
+	MockSessionDelegate mockDelegate;
+	mockDelegate.checkReservedTimeoutReturn = true;
+	RUDPSessionManager manager{ 3, core, mockDelegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	RUDPSession* connected = manager.AcquireSession();
+	RUDPSession* reserved = manager.AcquireSession();
+	ASSERT_NE(connected, nullptr);
+	ASSERT_NE(reserved, nullptr);
+	RUDPSessionBehaviorAccess::SetConnected(*connected);
+	RUDPSessionBehaviorAccess::SetReserved(*reserved);
+
+	manager.HeartbeatCheck(1234);
+
+	EXPECT_EQ(mockDelegate.sendHeartbeatCount, 1);
+	EXPECT_EQ(mockDelegate.abortReservedCount, 1);
+}
+
+// ------------------------------------------------------------
+// 제한 시간 전의 예약 세션은 heartbeat 검사에서 중단되지 않는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPSessionManagerTest, HeartbeatCheckDoesNotAbortReservedSessionBeforeTimeout)
+{
+	MockSessionDelegate mockDelegate;
+	mockDelegate.checkReservedTimeoutReturn = false;
+	RUDPSessionManager manager{ 1, core, mockDelegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	RUDPSession* reserved = manager.AcquireSession();
+	ASSERT_NE(reserved, nullptr);
+	RUDPSessionBehaviorAccess::SetReserved(*reserved);
+
+	manager.HeartbeatCheck(99);
+
+	EXPECT_EQ(mockDelegate.sendHeartbeatCount, 0);
+	EXPECT_EQ(mockDelegate.abortReservedCount, 0);
 }
