@@ -872,3 +872,127 @@ TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_AllTypes_NoTpsIncrement)
 
     EXPECT_EQ(processor->GetTPS(), 0);
 }
+
+// ------------------------------------------------------------
+// 정상 CONNECT 패킷의 복호화와 연결 처리가 성공하고 세션 연결 통계가 증가하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_ConnectDecryptSucceeds_ConnectsAndIncrementsCount)
+{
+	SetupRealCrypto();
+	mockDelegate.tryConnectReturn = true;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::CONNECT_TYPE,
+		1,
+		0,
+		testKey.Get(),
+		mockDelegate.dummySalt,
+		true,
+		PACKET_DIRECTION::CLIENT_TO_SERVER);
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.tryConnectCount, 1);
+	EXPECT_EQ(mockDelegate.refreshLastRecvPacketTimeCount, 1);
+	EXPECT_EQ(sessionManager.GetNowSessionCount(), 1);
+	EXPECT_EQ(sessionManager.GetAllConnectedCount(), 1u);
+	NetBuffer::Free(buf);
+}
+
+// ------------------------------------------------------------
+// 연결 delegate가 CONNECT 요청을 거부하면 현재 및 누적 연결 수가 증가하지 않는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_ConnectDelegateRejects_CountRemainsZero)
+{
+	SetupRealCrypto();
+	mockDelegate.tryConnectReturn = false;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::CONNECT_TYPE, 2, 0, testKey.Get(), mockDelegate.dummySalt, true,
+		PACKET_DIRECTION::CLIENT_TO_SERVER);
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.tryConnectCount, 1);
+	EXPECT_EQ(sessionManager.GetNowSessionCount(), 0);
+	EXPECT_EQ(sessionManager.GetAllConnectedCount(), 0u);
+	NetBuffer::Free(buf);
+}
+
+// ------------------------------------------------------------
+// 정상 DISCONNECT 패킷이 복호화되면 세션 연결 종료 처리가 호출되는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_DisconnectDecryptSucceeds_CallsDisconnect)
+{
+	SetupRealCrypto();
+	mockDelegate.canProcessReturn = true;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::DISCONNECT_TYPE, 3, 0, testKey.Get(), mockDelegate.dummySalt, true,
+		PACKET_DIRECTION::CLIENT_TO_SERVER);
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.disconnectCount, 1);
+	EXPECT_EQ(mockDelegate.refreshLastRecvPacketTimeCount, 1);
+	NetBuffer::Free(buf);
+}
+
+// ------------------------------------------------------------
+// 정상 HEARTBEAT_REPLY 패킷이 복호화되면 응답 처리기가 호출되는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_HeartbeatReplyDecryptSucceeds_CallsReplyHandler)
+{
+	SetupRealCrypto();
+	mockDelegate.canProcessReturn = true;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::HEARTBEAT_REPLY_TYPE, 4, 0, testKey.Get(), mockDelegate.dummySalt, true,
+		PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY);
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.onSendReplyCount, 1);
+	EXPECT_EQ(mockDelegate.refreshLastRecvPacketTimeCount, 1);
+	NetBuffer::Free(buf);
+}
+
+// ------------------------------------------------------------
+// 인증 태그가 변조된 패킷이 delegate와 TPS 집계까지 전달되지 않는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_TamperedAuthTagDoesNotReachDelegate)
+{
+	SetupRealCrypto();
+	mockDelegate.canProcessReturn = true;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::SEND_TYPE, 5, 77, testKey.Get(), mockDelegate.dummySalt, false,
+		PACKET_DIRECTION::CLIENT_TO_SERVER);
+	*(buf->GetWriteBufferPtr() - 1) ^= 0x01;
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.onRecvPacketCount, 0);
+	EXPECT_EQ(mockDelegate.refreshLastRecvPacketTimeCount, 0);
+	EXPECT_EQ(processor->GetTPS(), 0);
+	NetBuffer::Free(buf);
+}
+
+// ------------------------------------------------------------
+// 잘못된 패킷 방향으로 암호화된 데이터가 인증에 실패하고 delegate에 전달되지 않는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPPacketProcessorTest, ProcessByPacketType_WrongDirectionDoesNotReachDelegate)
+{
+	SetupRealCrypto();
+	mockDelegate.canProcessReturn = true;
+	NetBuffer* buf = MakeEncryptedReceiveBuffer(
+		PACKET_TYPE::SEND_TYPE, 6, 78, testKey.Get(), mockDelegate.dummySalt, false,
+		PACKET_DIRECTION::SERVER_TO_CLIENT);
+	const auto validAddr = MakeValidAddrBuffer();
+
+	processor->OnRecvPacket(session, *buf, std::span<const unsigned char>(validAddr));
+
+	EXPECT_EQ(mockDelegate.onRecvPacketCount, 0);
+	EXPECT_EQ(mockDelegate.refreshLastRecvPacketTimeCount, 0);
+	NetBuffer::Free(buf);
+}

@@ -8,6 +8,10 @@
 #include "RetransmissionScheduler.h"
 #include "MockRIOManager.h"
 #include "MockSessionDelegate.h"
+#ifndef LOG_ERROR
+#define LOG_ERROR(...) ((void)0)
+#endif
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 // ============================================================
 // 테스트용 최소 RUDPSession 서브클래스
@@ -71,6 +75,16 @@ protected:
         handler.reset();
         for (const auto& scheduler : retransmissionSchedulers)
         {
+			if (scheduler != nullptr)
+			{
+				std::scoped_lock lock(scheduler->lock);
+				while (not scheduler->heap.empty())
+				{
+					SendPacketInfo::Free(scheduler->heap.top().info);
+					scheduler->heap.pop();
+				}
+			}
+
             if (scheduler != nullptr && scheduler->wakeEventHandle != NULL)
             {
                 CloseHandle(scheduler->wakeEventHandle);
@@ -122,6 +136,37 @@ protected:
         info->Initialize(nullptr, 0, buffer, sequence, false);
         return info;
     }
+
+	SendPacketInfo* AllocSerializedSendPacketInfo(
+		const PacketSequence sequence = 1,
+		const bool isReplyType = false)
+	{
+		SendPacketInfo* info = AllocSendPacketInfo(sequence);
+		if (info != nullptr)
+		{
+			*info->buffer << static_cast<BYTE>(sequence);
+			PacketCryptoHelper::SetHeader(*info->buffer);
+			info->isReplyType = isReplyType;
+		}
+		return info;
+	}
+
+	void SetupValidSendPath()
+	{
+		mockDelegate.isNothingToSendReturn = false;
+		mockDelegate.getSocketReturn = static_cast<SOCKET>(1);
+		mockDelegate.sendBufferIdReturn = reinterpret_cast<RIO_BUFFERID>(2);
+		mockDelegate.sendRIORQReturn = reinterpret_cast<RIO_RQ>(3);
+		mockRIO.rioSendExReturn = true;
+	}
+
+	void CompleteOutstandingSend()
+	{
+		ASSERT_NE(mockRIO.lastSendRequestContext, nullptr);
+		IOContext* context = static_cast<IOContext*>(mockRIO.lastSendRequestContext);
+		ASSERT_TRUE(handler->IOCompleted(context, 0, THREAD_ID));
+		mockRIO.lastSendRequestContext = nullptr;
+	}
 };
 
 // ============================================================
@@ -586,4 +631,100 @@ TEST_F(RUDPIOHandlerTest, DoSend_AlternatingPaths_NoCrash)
         EXPECT_TRUE(handler->DoSend(session, THREAD_ID)) << "Failed on iteration " << i;
     }
     EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+}
+
+// ------------------------------------------------------------
+// 일반 데이터 패킷이 송신 스트림으로 구성되고 재전송 예약 후 RIO에 게시되는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_DataPacketBuildsStreamSchedulesRetransmissionAndPostsRIO)
+{
+	SetupValidSendPath();
+	SendPacketInfo* info = AllocSerializedSendPacketInfo(7);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
+	EXPECT_EQ(mockRIO.lastSendRequestQueue, mockDelegate.sendRIORQReturn);
+	EXPECT_EQ(mockRIO.lastSendBufferId, mockDelegate.sendBufferIdReturn);
+	EXPECT_EQ(mockRIO.lastSendLength, df_HEADER_SIZE + 1);
+	EXPECT_NE(mockRIO.lastSendRemoteAddress, nullptr);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_SENDING);
+	{
+		std::scoped_lock lock(retransmissionSchedulers[THREAD_ID]->lock);
+		ASSERT_EQ(retransmissionSchedulers[THREAD_ID]->heap.size(), 1u);
+		EXPECT_EQ(retransmissionSchedulers[THREAD_ID]->heap.top().info->sendPacketSequence, 7);
+	}
+
+	CompleteOutstandingSend();
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
+}
+
+// ------------------------------------------------------------
+// 응답 패킷이 재전송 스케줄에는 등록되지 않고 RIO 송신만 수행하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_ReplyPacketPostsWithoutRetransmissionSchedule)
+{
+	SetupValidSendPath();
+	SendPacketInfo* info = AllocSerializedSendPacketInfo(8, true);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
+	{
+		std::scoped_lock lock(retransmissionSchedulers[THREAD_ID]->lock);
+		EXPECT_TRUE(retransmissionSchedulers[THREAD_ID]->heap.empty());
+	}
+
+	CompleteOutstandingSend();
+}
+
+// ------------------------------------------------------------
+// 길이가 0인 패킷의 송신을 거부하고 세션의 송신 IO 모드를 원래 상태로 복구하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_ZeroLengthPacketFailsAndRestoresIOMode)
+{
+	SetupValidSendPath();
+	SendPacketInfo* info = AllocSendPacketInfo(11);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	EXPECT_FALSE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
+}
+
+// ------------------------------------------------------------
+// 주소 버퍼 등록 실패 시 송신 컨텍스트와 IO 모드가 누수 없이 롤백되는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_AddressBufferRegistrationFailureRollsBackContextAndIOMode)
+{
+	SetupValidSendPath();
+	mockRIO.registerRIOBufferReturn = RIO_INVALID_BUFFERID;
+	SendPacketInfo* info = AllocSerializedSendPacketInfo(12);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	EXPECT_FALSE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.registerRIOBufferCallCount, 1);
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
+}
+
+// ------------------------------------------------------------
+// 유효하지 않은 소켓에서는 RIO 게시를 수행하지 않고 송신 IO 모드를 복구하는지 확인합니다.
+// ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_InvalidSocketRejectsPostAndRestoresIOMode)
+{
+	SetupValidSendPath();
+	mockDelegate.getSocketReturn = INVALID_SOCKET;
+	SendPacketInfo* info = AllocSerializedSendPacketInfo(13);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	EXPECT_FALSE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
 }

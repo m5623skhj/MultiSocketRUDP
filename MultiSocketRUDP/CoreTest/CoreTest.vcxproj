@@ -38,12 +38,14 @@
     <ClCompile Include="SessionPacketOrdererTest.cpp" />
     <ClCompile Include="SessionRIOContextTest.cpp" />
     <ClCompile Include="SendPacketInfoTest.cpp" />
+	<ClCompile Include="ServerUtilityTypesTest.cpp" />
     <ClCompile Include="SessionStateMachineTest.cpp" />
     <ClCompile Include="SessionSendContextTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h" />
+	<ClInclude Include="RUDPSessionTestAccess.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json">

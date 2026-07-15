@@ -19,6 +19,9 @@ jobs:
       - name: Build BotTester solution
         run: dotnet build MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.sln --configuration Debug
 
+      - name: Run BotTester unit tests
+        run: dotnet test MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug --no-build
+
       - name: Build C# protocol interop test
         run: dotnet build MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj --configuration Debug
 

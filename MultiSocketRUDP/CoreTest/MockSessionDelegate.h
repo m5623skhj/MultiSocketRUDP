@@ -1,5 +1,6 @@
 #pragma once
 #include "ISessionDelegate.h"
+#include <deque>
 #include <functional>
 
 class MockSessionDelegate final : public ISessionDelegate
@@ -38,7 +39,17 @@ public:
     [[nodiscard]]
     bool IsSendPacketInfoQueueEmpty(RUDPSession&) override { return isSendPacketInfoQueueEmpty; }
     [[nodiscard]]
-    SendPacketInfo* TryGetFrontAndPop(RUDPSession&) override { return tryGetFrontReturn; }
+    SendPacketInfo* TryGetFrontAndPop(RUDPSession&) override
+    {
+        if (not queuedSendPacketInfos.empty())
+        {
+            SendPacketInfo* front = queuedSendPacketInfos.front();
+            queuedSendPacketInfos.pop_front();
+            return front;
+        }
+
+        return tryGetFrontReturn;
+    }
     [[nodiscard]]
     SendPacketInfo* GetReservedSendPacketInfo(RUDPSession&) override { return reservedSendReturn; }
     [[nodiscard]]
@@ -50,7 +61,10 @@ public:
     }
     void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override { reservedSendReturn = info; }
     [[nodiscard]]
-    size_t GetSendPacketInfoQueueSize(RUDPSession&) override { return sendPacketInfoQueueSizeRet; }
+    size_t GetSendPacketInfoQueueSize(RUDPSession&) override
+    {
+        return queuedSendPacketInfos.empty() ? sendPacketInfoQueueSizeRet : queuedSendPacketInfos.size();
+    }
     [[nodiscard]]
     char* GetRIOSendBuffer(RUDPSession&) override { return dummySendBuffer; }
     [[nodiscard]]
@@ -75,7 +89,11 @@ public:
         ++onRecvPacketCount; return onRecvPacketReturn;
     }
 
-	void RefreshLastRecvPacketTime(RUDPSession&, unsigned long long) override {}
+	void RefreshLastRecvPacketTime(RUDPSession&, unsigned long long now) override
+    {
+        ++refreshLastRecvPacketTimeCount;
+        lastRefreshTime = now;
+    }
 
     void OnSendReply(RUDPSession&, NetBuffer&) override { ++onSendReplyCount; }
     void Disconnect(RUDPSession&, NetBuffer&) override { ++disconnectCount; }
@@ -121,7 +139,8 @@ public:
     {
         initializeSessionRIOCount = closeSocketCount = recvContextResetCount
             = tryConnectCount = onRecvPacketCount = onSendReplyCount
-            = disconnectCount = sendHeartbeatCount = abortReservedCount = 0;
+            = disconnectCount = sendHeartbeatCount = abortReservedCount
+            = refreshLastRecvPacketTimeCount = 0;
     }
 
     bool initializeSessionRIOReturn = true;
@@ -142,6 +161,7 @@ public:
     bool isNothingToSendReturn = true;
     bool isSendPacketInfoQueueEmpty = true;
     SendPacketInfo* tryGetFrontReturn = nullptr;
+    std::deque<SendPacketInfo*> queuedSendPacketInfos;
     SendPacketInfo* reservedSendReturn = nullptr;
     size_t sendPacketInfoQueueSizeRet = 0;
     char dummySendBuffer[65536]{};
@@ -156,6 +176,8 @@ public:
     unsigned char dummyKeyObjBuf[256]{};
 
     int sendHeartbeatCount = 0;
+    int refreshLastRecvPacketTimeCount = 0;
+    unsigned long long lastRefreshTime = 0;
     bool checkReservedTimeoutReturn = false;
     int abortReservedCount = 0;
     unsigned long long lastReservedTime = 0;

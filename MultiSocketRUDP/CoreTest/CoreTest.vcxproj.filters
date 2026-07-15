@@ -78,10 +78,16 @@
     <ClCompile Include="SessionRIOContextTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
+	<ClCompile Include="ServerUtilityTypesTest.cpp">
+	  <Filter>소스 파일\GoogleTestForServerCore</Filter>
+	</ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h">
       <Filter>소스 파일\GoogleTestMain</Filter>
     </ClInclude>
+	<ClInclude Include="RUDPSessionTestAccess.h">
+	  <Filter>헤더 파일</Filter>
+	</ClInclude>
   </ItemGroup>
 </Project>

@@ -1,8 +1,10 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
+#include <latch>
+#include <semaphore>
 
 #include "RUDPThreadManager.h"
 #include "../Common/etc/EnumTypes.h"
@@ -104,4 +106,68 @@ TEST(RUDPThreadManagerTest, StopAllThreadsRequestsStopForEveryGroup)
 	manager.StopAllThreads();
 
 	EXPECT_EQ(stoppedCount.load(std::memory_order_relaxed), 3);
+}
+
+// ------------------------------------------------------------
+// 스레드 수가 0인 그룹의 시작과 종료가 작업 실행이나 예외 없이 안전하게 완료되는지 확인합니다.
+// ------------------------------------------------------------
+TEST(RUDPThreadManagerTest, ZeroThreadGroupCanBeStartedAndStopped)
+{
+	RUDPThreadManager manager;
+	std::atomic_int callCount{};
+
+	manager.StartThreads(THREAD_GROUP::IO_WORKER_THREAD, [&](std::stop_token, unsigned char)
+	{
+		++callCount;
+	}, 0);
+	manager.StopThreadGroup(THREAD_GROUP::IO_WORKER_THREAD);
+
+	EXPECT_EQ(callCount.load(), 0);
+}
+
+// ------------------------------------------------------------
+// 존재하지 않거나 이미 종료된 그룹에 대한 종료 요청이 여러 번 호출되어도 안전한지 확인합니다.
+// ------------------------------------------------------------
+TEST(RUDPThreadManagerTest, StopOperationsAreIdempotentForMissingGroups)
+{
+	RUDPThreadManager manager;
+
+	EXPECT_NO_FATAL_FAILURE(manager.StopThreadGroup(THREAD_GROUP::HEARTBEAT_THREAD));
+	EXPECT_NO_FATAL_FAILURE(manager.StopAllThreads());
+	EXPECT_NO_FATAL_FAILURE(manager.StopAllThreads());
+}
+
+// ------------------------------------------------------------
+// 종료된 스레드 그룹을 같은 종류로 다시 시작하고 정상적으로 중지할 수 있는지 확인합니다.
+// ------------------------------------------------------------
+TEST(RUDPThreadManagerTest, StoppedGroupCanBeRestarted)
+{
+	RUDPThreadManager manager;
+	std::latch firstStarted(1);
+	std::latch firstStopped(1);
+	std::binary_semaphore firstStopSignal(0);
+	manager.StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD,
+		[&](const std::stop_token& stopToken, unsigned char)
+		{
+			std::stop_callback callback(stopToken, [&]() { firstStopSignal.release(); });
+			firstStarted.count_down();
+			firstStopSignal.acquire();
+			firstStopped.count_down();
+		}, 1);
+	firstStarted.wait();
+	manager.StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
+	firstStopped.wait();
+
+	std::latch secondStarted(1);
+	std::binary_semaphore secondStopSignal(0);
+	manager.StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD,
+		[&](const std::stop_token& stopToken, unsigned char)
+		{
+			std::stop_callback callback(stopToken, [&]() { secondStopSignal.release(); });
+			secondStarted.count_down();
+			secondStopSignal.acquire();
+		}, 1);
+	secondStarted.wait();
+
+	manager.StopThreadGroup(THREAD_GROUP::RETRANSMISSION_THREAD);
 }

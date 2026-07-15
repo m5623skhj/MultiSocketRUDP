@@ -1,5 +1,6 @@
 ﻿#include "gtest/gtest.h"
 #include "SessionStateMachine.h"
+#include <barrier>
 
 // ============================================================
 // SessionStateMachine 단위 테스트
@@ -270,4 +271,36 @@ TEST_F(SessionStateMachineTest, FullLifecycle_ResetAndReuse)
 	EXPECT_TRUE(sm.IsReserved());
 	EXPECT_TRUE(sm.TryTransitionToConnected());
 	EXPECT_TRUE(sm.IsConnected());
+}
+
+// ------------------------------------------------------------
+// 여러 스레드가 동시에 연결 전이를 시도할 때 정확히 하나만 성공하는지 확인합니다.
+// ------------------------------------------------------------
+TEST(SessionStateMachineConcurrencyTest, ExactlyOneConcurrentConnectTransitionSucceeds)
+{
+	SessionStateMachine stateMachine;
+	stateMachine.SetReserved();
+	constexpr int threadCount = 8;
+	std::barrier startBarrier(threadCount + 1);
+	std::atomic_int successCount{};
+	std::vector<std::jthread> threads;
+	threads.reserve(threadCount);
+
+	for (int i = 0; i < threadCount; ++i)
+	{
+		threads.emplace_back([&]()
+		{
+			startBarrier.arrive_and_wait();
+			if (stateMachine.TryTransitionToConnected())
+			{
+				successCount.fetch_add(1, std::memory_order_relaxed);
+			}
+		});
+	}
+
+	startBarrier.arrive_and_wait();
+	threads.clear();
+
+	EXPECT_EQ(successCount.load(std::memory_order_relaxed), 1);
+	EXPECT_EQ(stateMachine.GetSessionState(), SESSION_STATE::CONNECTED);
 }
