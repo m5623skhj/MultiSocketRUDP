@@ -32,6 +32,8 @@ MultiSocketRUDP/CoreTest/x64/
 .vs/
 MultiSocketRUDPBotTester/ProtocolInteropTest/bin/
 MultiSocketRUDPBotTester/ProtocolInteropTest/obj/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/bin/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/obj/
 .dotnet-cli/
 MultiSocketRUDP/ContentsServer/ContentsServer/x64/Debug/vc143.idb
 MultiSocketRUDP/ContentsServer/ContentsServer/x64/Debug/vc143.pdb

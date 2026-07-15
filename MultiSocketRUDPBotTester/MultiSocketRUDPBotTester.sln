@@ -5,6 +5,8 @@ VisualStudioVersion = 17.12.35707.178 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiSocketRUDPBotTester", "MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.csproj", "{1225F6BC-C4AC-43E2-9332-C230C6B45334}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiSocketRUDPBotTester.UnitTests", "MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj", "{B24EA1C9-A568-4C46-B44E-10D6D48938B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{1225F6BC-C4AC-43E2-9332-C230C6B45334}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1225F6BC-C4AC-43E2-9332-C230C6B45334}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1225F6BC-C4AC-43E2-9332-C230C6B45334}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B24EA1C9-A568-4C46-B44E-10D6D48938B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B24EA1C9-A568-4C46-B44E-10D6D48938B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B24EA1C9-A568-4C46-B44E-10D6D48938B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B24EA1C9-A568-4C46-B44E-10D6D48938B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

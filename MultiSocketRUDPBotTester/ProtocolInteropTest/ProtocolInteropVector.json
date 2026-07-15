@@ -1,9 +1,106 @@
-{
-  "sequence": 72623859790382856,
-  "keyHex": "0102030405060708090A0B0C0D0E0F10",
-  "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
-  "packetType": 3,
-  "packetId": 77,
-  "plaintextHex": "DEADBEEF",
-  "encodedPacketHex": "CC210000000308070605040302014D0000000F36689548DC6A5962DE6CAA96BDA1A957E7E28B"
-}
+[
+  {
+    "name": "ClientToServerFullEmpty",
+    "sequence": 0,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 0,
+    "isCorePacket": false,
+    "packetType": 3,
+    "packetId": 77,
+    "plaintextHex": "",
+    "encodedPacketHex": "001D0000000300000000000000004D000000A8B2F9FFBE42B01DBC4EC96945ED307D"
+  },
+  {
+    "name": "ClientToServerReplyFull",
+    "sequence": 1,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 1,
+    "isCorePacket": false,
+    "packetType": 4,
+    "packetId": 78,
+    "plaintextHex": "DEADBEEF",
+    "encodedPacketHex": "00210000000401000000000000004E0000000D61D1CFE99E58F3EE2F634258ED6278C303668D"
+  },
+  {
+    "name": "ServerToClientFull",
+    "sequence": 72623859790382856,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 2,
+    "isCorePacket": false,
+    "packetType": 3,
+    "packetId": 79,
+    "plaintextHex": "0001020304050607",
+    "encodedPacketHex": "00250000000308070605040302014F000000D19AD47938508C482F6EE6EC0ECE3C9531C9ACA740134A72"
+  },
+  {
+    "name": "ServerToClientReplyFull",
+    "sequence": 18446744073709551615,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 3,
+    "isCorePacket": false,
+    "packetType": 4,
+    "packetId": 80,
+    "plaintextHex": "CAFEBABE",
+    "encodedPacketHex": "002100000004FFFFFFFFFFFFFFFF50000000F133309C43476E90A369B285F3561A0D59C55D04"
+  },
+  {
+    "name": "ClientToServerCore",
+    "sequence": 0,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 0,
+    "isCorePacket": true,
+    "packetType": 1,
+    "packetId": null,
+    "plaintextHex": "3412",
+    "encodedPacketHex": "001B0000000100000000000000005419CD5242E08AEF09574BA2063359F57742"
+  },
+  {
+    "name": "ClientToServerReplyCore",
+    "sequence": 1,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 1,
+    "isCorePacket": true,
+    "packetType": 6,
+    "packetId": null,
+    "plaintextHex": "",
+    "encodedPacketHex": "00190000000601000000000000005F8E3594F37CD95E9795F74F999E795D"
+  },
+  {
+    "name": "ServerToClientCore",
+    "sequence": 72623859790382856,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 2,
+    "isCorePacket": true,
+    "packetType": 5,
+    "packetId": null,
+    "plaintextHex": "",
+    "encodedPacketHex": "00190000000508070605040302015AD2DD7464EE7DA781B9D0C178968805"
+  },
+  {
+    "name": "ServerToClientReplyCore",
+    "sequence": 18446744073709551615,
+    "keyHex": "0102030405060708090A0B0C0D0E0F10",
+    "saltHex": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+    "headerCode": 0,
+    "direction": 3,
+    "isCorePacket": true,
+    "packetType": 6,
+    "packetId": null,
+    "plaintextHex": "",
+    "encodedPacketHex": "001900000006FFFFFFFFFFFFFFFF30C6BE58AB11C75862E15E655DAE2156"
+  }
+]
