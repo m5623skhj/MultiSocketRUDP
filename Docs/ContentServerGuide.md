@@ -27,6 +27,7 @@ ContentsServer/
   main.cpp
   Player.h
   Player.cpp
+  PlayerManager.h / PlayerManager.cpp
   Protocol.h / Protocol.cpp
   PacketIdType.h
   ContentsPacketRegister.h / .cpp
@@ -155,6 +156,8 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 auto* session = core.GetUsingSession(sessionId); // 현재 콘텐츠 코드에서는 불가
 ```
 
+현재 샘플은 `PlayerManager`가 `PlayerId`와 `SessionId`를 별도 map에 보관한다. 이 map은 비소유 raw pointer를 반환하므로, 콘텐츠 레이어에서 사용할 때는 [[PlayerManager]]의 수명·동시성 제한을 함께 확인해야 한다.
+
 ---
 
 ## 운영 체크리스트
@@ -173,3 +176,4 @@ auto* session = core.GetUsingSession(sessionId); // 현재 콘텐츠 코드에�
 - [[RUDPSession]] - 세션 확장 포인트
 - [[MultiSocketRUDPCore]] - 서버 코어 공개 API
 - [[Server/RUDPSessionBroker]] - 세션 발급 경로
+- [[PlayerManager]] - 샘플 player 조회와 동시성 제한

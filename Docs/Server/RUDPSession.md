@@ -4,6 +4,17 @@
 
 ---
 
+## 목차
+
+1. [콘텐츠 코드에서 직접 쓰는 API](#콘텐츠-코드에서-직접-쓰는-api)
+2. [오버라이드 포인트](#오버라이드-포인트)
+3. [최소 예시](#최소-예시)
+4. [주의할 점](#주의할-점)
+5. [내부 구현 이해 포인트](#내부-구현-이해-포인트)
+6. [RTT와 재전송 timeout 전달](#rtt와-재전송-timeout-전달)
+
+---
+
 ## 콘텐츠 코드에서 직접 쓰는 API
 
 ### 패킷 핸들러 등록
@@ -32,13 +43,22 @@ void DoDisconnect(const DISCONNECT_REASON disconnectSession);
 ### 기본 조회
 
 ```cpp
+[[nodiscard]]
 SessionIdType GetSessionId() const;
+[[nodiscard]]
 bool IsConnected() const;
+[[nodiscard]]
 bool IsReserved() const;
+[[nodiscard]]
 bool IsReleasing() const;
+[[nodiscard]]
 SESSION_STATE GetSessionState() const;
 DISCONNECT_REASON GetDisconnectedReason() const;
 ```
+
+`GetDisconnectedReason()`을 제외한 위 기본 조회 함수에는 `[[nodiscard]]`가 있다.
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 ---
 
@@ -124,8 +144,7 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 
 ---
 
-
----
+## RTT와 재전송 timeout 전달
 
 ### `OnRttSample`
 
@@ -142,8 +161,25 @@ void OnRttSample(std::chrono::steady_clock::duration sample);
 **전제 조건**:
 - `sample`은 재전송되지 않은 패킷으로부터 측정된 유효한 값이어야 한다.
 
+`OnRetransmissionTimeout()`은 estimator의 backoff가 실제 적용된 경우에만 `flowManager.OnTimeout()`을 호출한다. 현재 RTO는 `GetRetransmissionTimeoutMs()`로 조회한다. 계산식과 동시성 규칙은 [[RetransmissionTimeoutEstimator]]에 정리한다.
+
+### `GetRetransmissionTimeoutMs`
+
+```cpp
+[[nodiscard]]
+unsigned int GetRetransmissionTimeoutMs() const noexcept;
+```
+
+현재 세션 estimator가 계산한 RTO를 밀리초 단위로 반환한다. `std::atomic_uint`에 캐시된 값을 읽으므로 estimator mutex를 획득하지 않는다.
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
+
+---
+
 ## 관련 문서
 
 - [[GettingStarted]] - 최소 서버 구축
 - [[MultiSocketRUDPCore]] - 서버 공개 API
 - [[FlowController]] - 흐름 제어 개념
+- [[RetransmissionTimeoutEstimator]] - SRTT/RTTVAR 기반 RTO 계산
+- [[SendPacketInfo]] - RTT 표본 유효성 추적

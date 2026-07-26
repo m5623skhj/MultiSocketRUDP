@@ -82,14 +82,20 @@ BotTesterCore.Instance.SaveGraphVisuals(allNodes)
 
 ## 그래프 저장/복원
 
-`SaveGraphVisuals(allNodes)` → `BotTesterCore`에 `NodeVisual` 리스트 저장  
-창 재오픈 시 `GetSavedGraphVisuals()`로 복원 → `RestoreSavedGraph()`
+저장 방식은 두 가지다.
+
+- 메모리 snapshot: `SaveGraphVisuals(allNodes)`로 `BotTesterCore`에 `NodeVisual` 리스트를 보관하고, 창 재오픈 시 `GetSavedGraphVisuals()`와 `RestoreSavedGraph()`로 복원한다.
+- 파일 저장: `CreateGraphFileModel()`로 node ID 기반 모델을 만든 뒤 `GraphFileStorage.Save()`로 `.botgraph.json`에 기록한다. `Load()` 후에는 `RestoreGraphFromFile()`로 화면을 복원하고 `BuiltGraph`를 `null`로 되돌린다.
 
 복원 시 처리:
 1. `NodeVisual` 복제 (경계 + 포트 재생성)
 2. 포트 위치 계산 및 캔버스 배치
 3. 노드 간 참조 복원 (매핑 딕셔너리 사용)
 4. `RedrawConnections()` 호출
+
+파일에서 불러온 그래프는 자동 적용되지 않는다. 로드 후 `Build Graph`로 실행 그래프를 만들고 내부 검증을 통과한 뒤 `Apply to BotTester`를 눌러야 한다. `Validate Graph`는 빌드된 그래프만 검사하므로 빌드 후 필요할 때 사용한다.
+
+> **현재 제한:** 검증 오류가 발생하거나 경고 대화상자에서 중단해도 `BuiltGraph`가 자동으로 `null`이 되지 않으며, `Apply to BotTester`는 다시 검증하지 않는다. 빌드 성공 메시지를 확인한 그래프만 적용해야 한다.
 
 ---
 
@@ -172,10 +178,10 @@ NodeBuilderRegistry
 - 그래프를 파일 모델로 저장하거나 불러온다.
 
 #### `BuildGraph_Click(...)`
-- `NodeBuilderRegistry`를 사용해 현재 `NodeVisual`을 실행용 `ActionGraph`로 변환한다.
+- `NodeBuilderRegistry`를 사용해 현재 `NodeVisual`을 실행용 `ActionGraph`로 변환하고 즉시 검증한다.
 
 #### `ValidateGraph_Click(...)`
-- 현재 그래프를 `GraphValidator`로 검사하고 결과 창을 띄운다.
+- 이미 빌드된 그래프를 `GraphValidator`로 검사하고 결과 창을 띄운다. `BuiltGraph`가 없으면 먼저 빌드하라는 경고를 표시한다.
 
 #### `ApplyGraph_Click(...)`
 - 빌드된 그래프와 비주얼 상태를 `BotTesterCore`에 적용한다.
@@ -202,3 +208,4 @@ NodeBuilderRegistry
 - [[NodeConfigPanels]] — 노드 설정 다이얼로그
 - [[AiTreeGenerator]] — AI 트리 생성
 - [[GraphValidator]] — 그래프 검증
+- [[GraphFileStorage]] — `.botgraph.json` 형식과 저장/로드 계약

@@ -22,6 +22,7 @@
 | [[RuntimeContext]] | 노드 간 데이터 공유 컨텍스트 |
 | [[GraphValidator]] | 그래프 정합성 검증 |
 | [[NodeExecutionStats]] | 노드 실행 통계 |
+| [[PacketSchema]] | 패킷 입력 필드 schema |
 
 ### UI / 비주얼 에디터
 | 문서 | 내용 |
@@ -29,6 +30,7 @@
 | [[BotActionGraphWindow]] | 메인 그래프 에디터 윈도우 |
 | [[NodeConfigPanels]] | 노드별 설정 다이얼로그 |
 | [[CanvasRenderer]] | 캔버스 렌더링·드래그·연결 |
+| [[GraphFileStorage]] | `.botgraph.json` 저장/복원 |
 
 ### AI 연동
 | 문서 | 내용 |
@@ -42,6 +44,8 @@
 | [[BotTesterCore]] | 세션 관리·봇 라이프사이클 |
 | [[RudpSession_CS]] | C# RUDP 세션 구현 |
 | [[SessionGetter_CS]] | TLS 세션 정보 수신 |
+| [[BufferStore]] | 미응답 송신 패킷 추적 |
+| [[PacketLossSimulator]] | 양방향 UDP 손실 시뮬레이션 |
 
 ---
 

@@ -87,11 +87,11 @@ sessionSalt 16B
 현재 구현 기준 값은 아래다.
 
 - `RetransmissionWakeUpMs = 16`
-- `BufferStore.RetransmissionTimeoutMs = 50`
+- `BufferStore.RetransmissionTimeoutMs = 20`
 - `BufferStore.RetransmissionMaxCount = 16`
 - 서버 생존 확인 주기 `15초`
 
-예전 문서의 `30ms`, `32ms` 설명은 현재 코드와 맞지 않는다.
+예전 문서의 `30ms`, `32ms`, `50ms` 설명은 현재 코드와 맞지 않는다.
 
 ---
 
@@ -120,3 +120,5 @@ ACK sequence 0을 받으면:
 - [[SessionGetter_CS]] - 브로커 응답 수신
 - [[RUDPClientCore]] - C++ 클라이언트 구현
 - [[FlowController]] - 공통 개념
+- [[BufferStore]] - 미응답 송신 패킷과 재전송 횟수 추적
+- [[PacketLossSimulator]] - 송수신 datagram 손실 시뮬레이션

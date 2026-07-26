@@ -81,3 +81,4 @@ GetUnusedSessionCount()
 - [[FlowController]] - 흐름 제어 개념
 - [[MultiSocketRUDPCore]] - 통계 조회 API
 - [[Troubleshooting]] - 성능 이슈 점검
+- [[RetransmissionTimeoutEstimator]] - 서버 RTO 계산과 backoff 규칙

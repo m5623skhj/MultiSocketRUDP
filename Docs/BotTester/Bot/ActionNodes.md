@@ -305,3 +305,5 @@ public static class BotVariables
 - [[RuntimeContext]] — 노드 간 데이터 공유
 - [[GraphValidator]] — 노드 설정 검증
 - [[AiTreeGenerator]] — AI로 노드 트리 자동 생성
+- [[PacketSchema]] — 패킷 필드 입력 schema
+- [[NodeConfigPanels]] — 노드별 설정 UI

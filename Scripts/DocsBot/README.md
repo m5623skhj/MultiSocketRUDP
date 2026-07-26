@@ -1,250 +1,200 @@
-# docs-bot - 전체 기능 및 구조 서술
+# docs-bot
 
-## 1. 프로젝트 개요
-
-PR 머지 시 변경된 코드의 인터페이스(함수, 시그니처, 파라미터, 반환값, 에러 케이스)를 감지하고, 기존 기능 문서와 비교하여 불일치를 AI가 판단한 뒤, 문서 수정 PR을 자동 생성하는 GitHub Actions 기반 CI 파이프라인.
-
-"문서를 자동으로 관리하는 시스템"이 아닌, **"사람이 놓치지 않도록 잡아주는 보조 시스템"**으로 설계되었다.
+> **머지된 PR의 인터페이스 변경을 감지해 기능 문서 수정 PR을 제안하는 GitHub Actions 파이프라인이다.**
+> 완전 자동 문서 생성기가 아니라, 변경 누락을 찾고 사람이 검토할 초안을 만드는 보조 도구다.
 
 ---
 
-## 2. 자동화 범위
+## 목차
 
-### 대상
-- 기능(인터페이스) 레벨 문서만 한정
-- 캡슐화 관점: 호출자가 알아야 할 정보만 문서화, 내부 구현은 제외
-- 함수 시그니처, 파라미터, 반환값, 동작 설명, 사전/사후 조건, 에러 및 예외 케이스
-
-### 변경 유형별 처리
-- **함수 수정**: 기존 문서 섹션과 최신 코드를 AI가 비교하여 수정 제안
-- **함수 추가**: AI가 문서 초안 생성
-- **함수 삭제**: 해당 문서 섹션 자동 제거 (AI 호출 불필요)
-
-### 대상 제외
-- 아키텍처 레벨 문서 (config.py의 `EXCLUDED_DOCS`로 관리)
-- 내부 구현 상세 (C++ .cpp만 변경되고 .h 미변경인 경우 자동 제외)
-- 생성자/소멸자
+1. [자동화 범위](#1-자동화-범위)
+2. [실행 조건과 환경 변수](#2-실행-조건과-환경-변수)
+3. [파이프라인](#3-파이프라인)
+4. [모듈](#4-모듈)
+5. [매핑과 문서 수정 규칙](#5-매핑과-문서-수정-규칙)
+6. [AI provider와 재시도](#6-ai-provider와-재시도)
+7. [출력과 PR](#7-출력과-pr)
+8. [한계와 수동 검토](#8-한계와-수동-검토)
 
 ---
 
-## 3. 파일 구조
+## 1. 자동화 범위
 
-```
-.github/workflows/docs-bot.yml          워크플로우 정의
-    main.py                             파이프라인 오케스트레이션
-    config.py                           설정, 매핑 테이블, 제외 목록
-    git_utils.py                        GitHub API 유틸리티
-    change_detector.py                  변경 감지
-    code_extractor.py                   코드 추출
-    doc_mapper.py                       문서 매핑
-    ai_client.py                        AI API 추상화
-    doc_writer.py                       문서 수정 + PR 본문 생성
-    requirements.txt                    의존성
-    __init__.py
-```
+대상은 `.h`, `.hpp`, `.cpp`, `.cc`, `.cs`의 함수 인터페이스 변경이다.
+
+- 함수 시그니처, 파라미터, 반환형, 접근 제한자, 한정자, 인접 문서 주석을 추출한다.
+- C++는 header 변경을 우선하며 `.cpp`만 바뀐 내부 구현 변경은 필터링한다.
+- 생성자와 소멸자는 기본적으로 제외한다.
+- 기존 문서의 함수 섹션 비교, 삭제 섹션 제거, 문서 누락 후보 보고를 수행한다.
+- `EXCLUDED_DOCS`에 등록한 아키텍처·가이드 문서는 자동 수정하지 않고 수동 검토 대상으로 표시한다.
+
+새 클래스에 대응하는 문서 파일이 없으면 실제 파일을 자동 생성하지 않는다. PR 본문에 클래스와 함수 시그니처 기반 skeleton을 표시해 생성 여부를 사람이 결정하게 한다.
 
 ---
 
-## 4. 파이프라인 흐름
+## 2. 실행 조건과 환경 변수
 
-```
-매일 00:00 UTC
-    Step 1: DOCS_BOT_LAST_RUN 조회
-        없으면 현재 시간 설정 후 종료(초기 실행)
-    
-    Step 2: 머지된 PR 수집
-        없으면 즉시 종료
-    
-    Step 3: 기존 봇 PR 자동 닫기
+workflow: `.github/workflows/docs-bot.yml`
 
-    Step 4: 변경 감지 + 코드 추출
-        변경된 .h/.hpp/.cs 파일에서 함수 감지
-        내부 구현 변경 필터링 (.cpp만 수정 시 제외)
-        생성자/소멸자 필터링
-        main 브랜치 최종 코드에서 시그니처/파라미터/반환 타입 추출
+| trigger | 조건 |
+|---------|------|
+| schedule | 매일 `00:00 UTC` |
+| pull request label | `docs-review` 라벨이 추가됨 |
+| manual | `workflow_dispatch` |
 
-    Step 5: 문서 매핑
-        1. 수동 매핑 테이블 -> 클래스명 기반 -> fallback 전체 검색
-        2. 헤딩에 함수명이 포함된 섹션 탐색 (최대 3개)
-        아키텍처 문서 -> 플래그만 표시
-        같은 섹션 내 변경을 그룹핑 (AI 호출 최소화)
+필수 환경 변수:
 
-    Step 6: AI 분석
-        기존 함수: 최종 코드 vs 문서 섹션 비교 -> 수정 필요 여부
-        신규 함수: 문서 초안 생성
-        삭제 함수: AI 호출 없이 섹션 제거
-        재시도: rate limit 지수 백오프 3회, timeout 1회, 서버 에러 2회
+| 변수 | 설명 |
+|------|------|
+| `GITHUB_TOKEN` | GitHub API tree, commit, PR 작업 |
+| `REPO` | `owner/repository` 형식 |
+| `DOCS_BOT_LAST_RUN` | 이전 성공 처리 기준 UTC 시각 |
+| `AI_PROVIDER` | `claude`, `openai`, `gemini` 중 하나 |
+| `AI_API_KEY` | 선택 provider의 API key |
+| `AI_MODEL` | 선택 사항. 비어 있으면 provider 기본 모델 사용 |
 
-    Step 7: 문서 수정
-        섹션 교체/추가/삭제
-        목차 자동 갱신
-        옵시디언 위키 링크 보존 검증
-
-    Step 8: 브랜치 생성 -> 커밋 -> PR 생성
-        PR 본문: 수정/생성/삭제 요약, 참조 PR, AI 판단 근거
-        아키텍처 문서 검토 필요 플래그
-        문서 없는 클래스 -> 스켈레톤 제안 (시그니처 기반)
-        실패 항목 목록
-    
-    Step 9: DOCS_BOT_LAST_RUN 갱신 (성공 시에만)
-```
+workflow는 repository variable을 읽고 갱신할 때 `PAT` secret을 `GH_TOKEN`으로 사용한다.
 
 ---
 
-## 5. 모듈별 기능 상세
+## 3. 파이프라인
 
-### 5.1. main.py - 파이프라인 오케스트레이션
+```text
+1. DOCS_BOT_LAST_RUN 파싱
+   └─ 값이 없으면 current_time output을 기록하고 종료
 
-전체 8단계 흐름을 순차적으로 실행한다. 각 단계의 실패 시 적절한 종료 코드를 반환하고, GitHub Actions output 변수를 설정하여 워크플로우의 후속 step에서 조건 분기에 사용한다.
+2. 기준 시각 이후 머지된 PR 수집
+   └─ docs-bot 라벨 PR 제외
 
-주요 분기:
-- 초기 실행 (DOCS_BOT_LAST_RUN 없음) -> 시간 설정 후 정상 종료
-- 머지된 PR 없음 -> 즉시 종료
-- 인터페이스 변경 없음 -> 즉시 종료
-- AI 미설정 -> 결과 요약만 출력하고 정상 종료, DOCS_BOT_LAST_RUN 미갱신
-- 문서 변경 없음 -> PR 미생성
+3. 열려 있는 이전 docs-bot PR 닫기
 
-### 5.2. config.py - 설정 관리
+4. 변경 감지와 코드 추출
+   ├─ 대상 확장자 파일의 main 최종 내용 로드
+   ├─ interface 변경 필터링
+   └─ tree-sitter 우선, 정규식 fallback
 
-설정 : 내용
-- `CODE_tO_DOCS_DIR_MAP` : 코드 디렉토리 -> 문서 디렉토리 매핑
-- `CLASS_TO_DOC_OVDERRIDE` : 클래스명 <-> 문서 파일명 불일치 수동 매핑
-- `EXCLUDED_DOCS` : 아키텍처 / 가이드 문서 제외 목록
-- `TARGET_EXTENSIONS` : 감지 대상 확장자 (.h, .hpp, .cpp, .cc, .cs)
-- `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` : AI API 설정
+5. 문서 파일과 섹션 매핑
+   ├─ 수동 override
+   ├─ 코드 디렉터리 → 문서 디렉터리
+   └─ 전체 Docs fallback
 
-### 5-3. git_utils.py - GitHub API 유틸리티
+6. AI 분석
+   ├─ 기존 섹션과 현재 함수 비교
+   └─ 문서 없는 신규 함수 초안 생성
 
-함수 : 역할
-- `get_last_run_time()` : DOCS_BOT_LAST_RUN 파싱 (초기 실행 시 None 반환)
-- `get_merged_prs()` : 기간 내 머지된 PR 조회 (봇 PR 제외)
-- `close_existing_bot_prs()` : 열려 있는 봇 PR 자동 닫기
-- `create_branch()` : main 최신 커밋에서 새 브랜치 생성
-- `commit_and_push()` : GitHub API tree/commit 방식으로 파일 커밋
-- `create_pr()` : 문서 수정 PR 생성 + docs-bot 라벨 추가
-- `get_file_content()` : main 브랜치 파일 내용 조회
+7. 문서 변경 계산
+   ├─ 기존 섹션 교체
+   ├─ 삭제 함수 섹션 제거
+   ├─ 목차 갱신
+   └─ 위키링크와 frontmatter 보존 검사
 
-### 5.4. change_detector.py - 변경 감지
+8. 변경이 있으면 branch → commit → PR 생성
 
-PR diff에서 변경된 파일과 함수를 식별하고 변경 유형을 분류한다. 범위 축소가 목적이므로 경량 파싱(정규식)으로 처리
+9. workflow가 PR 생성 성공 시 DOCS_BOT_LAST_RUN 갱신
+```
 
-핵심 로직:
-- **diff 파싱** : unified diff를 파일별 추가/삭제 라인 정보로 분해
+AI provider나 API key가 없으면 변경 후보 요약을 출력하고 `ai_skipped=true`로 정상 종료하는 것이 의도된 흐름이다. 이 경우 기준 시각을 갱신하지 않아 설정을 추가한 뒤 같은 변경을 다시 처리할 수 있다. 다만 현재 `_print_summary()`에는 아래 한계가 있어 삭제 매핑이나 제외 문서 매핑이 있으면 예외로 종료될 수 있다.
 
-### 5.5. code_extractor.py - 코드 추출
+---
 
-main 브랜치의 최종 코드에서 함수의 구조화된 정보를 추출한다.
+## 4. 모듈
 
-추출 정보 : 시그니처, 반환 타입, 파라미터 (타입 + 이름), 접근 제한자, 한정자 (virtual, static, async, [[nodiscard]] 등), @brief/@param 주석, 코드 원본
+| 파일 | 역할 |
+|------|------|
+| `main.py` | 전체 파이프라인과 GitHub Actions output 조율 |
+| `config.py` | 경로 매핑, 제외 문서, provider, branch·label 상수 |
+| `git_utils.py` | PR 조회, main 파일 읽기, branch·commit·PR API |
+| `change_detector.py` | unified diff와 최종 파일을 이용한 함수 변경 감지 |
+| `code_extractor.py` | tree-sitter/정규식 기반 `FunctionInfo` 추출 |
+| `doc_mapper.py` | 클래스→문서, 함수→섹션 매핑 및 그룹화 |
+| `ai_client.py` | provider별 호출과 비교·생성 prompt |
+| `doc_writer.py` | 섹션 교체·삭제, 목차, PR 본문 생성 |
+| `requirements.txt` | Python 의존성 |
+| `__init__.py` | package marker |
 
-파싱 방식:
-- **tree-sitter (우선)**: C++/C# AST 기반으로 추출. tree-sitter 미설치 시 자동 비활성화
-- **정규식 (fallback)**: tree-sitter 없을 때 동작, return_type, parameters, access_modifier 모두 시그니처 문자열에서 파싱
+---
 
-### 5-6. doc_mapper.py - 문서 매핑
+## 5. 매핑과 문서 수정 규칙
 
-변경된 코드와 문서 파일/섹션을 연결한다.
+### 문서 파일 매핑
 
-**1단계 - 파일 매핑**:
-1. `CLASS_TO_DOC_OVERRIDE` 수동 매핑 테이블 조회
-2. `CODE_TO_DOCS_DIR_MAP`으로 코드 디렉토리 -> 문서 디렉토리 변환 후 클래스명 매칭
-3. 전체 Docs/ 디렉토리에서 클래스명 매칭 (fallback)
+1. `CLASS_TO_DOC_OVERRIDE`에서 소문자 클래스명을 찾는다.
+2. `CODE_TO_DOCS_DIR_MAP`으로 코드 경로를 문서 디렉터리에 대응시킨 뒤 `{ClassName}.md`를 찾는다.
+3. 전체 `Docs/` 파일명 index에서 같은 클래스명을 찾는다.
 
-**2단계 - 섹셩 매핑**:
-1. 헤딩에 함수명이 직접 포함된 섹션
-2. 코드 블록 내 함수 시그니처가 포함된 섹션
+### 섹션 매핑
+
+1. heading에 함수명이 포함된 섹션
+2. 코드 블록에 함수 시그니처가 포함된 섹션
 3. 본문에 함수명이 언급된 섹션
 
-상위 우선순위 매칭이 있으면 하위는 제외, 최대 3개 섹션으로 제한하여 토큰 비용 최소화
+가장 높은 우선순위의 결과만 사용하고 최대 3개 섹션으로 제한한다. 같은 문서·같은 시작 줄의 변경은 한 AI 요청으로 묶는다.
 
-**센션 그룹핑**: 같은 문서의 같은 섹션에 속한 변경을 묶어서 AI 호출 1회로 처리
+### 변경 적용
 
-### 5.7. ai_client.py - AI API 추상화
+- AI가 `needs_update=true`로 판정한 섹션만 교체한다.
+- 삭제 함수는 매핑된 섹션과 앞쪽 구분선을 제거한다.
+- 추가 초안은 대응 문서 경로가 있을 때만 `## 관련 문서` 앞에 넣을 수 있다.
+- 번호가 있는 `## N. 제목` 형식의 목차만 자동 갱신한다.
+- 기존 위키링크가 사라지면 warning을 남긴다.
+- 기존 YAML frontmatter와 파일 끝 newline을 보존한다.
 
-모델 교체 가능 구조, `AIClient` 추상 클래스를 상속하여 구현체 제공
-
-구현체 / 모델 기본값
-`ClaudeClient` / claude-sonnet-4-20250514
-`OpenAIClient` / gpt-4o
-`GeminiClient` / gemini-2.5-flash
-
-`create_client("gemini", api_key)` 방식으로 사용
-
-프롬프트 설계:
-- **시스템 프롬프트**: 역할 정의 + 인터페이스 관점 판단 기준 + 스타일 가이드
-- **비교 분석 프롬프트**: 최종 함수 코드 + 현재 문서 섹션 -> JSON 응답(needs_update + updated_content + reason)
-- **신규 생성 프롬프트**: 함수 정보 + 기존 문서 스타일 참고 -> 마크다운 섹션
-
-재시도 로직:
-- rate limit : 지수 백오프 2초 -> 4초 -> 8초, 최대 3회
-- timeout: 1회 재시도 후 스킵
-- 서버 에러: 2회 재시도 후 스킵
-- JSON 파싱 실패ㅣ is_error=True로 처리하여 문서 손상 방지
-
-### 5-8. doc_writer.py - 문서 수정 + PR 본문 생성
-
-**문서 수정 함수**
-
-함수 / 역할
-- `update_section()` / 기존 섹션을 AI 응답으로 교체 + 위키링크 손실 경고
-- `add_section()` / "## 관련 문서" 앞에 새 섹션 삽입
-- `remove_section()` / 삭제된 함수의 섹션 제거 (앞쪽 구분선/빈줄 정리)
-- `update_toc()` / "## 목차" 섹션을 현재 헤딩 구조에 맞게 재성성
-- `apply_all_chages()` / 위 함수들을 조합하여 파일별 변경 적용 (삭제 -> 수정 -> 추가 순서)
-
-**PR 본문 구성**
-- 참조 PR 목록
-- ✏️ 수정 : 함수명 + AI 판단 근거
-- ✨ 신규 생성 : 함수명
-- 🗑️ 삭제 : 클래스명::함수명
-- ⚠️ 아키텍처 문서 검토 필요 : 플래그
-- 📋 문서 없는 클래스 : 클래스별 skeleton 제안 (시그니처/파라미터/반환 타입 기반, `<details>` 접힘)
-- ❌ 수동 확인 필요 : AI 분석 실패, 섹션 매핑 실패 항목
-
-**옵시디언 호환성**
-- 위키링크 (`[[문서명]]`, `![[파일명.svg]]`) 보존 검증
-- frontmatter 보존
-- 연속 빈 줄 정리(4줄 이상 -> 3줄)
-
-### 5-9. docs-bot.yml - GitHub Actions 워크플로우
-
-트리거:
-- `schedule: cron "0 0 * * *"` (매일 00:00 UTC)
-- `pull_request: labeled` : (docs-reviw 라벨)
-- `workflow_dispatch` : (수동)
-
-환경 변수
-- `GITHUB_TOKEN` : 자동 제공
-- `DOCS_BOT_LAST_RUN` : Repository Variable에서 읽기
-- `AI_PROVIDER`, `AI_MODEL` : Repository Variables
-- `AI_API_KEY` : Repository Secret
-
-DOCS_BOT_LAST_RUN 갱신 조건 :
-- 초기 실행이 아님
-- AI 스킵이 아님 (AI 키 추가 전 변경 누락 방지)
-- PR 생성 송공
-- Job 성공
+스타일 입력은 `Docs/style_guide.md`를 사용한다.
 
 ---
 
-## 6. 설계 결정 요약
-항목 / 결정  / 이유
-- 자동화 범위 / 인터페이스 문서만 / 아키텍처 문서는 AI 판단이 어려워 보이고, 기술 부채 리스크가 존재
-- 트리거 / 매일 00:00 스케줄링 / 매 PR 호출 시 AI 토큰 비용이 부담됨
-- diff 기준 / main 브랜치 최종 코드 상태 / 오버로드, 중복 변경 방지
-- 문서 매핑 / 클래스명 기반 + 수동 override / frontmatter 불필요, 기존 프로젝트 구조 활용
-- 섹션 매핑 / 헤딩 우선 + 최대 3개 / 노이즈 감소 및 토큰 절약
-- AI 응답 파싱 실패 / is_error=True (문서 미적용) / 원본 응답을 문서에 적용하면 손상 위험
-- AI 미설정 시 / 정상 종료 + LAST_RUN 미갱신 / 키 추가 후 이전 변경 재처리 유도
-- 기본 봇 PR / 새 실행 시 자동 닫기 / main 기준 최신 상태만 유효
-- 기존 문서 정합성 / 완전하다는 전제 / 매번 검증 시 토큰 소모량이 극히 부담됨
-- 봇 역할 / 감지 + 제안 / AI 판단 한계 보완
+## 6. AI provider와 재시도
+
+현재 기본 모델은 아래와 같다.
+
+| provider | 기본 모델 | endpoint 방식 |
+|----------|-----------|---------------|
+| `claude` | `claude-sonnet-4-20250514` | Anthropic Messages API |
+| `openai` | `gpt-4o` | Chat Completions API |
+| `gemini` | `gemini-2.5-flash` | Gemini `generateContent` API |
+
+모든 provider는 요청 timeout `60초`를 사용한다. Claude와 OpenAI 요청은 최대 출력 `4096` token을 지정하고, Gemini 요청은 별도 출력 한도를 전달하지 않는다. 공통 재시도 정책은 아래와 같다.
+
+- rate limit: 2초, 4초, 8초 지수 backoff로 최대 3회
+- timeout: 1회 재시도
+- server error: 최대 2회 재시도
+- JSON 파싱 실패: `is_error=true`로 표시하고 문서에 적용하지 않음
 
 ---
 
-## 7. 한계
+## 7. 출력과 PR
 
-- AI가 "함수가 무엇을 하는지"는 파악 가능하나, "왜 이렇게 만들었는지"는 코드만으로 파악하기 어려움
-- 기능 문서에 한정해도 아키텍처적 맥락이 스며들 수 있음(인터페이스 관점 한정으로 최소화)
-- 신규 함수 문서 초안은 의도/사용 맥락이 부정확 할 수 있음 -> 리뷰 단계에서 보정
-- 동일 클래스 내 private 오버로드와 public 오버로드가 같은 이름일 때, 변경 감지는 되지만 문서 매핑 시 같은 섹션으로 연결됨
+GitHub Actions output은 `$GITHUB_OUTPUT`에 기록한다. 로컬 실행에서는 `[OUTPUT] key=value` 형식으로 출력한다.
+
+| output | 의미 |
+|--------|------|
+| `initial_run` | 기준 시각이 없어 초기화만 필요함 |
+| `current_time` | 초기 기준으로 저장할 UTC 시각 |
+| `has_changes` | 인터페이스 또는 문서 변경 후보 존재 여부 |
+| `ai_skipped` | AI 설정 부족으로 분석을 생략함 |
+| `pr_number` | 생성된 문서 PR 번호 |
+
+branch는 `docs-bot/YYYYMMDD-HHMMSS`, 제목과 commit message는 `[docs-bot] YYYY-MM-DD 문서 자동 갱신` 형식이다. PR에는 `docs-bot` 라벨을 붙인다.
+
+PR 본문은 참조 PR, 수정·신규·삭제 요약, 아키텍처 검토, 문서 없는 클래스 skeleton, 수동 확인 항목을 포함한다.
+
+---
+
+## 8. 한계와 수동 검토
+
+- AI 설정이 없고 삭제 매핑이 있으면 `_print_summary()`의 `functionn_info` 오타로 `AttributeError`가 발생한다.
+- AI 설정이 없고 제외 문서 매핑이 있으면 `_print_summary()`가 존재하지 않는 `FunctionInfo.doc_file_path`를 조회해 `AttributeError`가 발생한다. 현재 정상 요약 종료는 두 매핑 목록이 모두 비어 있을 때만 보장된다.
+- 경량 정규식 fallback은 지역 변수, initializer, 복잡한 macro를 함수로 오탐할 수 있다.
+- 오버로드와 같은 이름의 private/public 함수가 같은 문서 섹션에 매핑될 수 있다.
+- 구현 의도와 아키텍처 결정은 코드만으로 확정할 수 없다.
+- 함수가 여러 개념 문서에 흩어져 있으면 최대 3개 섹션 제한으로 일부 참조가 빠질 수 있다.
+- 문서가 전혀 없는 클래스는 자동 파일 생성 대상이 아니므로 반드시 사람이 생성 여부와 위치를 결정해야 한다.
+- 문서 수정 PR은 코드 owner가 시그니처, 상태 전제 조건, 스레드 안전성, 예외·오류 의미를 최종 검토해야 한다.
+
+---
+
+## 관련 문서
+
+- `Docs/style_guide.md` - 생성·수정 문서 형식
+- `Docs/Testing.md` - PR CI와 docs-bot 운영 위치
+- `.github/workflows/docs-bot.yml` - 실제 trigger와 환경 변수 전달

@@ -594,12 +594,14 @@ RIOCreateRequestQueue(
 
 ### 설정값 선택 가이드
 
+재전송 범위는 `0 < MIN_RETRANSMISSION_MS <= RETRANSMISSION_MS <= MAX_RETRANSMISSION_MS`를 만족해야 한다. 최소값과 최대값 중 하나만 제공하거나 범위를 어기면 옵션 로딩이 실패한다. `SIMULATED_PACKET_LOSS_PERCENT`는 코드에서 상한을 검사하지 않으므로 반드시 `[0, 100]` 범위로 설정한다.
+
 | 시나리오 | 권장 설정 |
 |----------|-----------|
 | 저레이턴시 우선 (FPS 게임) | `WORKER_THREAD_ONE_FRAME_MS=0`, `RETRANSMISSION_MS=50` |
-| CPU 절약 우선 (MMO) | `WORKER_THREAD_ONE_FRAME_MS=1`, `RETRANSMISSION_MS=200` |
+| CPU 절약 우선 (MMO) | `WORKER_THREAD_ONE_FRAME_MS=1`, 예: `MIN_RETRANSMISSION_MS=50`, `RETRANSMISSION_MS=200`, `MAX_RETRANSMISSION_MS=400` |
 | 세션 수 많음 (1000+) | `THREAD_COUNT` ≥ 4, `NUM_OF_SOCKET` 적절히 |
-| 불안정 네트워크 | `MAX_PACKET_RETRANSMISSION_COUNT` 증가, `RETRANSMISSION_MS` 증가 |
+| 불안정 네트워크 | `MAX_PACKET_RETRANSMISSION_COUNT` 증가, `RETRANSMISSION_MS`와 `MAX_RETRANSMISSION_MS`를 함께 조정 |
 | 고빈도 하트비트 필요 | `HEARTBEAT_THREAD_SLEEP_MS` 감소 |
 
 ---

@@ -62,6 +62,17 @@ public async Task<string> AskAsync(string userMessage)
 
 ---
 
+## API key 보안
+
+`GeminiClient`는 설정 JSON의 `GeminiSettings:ApiKey`를 평문으로 읽는다.
+
+- 실제 API key가 들어 있는 설정 파일을 공개 저장소에 커밋하지 않는다.
+- 개발용 template에는 빈 값이나 placeholder만 둔다.
+- 이미 commit, 로그, 문서에 노출된 key는 파일에서 지우는 것만으로 충분하지 않다. provider에서 즉시 폐기하고 새 key를 발급해야 한다.
+- 배포 환경에서는 사용자 secret, 환경별 비추적 설정, secret manager 등 저장소 밖의 값을 구성에 주입하는 방식을 사용한다.
+
+---
+
 ## 응답 파싱 (`GeminiExtensions.GetText`)
 
 ```csharp
@@ -77,3 +88,4 @@ response.Candidates
 
 ## 관련 문서
 - [[AiTreeGenerator]] — GeminiClient 사용 흐름
+- [[Testing]] — BotTester CI와 AI 리뷰 자동화 구분

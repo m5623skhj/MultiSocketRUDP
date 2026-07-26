@@ -474,23 +474,37 @@ RunRetransmissionThread:
 
 ---
 
+### `DatagramLossSimulator`
 
----
+```cpp
+DatagramLossSimulator(
+    unsigned int inLossPercent,
+    int inSeed);
+```
+
+`inLossPercent / 100.0`을 `std::bernoulli_distribution`의 확률로 사용한다. 수신 난수 엔진은 `inSeed`, 송신 난수 엔진은 `static_cast<unsigned int>(inSeed) ^ 0x9E3779B9u`로 초기화한다.
+
+> **전제 조건:** `inLossPercent`는 `0` 이상 `100` 이하여야 한다. 생성자와 옵션 로더는 상한을 보정하거나 거부하지 않는다.
+
+`RUDPIOHandler`는 손실률이 `0`이면 simulator를 생성하지 않는다. 아래 두 함수는 생성된 simulator 자체의 확률 판정이며 별도 활성화 상태를 갖지 않는다.
 
 ### `ShouldDropReceivedDatagram`
 
 ```cpp
-bool ShouldDropReceivedDatagram()
+[[nodiscard]]
+bool ShouldDropReceivedDatagram();
 ```
 
-패킷 손실 시뮬레이션 활성화 여부와 설정된 손실률에 따라 수신된 데이터그램을 폐기할지 결정한다.
+설정된 손실률에 따라 수신 데이터그램을 폐기할지 결정한다.
 
 #### 반환값
 
 | 반환값 | 조건 |
 |--------|------|
-| `true` | 시뮬레이션이 활성화되어 있고, 무작위 확률에 따라 폐기 대상으로 결정됨 |
-| `false` | 시뮬레이션이 비활성화되어 있거나, 폐기하지 않기로 결정됨 |
+| `true` | 수신 전용 난수 결과가 폐기 대상으로 결정됨 |
+| `false` | 수신 전용 난수 결과가 통과 대상으로 결정됨 |
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 > **주의:** 내부적으로 `recvLock`을 사용하여 난수 엔진 접근을 보호한다.
 
@@ -500,15 +514,18 @@ bool ShouldDropReceivedDatagram()
 ### `ShouldDropSendingDatagram`
 
 ```cpp
-bool ShouldDropSendingDatagram()
+[[nodiscard]]
+bool ShouldDropSendingDatagram();
 ```
 
-패킷 손실 시뮬레이션이 활성화된 경우, 설정된 `lossRate`에 따라 데이터그램을 드롭해야 하는지 결정한다.
+설정된 `lossRate`에 따라 송신 데이터그램을 폐기할지 결정한다.
 
 | 반환값 | 조건 |
 |--------|------|
-| `true` | 패킷 손실 시뮬레이션 활성 상태이며, 난수 발생 결과에 따라 드롭함 |
-| `false` | 시뮬레이션 비활성 상태이거나, 난수 발생 결과 드롭하지 않음 |
+| `true` | 송신 전용 난수 결과가 폐기 대상으로 결정됨 |
+| `false` | 송신 전용 난수 결과가 통과 대상으로 결정됨 |
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 > **주의:** 내부적으로 `sendLock`을 사용하여 난수 엔진 접근을 보호한다.
 

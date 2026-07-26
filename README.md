@@ -13,7 +13,7 @@
 
 1. 개요
 
-[이전에 개발중이던던 RUDP 프로젝트](https://github.com/m5623skhj/RUDPServer)에서 부족한 점을 보완하기 위해 생성한 프로젝트 입니다.
+[이전에 개발하던 RUDP 프로젝트](https://github.com/m5623skhj/RUDPServer)에서 부족한 점을 보완하기 위해 생성한 프로젝트입니다.
 
 이전에 개발중이던 RUDP에서는 하나의 소켓이 여러 클라이언트에 대한 수신을, SendWorkerThread가 소유한 소켓에 대해서 클라이언트에 대한 송신을 담당하였는데,
 
@@ -43,6 +43,9 @@
 | `CoreTest` | 서버/클라이언트 코어의 주요 로직의 계약을 검증하는 테스트 프로젝트입니다. |
 | `IntegrationTest` | 실제 서버-클라이언트 흐름을 기준으로 연결, 요청/응답, 재전송 동작을 검증하는 통합 테스트 프로젝트입니다. |
 | `IntegrationClientHarness` | 통합 테스트에서 클라이언트 동작을 별도 실행 대상으로 분리하기 위한 테스트 하네스입니다. |
+| `MultiSocketRUDPBotTester` | WPF 기반 행동 그래프 편집기와 C# RUDP 부하 테스트 클라이언트입니다. |
+| `MultiSocketRUDPBotTester.UnitTests` | BotTester 저장소, 암호화, 그래프, 실행 정책을 검증하는 xUnit 프로젝트입니다. |
+| `ProtocolInteropTest` | C++/C# AES-GCM 패킷 형식이 공용 vector와 일치하는지 검증하는 실행형 테스트입니다. |
 
 ---
 
@@ -53,12 +56,12 @@
   * 스레드는 아래와 같이 구성됩니다.
     * `IOWorkerThread` : IO 처리를 담당합니다.
     * `RecvLogicThread` : 클라이언트에게 받은 패킷을 바탕으로 연결, 연결 해제, 패킷 핸들러 호출 등을 담당합니다.
-    * `SessionBrokerThread` : 클라이언트가 어떤 소켓과 통신 할 것인지 알 수 있도록 지원해주는 스레드입니다.
+    * `SessionBrokerThread` : 클라이언트가 어떤 소켓과 통신할 것인지 알 수 있도록 지원하는 스레드입니다.
     * `RetransmissionThread` : 패킷 유실 등으로 인한 타임 아웃이 발생했을 때, 해당 패킷을 재전송해주는 스레드입니다.
       * 일정 횟수 재전송을 해보고, 응답이 오지 않을 경우, 클라이언트가 끊겼다고 판단하고, 해당 세션을 ReleaseThread에서 정리할 수 있도록 전달합니다.
     * `ReleaseThread` : 세션 정리를 전담하는 스레드입니다.
       * 단일 스레드입니다.
-    * `HeartbeatThread` : 객 세션의 통신 상태를 확인하기 위하여 일정 시간 마다 하트비트 패킷을 보내는 스레드입니다.
+    * `HeartbeatThread` : 각 세션의 통신 상태를 확인하기 위하여 일정 시간마다 하트비트 패킷을 보내는 스레드입니다.
       * 단일 스레드입니다.
   
 * `RUDPSession`
@@ -147,6 +150,18 @@
         * `DevServerCert` 라는 이름의 인증서를 제작합니다.
       * RemoveDevTLSCert.bat
         * `DevServerCert` 라는 이름을 가진 인증서를 제거합니다.
+      * CreateDevTLSPfx.bat
+        * 통합 테스트용 self-signed 인증서를 `IntegrationTest/TestCert.pfx`로 생성하고 인증서 저장소의 임시 원본을 제거합니다.
+   4. 테스트 실행
+      * `BuildCoreTestAndRunUnitTest.bat` : CoreTest를 Debug x64로 빌드하고 실행합니다.
+      * `BuildIntegrationTestAndRun.bat` : 필요한 PFX를 생성한 뒤 IntegrationTest를 빌드하고 실행합니다.
+   5. 패킷 정의 업로드
+      * `PacketUploader.bat` : `PacketDefine.yml`을 설정된 Google Sheets worksheet에 업로드합니다.
+      * `PacketGenerateAndUploader.bat` : 패킷 코드를 생성한 뒤 업로드를 연속 실행합니다.
+      * 자세한 주의점은 [PacketUploader](./Docs/Tools/PacketUploader.md)를 참고합니다.
+   6. 로그 압축
+      * `LogCompress.bat` : 스크립트 위치 아래 `Log Folder`의 `.txt` 로그를 검증된 `.tar.gz`로 압축합니다.
+      * 자세한 경로와 보존 정책은 [개발·테스트 보조 스크립트](./Docs/Tools/DevelopmentScripts.md)를 참고합니다.
 
 ---
 
@@ -158,7 +173,9 @@
 
 * `CoreTest`는 GoogleTest 기반 유닛 테스트입니다.
 * `IntegrationTest`는 실제 서버/클라이언트, TLS, UDP 흐름을 사용하는 통합 테스트입니다.
-* PR CI는 변경 경로에 따라 Native GTest와 BotTester 테스트를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
+* `MultiSocketRUDPBotTester.UnitTests`는 xUnit 기반 BotTester 유닛 테스트입니다.
+* `ProtocolInteropTest`는 8개의 공용 vector로 C++/C# 패킷 암호화 호환성을 검증합니다.
+* PR CI는 변경 경로에 따라 Native GTest와 BotTester xUnit/프로토콜 테스트를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
 * 자세한 실행 방법과 CI 주의점은 [Testing](./Docs/Testing.md)을 참고합니다.
 
 ---

@@ -35,6 +35,7 @@ MultiSocketRUDP-Docs/
 │   ├── RUDPPacketProcessor.md
 │   ├── RUDPThreadManager.md
 │   ├── SendPacketInfo.md
+│   ├── RetransmissionTimeoutEstimator.md
 │   ├── Ticker.md
 │   └── MemoryTracer.md
 │
@@ -55,8 +56,13 @@ MultiSocketRUDP-Docs/
 ├── Logger/
 │   └── Logger.md
 │
+├── ContentServer/
+│   └── PlayerManager.md
+│
 ├── Tools/
-│   └── PacketGenerator.md
+│   ├── PacketGenerator.md
+│   ├── PacketUploader.md
+│   └── DevelopmentScripts.md
 │
 └── Diagrams/              ← SVG 다이어그램 (문서에서 인라인 표시)
     ├── README.md
@@ -106,7 +112,10 @@ BotTester/
 │   ├── ActionNodes.md         ← 전체 노드 레퍼런스
 │   ├── RuntimeContext.md      ← 실행 컨텍스트
 │   ├── GraphValidator.md      ← 검증기
-│   └── NodeExecutionStats.md  ← 통계
+│   ├── NodeExecutionStats.md  ← 통계
+│   └── PacketSchema.md        ← 패킷 입력 schema
+├── Graph/
+│   └── GraphFileStorage.md    ← 그래프 파일 저장/복원
 ├── UI/
 │   ├── BotActionGraphWindow.md ← 메인 에디터
 │   ├── CanvasRenderer.md       ← 렌더링·드래그·연결
@@ -117,5 +126,7 @@ BotTester/
 └── ClientCore/
     ├── BotTesterCore.md       ← 봇 세션 관리
     ├── RudpSession_CS.md      ← C# RUDP 세션
-    └── SessionGetter_CS.md    ← TLS 세션 수신
+    ├── SessionGetter_CS.md    ← TLS 세션 수신
+    ├── BufferStore.md         ← 미응답 패킷 추적
+    └── PacketLossSimulator.md ← UDP 손실 시뮬레이션
 ```

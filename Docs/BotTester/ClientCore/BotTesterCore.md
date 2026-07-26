@@ -102,3 +102,5 @@ int GetActiveBotCount()                   // IsConnected() == true 개수
 - [[RudpSession_CS]] — Client가 상속하는 세션 클래스
 - [[SessionGetter_CS]] — TLS 세션 정보 수신
 - [[BotActionGraph]] — 봇에 적용되는 행동 트리
+- [[PacketLossSimulator]] — RTT 테스트의 양방향 손실 시뮬레이션
+- [[BufferStore]] — 세션의 미응답 송신 패킷 추적

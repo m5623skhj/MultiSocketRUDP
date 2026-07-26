@@ -6,7 +6,7 @@
 
 ## 테스트 구성
 
-현재 테스트는 세 범위로 구성한다.
+현재 테스트는 네 범위로 구성한다.
 
 - `CoreTest`
   - 서버 코어 내부 컴포넌트를 대상으로 하는 GoogleTest 기반 유닛 테스트
@@ -16,7 +16,9 @@
   - TLS 세션 브로커, UDP CONNECT, 요청/응답, 클라이언트 disconnect/stop, 재전송 실패 disconnect, 다중 클라이언트, 순서 보장 흐름을 검증
 - `ProtocolInteropTest`
   - BotTester의 C# 패킷 암호화 구현을 검증하는 실행형 테스트
-  - C++ CoreTest와 공용 protocol vector를 사용해 AES-GCM 결과 호환성을 검증
+  - C++ CoreTest와 8개의 공용 protocol vector를 사용해 방향·core/full packet별 AES-GCM 결과 호환성을 검증
+- `MultiSocketRUDPBotTester.UnitTests`
+  - BotTester의 저장소, 암호화, graph, 실행 통계, AI 응답 파서, 조건 평가, 패킷 schema, 손실 시뮬레이터를 검증하는 xUnit 프로젝트
 
 `IntegrationClientHarness`는 `IntegrationTest`가 별도 프로세스로 실행하는 테스트용 클라이언트 실행 파일이다.
 
@@ -44,6 +46,7 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
 - `RetransmissionTimeoutEstimatorTest`
 - `RingBufferTest`
 - `SendPacketInfoTest`
+- `ServerUtilityTypesTest`
 - `RUDPSessionTest`
 - `RUDPSessionManagerTest`
 - `SessionCryptoContextTest`
@@ -65,6 +68,14 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
   - `RELEASING` 상태가 아닌 세션 반환 요청을 거부한다.
   - `BY_RETRANSMISSION` disconnect가 전체 disconnect 및 retransmission disconnect 통계를 함께 증가시키는지 검증한다.
   - `BY_ABORT_RESERVED`는 연결된 세션의 disconnect 통계로 계산하지 않는지 검증한다.
+- `ServerUtilityTypesTest`
+  - `IOContext`, `RecvBuffer`, `PacketSequenceSetKey`의 초기화·순서 계약을 검증한다.
+  - `DatagramLossSimulator`의 0%/100% 경계와 같은 seed 재현성을 검증한다.
+  - 초기화 전 `RIOManager` API가 RIO 함수를 호출하지 않고 안전한 실패값을 반환하는지 검증한다.
+- `RUDPSessionTest`, `RUDPIOHandlerTest`, `SendPacketInfoTest`
+  - 세션의 잘못된 상태·packet ID·owner generation 경계와 ACK 정리를 검증한다.
+  - 재전송 scheduler의 참조 카운트, stale version, erased entry 정리를 검증한다.
+  - RIO buffer 등록 실패와 잘못된 소켓에서 context 및 I/O mode가 원복되는지 검증한다.
 
 빌드:
 
@@ -77,6 +88,34 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 ```powershell
 .\MultiSocketRUDP\x64\Debug\CoreTest.exe
 ```
+
+---
+
+## BotTester 유닛 테스트
+
+프로젝트:
+
+```text
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj
+```
+
+현재 5개 테스트 파일에 58개 test method가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다.
+
+| 테스트 파일 | 주요 범위 |
+|-------------|-----------|
+| `BufferStoreTests.cs` | 송신/보류 저장소 순서, 중복 처리, snapshot, 병렬 추가·제거, 타임스탬프 |
+| `NetBufferCryptoTests.cs` | little-endian 직렬화, packet layout, AES-GCM 왕복, 변조·잘못된 키/방향 거부, nonce |
+| `GraphTests.cs` | graph 검증, 순환·깊이, fluent builder, node builder registry와 설정 변환 |
+| `RuntimeStatsTriggerTests.cs` | runtime context, 실행 통계, trigger 조건과 동시 갱신 |
+| `ServicesAndPolicyTests.cs` | AI 응답 parsing, tree policy, 조건 평가, 손실 시뮬레이터, packet schema |
+
+실행:
+
+```powershell
+dotnet test .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug
+```
+
+테스트는 WPF 타입을 참조하므로 target framework는 `net9.0-windows7.0`이며 `UseWPF`가 활성화되어 있다. static registry나 schema를 변경하는 테스트는 원래 상태를 복원해야 하며, test assembly는 병렬 실행을 비활성화한다.
 
 ---
 
@@ -125,6 +164,12 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 .\MultiSocketRUDP\x64\Debug\IntegrationTest.exe
 ```
 
+각 시나리오는 실제 서버와 별도 client harness 프로세스를 시작하고 timeout·재전송 대기까지 수행하므로 전체 suite는 수 분이 걸릴 수 있다. 특정 시나리오만 확인할 때는 GoogleTest filter를 사용한다.
+
+```powershell
+.\MultiSocketRUDP\x64\Debug\IntegrationTest.exe --gtest_filter=IntegrationFixture.ConnectHandshakeCompletesAndSessionCountsUpdate
+```
+
 또는 빌드와 인증서 생성을 포함한 스크립트를 사용한다.
 
 ```powershell
@@ -141,7 +186,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json
 ```
 
-C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 평문 및 예상 패킷을 읽는다.
+C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문 및 예상 패킷을 읽는다. 현재 vector는 네 방향과 core/full 조합을 모두 포함한다.
 
 BotTester 전체 빌드와 protocol test 실행:
 
@@ -218,8 +263,9 @@ PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 
 1. .NET 9 설정
 2. `MultiSocketRUDPBotTester.sln` 전체 빌드
-3. `ProtocolInteropTest.csproj` 빌드 및 실행
-4. C++과 C#이 공용 `ProtocolInteropVector.json`을 기준으로 동일한 암호화 결과를 내는지 검증
+3. `MultiSocketRUDPBotTester.UnitTests.csproj` xUnit 테스트 실행
+4. `ProtocolInteropTest.csproj` 빌드 및 실행
+5. C++과 C#이 공용 `ProtocolInteropVector.json`을 기준으로 동일한 암호화 결과를 내는지 검증
 
 ### 필수 체크
 
@@ -294,6 +340,7 @@ error C1083: Cannot open source file
 - `.github/workflows/GoogleTest.yml`
 - `.github/workflows/BotTester.yml`
 - `MultiSocketRUDPBotTester/ProtocolInteropTest`
+- `MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests`
 
 ---
 

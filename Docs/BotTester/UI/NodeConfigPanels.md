@@ -108,3 +108,5 @@ ConfigUi.SaveButton(onClick)          // Save 버튼
 ## 관련 문서
 - [[BotActionGraphWindow]] — 다이얼로그 호출
 - [[ActionNodes]] — 노드별 설정값 의미
+- [[PacketSchema]] — SendPacket 입력 필드 schema
+- [[GraphFileStorage]] — 설정값의 파일 저장 모델

@@ -16,27 +16,32 @@
 
 2. UI
 
-1 메인 페이지 UI 구성  
+2.1 메인 페이지 UI 구성
 <img width="782" height="385" alt="image" src="https://github.com/user-attachments/assets/ea8d54ff-bbf4-4e84-aee3-83a8e97f5c8c" />  
 * Set Bot Action Graph : 사용자가 봇의 행동을 정의하도록 봇 액션 그래프를 그릴 수 있는 보드 및 노드를 제공
 * Start Bot Test : 액션 그래프가 작성 및 적용되어 있다면, 해당 그래프에 따라 봇이 행동을 시작
 * Stop Bot Test : 봇 테스트 중지
 
-2 Start Bot Action Graph UI 구성
+2.2 Bot Action Graph UI 구성
 <img width="1915" height="1025" alt="image" src="https://github.com/user-attachments/assets/8cab5776-772c-401f-ae65-3d3021d106d9" />
 * AI Tree Generator : AI에게 액션 노드 트리를 구성하도록 요청
 * Add Node : 좌측의 노드들 중 현재 선택되어 있는 노드를 보드에 추가
 * Save Graph : 현재 그래프를 저장
 * Load Graph : 저장된 그래프를 불러옴
-* Vaildate Graph : 그래프의 정합성을 검증
+* Validate Graph : 그래프의 정합성을 검증
 * Build Graph : 그래프를 빌드
 * Apply to BotTester : 빌드된 봇 테스트를 적용, 해당 버튼 클릭 이후 부터 메인 페이지의 Start Bot Test의 진행이 현재 구성으로 변경됨
 * View Statistics : 노드 통계 창을 출력
 
-2.1 AI를 이용한 액션 그래프 제작  
+그래프 파일의 기본 확장자는 `.botgraph.json`입니다. 파일을 불러오면 편집 상태만 복원되므로 Build의 내부 검증을 통과한 뒤 Apply를 다시 수행해야 합니다. Validate는 빌드된 그래프를 필요할 때 다시 확인하는 기능입니다. 상세 형식과 현재 적용 제한은 [GraphFileStorage](../Docs/BotTester/Graph/GraphFileStorage.md)를 참고합니다.
+
+2.3 AI를 이용한 액션 그래프 제작
 ![bandicam2026-02-0200-29-17-679-ezgif com-video-to-gif-converter](https://github.com/user-attachments/assets/94b2be91-f57c-4a48-9d1e-067577a2acc5)  
 봇 테스트 노드를 직접 그리기 어려울 경우, 원하는 테스트 내용을 입력하면 AI에게 요청하여 테스트 노드 트리를 생성할 수 있습니다.  
 단, 이 기능을 사용할 경우, AI가 원하는 테스트 내용을 정상적으로 생성했는지에 대한 확인이 필요합니다.  
+
+2.4 노드 통계 창
+<img width="883" height="584" alt="image" src="https://github.com/user-attachments/assets/115d479e-13cd-4009-810a-b74895efb1fb" />
 
 ---
 
@@ -54,7 +59,10 @@ C++/C# 프로토콜 상호운용 테스트:
 dotnet run --project .\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug
 ```
 
-PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출된다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 프로토콜 테스트를 실행한다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행된다.
+BotTester xUnit 테스트:
 
-1.2.2 노드 통계 창  
-<img width="883" height="584" alt="image" src="https://github.com/user-attachments/assets/115d479e-13cd-4009-810a-b74895efb1fb" />
+```powershell
+dotnet test .\MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug
+```
+
+PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출됩니다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 xUnit 테스트와 프로토콜 상호운용 테스트를 실행합니다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행됩니다.

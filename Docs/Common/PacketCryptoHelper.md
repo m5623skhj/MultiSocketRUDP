@@ -46,21 +46,21 @@ CONNECT, DISCONNECT, SEND_REPLY, HEARTBEAT 계열 core packet에는 `PacketId`�
 
 ```cpp
 static void EncodePacket(
-    NetBuffer& packet,
-    PacketSequence packetSequence,
-    PACKET_DIRECTION direction,
+    OUT NetBuffer& packet,
+    const PacketSequence packetSequence,
+    const PACKET_DIRECTION direction,
     const std::vector<unsigned char>& sessionSalt,
     const BCRYPT_KEY_HANDLE& sessionKeyHandle,
-    bool isCorePacket);
+    const bool isCorePacket);
 
 static void EncodePacket(
-    NetBuffer& packet,
-    PacketSequence packetSequence,
-    PACKET_DIRECTION direction,
+    OUT NetBuffer& packet,
+    const PacketSequence packetSequence,
+    const PACKET_DIRECTION direction,
     const unsigned char* sessionSalt,
-    size_t sessionSaltSize,
+    const size_t sessionSaltSize,
     const BCRYPT_KEY_HANDLE& sessionKeyHandle,
-    bool isCorePacket);
+    const bool isCorePacket);
 ```
 
 패킷이 이미 인코딩된 상태면 즉시 반환한다.
@@ -72,19 +72,19 @@ static void EncodePacket(
 
 ```cpp
 static bool DecodePacket(
-    NetBuffer& packet,
+    OUT NetBuffer& packet,
     const std::vector<unsigned char>& sessionSalt,
     const BCRYPT_KEY_HANDLE& sessionKeyHandle,
-    bool isCorePacket,
-    PACKET_DIRECTION direction);
+    const bool isCorePacket,
+    const PACKET_DIRECTION direction);
 
 static bool DecodePacket(
-    NetBuffer& packet,
+    OUT NetBuffer& packet,
     const unsigned char* sessionSalt,
-    size_t sessionSaltSize,
+    const size_t sessionSaltSize,
     const BCRYPT_KEY_HANDLE& sessionKeyHandle,
-    bool isCorePacket,
-    PACKET_DIRECTION direction);
+    const bool isCorePacket,
+    const PACKET_DIRECTION direction);
 ```
 
 수신 패킷의 sequence와 AuthTag를 읽고, 송신 시와 같은 nonce/AAD 범위로 AES-GCM 복호화를 수행한다.
@@ -93,7 +93,7 @@ static bool DecodePacket(
 ### `SetHeader`
 
 ```cpp
-static void SetHeader(NetBuffer& netBuffer, int extraSize = 0);
+static void SetHeader(OUT NetBuffer& netBuffer, const int extraSize = 0);
 ```
 
 `HeaderCode`와 payload 길이를 기록한다. `extraSize`는 아직 쓰기 전인 AuthTag 같은 후미 데이터를 payload 길이에 포함할 때 사용한다.
@@ -143,6 +143,46 @@ bodyOffsetWithNotHeaderForCorePacket =
 
 ---
 
+## 테스트용 인터페이스와 adapter
+
+`IPacketCryptoHelper`는 `DecodePacket`, `EncodePacket`, `SetHeader`를 추상화한다. `PacketCryptoHelperAdapter`는 각 호출을 정적 `PacketCryptoHelper`로 전달한다.
+
+```cpp
+class IPacketCryptoHelper
+{
+public:
+    virtual ~IPacketCryptoHelper() = default;
+
+    [[nodiscard]]
+    virtual bool DecodePacket(
+        OUT NetBuffer& packet,
+        const unsigned char* sessionSalt,
+        size_t sessionSaltSize,
+        const BCRYPT_KEY_HANDLE& sessionKeyHandle,
+        bool isCorePacket,
+        PACKET_DIRECTION direction) = 0;
+
+    virtual void EncodePacket(
+        OUT NetBuffer& packet,
+        PacketSequence packetSequence,
+        PACKET_DIRECTION direction,
+        const unsigned char* sessionSalt,
+        size_t sessionSaltSize,
+        const BCRYPT_KEY_HANDLE& sessionKeyHandle,
+        bool isCorePacket) = 0;
+
+    virtual void SetHeader(OUT NetBuffer& netBuffer) = 0;
+};
+```
+
+아래 경고는 `IPacketCryptoHelper::DecodePacket()`에 적용된다.
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
+
+서버 패킷 프로세서는 이 인터페이스를 주입받아 테스트에서 암호화 성공·실패 경로를 독립적으로 제어한다. 운영 adapter의 `SetHeader()`는 `extraSize`를 받지 않고 기본값 `0`으로 호출한다.
+
+---
+
 ## 주의사항
 
 - `PACKET_DIRECTION`은 송신자와 수신자가 동일하게 해석해야 한다. 방향이 다르면 nonce가 달라져 복호화가 실패한다.
@@ -159,3 +199,4 @@ bodyOffsetWithNotHeaderForCorePacket =
 - [[Common/PacketFormat]] - 공용 패킷 레이아웃
 - [[PacketProcessing]] - 서버 수신 처리 흐름
 - [[RUDPSession]] - 서버 송신 경로
+- [[Testing]] - 실제 암호화 경로와 adapter 기반 실패 경로 검증

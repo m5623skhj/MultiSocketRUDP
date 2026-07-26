@@ -63,10 +63,12 @@ Worker()
     큐를 copyQueue로 swap
     WriteLogImpl(copyQueue)   ← JSON 직렬화 → 파일 쓰기
   case 1 (STOP_HANDLE):
-    Sleep(10초)               ← 남은 로그 수집 대기
-    WriteLogImpl(copyQueue)
+    Sleep(10초)
+    WriteLogImpl(copyQueue)   ← stop event 직후 swap한 snapshot 기록
     return
 ```
+
+stop event를 받은 뒤 10초 동안 새로 들어온 로그는 위 snapshot에 포함되지 않는다. 이후 `Logger` 소멸자가 대기 큐를 다시 swap해 남은 로그를 기록한다.
 
 ---
 
@@ -108,16 +110,15 @@ StopLoggerThread()
 
 ## 로그 압축 도구
 
-`Tool/LogCompress.bat`:
-- 당일 `.txt` 로그 → `Archive/` 폴더에 `.tar.gz` 압축
+각 `LogCompress.bat`는 **스크립트 파일이 있는 디렉터리 아래** `Log Folder`를 처리한다.
+
+- root와 1단계 하위 폴더의 `.txt` 로그 → `Archive/` 폴더에 `.tar.gz` 압축
 - 무결성 검사 실패 시 원본 유지, 손상 아카이브 삭제
-- 이전 날 아카이브 자동 삭제
+- 오늘 날짜가 아닌 기존 아카이브 자동 삭제
+- 같은 날짜·폴더의 아카이브가 이미 있으면 해당 폴더를 건너뜀
 
----
+상세 경로와 보존 주의점은 [[DevelopmentScripts]]를 참고한다.
 
-## 관련 문서
-- [[MultiSocketRUDPCore]] — RunLoggerThread / StopLoggerThread 호출
-- [[RUDPClientCore]] — 클라이언트 측 Logger 사용
 ---
 
 ## 현재 코드 기준 함수 설명
@@ -155,3 +156,11 @@ StopLoggerThread()
 
 #### `void WriteLogToFile(const std::shared_ptr<LogBase>& logObject)`
 - 단일 로그 객체를 JSON 라인 형식으로 파일에 기록한다.
+
+---
+
+## 관련 문서
+
+- [[MultiSocketRUDPCore]] — RunLoggerThread / StopLoggerThread 호출
+- [[RUDPClientCore]] — 클라이언트 측 Logger 사용
+- [[DevelopmentScripts]] — 로그 압축 대상 경로와 보존 정책
