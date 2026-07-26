@@ -4,6 +4,7 @@
 #include <WS2tcpip.h>
 #include <Windows.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -177,6 +178,8 @@ namespace
 		std::atomic_int pingRequestCount{ 0 };
 		std::atomic_int echoRequestCount{ 0 };
 		std::atomic_int orderedRequestCount{ 0 };
+		std::mutex connectedSessionIdsMutex;
+		std::vector<SessionIdType> connectedSessionIds;
 		std::mutex lastEchoMutex;
 		std::string lastEchoRequest{};
 
@@ -188,6 +191,10 @@ namespace
 			pingRequestCount.store(0, std::memory_order_relaxed);
 			echoRequestCount.store(0, std::memory_order_relaxed);
 			orderedRequestCount.store(0, std::memory_order_relaxed);
+			{
+				std::scoped_lock lock(connectedSessionIdsMutex);
+				connectedSessionIds.clear();
+			}
 			std::scoped_lock lock(lastEchoMutex);
 			lastEchoRequest.clear();
 		}
@@ -234,6 +241,8 @@ namespace
 		void OnConnected() override
 		{
 			GetSessionStats().connectedCount.fetch_add(1, std::memory_order_relaxed);
+			std::scoped_lock lock(GetSessionStats().connectedSessionIdsMutex);
+			GetSessionStats().connectedSessionIds.emplace_back(GetSessionId());
 		}
 
 		void OnDisconnected() override
@@ -638,6 +647,56 @@ namespace
 
 		std::scoped_lock lock(GetSessionStats().lastEchoMutex);
 		EXPECT_EQ(GetSessionStats().lastEchoRequest, "integration-echo");
+	}
+
+	TEST_F(IntegrationFixture, PingPongRoundTripUsesRegisteredApplicationHandler)
+	{
+		ClientHarnessProcess process;
+		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"ping" })));
+
+		const auto result = process.Wait(45s);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+		EXPECT_EQ(GetSessionStats().pingRequestCount.load(std::memory_order_relaxed), 1);
+	}
+
+	TEST_F(IntegrationFixture, ReleasedSessionIdReturnsToRotationAndIsReusedAfterPoolCycle)
+	{
+		const unsigned short unusedBefore = server->GetUnusedSessionCount();
+		ClientHarnessProcess disconnectProcess;
+		ASSERT_TRUE(disconnectProcess.Start(BuildClientArgs({ L"--scenario", L"disconnect" })));
+
+		ASSERT_TRUE(WaitUntil(25s, [this, unusedBefore]()
+		{
+			return GetSessionStats().releasedCount.load(std::memory_order_relaxed) == 1 &&
+				server->GetUnusedSessionCount() == unusedBefore;
+		}));
+
+		const auto disconnectResult = disconnectProcess.Wait(45s);
+		ASSERT_TRUE(disconnectResult.completed);
+		ASSERT_EQ(disconnectResult.exitCode, 0u) << disconnectResult.output;
+
+		ClientHarnessProcess poolCycleProcess;
+		ASSERT_TRUE(poolCycleProcess.Start(BuildClientArgs(
+			{ L"--scenario", L"multi-echo", std::to_wstring(unusedBefore) })));
+
+		const auto poolCycleResult = poolCycleProcess.Wait(70s);
+		ASSERT_TRUE(poolCycleResult.completed);
+		ASSERT_EQ(poolCycleResult.exitCode, 0u) << poolCycleResult.output;
+		ASSERT_EQ(
+			GetSessionStats().echoRequestCount.load(std::memory_order_relaxed),
+			unusedBefore);
+
+		std::scoped_lock lock(GetSessionStats().connectedSessionIdsMutex);
+		ASSERT_EQ(
+			GetSessionStats().connectedSessionIds.size(),
+			static_cast<size_t>(unusedBefore) + 1);
+		const SessionIdType releasedSessionId = GetSessionStats().connectedSessionIds.front();
+		const auto reusedCount = std::count(
+			GetSessionStats().connectedSessionIds.cbegin() + 1,
+			GetSessionStats().connectedSessionIds.cend(),
+			releasedSessionId);
+		EXPECT_EQ(reusedCount, 1);
 	}
 
 	TEST_F(IntegrationFixture, MissingReplyAckTriggersServerRetransmissionDisconnect)

@@ -89,27 +89,36 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private List<ActionNodeBase>? ResolveCandidates(TriggerType triggerType, PacketId? packetId)
+        internal List<ActionNodeBase> ResolveCandidates(TriggerType triggerType, PacketId? packetId)
         {
             if (triggerType == TriggerType.OnPacketReceived && packetId.HasValue)
             {
+                List<ActionNodeBase> candidates;
+                lock (triggerNodesLock)
+                {
+                    candidates = triggerNodes
+                        .GetValueOrDefault(triggerType)?
+                        .Where(node => node.Trigger?.PacketId.HasValue == false)
+                        .ToList() ?? [];
+                }
+
                 lock (packetTriggerNodesLock)
                 {
-                    if (!packetTriggerNodes.TryGetValue(packetId.Value, out var list))
+                    if (packetTriggerNodes.TryGetValue(packetId.Value, out var list))
                     {
-                        return null;
+                        candidates.AddRange(list);
                     }
-
-                    Log.Debug("Found {Count} nodes for PacketId {PacketId}", list.Count, packetId);
-                    return list.ToList();
                 }
+
+                Log.Debug("Found {Count} nodes for PacketId {PacketId}", candidates.Count, packetId);
+                return candidates;
             }
 
             lock (triggerNodesLock)
             {
                 if (!triggerNodes.TryGetValue(triggerType, out var list))
                 {
-                    return null;
+                    return [];
                 }
 
                 Log.Debug("Found {Count} nodes for TriggerType {Type}", list.Count, triggerType);

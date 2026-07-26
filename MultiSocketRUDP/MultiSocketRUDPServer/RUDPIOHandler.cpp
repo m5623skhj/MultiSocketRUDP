@@ -37,6 +37,11 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 		LOG_ERROR("IOCompleted context is nullptr");
 		return false;
 	}
+	if (context->session == nullptr)
+	{
+		LOG_ERROR("IOCompleted context session is nullptr");
+		return false;
+	}
 
 	switch (context->ioType)
 	{

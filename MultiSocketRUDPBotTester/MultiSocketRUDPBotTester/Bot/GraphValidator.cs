@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace MultiSocketRUDPBotTester.Bot
 {
     public enum ValidationSeverity { Error, Warning, Info }
@@ -190,8 +192,9 @@ namespace MultiSocketRUDPBotTester.Bot
                     case SendPacketNode { PacketId: PacketId.InvalidPacketId }:
                         result.AddError(node.Name, "Invalid PacketId", "Configuration");
                         break;
-                    case SendPacketNode { PacketBuilder: null }:
-                        result.AddError(node.Name, "PacketBuilder is null", "Configuration");
+                    case SendPacketNode sendPacket
+                        when sendPacket.PacketBuilder == null && PacketSchema.Get(sendPacket.PacketId) == null:
+                        result.AddError(node.Name, "No PacketBuilder or packet schema is available", "Configuration");
                         break;
 
                     case DelayNode { DelayMilliseconds: <= 0 }:
@@ -204,6 +207,9 @@ namespace MultiSocketRUDPBotTester.Bot
                     case WaitForPacketNode { ExpectedPacketId: PacketId.InvalidPacketId }:
                         result.AddError(node.Name, "Invalid expected PacketId", "Configuration");
                         break;
+                    case WaitForPacketNode { TimeoutMilliseconds: <= 0 }:
+                        result.AddError(node.Name, "Timeout must be positive", "Configuration");
+                        break;
                     case WaitForPacketNode { TimeoutNodes.Count: 0 }:
                         result.AddWarning(node.Name, "No timeout handler configured", "Logic");
                         break;
@@ -215,8 +221,26 @@ namespace MultiSocketRUDPBotTester.Bot
                     case LoopNode { ContinueCondition: null }:
                         result.AddError(node.Name, "Continue condition is null", "Configuration");
                         break;
+                    case LoopNode { MaxIterations: <= 0 }:
+                        result.AddError(node.Name, "Maximum iterations must be positive", "Configuration");
+                        break;
                     case LoopNode { MaxIterations: > 10000 }:
                         result.AddWarning(node.Name, "Very high iteration limit", "Performance");
+                        break;
+
+                    case RandomDelayNode { MinDelayMilliseconds: < 0 }:
+                        result.AddError(node.Name, "Minimum delay cannot be negative", "Configuration");
+                        break;
+                    case RandomDelayNode randomDelay
+                        when randomDelay.MaxDelayMilliseconds < randomDelay.MinDelayMilliseconds:
+                        result.AddError(node.Name, "Maximum delay must be greater than or equal to minimum delay", "Configuration");
+                        break;
+
+                    case RepeatTimerNode { RepeatCount: <= 0 }:
+                        result.AddError(node.Name, "Repeat count must be positive", "Configuration");
+                        break;
+                    case RepeatTimerNode { IntervalMilliseconds: < 0 }:
+                        result.AddError(node.Name, "Repeat interval cannot be negative", "Configuration");
                         break;
 
                     case AssertNode { Condition: null }:
@@ -226,12 +250,60 @@ namespace MultiSocketRUDPBotTester.Bot
                         result.AddWarning(node.Name, "No failure handler configured", "Logic");
                         break;
 
+                    case RetryNode { MaxRetries: <= 0 }:
+                        result.AddError(node.Name, "Maximum retries must be positive", "Configuration");
+                        break;
+                    case RetryNode { RetryDelayMilliseconds: < 0 }:
+                        result.AddError(node.Name, "Retry delay cannot be negative", "Configuration");
+                        break;
+
                     case RandomChoiceNode { Choices.Count: < 2 }:
                         result.AddError(node.Name, "RandomChoiceNode requires at least 2 choices", "Configuration");
+                        break;
+                    case RandomChoiceNode randomChoice
+                        when randomChoice.Choices.Any(choice => choice.Node == null):
+                        result.AddError(node.Name, "Every random choice requires a target node", "Configuration");
+                        break;
+                    case RandomChoiceNode randomChoice
+                        when randomChoice.Choices.Any(choice => choice.Weight <= 0):
+                        result.AddError(node.Name, "Every random choice weight must be positive", "Configuration");
+                        break;
+
+                    case SetVariableNode setVariable when string.IsNullOrWhiteSpace(setVariable.VariableName):
+                        result.AddError(node.Name, "Variable name cannot be empty", "Configuration");
+                        break;
+                    case SetVariableNode setVariable when !IsSupportedVariableType(setVariable.ValueType):
+                        result.AddError(node.Name, $"Unsupported variable type: {setVariable.ValueType}", "Configuration");
+                        break;
+                    case SetVariableNode setVariable when !CanParseVariableValue(setVariable):
+                        result.AddError(node.Name, $"Value is invalid for type {setVariable.ValueType}", "Configuration");
                         break;
                 }
             }
         }
+
+        private static bool IsSupportedVariableType(string valueType) =>
+            valueType.ToLowerInvariant() is "int" or "long" or "float" or "double" or "bool" or "string";
+
+        private static bool CanParseVariableValue(SetVariableNode node) =>
+            node.ValueType.ToLowerInvariant() switch
+            {
+                "int" => int.TryParse(node.StringValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
+                "long" => long.TryParse(node.StringValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
+                "float" => float.TryParse(
+                    node.StringValue,
+                    NumberStyles.Float | NumberStyles.AllowThousands,
+                    CultureInfo.InvariantCulture,
+                    out _),
+                "double" => double.TryParse(
+                    node.StringValue,
+                    NumberStyles.Float | NumberStyles.AllowThousands,
+                    CultureInfo.InvariantCulture,
+                    out _),
+                "bool" => bool.TryParse(node.StringValue, out _),
+                "string" => true,
+                _ => false
+            };
 
         private static void ValidateConnectivity(List<ActionNodeBase> nodes, GraphValidationResult result)
         {

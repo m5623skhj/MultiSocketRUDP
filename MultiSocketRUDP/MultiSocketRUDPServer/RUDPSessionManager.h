@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <unordered_set>
+
 #include "RUDPSession.h"
 
 class ISessionDelegate;

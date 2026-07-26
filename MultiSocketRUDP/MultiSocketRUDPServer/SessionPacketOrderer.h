@@ -1,23 +1,10 @@
 ﻿#pragma once
-#include <queue>
 #include <functional>
 #include <atomic>
-#include <unordered_set>
+#include <unordered_map>
 
 #include "NetServerSerializeBuffer.h"
 #include "../Common/etc/CoreType.h"
-
-struct RecvPacketInfo
-{
-	explicit RecvPacketInfo(NetBuffer* inBuffer, const PacketSequence inPacketSequence)
-		: buffer(inBuffer)
-		, packetSequence(inPacketSequence)
-	{
-	}
-
-	NetBuffer* buffer{};
-	PacketSequence packetSequence{};
-};
 
 enum class ON_RECV_RESULT : uint8_t
 {
@@ -93,17 +80,8 @@ private:
 	[[nodiscard]]
 	bool ProcessHoldingPacket(const PacketProcessCallback& callback);
 
-	struct RecvPacketInfoPriority
-	{
-		bool operator()(const RecvPacketInfo& lhs, const RecvPacketInfo& rhs) const
-		{
-			return lhs.packetSequence > rhs.packetSequence;
-		}
-	};
-
 	std::atomic<PacketSequence> nextRecvPacketSequence{};
-	std::priority_queue<RecvPacketInfo, std::vector<RecvPacketInfo>, RecvPacketInfoPriority> recvPacketHolderQueue;
-	std::unordered_set<PacketSequence> recvHoldingPacketSequences;
+	std::unordered_map<PacketSequence, NetBuffer*> recvHoldingPackets;
 
 	BYTE maxHoldingQueueSize{};
 };

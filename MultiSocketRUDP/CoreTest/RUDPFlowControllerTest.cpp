@@ -50,6 +50,24 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsFalse_WhenOutstandingReaches
 	EXPECT_FALSE(fc.CanSendPacket(6, 0));
 }
 
+TEST_F(RUDPFlowControllerTest, CanSendPacket_DoesNotTruncateLargeOutstandingCount)
+{
+	EXPECT_FALSE(fc.CanSendPacket(256, 0));
+	EXPECT_FALSE(fc.CanSendPacket(257, 0));
+	EXPECT_FALSE(fc.CanSendPacket(258, 0));
+	EXPECT_FALSE(fc.CanSendPacket(1025, 0));
+	EXPECT_FALSE(fc.CanSendPacket((PacketSequence{ 1 } << 32) + 1, 0));
+}
+
+TEST_F(RUDPFlowControllerTest, CanSendPacket_HandlesSequenceWraparound)
+{
+	constexpr PacketSequence maxSequence = ~PacketSequence{ 0 };
+
+	EXPECT_TRUE(fc.CanSendPacket(1, maxSequence - 1));
+	EXPECT_FALSE(fc.CanSendPacket(4, maxSequence - 1));
+	EXPECT_TRUE(fc.CanSendPacket(PacketSequence{ 1 } << 63, 0));
+}
+
 // ------------------------------------------------------------
 // lastAcked�� nextSend�� ������ outstanding=0���� ���� �����ؾ� �Ѵ�
 // ------------------------------------------------------------
@@ -75,6 +93,15 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_UpdatesLastAckedSequence)
 {
 	fc.OnReplyReceived(3);
 	EXPECT_EQ(fc.GetLastAckedSequence(), 3);
+}
+
+TEST_F(RUDPFlowControllerTest, OnReplyReceived_DoesNotAliasTwoToTheThirtySecondGap)
+{
+	constexpr PacketSequence replySequence = PacketSequence{ 1 } << 32;
+
+	fc.OnReplyReceived(replySequence);
+
+	EXPECT_EQ(fc.GetLastAckedSequence(), replySequence);
 }
 
 // ------------------------------------------------------------

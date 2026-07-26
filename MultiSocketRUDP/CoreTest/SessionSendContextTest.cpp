@@ -133,6 +133,27 @@ TEST(SessionSendContextTest, SendPacketMapFindAndErasePreservesCallerReference)
 	SendPacketInfo::Free(info);
 }
 
+TEST(SessionSendContextTest, DuplicateSequenceKeepsExistingPacketWithoutTakingOwnership)
+{
+	SessionSendContext context;
+	SendPacketInfo* existing = MakeSendPacketInfo(11);
+	SendPacketInfo* duplicate = MakeSendPacketInfo(11);
+	ASSERT_NE(existing, nullptr);
+	ASSERT_NE(duplicate, nullptr);
+
+	context.InsertSendPacketInfo(11, existing);
+	context.InsertSendPacketInfo(11, duplicate);
+
+	EXPECT_EQ(context.FindSendPacketInfo(11), existing);
+	EXPECT_EQ(existing->refCount.load(std::memory_order_acquire), 2);
+	EXPECT_EQ(duplicate->refCount.load(std::memory_order_acquire), 1);
+
+	EXPECT_EQ(context.FindAndEraseSendPacketInfo(11), existing);
+	SendPacketInfo::Free(existing);
+	SendPacketInfo::Free(existing);
+	SendPacketInfo::Free(duplicate);
+}
+
 TEST(SessionSendContextTest, PendingQueueHonorsCapacityAndOrder)
 {
 	SessionSendContext context;

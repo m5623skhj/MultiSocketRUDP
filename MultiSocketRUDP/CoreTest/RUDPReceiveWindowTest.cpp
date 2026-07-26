@@ -45,6 +45,8 @@ TEST_F(RUDPReceiveWindowTest, CanReceive_ReturnsFalse_WhenOutsideWindow)
 {
 	EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE));
 	EXPECT_FALSE(rw.CanReceive(WINDOW_SIZE + 1));
+	EXPECT_FALSE(rw.CanReceive(PacketSequence{ 1 } << 32));
+	EXPECT_FALSE(rw.CanReceive(PacketSequence{ 1 } << 63));
 }
 
 // ------------------------------------------------------------
@@ -109,6 +111,17 @@ TEST_F(RUDPReceiveWindowTest, MarkReceived_OutOfWindow_IsIgnored)
 {
 	rw.MarkReceived(WINDOW_SIZE);
 	EXPECT_EQ(rw.GetWindowStart(), 0);
+}
+
+TEST_F(RUDPReceiveWindowTest, MarkReceived_DoesNotAliasSequenceSeparatedByTwoToTheThirtySecond)
+{
+	constexpr PacketSequence windowStart = PacketSequence{ 1 } << 32;
+	rw.Reset(windowStart);
+
+	rw.MarkReceived(0);
+
+	EXPECT_EQ(rw.GetWindowStart(), windowStart);
+	EXPECT_EQ(rw.GetAdvertiseWindow(), WINDOW_SIZE);
 }
 
 // ------------------------------------------------------------
@@ -182,12 +195,13 @@ TEST_F(RUDPReceiveWindowTest, Reset_ClearsPreviousReceivedFlags)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Wraparound_CanReceiveAcrossSequenceBoundary)
 {
-	constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 2;
+	constexpr PacketSequence nearMax = ~PacketSequence{ 0 } - 2;
 	rw.Reset(nearMax);
 
 	EXPECT_TRUE(rw.CanReceive(nearMax));
 	EXPECT_TRUE(rw.CanReceive(nearMax + 1));
 	EXPECT_TRUE(rw.CanReceive(nearMax + 2));
+	EXPECT_TRUE(rw.CanReceive(0));
 }
 
 // ------------------------------------------------------------
@@ -196,12 +210,12 @@ TEST_F(RUDPReceiveWindowTest, Wraparound_CanReceiveAcrossSequenceBoundary)
 // ------------------------------------------------------------
 TEST_F(RUDPReceiveWindowTest, Wraparound_MarkReceivedAcrossSequenceBoundary)
 {
-	constexpr PacketSequence nearMax = static_cast<PacketSequence>(0xFFFF) - 1;
+	constexpr PacketSequence nearMax = ~PacketSequence{ 0 } - 1;
 	rw.Reset(nearMax);
 
 	rw.MarkReceived(nearMax);
 	rw.MarkReceived(nearMax + 1);
 	rw.MarkReceived(nearMax + 2);
 
-	EXPECT_EQ(rw.GetWindowStart(), nearMax + 3);
+	EXPECT_EQ(rw.GetWindowStart(), 1);
 }

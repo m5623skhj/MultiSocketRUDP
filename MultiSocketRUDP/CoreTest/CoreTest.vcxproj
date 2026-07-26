@@ -22,7 +22,9 @@
     <ClCompile Include="..\..\CoreTest\subhook\subhook.c" />
     <ClCompile Include="GoogleTest.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="CoreOptionParserTest.cpp" />
     <ClCompile Include="CryptoHelperTest.cpp" />
+    <ClCompile Include="MemoryTracerTest.cpp" />
     <ClCompile Include="PacketManagerTest.cpp" />
     <ClCompile Include="RingBufferTest.cpp" />
     <ClCompile Include="RUDPFlowControllerTest.cpp" />
@@ -45,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h" />
+	<ClInclude Include="MultiSocketRUDPCoreTestAccess.h" />
 	<ClInclude Include="RUDPSessionTestAccess.h" />
   </ItemGroup>
   <ItemGroup>

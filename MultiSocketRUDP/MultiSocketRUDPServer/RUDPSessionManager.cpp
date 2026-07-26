@@ -23,13 +23,18 @@ bool RUDPSessionManager::Initialize(const BYTE inNumOfWorkerThreads, SessionFact
 		return true;
     }
 
-	numOfWorkerThreads = inNumOfWorkerThreads;
-
+    if (inNumOfWorkerThreads == 0)
+    {
+		LOG_ERROR("The number of worker threads must be greater than zero");
+		return false;
+    }
     if (factory == nullptr)
     {
 		LOG_ERROR("Session factory function is not set");
 		return false;
     }
+
+	numOfWorkerThreads = inNumOfWorkerThreads;
 	sessionFactory = std::move(factory);
 
     if (not CreateSessionPool())
@@ -200,6 +205,7 @@ void RUDPSessionManager::IncrementConnectedCount()
 
 void RUDPSessionManager::DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason)
 {
+	bool isRetransmissionDisconnect = false;
 	switch (disconnectedReason)
 	{
 	case DISCONNECT_REASON::BY_ABORT_RESERVED:
@@ -208,7 +214,7 @@ void RUDPSessionManager::DecrementConnectedCount(const DISCONNECT_REASON disconn
 	}
 	case DISCONNECT_REASON::BY_RETRANSMISSION:
 	{
-		allDisconnectedByRetransmissionCount.fetch_add(1, std::memory_order_relaxed);
+		isRetransmissionDisconnect = true;
 		break;
 	}
 	case DISCONNECT_REASON::NORMAL:
@@ -228,7 +234,24 @@ void RUDPSessionManager::DecrementConnectedCount(const DISCONNECT_REASON disconn
 	}
 	}
 
-	--connectedUserCount;
+	uint16_t connectedCount = connectedUserCount.load(std::memory_order_relaxed);
+	while (connectedCount > 0 &&
+		not connectedUserCount.compare_exchange_weak(
+			connectedCount,
+			static_cast<uint16_t>(connectedCount - 1),
+			std::memory_order_relaxed))
+	{
+	}
+	if (connectedCount == 0)
+	{
+		LOG_ERROR("Connected user count is already zero");
+		return;
+	}
+
+	if (isRetransmissionDisconnect)
+	{
+		allDisconnectedByRetransmissionCount.fetch_add(1, std::memory_order_relaxed);
+	}
 	allDisconnectedCount.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -259,13 +282,19 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
 
 bool RUDPSessionManager::CreateSessionPool()
 {
-	try
+    try
 	{
-		sessionList.reserve(maxSessionSize);
+		std::vector<std::unique_ptr<RUDPSession>> createdSessions;
+		createdSessions.reserve(maxSessionSize);
+		std::vector<RUDPSession*> newSessionList;
+		newSessionList.reserve(maxSessionSize);
+		std::list<SessionIdType> newUnusedSessionIdList;
+		std::unordered_set<SessionIdType> newUnusedSessionIdSet;
+		newUnusedSessionIdSet.reserve(maxSessionSize);
 
 		for (size_t sessionIndex = 0; sessionIndex < maxSessionSize; ++sessionIndex)
 		{
-			RUDPSession* session = sessionFactory(core);
+			std::unique_ptr<RUDPSession> session(sessionFactory(core));
 			if (session == nullptr)
 			{
 				LOG_ERROR(std::format("Failed to create session {}", sessionIndex));
@@ -275,9 +304,21 @@ bool RUDPSessionManager::CreateSessionPool()
 			sessionDelegate.SetSessionId(*session, static_cast<SessionIdType>(sessionIndex));
 			sessionDelegate.SetThreadId(*session, sessionIndex % numOfWorkerThreads);
 			sessionDelegate.InitializeSession(*session);
-			sessionList.emplace_back(session);
-			unusedSessionIdList.emplace_back(static_cast<SessionIdType>(sessionIndex));
-			unusedSessionIdSet.emplace(static_cast<SessionIdType>(sessionIndex));
+			newSessionList.emplace_back(session.get());
+			newUnusedSessionIdList.emplace_back(static_cast<SessionIdType>(sessionIndex));
+			newUnusedSessionIdSet.emplace(static_cast<SessionIdType>(sessionIndex));
+			createdSessions.emplace_back(std::move(session));
+		}
+
+		{
+			std::scoped_lock lock(unusedSessionIdListLock);
+			sessionList = std::move(newSessionList);
+			unusedSessionIdList = std::move(newUnusedSessionIdList);
+			unusedSessionIdSet = std::move(newUnusedSessionIdSet);
+			for (auto& session : createdSessions)
+			{
+				std::ignore = session.release();
+			}
 		}
 
 		return true;

@@ -10,20 +10,6 @@
 #include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
-namespace
-{
-	// ----------------------------------------
-	// @brief 두 PacketSequence 값 간의 차이를 계산하여 수신 순서를 결정하는 데 사용합니다.
-	// @param a 첫 번째 PacketSequence 값입니다.
-	// @param b 두 번째 PacketSequence 값입니다.
-	// @return PacketSequence a와 b의 차이(a - b)를 int32_t 타입으로 반환합니다.
-	// ----------------------------------------
-	int32_t SeqDiffForRecvOrder(const PacketSequence a, const PacketSequence b)
-	{
-		return static_cast<int32_t>(a - b);
-	}
-}
-
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 unsigned long long RUDPSession::reservedSessionTimeoutMs = 30000;
 
@@ -420,7 +406,7 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	recvPacket >> packetSequence;
 
 	const PacketSequence nextExpectedSequence = sessionPacketOrderer.GetNextExpected();
-	if (SeqDiffForRecvOrder(packetSequence, nextExpectedSequence) < 0)
+	if (IsOlderRecvSequence(packetSequence, nextExpectedSequence))
 	{
 		SendReplyToClient(packetSequence);
 		return true;
@@ -458,6 +444,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 	}
 
 	return false;
+}
+
+bool RUDPSession::IsOlderRecvSequence(
+	const PacketSequence sequence,
+	const PacketSequence expectedSequence) noexcept
+{
+	return static_cast<int64_t>(sequence - expectedSequence) < 0;
 }
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)

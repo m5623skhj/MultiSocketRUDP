@@ -74,6 +74,12 @@ namespace MultiSocketRUDPBotTester.Bot
                 {
                     throw;
                 }
+
+                var nextVisited = new HashSet<ActionNodeBase>();
+                foreach (var nextNode in NextNodes)
+                {
+                    NodeExecutionHelper.ExecuteChain(context, nextNode, nextVisited);
+                }
             }
         }
     }

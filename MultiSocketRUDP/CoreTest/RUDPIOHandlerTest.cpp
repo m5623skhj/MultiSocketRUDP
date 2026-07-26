@@ -300,6 +300,26 @@ TEST_F(RUDPIOHandlerTest, IOCompleted_NullContext_NeverTouchesMocks)
     EXPECT_EQ(mockDelegate.onRecvPacketCount, 0);
 }
 
+TEST_F(RUDPIOHandlerTest, IOCompleted_RecvContextWithNullSessionReturnsFalse)
+{
+	IOContext context;
+	context.InitContext(INVALID_SESSION_ID, RIO_OPERATION_TYPE::OP_RECV);
+	context.session = nullptr;
+
+	EXPECT_FALSE(handler->IOCompleted(&context, 0, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioReceiveExCallCount, 0);
+}
+
+TEST_F(RUDPIOHandlerTest, IOCompleted_SendContextWithNullSessionReturnsFalse)
+{
+	IOContext context;
+	context.InitContext(INVALID_SESSION_ID, RIO_OPERATION_TYPE::OP_SEND);
+	context.session = nullptr;
+
+	EXPECT_FALSE(handler->IOCompleted(&context, 0, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+}
+
 // ============================================================
 // 3. IOCompleted — OP_ERROR 타입
 //    default 분기로 빠져 false 를 반환해야 한다
@@ -726,5 +746,18 @@ TEST_F(RUDPIOHandlerTest, DoSend_InvalidSocketRejectsPostAndRestoresIOMode)
 
 	EXPECT_FALSE(handler->DoSend(session, THREAD_ID));
 	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
+}
+
+TEST_F(RUDPIOHandlerTest, DoSend_RIOSendExFailureRestoresIOMode)
+{
+	SetupValidSendPath();
+	mockRIO.rioSendExReturn = false;
+	SendPacketInfo* info = AllocSerializedSendPacketInfo(14);
+	ASSERT_NE(info, nullptr);
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+
+	EXPECT_FALSE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
 	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
 }

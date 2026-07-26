@@ -17,7 +17,7 @@ void RUDPReceiveWindow::ResizeRecvWindowSize(const BYTE recvWindowSize)
 
 bool RUDPReceiveWindow::CanReceive(const PacketSequence inSequence) const noexcept
 {
-	const int32_t diff = SeqDiff(inSequence, windowStart);
+	const int64_t diff = SeqDiff(inSequence, windowStart);
 	return diff >= 0 && diff < windowSize;
 }
 
@@ -28,7 +28,7 @@ void RUDPReceiveWindow::MarkReceived(const PacketSequence inSequence) noexcept
 		return;
 	}
 
-	const int32_t offset = SeqDiff(inSequence, windowStart);
+	const int64_t offset = SeqDiff(inSequence, windowStart);
 	if (const size_t idx = (startIndex + static_cast<size_t>(offset)) % windowSize; not receivedFlags[idx])
 	{
 		receivedFlags[idx] = 1;
@@ -62,7 +62,7 @@ BYTE RUDPReceiveWindow::GetAdvertiseWindow() const noexcept
 	return windowSize - usedCount;
 }
 
-int32_t RUDPReceiveWindow::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept
+int64_t RUDPReceiveWindow::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept
 {
-	return static_cast<int32_t>(a - b);
+	return static_cast<int64_t>(a - b);
 }

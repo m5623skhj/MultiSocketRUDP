@@ -2,9 +2,9 @@
 #include "RUDPFlowController.h"
 #include <algorithm>
 
-int32_t RUDPFlowController::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept
+int64_t RUDPFlowController::SeqDiff(const PacketSequence a, const PacketSequence b) noexcept
 {
-	return static_cast<int32_t>(a - b);
+	return static_cast<int64_t>(a - b);
 }
 
 RUDPFlowController::RUDPFlowController()
@@ -14,8 +14,8 @@ RUDPFlowController::RUDPFlowController()
 
 bool RUDPFlowController::CanSendPacket(const PacketSequence nextSendSequence, const PacketSequence lastAckedSequence) const noexcept
 {
-	const int32_t diff = SeqDiff(nextSendSequence, lastAckedSequence);
-	const uint8_t outstanding = diff > 1 ? static_cast<uint8_t>(diff - 1) : 0;
+	const int64_t diff = SeqDiff(nextSendSequence, lastAckedSequence);
+	const int64_t outstanding = diff > 1 ? diff - 1 : 0;
 	return outstanding < cwnd;
 }
 
@@ -23,7 +23,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 {
 	static constexpr int32_t GAP_THRESHOLD = 5;
 
-	const int32_t diff = SeqDiff(replySequence, lastReplySequence);
+	const int64_t diff = SeqDiff(replySequence, lastReplySequence);
 	if (diff <= 0)
 	{
 #ifdef _DEBUG
@@ -32,7 +32,7 @@ void RUDPFlowController::OnReplyReceived(const PacketSequence replySequence) noe
 		return;
 	}
 
-	if (const int32_t sequenceGap = diff - 1; sequenceGap >= GAP_THRESHOLD)
+	if (const int64_t sequenceGap = diff - 1; sequenceGap >= GAP_THRESHOLD)
 	{
 		OnCongestionEvent();
 	}

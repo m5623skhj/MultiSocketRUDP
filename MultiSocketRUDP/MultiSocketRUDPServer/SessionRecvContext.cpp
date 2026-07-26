@@ -36,6 +36,7 @@ bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
             context->localAddrRIOBuffer.BufferId == RIO_INVALID_BUFFERID)
         {
             Cleanup(rioFunctionTable);
+            recvBuffer.ClearFreeRecvContexts();
             return false;
         }
 

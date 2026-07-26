@@ -36,9 +36,7 @@ namespace MultiSocketRUDPBotTester.Bot
                 if (receivedBuffer != null)
                 {
                     Log.Information("WaitForPacketNode: Successfully received {Id}", ExpectedPacketId);
-                    var visited = new HashSet<ActionNodeBase>();
-                    foreach (var nextNode in NextNodes)
-                        NodeExecutionHelper.ExecuteChain(context, nextNode, visited);
+                    DispatchReceivedPacket(context, receivedBuffer);
                 }
                 else
                 {
@@ -57,6 +55,16 @@ namespace MultiSocketRUDPBotTester.Bot
                 Log.Error("WaitForPacketNode error: {Message}", ex.Message);
             }
         }
+
+        internal void DispatchReceivedPacket(RuntimeContext context, NetBuffer receivedBuffer)
+        {
+            context.SetPacket(receivedBuffer);
+            var visited = new HashSet<ActionNodeBase>();
+            foreach (var nextNode in NextNodes)
+            {
+                NodeExecutionHelper.ExecuteChain(context, nextNode, receivedBuffer, visited);
+            }
+        }
     }
 
     public class SetVariableNode : ContextNodeBase
@@ -69,7 +77,7 @@ namespace MultiSocketRUDPBotTester.Bot
         {
             try
             {
-                object value = ValueType.ToLower() switch
+                object value = ValueType.ToLowerInvariant() switch
                 {
                     "int" => int.Parse(StringValue, CultureInfo.InvariantCulture),
                     "long" => long.Parse(StringValue, CultureInfo.InvariantCulture),

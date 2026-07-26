@@ -68,3 +68,41 @@ TEST(RingBufferTest, ClearDropsItemsAndAllowsReuse)
 	ASSERT_TRUE(buffer.Pop(value));
 	EXPECT_EQ(value, 9);
 }
+
+TEST(RingBufferTest, PopFromEmptyBufferReturnsFalse)
+{
+	RingBuffer<int> buffer{ 2 };
+	int value = 17;
+
+	EXPECT_FALSE(buffer.Pop(value));
+	EXPECT_EQ(value, 17);
+}
+
+TEST(RingBufferTest, CapacityOneSupportsRepeatedWraparound)
+{
+	RingBuffer<int> buffer{ 1 };
+	int value{};
+
+	for (int expected = 1; expected <= 3; ++expected)
+	{
+		ASSERT_TRUE(buffer.Push(expected));
+		EXPECT_TRUE(buffer.IsFull());
+		ASSERT_TRUE(buffer.Pop(value));
+		EXPECT_EQ(value, expected);
+		EXPECT_TRUE(buffer.IsEmpty());
+	}
+}
+
+TEST(RingBufferTest, ResizeToZeroClearsItemsAndRejectsNewPush)
+{
+	RingBuffer<int> buffer{ 2 };
+	ASSERT_TRUE(buffer.Push(1));
+
+	buffer.Resize(0);
+
+	EXPECT_TRUE(buffer.IsEmpty());
+	EXPECT_TRUE(buffer.IsFull());
+	EXPECT_FALSE(buffer.Push(2));
+	int value{};
+	EXPECT_FALSE(buffer.Pop(value));
+}

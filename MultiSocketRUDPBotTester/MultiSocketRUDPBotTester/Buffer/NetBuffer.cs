@@ -45,18 +45,29 @@ namespace MultiSocketRUDPBotTester.Buffer
             _writePos = 0;
         }
 
-        public void ReserveHeader() => _writePos = HeaderSize;
+        public void ReserveHeader()
+        {
+            EnsureWritableFrom(0, HeaderSize);
+            _readPos = 0;
+            _writePos = HeaderSize;
+        }
 
-        public void WriteByte(byte value) => _buffer[_writePos++] = value;
+        public void WriteByte(byte value)
+        {
+            EnsureWritable(1);
+            _buffer[_writePos++] = value;
+        }
 
         public void WriteUShort(ushort value)
         {
+            EnsureWritable(sizeof(ushort));
             _buffer[_writePos++] = (byte)(value & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
         }
 
         public void WriteUInt(uint value)
         {
+            EnsureWritable(sizeof(uint));
             _buffer[_writePos++] = (byte)(value & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 16) & 0xFF);
@@ -65,6 +76,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteInt(int value)
         {
+            EnsureWritable(sizeof(int));
             _buffer[_writePos++] = (byte)(value & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 16) & 0xFF);
@@ -73,6 +85,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteULong(ulong value)
         {
+            EnsureWritable(sizeof(ulong));
             _buffer[_writePos++] = (byte)(value & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 8) & 0xFF);
             _buffer[_writePos++] = (byte)((value >> 16) & 0xFF);
@@ -85,7 +98,16 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteString(string value)
         {
+            ArgumentNullException.ThrowIfNull(value);
             var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+            if (bytes.Length > ushort.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    $"UTF-8 string length cannot exceed {ushort.MaxValue} bytes.");
+            }
+
+            EnsureWritable(sizeof(ushort) + bytes.Length);
             WriteUShort((ushort)bytes.Length);
             bytes.CopyTo(_buffer, _writePos);
             _writePos += bytes.Length;
@@ -93,29 +115,36 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public void WriteBytes(byte[] bytes)
         {
+            ArgumentNullException.ThrowIfNull(bytes);
+            EnsureWritable(bytes.Length);
             bytes.CopyTo(_buffer, _writePos);
             _writePos += bytes.Length;
         }
 
         public void WriteBytes(byte[] bytes, int offset, int count)
         {
+            ArgumentNullException.ThrowIfNull(bytes);
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            if (offset > bytes.Length - count)
+            {
+                throw new ArgumentException("The requested source range exceeds the byte array.");
+            }
+
+            EnsureWritable(count);
             Array.Copy(bytes, offset, _buffer, _writePos, count);
             _writePos += count;
         }
 
         public byte ReadByte()
         {
-            if (_readPos >= _buffer.Length)
-            {
-                throw new InvalidOperationException(
-                    $"Buffer underflow: tried to read at position {_readPos}, buffer size {_buffer.Length}");
-            }
-
+            EnsureReadable(1);
             return _buffer[_readPos++];
         }
 
         public ushort ReadUShort()
         {
+            EnsureReadable(sizeof(ushort));
             var v = (ushort)(_buffer[_readPos] | (_buffer[_readPos + 1] << 8));
             _readPos += 2;
             return v;
@@ -123,6 +152,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public uint ReadUInt()
         {
+            EnsureReadable(sizeof(uint));
             var v = (uint)(_buffer[_readPos]
                 | (_buffer[_readPos + 1] << 8)
                 | (_buffer[_readPos + 2] << 16)
@@ -133,6 +163,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public int ReadInt()
         {
+            EnsureReadable(sizeof(int));
             var v = (int)(_buffer[_readPos]
                 | (_buffer[_readPos + 1] << 8)
                 | (_buffer[_readPos + 2] << 16)
@@ -143,6 +174,7 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public ulong ReadULong()
         {
+            EnsureReadable(sizeof(ulong));
             var v = (ulong)_buffer[_readPos]
                 | ((ulong)_buffer[_readPos + 1] << 8)
                 | ((ulong)_buffer[_readPos + 2] << 16)
@@ -158,6 +190,7 @@ namespace MultiSocketRUDPBotTester.Buffer
         public string ReadString()
         {
             var len = ReadUShort();
+            EnsureReadable(len);
             var s = System.Text.Encoding.UTF8.GetString(_buffer, _readPos, len);
             _readPos += len;
             return s;
@@ -165,16 +198,25 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         public byte[] ReadBytes(int count)
         {
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            EnsureReadable(count);
             var result = new byte[count];
             Array.Copy(_buffer, _readPos, result, 0, count);
             _readPos += count;
             return result;
         }
 
-        public void SkipBytes(int count) => _readPos += count;
+        public void SkipBytes(int count)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            EnsureReadable(count);
+            _readPos += count;
+        }
 
         public void InsertPacketType(PacketType type)
         {
+            EnsureMetadataLayout(HeaderSize);
+            EnsureWritable(PacketTypeSize);
             var bodyLen = _writePos - HeaderSize;
             if (bodyLen > 0)
             {
@@ -188,6 +230,8 @@ namespace MultiSocketRUDPBotTester.Buffer
         public void InsertPacketSequence(ulong sequence)
         {
             var afterType = HeaderSize + PacketTypeSize;
+            EnsureMetadataLayout(afterType);
+            EnsureWritable(PacketSequenceSize);
             var bodyLen = _writePos - afterType;
             if (bodyLen > 0)
             {
@@ -205,6 +249,8 @@ namespace MultiSocketRUDPBotTester.Buffer
         public void InsertPacketId(PacketId packetId)
         {
             var afterSeq = HeaderSize + PacketTypeSize + PacketSequenceSize;
+            EnsureMetadataLayout(afterSeq);
+            EnsureWritable(PacketIdSize);
             var bodyLen = _writePos - afterSeq;
             if (bodyLen > 0)
             {
@@ -241,8 +287,21 @@ namespace MultiSocketRUDPBotTester.Buffer
 
         private void SetHeader(int extraSize = 0)
         {
+            EnsureMetadataLayout(HeaderSize);
+            if (extraSize < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(extraSize));
+            }
+
+            var payloadLength = _writePos - HeaderSize + extraSize;
+            if (payloadLength > ushort.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    $"Packet payload length cannot exceed {ushort.MaxValue} bytes.");
+            }
+
             _buffer[0] = HeaderCode;
-            var payloadSize = (ushort)(_writePos - HeaderSize + extraSize);
+            var payloadSize = (ushort)payloadLength;
             _buffer[1] = (byte)(payloadSize & 0xFF);
             _buffer[2] = (byte)((payloadSize >> 8) & 0xFF);
         }
@@ -270,12 +329,14 @@ namespace MultiSocketRUDPBotTester.Buffer
             bool isCorePacket)
         {
             var bodyOffset = isCorePacket ? BodyOffsetCorePacket : BodyOffsetFullPacket;
-            var bodySize = packet._writePos - bodyOffset;
-            if (bodySize < 0)
+            if (packet._writePos < bodyOffset)
             {
-                bodySize = 0;
+                throw new InvalidOperationException(
+                    $"Packet layout is shorter than the required body offset {bodyOffset}.");
             }
 
+            packet.EnsureWritable(AuthTagSize);
+            var bodySize = packet._writePos - bodyOffset;
             Span<byte> nonce = stackalloc byte[CryptoHelper.NonceSize];
             CryptoHelper.WriteNonce(nonce, sessionSalt, packetSequence, direction);
 
@@ -317,22 +378,22 @@ namespace MultiSocketRUDPBotTester.Buffer
             PacketDirection direction,
             out DecodePacketFailureDetails outFailureDetails)
         {
-            ulong packetSequence = 0;
-            for (var i = 0; i < PacketSequenceSize; i++)
-            {
-                packetSequence |= ((ulong)packet._buffer[PacketSequenceOffset + i]) << (i * 8);
-            }
-
             var bodyOffset = isCorePacket ? BodyOffsetCorePacket : BodyOffsetFullPacket;
             var authTagOffset = packet._writePos - AuthTagSize;
             var bodySize = authTagOffset - bodyOffset;
-            var headerPayloadSize = packet._buffer[1] | (packet._buffer[2] << 8);
+            var hasHeader = packet._writePos >= HeaderSize;
+            var headerPayloadSize = hasHeader
+                ? packet._buffer[1] | (packet._buffer[2] << 8)
+                : 0;
 
-            if (bodySize < 0 || authTagOffset < 0)
+            if (packet._writePos < PacketSequenceOffset + PacketSequenceSize
+                || bodySize < 0
+                || authTagOffset < bodyOffset
+                || headerPayloadSize != packet._writePos - HeaderSize)
             {
                 outFailureDetails = new DecodePacketFailureDetails(
                     DecodePacketFailureReason.InvalidLayout,
-                    packetSequence,
+                    0,
                     direction,
                     isCorePacket,
                     packet._writePos,
@@ -340,6 +401,12 @@ namespace MultiSocketRUDPBotTester.Buffer
                     bodySize,
                     authTagOffset);
                 return false;
+            }
+
+            ulong packetSequence = 0;
+            for (var i = 0; i < PacketSequenceSize; i++)
+            {
+                packetSequence |= ((ulong)packet._buffer[PacketSequenceOffset + i]) << (i * 8);
             }
 
             Span<byte> nonce = stackalloc byte[CryptoHelper.NonceSize];
@@ -371,6 +438,38 @@ namespace MultiSocketRUDPBotTester.Buffer
                     bodySize,
                     authTagOffset);
                 return false;
+            }
+        }
+
+        private void EnsureReadable(int count)
+        {
+            if (count < 0 || _readPos > _writePos - count)
+            {
+                throw new InvalidOperationException(
+                    $"Buffer underflow: tried to read {count} bytes at position {_readPos}, written size {_writePos}.");
+            }
+        }
+
+        private void EnsureWritable(int count)
+        {
+            EnsureWritableFrom(_writePos, count);
+        }
+
+        private void EnsureWritableFrom(int offset, int count)
+        {
+            if (count < 0 || offset < 0 || offset > _buffer.Length - count)
+            {
+                throw new InvalidOperationException(
+                    $"Buffer overflow: tried to write {count} bytes at position {offset}, capacity {_buffer.Length}.");
+            }
+        }
+
+        private void EnsureMetadataLayout(int minimumLength)
+        {
+            if (_writePos < minimumLength)
+            {
+                throw new InvalidOperationException(
+                    $"Packet metadata insertion requires at least {minimumLength} written bytes.");
             }
         }
     }

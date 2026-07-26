@@ -31,7 +31,7 @@ public:
 	BYTE GetAdvertiseWindow() const noexcept;
 
 private:
-	static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
+	static int64_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
 
 private:
 	PacketSequence windowStart{};

@@ -6,6 +6,9 @@
 #include "RUDPSessionManager.h"
 #include "MockSessionDelegate.h"
 #include "RUDPSessionTestAccess.h"
+#include <array>
+#include <barrier>
+#include <stdexcept>
 
 namespace
 {
@@ -274,4 +277,137 @@ TEST_F(RUDPSessionManagerTest, HeartbeatCheckDoesNotAbortReservedSessionBeforeTi
 
 	EXPECT_EQ(mockDelegate.sendHeartbeatCount, 0);
 	EXPECT_EQ(mockDelegate.abortReservedCount, 0);
+}
+
+TEST_F(RUDPSessionManagerTest, InitializeRejectsZeroWorkerThreadsBeforeCallingFactory)
+{
+	RUDPSessionManager manager{ 2, core, delegate };
+	int factoryCallCount = 0;
+
+	EXPECT_FALSE(manager.Initialize(0, [&](MultiSocketRUDPCore&)
+	{
+		++factoryCallCount;
+		return new ManagerTestSession(core);
+	}));
+
+	EXPECT_EQ(factoryCallCount, 0);
+	EXPECT_FALSE(manager.IsInitialized());
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+}
+
+TEST_F(RUDPSessionManagerTest, NullFactoryResultRollsBackPartialPoolAndAllowsRetry)
+{
+	ManagerTestSession::destroyedCount.store(0);
+	RUDPSessionManager manager{ 3, core, delegate };
+	int failedFactoryCallCount = 0;
+
+	EXPECT_FALSE(manager.Initialize(1, [&](MultiSocketRUDPCore&) -> RUDPSession*
+	{
+		if (++failedFactoryCallCount == 2)
+		{
+			return nullptr;
+		}
+		return new ManagerTestSession(core);
+	}));
+	EXPECT_EQ(ManagerTestSession::destroyedCount.load(), 1);
+	EXPECT_FALSE(manager.IsInitialized());
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+
+	int retryFactoryCallCount = 0;
+	EXPECT_TRUE(manager.Initialize(1, [&](MultiSocketRUDPCore&)
+	{
+		++retryFactoryCallCount;
+		return new ManagerTestSession(core);
+	}));
+	EXPECT_EQ(retryFactoryCallCount, 3);
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 3);
+}
+
+TEST_F(RUDPSessionManagerTest, ThrowingFactoryRollsBackPartialPoolAndAllowsRetry)
+{
+	ManagerTestSession::destroyedCount.store(0);
+	RUDPSessionManager manager{ 3, core, delegate };
+	int failedFactoryCallCount = 0;
+
+	EXPECT_FALSE(manager.Initialize(1, [&](MultiSocketRUDPCore&) -> RUDPSession*
+	{
+		if (++failedFactoryCallCount == 3)
+		{
+			throw std::runtime_error("factory failure");
+		}
+		return new ManagerTestSession(core);
+	}));
+	EXPECT_EQ(ManagerTestSession::destroyedCount.load(), 2);
+	EXPECT_FALSE(manager.IsInitialized());
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+
+	EXPECT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&)
+	{
+		return new ManagerTestSession(core);
+	}));
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 3);
+}
+
+TEST_F(RUDPSessionManagerTest, NormalAndErrorDisconnectsUpdateStatistics)
+{
+	RUDPSessionManager manager{ 0, core, delegate };
+	manager.IncrementConnectedCount();
+	manager.IncrementConnectedCount();
+
+	manager.DecrementConnectedCount(DISCONNECT_REASON::NORMAL);
+	manager.DecrementConnectedCount(DISCONNECT_REASON::BY_ERROR);
+
+	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+	EXPECT_EQ(manager.GetAllConnectedCount(), 2u);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 2u);
+	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 0u);
+}
+
+TEST_F(RUDPSessionManagerTest, DisconnectCountDoesNotUnderflowWhenAlreadyZero)
+{
+	RUDPSessionManager manager{ 0, core, delegate };
+
+	manager.DecrementConnectedCount(DISCONNECT_REASON::NORMAL);
+
+	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 0u);
+}
+
+TEST_F(RUDPSessionManagerTest, ConcurrentReleaseReturnsSessionToPoolExactlyOnce)
+{
+	RUDPSessionManager manager{ 1, core, delegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&)
+	{
+		return new ManagerTestSession(core);
+	}));
+	RUDPSession* session = manager.AcquireSession();
+	ASSERT_NE(session, nullptr);
+	RUDPSessionBehaviorAccess::SetReleasing(*session);
+	RUDPSessionBehaviorAccess::SetDisconnectedReason(*session, DISCONNECT_REASON::NORMAL);
+	manager.IncrementConnectedCount();
+
+	std::barrier startBarrier{ 3 };
+	std::array<bool, 2> releaseResults{};
+	std::array<std::jthread, 2> threads{
+		std::jthread([&]()
+		{
+			startBarrier.arrive_and_wait();
+			releaseResults[0] = manager.ReleaseSession(session->GetSessionId());
+		}),
+		std::jthread([&]()
+		{
+			startBarrier.arrive_and_wait();
+			releaseResults[1] = manager.ReleaseSession(session->GetSessionId());
+		})
+	};
+	startBarrier.arrive_and_wait();
+	for (auto& thread : threads)
+	{
+		thread.join();
+	}
+
+	EXPECT_NE(releaseResults[0], releaseResults[1]);
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 1);
+	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 1u);
 }

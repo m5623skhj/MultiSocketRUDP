@@ -125,9 +125,9 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 AverageRttMs = totalRttMs / inSampleCount,
                 MinRttMs = minRttMs,
                 MaxRttMs = maxRttMs,
-                P50RttMs = Percentile(rttSamples, 50.0),
-                P95RttMs = Percentile(rttSamples, 95.0),
-                P99RttMs = Percentile(rttSamples, 99.0),
+                P50RttMs = RttStatistics.Percentile(rttSamples, 50.0),
+                P95RttMs = RttStatistics.Percentile(rttSamples, 95.0),
+                P99RttMs = RttStatistics.Percentile(rttSamples, 99.0),
                 RetransmissionSuspectedCount = rttSamples.Count(
                     rtt => rtt >= RetransmissionSuspectedThresholdMs),
                 LossRate = inLossRate,
@@ -179,21 +179,12 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             }
         }
 
-        private static double Percentile(List<double> sortedSamples, double percentile)
-        {
-            if (sortedSamples.Count == 0)
-            {
-                return 0;
-            }
-
-            var rank = (int)Math.Ceiling(percentile / 100.0 * sortedSamples.Count);
-            var index = Math.Clamp(rank - 1, 0, sortedSamples.Count - 1);
-            return sortedSamples[index];
-        }
-
         private static bool ShouldPrintProgress(int inSampleCount)
         {
-            return inSampleCount <= DetailedSampleCount || (inSampleCount % ReportInterval) == 0;
+            return RttStatistics.ShouldPrintProgress(
+                inSampleCount,
+                DetailedSampleCount,
+                ReportInterval);
         }
 
         private void TryLogTailLatency(int inSampleIndex, long inSentTimestamp, double inRttMs)

@@ -117,6 +117,8 @@ private:
 	bool OnRecvPacket(NetBuffer& recvPacket);
 	[[nodiscard]]
 	bool ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacketSequence);
+	[[nodiscard]]
+	static bool IsOlderRecvSequence(PacketSequence sequence, PacketSequence expectedSequence) noexcept;
 	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
 	void OnRetransmissionTimeout() noexcept;

@@ -35,7 +35,7 @@ namespace MultiSocketRUDPBotTester.Bot
             }
         }
 
-        private NetBuffer? BuildFromSchema()
+        internal NetBuffer? BuildFromSchema()
         {
             var schema = PacketSchema.Get(PacketId);
             if (schema == null)
@@ -123,9 +123,10 @@ namespace MultiSocketRUDPBotTester.Bot
 
                     var context = client.GlobalContext;
                     context.SetPacket(receivedPacket);
+                    var visited = new HashSet<ActionNodeBase>();
                     foreach (var nextNode in NextNodes)
                     {
-                        nextNode.Execute(client, receivedPacket);
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, receivedPacket, visited);
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -140,7 +141,7 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            var delay = Random.Shared.Next(MinDelayMilliseconds, MaxDelayMilliseconds + 1);
+            var delay = SelectDelay(Random.Shared.NextInt64);
             var token = client.CancellationToken.Token;
 
             Task.Run(async () =>
@@ -152,13 +153,34 @@ namespace MultiSocketRUDPBotTester.Bot
 
                     var context = client.GlobalContext;
                     context.SetPacket(receivedPacket);
+                    var visited = new HashSet<ActionNodeBase>();
                     foreach (var nextNode in NextNodes)
                     {
-                        nextNode.Execute(client, receivedPacket);
+                        NodeExecutionHelper.ExecuteChain(context, nextNode, receivedPacket, visited);
                     }
                 }
                 catch (OperationCanceledException) { }
             }, token);
+        }
+
+        internal int SelectDelay(Func<long, long, long> nextRandom)
+        {
+            ArgumentNullException.ThrowIfNull(nextRandom);
+            if (MinDelayMilliseconds < 0 || MaxDelayMilliseconds < MinDelayMilliseconds)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(MinDelayMilliseconds),
+                    "Random delay range must be non-negative and ordered.");
+            }
+
+            var exclusiveMaximum = (long)MaxDelayMilliseconds + 1;
+            var selected = nextRandom(MinDelayMilliseconds, exclusiveMaximum);
+            if (selected < MinDelayMilliseconds || selected >= exclusiveMaximum)
+            {
+                throw new ArgumentOutOfRangeException(nameof(nextRandom));
+            }
+
+            return checked((int)selected);
         }
     }
 

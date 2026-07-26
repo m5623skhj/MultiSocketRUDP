@@ -200,3 +200,51 @@ TEST(SessionRIOContextTest, RequestQueueFailureCleansRegisteredRecvAndSendBuffer
 	EXPECT_EQ(state.createRequestQueueCallCount, 1);
 	EXPECT_EQ(state.deregisterCallCount, state.registerCallCount);
 }
+
+TEST(SessionRecvContextTest, ContextBeforeInitializeIsEmptyAndCleanupIsSafe)
+{
+	TestRIOState state;
+	const auto table = MakeTestRioTable(state);
+	SessionRecvContext context;
+
+	EXPECT_EQ(context.GetRecvBufferContext(), nullptr);
+	EXPECT_NO_FATAL_FAILURE(context.Cleanup(table));
+	EXPECT_EQ(state.deregisterCallCount, 0);
+}
+
+TEST(SessionRecvContextTest, CleanupIsIdempotentAndContextCanBeReinitialized)
+{
+	TestRIOState state;
+	const auto table = MakeTestRioTable(state);
+	SessionRecvContext context;
+	constexpr int buffersPerInitialization = RECV_OUTSTANDING_COUNT * 3;
+
+	ASSERT_TRUE(context.Initialize(table, 3, nullptr));
+	context.Cleanup(table);
+	context.Cleanup(table);
+	EXPECT_EQ(state.registerCallCount, buffersPerInitialization);
+	EXPECT_EQ(state.deregisterCallCount, buffersPerInitialization);
+
+	ASSERT_TRUE(context.Initialize(table, 4, nullptr));
+	EXPECT_EQ(state.registerCallCount, buffersPerInitialization * 2);
+	context.Cleanup(table);
+	EXPECT_EQ(state.deregisterCallCount, buffersPerInitialization * 2);
+}
+
+TEST(SessionRecvContextTest, EveryRegistrationFailurePositionRollsBackValidBuffers)
+{
+	constexpr int totalBufferRegistrations = RECV_OUTSTANDING_COUNT * 3;
+	for (int failureIndex = 1; failureIndex <= totalBufferRegistrations; ++failureIndex)
+	{
+		TestRIOState state;
+		state.failRegisterCallIndex = failureIndex;
+		const auto table = MakeTestRioTable(state);
+		SessionRecvContext context;
+
+		EXPECT_FALSE(context.Initialize(table, 7, nullptr)) << "failureIndex=" << failureIndex;
+		EXPECT_EQ(state.deregisterCallCount, state.registerCallCount - 1)
+			<< "failureIndex=" << failureIndex;
+		EXPECT_EQ(context.GetRecvBuffer().AcquireFreeRecvContext(), nullptr)
+			<< "failureIndex=" << failureIndex;
+	}
+}

@@ -31,7 +31,7 @@ private:
 	// @param b 두 번째 패킷 시퀀스.
 	// @return 두 시퀀스 번호의 차이.양수면 a가 b보다 나중 시퀀스임을 나타냅니다.
 	// ----------------------------------------
-	static int32_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
+	static int64_t SeqDiff(PacketSequence a, PacketSequence b) noexcept;
 
 private:
 	uint8_t cwnd{};

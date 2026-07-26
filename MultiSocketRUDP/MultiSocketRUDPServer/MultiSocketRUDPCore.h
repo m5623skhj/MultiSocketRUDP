@@ -24,10 +24,12 @@ class RUDPPacketProcessor;
 class RUDPIOHandler;
 class RUDPSessionBroker;
 class RUDPSessionManager;
+class MultiSocketRUDPCoreTestAccess;
 
 class MultiSocketRUDPCore : public ICore
 {
 	friend MultiSocketRUDPCoreFunctionDelegate;
+	friend MultiSocketRUDPCoreTestAccess;
 
 public:
 	explicit MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName);
@@ -100,6 +102,15 @@ private:
 private:
 	[[nodiscard]]
 	bool ReadOptionFile(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath);
+	[[nodiscard]]
+	static BYTE GetPacketHeaderCodeForTest() noexcept { return NetBuffer::m_byHeaderCode; }
+	[[nodiscard]]
+	static BYTE GetPacketXorCodeForTest() noexcept { return NetBuffer::m_byXORCode; }
+	static void SetPacketCodesForTest(const BYTE headerCode, const BYTE xorCode) noexcept
+	{
+		NetBuffer::m_byHeaderCode = headerCode;
+		NetBuffer::m_byXORCode = xorCode;
+	}
 	[[nodiscard]]
 	bool InitNetwork() const;
 	[[nodiscard]]

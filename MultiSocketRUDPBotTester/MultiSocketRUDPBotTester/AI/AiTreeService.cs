@@ -130,8 +130,11 @@ namespace MultiSocketRUDPBotTester.AI
             ("true_branch",   $"{basePath}.true_branch"),
             ("false_branch",  $"{basePath}.false_branch"),
             ("loop_body",     $"{basePath}.loop_body"),
+            ("exit_nodes",    $"{basePath}.exit_nodes"),
             ("repeat_body",   $"{basePath}.repeat_body"),
-            ("timeout_nodes", $"{basePath}.timeout_nodes")
+            ("retry_body",    $"{basePath}.retry_body"),
+            ("timeout_nodes", $"{basePath}.timeout_nodes"),
+            ("failure_nodes", $"{basePath}.failure_nodes")
         ];
 
         public string FormatJson(string json)

@@ -2,6 +2,7 @@
 #include "SessionPacketOrderer.h"
 #include "../Logger/Logger.h"
 #include "LogExtension.h"
+#include <ranges>
 
 SessionPacketOrderer::SessionPacketOrderer(const BYTE inMaxHoldingQueueSize)
 	: maxHoldingQueueSize(inMaxHoldingQueueSize)
@@ -27,13 +28,14 @@ void SessionPacketOrderer::SetMaximumHoldingQueueSize(const BYTE inMaxHoldingQue
 ON_RECV_RESULT SessionPacketOrderer::OnReceive(const PacketSequence sequence, NetBuffer& buffer, const PacketProcessCallback& callback)
 {
 	const PacketSequence expected = nextRecvPacketSequence.load(std::memory_order_relaxed);
+	const int64_t sequenceDiff = static_cast<int64_t>(sequence - expected);
 
-	if (sequence < expected)
+	if (sequenceDiff < 0)
 	{
 		return ON_RECV_RESULT::DUPLICATED_RECV;
 	}
 
-	if (sequence == expected)
+	if (sequenceDiff == 0)
 	{
 		if (not ProcessAndAdvance(buffer, sequence, callback))
 		{
@@ -48,9 +50,9 @@ ON_RECV_RESULT SessionPacketOrderer::OnReceive(const PacketSequence sequence, Ne
 		return ON_RECV_RESULT::PROCESSED;
 	}
 
-	if (not recvHoldingPacketSequences.contains(sequence) )
+	if (not recvHoldingPackets.contains(sequence))
 	{
-		if (recvHoldingPacketSequences.size() >= maxHoldingQueueSize)
+		if (recvHoldingPackets.size() >= maxHoldingQueueSize)
 		{
 			LOG_ERROR(std::format(
 				"SessionPacketOrderer: holding queue full. "
@@ -63,8 +65,7 @@ ON_RECV_RESULT SessionPacketOrderer::OnReceive(const PacketSequence sequence, Ne
 		}
 
 		NetBuffer::AddRefCount(&buffer);
-		recvPacketHolderQueue.emplace(&buffer, sequence);
-		recvHoldingPacketSequences.emplace(sequence);
+		recvHoldingPackets.emplace(sequence, &buffer);
 	}
 
 	return ON_RECV_RESULT::PACKET_HELD;
@@ -74,13 +75,11 @@ void SessionPacketOrderer::Reset(const PacketSequence startSequence)
 {
 	nextRecvPacketSequence.store(startSequence, std::memory_order_relaxed);
 
-	while (not recvPacketHolderQueue.empty())
+	for (const auto& buffer : recvHoldingPackets | std::views::values)
 	{
-		NetBuffer::Free(recvPacketHolderQueue.top().buffer);
-		recvPacketHolderQueue.pop();
+		NetBuffer::Free(buffer);
 	}
-
-	recvHoldingPacketSequences.clear();
+	recvHoldingPackets.clear();
 }
 
 PacketSequence SessionPacketOrderer::GetNextExpected() const noexcept
@@ -96,34 +95,25 @@ bool SessionPacketOrderer::ProcessAndAdvance(NetBuffer& buffer, const PacketSequ
 		return false;
 	}
 
-	recvHoldingPacketSequences.erase(sequence);
+	recvHoldingPackets.erase(sequence);
 	return true;
 }
 
 bool SessionPacketOrderer::ProcessHoldingPacket(const PacketProcessCallback& callback)
 {
-	while (not recvPacketHolderQueue.empty())
+	while (true)
 	{
 		const PacketSequence expected = nextRecvPacketSequence.load(std::memory_order_relaxed);
-		auto& top = recvPacketHolderQueue.top();
-
-		if (top.packetSequence > expected)
+		const auto heldPacket = recvHoldingPackets.find(expected);
+		if (heldPacket == recvHoldingPackets.end())
 		{
 			break;
 		}
 
-		const PacketSequence topSequence = top.packetSequence;
-		NetBuffer* storedBuffer = top.buffer;
-		recvPacketHolderQueue.pop();
+		NetBuffer* storedBuffer = heldPacket->second;
+		recvHoldingPackets.erase(heldPacket);
 
-		if (topSequence < expected)
-		{
-			recvHoldingPacketSequences.erase(topSequence);
-			NetBuffer::Free(storedBuffer);
-			continue;
-		}
-
-		if (not ProcessAndAdvance(*storedBuffer, topSequence, callback))
+		if (not ProcessAndAdvance(*storedBuffer, expected, callback))
 		{
 			NetBuffer::Free(storedBuffer);
 			return false;

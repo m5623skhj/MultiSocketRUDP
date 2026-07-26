@@ -158,12 +158,9 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private UdpClient udpClient = null!;
         private PacketSequence lastSendSequence = 0;
 
-        private readonly Lock expectedRecvSequenceLock = new();
-        private PacketSequence expectedRecvSequence;
-
         private readonly Lock aesGcmLock = new();
 
-        private readonly HoldingPacketStore holdingPacketStore = new();
+        private readonly ReceivePacketOrderer receivePacketOrderer = new();
         private readonly BufferStore bufferStore = new();
 
         private volatile PacketLossSimulator? packetLossSimulator;
@@ -199,18 +196,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private void ParseSessionBrokerResponse(byte[] data)
         {
-            var buffer = new NetBuffer(data.Length);
-            buffer.WriteBytes(data);
-
-            var resultCode = (ConnectResultCode)buffer.ReadByte();
-            if (resultCode != ConnectResultCode.Success)
-                throw new Exception($"Session broker response error: {resultCode}");
-
-            TargetServerInfo.ServerIp = buffer.ReadString();
-            TargetServerInfo.ServerPort = buffer.ReadUShort();
-            SessionInfo.SessionId = buffer.ReadUShort();
-            SessionInfo.SessionKey = buffer.ReadBytes(SessionInfo.SessionKeySize);
-            SessionInfo.SessionSalt = buffer.ReadBytes(SessionInfo.SessionSaltSize);
+            var response = SessionBrokerResponseParser.Parse(data);
+            TargetServerInfo.ServerIp = response.ServerIp;
+            TargetServerInfo.ServerPort = response.ServerPort;
+            SessionInfo.SessionId = response.SessionId;
+            SessionInfo.SessionKey = response.SessionKey;
+            SessionInfo.SessionSalt = response.SessionSalt;
 
             SessionInfo.AesGcm = new AesGcm(SessionInfo.SessionKey, 16);
             SessionInfo.SessionState = SessionState.Connecting;
@@ -388,7 +379,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var offset = 0;
             while (offset + HeaderSize <= data.Length)
             {
-                if (!TryGetPacketSize(data, offset, out var packetSize))
+                if (!DatagramFramer.TryGetPacketSize(data, offset, out var packetSize))
                 {
                     Log.Error(
                         "ProcessReceivedStreamAsync: invalid packet layout offset={Offset} datagramLength={DatagramLength}",
@@ -413,24 +404,6 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                 offset += packetSize;
             }
-        }
-
-        private static bool TryGetPacketSize(byte[] data, int offset, out int outPacketSize)
-        {
-            outPacketSize = 0;
-            if (offset + HeaderSize > data.Length)
-            {
-                return false;
-            }
-
-            var payloadLength = data[offset + 1] | (data[offset + 2] << 8);
-            if (payloadLength <= 0)
-            {
-                return false;
-            }
-
-            outPacketSize = HeaderSize + payloadLength;
-            return true;
         }
 
         private async Task ProcessReceivedPacketAsync(byte[] data)
@@ -539,37 +512,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             NetBuffer buffer,
             PacketType packetType)
         {
-            var result = new List<(PacketSequence, PacketId, NetBuffer, PacketType)>();
-            lock (expectedRecvSequenceLock)
-            {
-                if (packetSequence <= expectedRecvSequence)
-                {
-                    return result;
-                }
-
-                if (packetSequence == expectedRecvSequence + 1)
-                {
-                    expectedRecvSequence = packetSequence;
-                    result.Add((packetSequence, packetId, buffer, packetType));
-
-                    while (holdingPacketStore.TryGetFirst(out var nextSeq, out var held))
-                    {
-                        if (nextSeq != expectedRecvSequence + 1)
-                            break;
-
-                        expectedRecvSequence = nextSeq;
-                        holdingPacketStore.Remove(nextSeq);
-                        result.Add((held.Sequence, held.PacketId, held.Buffer, held.PacketType));
-                    }
-                }
-                else
-                {
-                    holdingPacketStore.Add(packetSequence,
-                        new HeldPacket { Sequence = packetSequence, PacketId = packetId, Buffer = buffer, PacketType = packetType });
-                }
-            }
-
-            return result;
+            return receivePacketOrderer.Collect(packetSequence, packetId, buffer, packetType);
         }
 
         private async Task SendReplyToServerAsync(PacketSequence packetSequence)
@@ -793,8 +736,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 {
                     if (!isConnected) break;
 
-                    PacketSequence curr;
-                    lock (expectedRecvSequenceLock) { curr = expectedRecvSequence; }
+                    var curr = receivePacketOrderer.GetExpectedSequence();
 
                     if (prev != curr) { prev = curr; continue; }
 
@@ -842,9 +784,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             TargetServerInfo.ServerIp = string.Empty;
             TargetServerInfo.ServerPort = 0;
             Interlocked.Exchange(ref lastSendSequence, 0);
-            lock (expectedRecvSequenceLock) { expectedRecvSequence = 0; }
-
-            holdingPacketStore.Clear();
+            receivePacketOrderer.Clear();
             bufferStore.Clear();
 
             OnSessionDisconnected?.Invoke(capturedSessionId);

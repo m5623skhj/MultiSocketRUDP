@@ -5,6 +5,7 @@
 #include "../MultiSocketRUDPServer/RUDPSession.h"
 #include "../MultiSocketRUDPServer/MultiSocketRUDPCore.h"
 #include "../MultiSocketRUDPServer/SendPacketInfo.h"
+#include "MultiSocketRUDPCoreTestAccess.h"
 #include "RUDPSessionTestAccess.h"
 
 namespace
@@ -98,6 +99,17 @@ TEST(RUDPSessionBehaviorTest, OnRecvPacketUnknownPacketIdReturnsFalse)
 	NetBuffer::Free(buffer);
 }
 
+TEST(RUDPSessionBehaviorTest, ReceiveOrderComparisonUsesFullPacketSequenceWidth)
+{
+	constexpr PacketSequence twoToTheThirtySecond = PacketSequence{ 1 } << 32;
+	constexpr PacketSequence maxSequence = ~PacketSequence{ 0 };
+
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::IsOlderRecvSequence(twoToTheThirtySecond, 0));
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::IsOlderRecvSequence(0, twoToTheThirtySecond));
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::IsOlderRecvSequence(0, maxSequence));
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::IsOlderRecvSequence(maxSequence, 0));
+}
+
 TEST(RUDPSessionBehaviorTest, OnSendReplyErasesTrackedSendPacketInfo)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -119,5 +131,146 @@ TEST(RUDPSessionBehaviorTest, OnSendReplyErasesTrackedSendPacketInfo)
 	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(sequence), nullptr);
 	EXPECT_TRUE(info->isErasedPacketInfo.load(std::memory_order_acquire));
 
+	SendPacketInfo::Free(info);
+}
+
+TEST(RUDPSessionBehaviorTest, InitializeSessionResetsReusableStateAndUsesCoreRtoOptions)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	MultiSocketRUDPCoreTestAccess::SetTimingOptions(core, 100, 250, 100, 1000);
+	RUDPSessionBehaviorAccess::SetMaximumPacketHoldingQueueSize(4);
+	SessionBehaviorTestSession session{ core };
+	RUDPSessionBehaviorAccess::SetConnected(session);
+	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	RUDPSessionBehaviorAccess::SetDisconnectedReason(session, DISCONNECT_REASON::BY_ERROR);
+	RUDPSessionBehaviorAccess::RefreshLastReceivedPacketTime(session, 500);
+	std::ignore = RUDPSessionBehaviorAccess::GetSendContext(session).IncrementLastSendPacketSequence();
+	sockaddr_in clientAddress{};
+	clientAddress.sin_family = AF_INET;
+	clientAddress.sin_port = htons(12000);
+	clientAddress.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+	RUDPSessionBehaviorAccess::SetClientAddress(session, clientAddress);
+	const uint32_t generationBefore = session.GetSessionGeneration();
+
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+
+	EXPECT_EQ(session.GetSessionGeneration(), generationBefore + 1);
+	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::DISCONNECTED);
+	EXPECT_FALSE(session.IsReleasing());
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NOT_DISCONNECTED);
+	EXPECT_EQ(session.GetSocketAddress().sin_port, 0);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).GetLastSendPacketSequence(), 0);
+	EXPECT_EQ(session.GetRetransmissionTimeoutMs(), 250u);
+}
+
+TEST(RUDPSessionBehaviorTest, HeartbeatGuardHonorsStateReleaseAndThreshold)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	MultiSocketRUDPCoreTestAccess::SetTimingOptions(core, 100, 250, 100, 1000);
+	SessionBehaviorTestSession session{ core };
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	RUDPSessionBehaviorAccess::RefreshLastReceivedPacketTime(session, 1000);
+
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1100));
+
+	RUDPSessionBehaviorAccess::SetConnected(session);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1099));
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1100));
+
+	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1200));
+}
+
+TEST(RUDPSessionBehaviorTest, ReservedSessionTimeoutUsesInclusiveBoundary)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	RUDPSessionBehaviorAccess::SetReservedSessionTimeoutMs(100);
+	RUDPSessionBehaviorAccess::SetSessionReservedTime(session, 1000);
+
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CheckReservedSessionTimeout(session, 1100));
+	RUDPSessionBehaviorAccess::SetReserved(session);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CheckReservedSessionTimeout(session, 1099));
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CheckReservedSessionTimeout(session, 1100));
+
+	RUDPSessionBehaviorAccess::SetReservedSessionTimeoutMs(30000);
+}
+
+TEST(RUDPSessionBehaviorTest, CanProcessPacketRequiresMatchingAddressAndNonReleasingSession)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	sockaddr_in clientAddress{};
+	clientAddress.sin_family = AF_INET;
+	clientAddress.sin_port = htons(12000);
+	clientAddress.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+	RUDPSessionBehaviorAccess::SetClientAddress(session, clientAddress);
+
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanProcessPacket(session, clientAddress));
+
+	sockaddr_in wrongPort = clientAddress;
+	wrongPort.sin_port = htons(12001);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanProcessPacket(session, wrongPort));
+
+	sockaddr_in wrongAddress = clientAddress;
+	wrongAddress.sin_addr.S_un.S_addr = htonl(0x7F000002);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanProcessPacket(session, wrongAddress));
+
+	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanProcessPacket(session, clientAddress));
+}
+
+TEST(RUDPSessionBehaviorTest, TryConnectRejectsInvalidSequenceSessionIdAndStateWithoutMutation)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	RUDPSessionBehaviorAccess::SetSessionId(session, 7);
+	RUDPSessionBehaviorAccess::SetReserved(session);
+	sockaddr_in clientAddress{};
+	clientAddress.sin_family = AF_INET;
+	clientAddress.sin_port = htons(12000);
+	clientAddress.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+
+	NetBuffer invalidSequence;
+	invalidSequence << PacketSequence{ LOGIN_PACKET_SEQUENCE + 1 } << SessionIdType{ 7 };
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::TryConnect(session, invalidSequence, clientAddress));
+	EXPECT_TRUE(session.IsReserved());
+
+	NetBuffer invalidSessionId;
+	invalidSessionId << PacketSequence{ LOGIN_PACKET_SEQUENCE } << SessionIdType{ 8 };
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::TryConnect(session, invalidSessionId, clientAddress));
+	EXPECT_TRUE(session.IsReserved());
+
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	NetBuffer invalidState;
+	invalidState << PacketSequence{ LOGIN_PACKET_SEQUENCE } << SessionIdType{ 7 };
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::TryConnect(session, invalidState, clientAddress));
+	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::DISCONNECTED);
+	EXPECT_EQ(session.GetSocketAddress().sin_port, 0);
+}
+
+TEST(RUDPSessionBehaviorTest, OnSendReplyIgnoresFutureAndUnknownSequences)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	NetBuffer* sendBuffer = NetBuffer::Alloc();
+	SendPacketInfo* info = sendPacketInfoPool->Alloc();
+	ASSERT_NE(sendBuffer, nullptr);
+	ASSERT_NE(info, nullptr);
+	info->Initialize(&session, session.GetSessionGeneration(), sendBuffer, 1, false);
+	RUDPSessionBehaviorAccess::GetSendContext(session).InsertSendPacketInfo(1, info);
+
+	NetBuffer futureReply;
+	futureReply << PacketSequence{ 2 } << BYTE{ 1 };
+	RUDPSessionBehaviorAccess::OnSendReply(session, futureReply);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(1), info);
+
+	NetBuffer unknownReply;
+	unknownReply << PacketSequence{ 0 } << BYTE{ 1 };
+	RUDPSessionBehaviorAccess::OnSendReply(session, unknownReply);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(1), info);
+
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindAndEraseSendPacketInfo(1), info);
+	SendPacketInfo::Free(info);
 	SendPacketInfo::Free(info);
 }

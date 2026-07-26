@@ -5,31 +5,30 @@ using System.Collections.Concurrent;
 
 namespace MultiSocketRUDPBotTester.Bot
 {
-    public class RuntimeContext(Client client, NetBuffer? packet)
+    public class RuntimeContext
     {
-        public Client Client { get; } = client;
+        public Client Client { get; }
 
-        private NetBuffer? currentPacket = packet;
-        private readonly Lock packetLock = new();
+        private readonly AsyncLocal<NetBuffer?> currentPacket = new();
 
         private readonly ConcurrentDictionary<string, object> vars = new();
 
-        private volatile Task _pendingAsyncTask = Task.CompletedTask;
+        private Task pendingAsyncTask = Task.CompletedTask;
+
+        public RuntimeContext(Client client, NetBuffer? packet)
+        {
+            Client = client;
+            currentPacket.Value = packet;
+        }
 
         public NetBuffer? GetPacket()
         {
-            lock (packetLock)
-            {
-                return currentPacket;
-            }
+            return currentPacket.Value;
         }
 
         public void SetPacket(NetBuffer? newPacket)
         {
-            lock (packetLock)
-            {
-                currentPacket = newPacket;
-            }
+            currentPacket.Value = newPacket;
         }
 
         public void Set<T>(string key, T value) where T : notnull
@@ -79,24 +78,20 @@ namespace MultiSocketRUDPBotTester.Bot
 
         public void SetPendingAsyncTask(Task task)
         {
-            _pendingAsyncTask = task;
+            ArgumentNullException.ThrowIfNull(task);
+            Interlocked.Exchange(ref pendingAsyncTask, task);
         }
 
         public Task GetAndClearPendingAsyncTask()
         {
-            var task = _pendingAsyncTask;
-            _pendingAsyncTask = Task.CompletedTask;
-            return task;
+            return Interlocked.Exchange(ref pendingAsyncTask, Task.CompletedTask);
         }
 
         public void Clear()
         {
             vars.Clear();
-            lock (packetLock)
-            {
-                currentPacket = null;
-            }
-            _pendingAsyncTask = Task.CompletedTask;
+            currentPacket.Value = null;
+            Interlocked.Exchange(ref pendingAsyncTask, Task.CompletedTask);
         }
     }
 }

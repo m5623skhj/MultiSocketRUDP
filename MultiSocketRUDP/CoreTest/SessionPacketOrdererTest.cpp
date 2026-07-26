@@ -296,3 +296,51 @@ TEST_F(SessionPacketOrdererTest, GapScenario_ProcessesInChunks)
 		EXPECT_EQ(processed[i], START + i);
 	}
 }
+
+TEST_F(SessionPacketOrdererTest, WraparoundHeldPacketsAreProcessedInSequenceOrder)
+{
+	constexpr PacketSequence maxSequence = ~PacketSequence{ 0 };
+	orderer.Reset(maxSequence - 1);
+	std::vector<PacketSequence> processed;
+	auto callback = makeRecorder(processed);
+	AutoBuf wrapped;
+	AutoBuf maximum;
+	AutoBuf beforeMaximum;
+
+	EXPECT_EQ(orderer.OnReceive(0, wrapped.get(), callback), ON_RECV_RESULT::PACKET_HELD);
+	EXPECT_EQ(orderer.OnReceive(maxSequence, maximum.get(), callback), ON_RECV_RESULT::PACKET_HELD);
+	EXPECT_EQ(orderer.OnReceive(maxSequence - 1, beforeMaximum.get(), callback), ON_RECV_RESULT::PROCESSED);
+
+	EXPECT_EQ(processed, (std::vector<PacketSequence>{ maxSequence - 1, maxSequence, 0 }));
+	EXPECT_EQ(orderer.GetNextExpected(), 1);
+}
+
+TEST_F(SessionPacketOrdererTest, SequenceImmediatelyBeforeWrappedExpectedIsDuplicate)
+{
+	constexpr PacketSequence maxSequence = ~PacketSequence{ 0 };
+	orderer.Reset(0);
+	AutoBuf buffer;
+
+	EXPECT_EQ(orderer.OnReceive(maxSequence, buffer.get(), successCb), ON_RECV_RESULT::DUPLICATED_RECV);
+	EXPECT_EQ(orderer.GetNextExpected(), 0);
+}
+
+TEST_F(SessionPacketOrdererTest, SequenceSeparatedByTwoToTheThirtySecondIsNotAliased)
+{
+	constexpr PacketSequence distantFuture = PacketSequence{ 1 } << 32;
+	orderer.Reset(0);
+	AutoBuf buffer;
+
+	EXPECT_EQ(orderer.OnReceive(distantFuture, buffer.get(), successCb), ON_RECV_RESULT::PACKET_HELD);
+	EXPECT_EQ(orderer.GetNextExpected(), 0);
+}
+
+TEST_F(SessionPacketOrdererTest, HalfRangeBoundaryIsTreatedAsPast)
+{
+	constexpr PacketSequence halfRange = PacketSequence{ 1 } << 63;
+	orderer.Reset(0);
+	AutoBuf buffer;
+
+	EXPECT_EQ(orderer.OnReceive(halfRange, buffer.get(), successCb), ON_RECV_RESULT::DUPLICATED_RECV);
+	EXPECT_EQ(orderer.GetNextExpected(), 0);
+}

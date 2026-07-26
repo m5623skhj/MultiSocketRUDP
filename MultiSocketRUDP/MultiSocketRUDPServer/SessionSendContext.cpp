@@ -139,8 +139,11 @@ std::atomic<IO_MODE>& SessionSendContext::GetIOMode()
 void SessionSendContext::InsertSendPacketInfo(const PacketSequence sequence, SendPacketInfo* info)
 {
 	std::unique_lock lock(sendPacketInfoMapLock);
-	info->AddRefCount();
-	sendPacketInfoMap.insert({ sequence, info });
+	const auto [_, inserted] = sendPacketInfoMap.try_emplace(sequence, info);
+	if (inserted)
+	{
+		info->AddRefCount();
+	}
 }
 
 SendPacketInfo* SessionSendContext::FindSendPacketInfo(const PacketSequence sequence)

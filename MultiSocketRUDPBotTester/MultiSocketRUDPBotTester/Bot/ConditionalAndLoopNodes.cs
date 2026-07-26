@@ -8,8 +8,13 @@ namespace MultiSocketRUDPBotTester.Bot
     {
         public sealed override void Execute(Client client, NetBuffer? receivedPacket = null)
         {
-            client.GlobalContext.SetPacket(receivedPacket);
-            ExecuteImpl(client.GlobalContext);
+            ExecuteWithContext(client.GlobalContext, receivedPacket);
+        }
+
+        internal void ExecuteWithContext(RuntimeContext context, NetBuffer? receivedPacket)
+        {
+            context.SetPacket(receivedPacket);
+            ExecuteImpl(context);
         }
 
         protected abstract void ExecuteImpl(RuntimeContext context);

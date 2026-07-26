@@ -106,6 +106,33 @@ namespace
 		return true;
 	}
 
+	bool RunPingScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
+	{
+		auto client = std::make_unique<TestableRUDPClient>();
+		if (not client->StartClient(clientCoreOptionPath, sessionGetterOptionPath, true))
+		{
+			std::cout << "client start failed\n";
+			Logger::GetInstance().StopLoggerThread();
+			return false;
+		}
+
+		if (not client->WaitForConnected(8s))
+		{
+			std::cout << "client connect wait failed\n";
+			return false;
+		}
+
+		client->SendPingPacket();
+		if (not client->WaitForPong(3s))
+		{
+			std::cout << "pong wait failed\n";
+			return false;
+		}
+
+		client->StopClient();
+		return true;
+	}
+
 	bool RunDropAckScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
 	{
 		auto client = std::make_unique<TestableRUDPClient>();
@@ -261,7 +288,7 @@ int wmain(const int argc, wchar_t* argv[])
 	int exitCode = 2;
 	if (argc < 3 || std::wstring_view(argv[1]) != L"--scenario")
 	{
-		std::cout << "usage: --scenario <connect|reserve-timeout|echo|drop-ack|disconnect|stop|multi-echo|ordered-burst> [value]\n";
+		std::cout << "usage: --scenario <connect|reserve-timeout|echo|ping|drop-ack|disconnect|stop|multi-echo|ordered-burst> [value]\n";
 		return 2;
 	}
 
@@ -283,6 +310,10 @@ int wmain(const int argc, wchar_t* argv[])
 	{
 		const std::string message = argc >= 4 ? std::filesystem::path(argv[3]).string() : "integration-echo";
 		exitCode = RunEchoScenario(clientCoreOptionPath, sessionGetterOptionPath, message) ? 0 : 1;
+	}
+	else if (scenario == L"ping")
+	{
+		exitCode = RunPingScenario(clientCoreOptionPath, sessionGetterOptionPath) ? 0 : 1;
 	}
 	else if (scenario == L"drop-ack")
 	{
