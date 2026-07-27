@@ -1,0 +1,364 @@
+name: Daily Static Analysis
+
+on:
+  schedule:
+    - cron: "30 9 * * *"
+      timezone: "Asia/Seoul"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-analysis
+  cancel-in-progress: false
+
+jobs:
+  native-analysis:
+    name: MSVC Native Analysis
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout (with private submodules)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+
+      - name: Restore NuGet
+        run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
+
+      - name: Generate IntegrationTest certificate
+        shell: cmd
+        run: MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
+
+      - name: Resolve GTest revision
+        id: gtest-revision
+        shell: pwsh
+        run: |
+          $revision = git -C external/CommonCode/Common/googletest-main rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($revision)) {
+              Write-Error "Could not resolve the checked-out GTest revision"
+              exit 1
+          }
+          "sha=$revision" | Add-Content -Path $env:GITHUB_OUTPUT
+
+      - name: Cache GTest build
+        id: cache-gtest
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: external/CommonCode/Common/googletest-main/build
+          key: gtest-${{ runner.os }}-${{ steps.gtest-revision.outputs.sha }}
+
+      - name: Build GTest
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $gtestActualRoot = Get-ChildItem -Recurse -Directory -Filter "googletest-main" |
+                             Where-Object { Test-Path "$($_.FullName)/CMakeLists.txt" } |
+                             Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $gtestActualRoot) {
+              Write-Error "Could not find googletest-main with CMakeLists.txt"
+              exit 1
+          }
+
+          $gtestBuild = Join-Path $gtestActualRoot "build"
+          if (!(Test-Path $gtestBuild)) {
+              New-Item -ItemType Directory -Path $gtestBuild | Out-Null
+          }
+
+          cmake -S $gtestActualRoot -B $gtestBuild -A x64 -T v143 -DCMAKE_BUILD_TYPE=Debug
+          cmake --build $gtestBuild --config Debug
+
+      - name: Run MSVC code analysis
+        shell: pwsh
+        run: |
+          $env:CAExcludePath = (Resolve-Path "external").Path
+
+          msbuild MultiSocketRUDP/MultiSocketRUDP.sln `
+            /m `
+            /t:Rebuild `
+            /p:Configuration=Debug `
+            /p:Platform=x64 `
+            /p:RunCodeAnalysis=true `
+            /p:CodeAnalysisRuleSet=NativeRecommendedRules.ruleset `
+            /fl `
+            "/flp:logfile=native-analysis.log;verbosity=normal"
+
+      - name: Summarize native analysis
+        if: always()
+        shell: pwsh
+        run: |
+          $warningCount = 0
+          if (Test-Path "native-analysis.log") {
+              $warningKeys = Select-String `
+                  -Path "native-analysis.log" `
+                  -Pattern '\bwarning C(?:6|26|28)\d+\b' |
+                  ForEach-Object {
+                      if ($_.Line -match '(?<key>[A-Za-z]:\\.*?\(\d+(?:,\d+)?\): warning C(?:6|26|28)\d+)') {
+                          $Matches.key
+                      }
+                  } |
+                  Sort-Object -Unique
+              $warningCount = @($warningKeys).Count
+          }
+
+          @(
+              "## MSVC Native Analysis",
+              "",
+              "- Unique analyzer warning locations: $warningCount",
+              "- Rule set: NativeRecommendedRules.ruleset",
+              "- Configuration: Debug | x64"
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload native analysis log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-static-analysis-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: native-analysis.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  managed-analysis:
+    name: .NET Roslyn Analysis
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore BotTester projects
+        shell: pwsh
+        run: |
+          dotnet restore MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.sln
+          dotnet restore MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj
+
+      - name: Run Roslyn analysis
+        shell: pwsh
+        run: |
+          dotnet build MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.sln `
+            --configuration Debug `
+            --no-restore `
+            --nologo `
+            --verbosity minimal `
+            -p:RunAnalyzers=true `
+            -p:RunAnalyzersDuringBuild=true `
+            -p:AnalysisLevel=latest `
+            -p:AnalysisMode=All `
+            -p:TreatWarningsAsErrors=false 2>&1 |
+              Tee-Object -FilePath "managed-analysis.log"
+
+          $solutionExitCode = $LASTEXITCODE
+
+          dotnet build MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropTest.csproj `
+            --configuration Debug `
+            --no-restore `
+            --nologo `
+            --verbosity minimal `
+            -p:RunAnalyzers=true `
+            -p:RunAnalyzersDuringBuild=true `
+            -p:AnalysisLevel=latest `
+            -p:AnalysisMode=All `
+            -p:TreatWarningsAsErrors=false 2>&1 |
+              Tee-Object -FilePath "managed-analysis.log" -Append
+
+          $interopExitCode = $LASTEXITCODE
+
+          if ($solutionExitCode -ne 0) {
+              exit $solutionExitCode
+          }
+          if ($interopExitCode -ne 0) {
+              exit $interopExitCode
+          }
+
+      - name: Summarize managed analysis
+        if: always()
+        shell: pwsh
+        run: |
+          $warningCount = 0
+          if (Test-Path "managed-analysis.log") {
+              $warningKeys = Select-String `
+                  -Path "managed-analysis.log" `
+                  -Pattern '\bwarning (?:CA|IDE)\d+\b' |
+                  ForEach-Object {
+                      if ($_.Line -match '(?<key>[A-Za-z]:\\.*?\(\d+(?:,\d+)?\): warning (?:CA|IDE)\d+)') {
+                          $Matches.key
+                      }
+                  } |
+                  Sort-Object -Unique
+              $warningCount = @($warningKeys).Count
+          }
+
+          @(
+              "## .NET Roslyn Analysis",
+              "",
+              "- Unique analyzer warning locations: $warningCount",
+              "- Analysis mode: All",
+              "- Configuration: Debug"
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload managed analysis log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: managed-static-analysis-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: managed-analysis.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  cleanup-artifacts:
+    name: Keep Latest Complete Artifact Set
+    needs: [native-analysis, managed-analysis]
+    if: always()
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Remove stale or incomplete static analysis artifacts
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const artifactFamilies = [
+              {
+                prefix: "native-static-analysis-log-",
+                legacyName: "native-static-analysis-log",
+              },
+              {
+                prefix: "managed-static-analysis-log-",
+                legacyName: "managed-static-analysis-log",
+              },
+            ];
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const runId = process.env.GITHUB_RUN_ID;
+            const runAttempt = process.env.GITHUB_RUN_ATTEMPT;
+            const defaultBranch = context.payload.repository.default_branch;
+            const isDefaultBranch =
+              process.env.GITHUB_REF_NAME === defaultBranch;
+            const expectedNames = new Set(
+              artifactFamilies.map(
+                ({ prefix }) => `${prefix}${runId}-${runAttempt}`,
+              ),
+            );
+            const jobResults = {
+              native: "${{ needs.native-analysis.result }}",
+              managed: "${{ needs.managed-analysis.result }}",
+            };
+            const isStaticAnalysisArtifact = (artifact) =>
+              artifactFamilies.some(
+                ({ prefix, legacyName }) =>
+                  artifact.name === legacyName ||
+                  artifact.name.startsWith(prefix),
+              );
+
+            const currentArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner,
+                repo,
+                run_id: Number(runId),
+                per_page: 100,
+              },
+            );
+            const currentStaticArtifacts = currentArtifacts.filter(
+              (artifact) => expectedNames.has(artifact.name),
+            );
+            const currentNames = new Set(
+              currentStaticArtifacts.map((artifact) => artifact.name),
+            );
+            const analysisSucceeded =
+              jobResults.native === "success" &&
+              jobResults.managed === "success";
+            const artifactSetComplete = [...expectedNames].every(
+              (name) => currentNames.has(name),
+            );
+
+            if (
+              !isDefaultBranch ||
+              !analysisSucceeded ||
+              !artifactSetComplete
+            ) {
+              for (const artifact of currentStaticArtifacts) {
+                await github.rest.actions.deleteArtifact({
+                  owner,
+                  repo,
+                  artifact_id: artifact.id,
+                });
+              }
+
+              const reason = !isDefaultBranch
+                ? `The run is not on the default branch (${defaultBranch}).`
+                : "The current static analysis result is incomplete.";
+              core.info(
+                `${reason} Current-attempt artifacts were removed and ` +
+                "the previous complete default-branch set was preserved.",
+              );
+              await core.summary
+                .addHeading("Static Analysis Artifact Cleanup")
+                .addRaw(
+                  `${reason} The previous complete default-branch artifact set was preserved.`,
+                )
+                .write();
+              if (
+                isDefaultBranch &&
+                analysisSucceeded &&
+                !artifactSetComplete
+              ) {
+                core.setFailed(
+                  "Static analysis succeeded, but the expected artifact set was not created.",
+                );
+              }
+              return;
+            }
+
+            const currentArtifactIds = new Set(
+              currentStaticArtifacts.map((artifact) => artifact.id),
+            );
+            const repositoryArtifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              {
+                owner,
+                repo,
+                per_page: 100,
+              },
+            );
+            const staleArtifacts = repositoryArtifacts.filter(
+              (artifact) =>
+                isStaticAnalysisArtifact(artifact) &&
+                !currentArtifactIds.has(artifact.id),
+            );
+
+            for (const artifact of staleArtifacts) {
+              await github.rest.actions.deleteArtifact({
+                owner,
+                repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+            core.info(
+              `Removed ${staleArtifacts.length} stale static analysis artifact(s).`,
+            );
+            await core.summary
+              .addHeading("Static Analysis Artifact Cleanup")
+              .addRaw(`Kept the latest complete set and removed ${staleArtifacts.length} stale artifact(s).`)
+              .write();
