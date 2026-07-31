@@ -7,7 +7,8 @@
 3. Tools
 4. 문서
 5. 테스트
-6. 측정
+6. GitHub Actions 자동화
+7. 측정
 
 ---
 
@@ -180,7 +181,24 @@
 
 ---
 
-6. 측정
+6. GitHub Actions 자동화
+
+GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지보수, 정적 분석을 지원하는 자동화로 구성됩니다.
+
+| 구분 | Action | 실행 조건 | 역할 |
+| :--- | :--- | :--- | :--- |
+| PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류하고 필요한 테스트를 호출한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. |
+| PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
+| PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C++/C# 프로토콜 상호운용 테스트를 수행합니다. |
+| 리뷰 보조 | [Gemini PR Comment Bot](./.github/workflows/GeminiPRCommoentBot.yml) | PR 생성, 갱신, 재오픈 | 코드 diff를 분석해 AI 리뷰 주석을 남깁니다. 병합 필수 체크로 사용하지 않습니다. |
+| 문서 자동화 | [docs-bot](./.github/workflows/docs-bot.yml) | 매일, `docs-review` 라벨, 수동 실행 | 병합된 코드의 인터페이스 변경을 분석해 문서 최신화 PR을 제안합니다. |
+| 품질 분석 | [Daily Static Analysis](./.github/workflows/StaticAnalysis.yml) | 매일 09:30 KST, 수동 실행 | C++ MSVC Native Analysis와 .NET Roslyn Analysis를 수행하고 분석 로그를 artifact로 보관합니다. |
+
+PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Testing](./Docs/Testing.md), 문서 자동화의 상세 동작은 [docs-bot](./Scripts/DocsBot/README.md)을 참고합니다.
+
+---
+
+7. 측정
 
 [RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
 
