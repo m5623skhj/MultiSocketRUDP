@@ -8,6 +8,7 @@ int main()
 {
 	ContentsPacketRegister::Init();
 
+	std::cout << "Now trying to start the server...." << '\n';
 	if (not TestServer::GetInst().Start(L"ServerOptionFile/CoreOption.txt", L"ServerOptionFile/SessionBrokerOption.txt"))
 	{
 		std::cout << "StartServer() failed" << '\n';
