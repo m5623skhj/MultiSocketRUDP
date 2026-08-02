@@ -1,7 +1,8 @@
 # CryptoHelper
 
 > **Windows BCrypt API를 래핑한 AES-GCM 저수준 암호화 헬퍼.**  
-> 스레드마다 독립 인스턴스(`thread_local`)를 유지해 락 없이 병렬 암복호화를 수행한다.
+> 스레드마다 algorithm provider를 가진 `CryptoHelper` 인스턴스를 유지한다.
+> 실제 암복호화는 호출자가 전달한 세션 `BCRYPT_KEY_HANDLE`을 사용한다.
 
 ---
 
@@ -32,12 +33,13 @@ static CryptoHelper& CryptoHelper::GetTLSInstance()
 }
 ```
 
-**thread_local을 사용하는 이유:**
+**thread_local의 실제 범위:**
 
-BCrypt는 `BCRYPT_ALG_HANDLE`과 `BCRYPT_KEY_HANDLE`이 스레드 안전하지 않다.  
-스레드마다 독립 인스턴스를 보유하면:
-- `BCryptEncrypt` / `BCryptDecrypt` 호출 시 락 불필요
-- IO Worker N개, RecvLogic N개가 각자 핸들을 보유 → 완전 병렬 처리
+- `GetTLSInstance()`가 스레드마다 분리하는 자원은 `CryptoHelper::aesAlg` algorithm handle이다.
+- `EncryptAESGCM`과 `DecryptAESGCM`은 static 함수이며, 외부에서 받은 세션
+  `BCRYPT_KEY_HANDLE`을 그대로 사용한다.
+- 따라서 thread-local `CryptoHelper`만으로 세션 key handle까지 스레드별로
+  분리되거나 락 없는 동시 호출이 보장된다고 해석하면 안 된다.
 
 **서버에서의 스레드별 호출 경로:**
 
@@ -47,15 +49,15 @@ IO Worker Thread id=0
 
 RecvLogic Worker Thread id=0
   → PacketCryptoHelper::DecodePacket()
-      → CryptoHelper::GetTLSInstance()  ← 이 스레드 전용 인스턴스
+      → CryptoHelper::DecryptAESGCM(sessionKeyHandle)
 
 Retransmission Thread id=0
   → core.SendPacket()
       → (이미 인코딩됨, DecodePacket 없음)
 
-SessionBroker Worker Thread (4개)
-  → PacketCryptoHelper::EncodePacket()  ← 세션 키 생성 등
-      → CryptoHelper::GetTLSInstance()
+SessionBroker Worker Thread
+  → CryptoHelper::GetTLSInstance()
+      → GetSymmetricKeyHandle(...)      ← algorithm provider 사용
 ```
 
 ---
@@ -91,6 +93,10 @@ status = BCryptGetProperty(
 
 ```
 
+세 단계 중 하나가 실패하면 생성자는 `std::runtime_error`를 던진다.
+따라서 첫 `GetTLSInstance()` 호출도 예외를 전파할 수 있으며, 실패 후
+`keyObjectSize == 0`인 인스턴스가 반환되는 계약은 아니다.
+
 **`keyObjectSize`의 의미:**  
 `BCryptGenerateSymmetricKey`는 키 상태를 내부 구조체에 저장해야 한다.  
 이 구조체의 크기는 알고리즘마다 다르며, `BCRYPT_OBJECT_LENGTH`로 런타임에 조회해야 한다.  
@@ -111,7 +117,7 @@ BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(
 
 ```cpp
 {
-    if (keyObjectSize == 0) return nullptr;  // 생성자에서 초기화 실패 시
+    if (keyObjectSize == 0) return nullptr;
 
     BCRYPT_KEY_HANDLE keyHandle = nullptr;
     NTSTATUS status = BCryptGenerateSymmetricKey(
@@ -124,13 +130,12 @@ BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(
         0
     );
 
-    if (!BCRYPT_SUCCESS(status)) {
-        LOG_ERROR(std::format("BCryptGenerateSymmetricKey failed: {:X}", status));
-        return nullptr;
-    }
-    return keyHandle;
+    return BCRYPT_SUCCESS(status) ? keyHandle : nullptr;
 }
 ```
+
+`BCryptGenerateSymmetricKey` 실패 시 현재 구현은 별도 로그를 남기지 않고
+`nullptr`만 반환한다.
 
 > **`keyObject` 버퍼의 소유권**: 호출자(`SessionCryptoContext`)가 소유하며,  
 > `keyHandle`이 살아있는 동안 버퍼도 유효해야 한다.  
@@ -323,7 +328,7 @@ static bool CryptoHelper::DecryptAESGCM(
     );
 
     // STATUS_AUTH_TAG_MISMATCH = 0xC000A002
-    // → Nonce 불일치, AAD 변조, 페이로드 변조, 재전송 공격 등
+    // → Nonce 불일치, AAD 변조, 페이로드 변조 등
     return BCRYPT_SUCCESS(status);
 }
 ```

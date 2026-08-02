@@ -1,8 +1,9 @@
 # TLSHelper
 
-> **Windows SChannel(Schannel SSP)을 이용한 TLS 1.2 핸드셰이크 및 스트림 암복호화 모듈.**  
+> **Windows SChannel(Schannel SSP)을 이용한 TLS 핸드셰이크 및 스트림 암복호화 모듈.**
 > `RUDPSessionBroker`(서버)와 `RUDPClientCore`(클라이언트)가 세션 정보를 안전하게 교환하는 채널을 제공한다.  
 > AES-GCM과 달리 표준 X.509 인증서를 사용하고, 스트림 방식으로 동작한다.
+> 서버 credential은 TLS 1.2로 제한하고, 클라이언트 credential은 OS Schannel 기본 프로토콜 정책을 사용한다.
 
 ---
 
@@ -27,8 +28,8 @@
 
 ```
 TLSHelperBase
- ├── credentialsHandle   (CredHandle)
- ├── securityContext     (CtxtHandle)
+ ├── credHandle          (CredHandle)
+ ├── ctxtHandle          (CtxtHandle)
  ├── streamSizes         (SecPkgContext_StreamSizes)
  │    ├── cbHeader       TLS 레코드 헤더 크기 (보통 5 bytes)
  │    ├── cbTrailer      TLS 레코드 트레일러 크기 (MAC + 패딩)
@@ -80,10 +81,10 @@ Store 경로 Step 1. 인증서 저장소 열기
       CERT_STORE_PROV_SYSTEM,
       X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
       nullptr,
-      CERT_SYSTEM_STORE_LOCAL_MACHINE,  // 로컬 컴퓨터 저장소
+      CERT_SYSTEM_STORE_CURRENT_USER,   // 현재 사용자 저장소
       storeName.c_str()
   )
-  실패 → LOG_ERROR("CertOpenStore failed") + return false
+  실패 → 별도 로그 없이 return false
 
 Store 경로 Step 2. 인증서 검색 (Subject Name 기준)
   certContext = CertFindCertificateInStore(
@@ -94,7 +95,7 @@ Store 경로 Step 2. 인증서 검색 (Subject Name 기준)
       subjectName.c_str(),
       nullptr
   )
-  실패 → LOG_ERROR("CertFindCertificateInStore failed: " + subjectName) + return false
+  실패 → 저장소를 닫고 별도 로그 없이 return false
 
 Step 3. SChannel 자격 증명 설정
   SCHANNEL_CRED cred = {};
@@ -107,7 +108,7 @@ Step 3. SChannel 자격 증명 설정
   AcquireCredentialsHandle(
       nullptr, UNISP_NAME, SECPKG_CRED_INBOUND,
       nullptr, &cred, nullptr, nullptr,
-      &credentialsHandle, nullptr
+      &credHandle, nullptr
   )
   실패 → return false
 ```
@@ -119,6 +120,7 @@ namespace TLSHelper::StoreNames {
     constexpr wchar_t* MY       = L"MY";        // 개인 인증서
     constexpr wchar_t* ROOT     = L"ROOT";      // 신뢰할 수 있는 루트 CA
     constexpr wchar_t* CA       = L"CA";
+    constexpr wchar_t* TRUST    = L"TRUST";
     constexpr wchar_t* AuthRoot = L"AuthRoot";  // 타사 루트 CA
 }
 ```
@@ -127,8 +129,8 @@ namespace TLSHelper::StoreNames {
 
 | 저장소 | 기본값 | 용도 |
 |--------|--------|------|
-| `LOCAL_MACHINE` | 현재 코드 사용 | 서비스, 공유 인증서 |
-| `CURRENT_USER` | - | 사용자별 인증서 |
+| `LOCAL_MACHINE` | - | 서비스, 공유 인증서 |
+| `CURRENT_USER` | 현재 코드 사용 | 사용자별 인증서 |
 
 ---
 
@@ -141,13 +143,13 @@ bool TLSHelperClient::Initialize()
 ```
 SCHANNEL_CRED cred = {};
 cred.dwVersion = SCHANNEL_CRED_VERSION;
-cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
+cred.grbitEnabledProtocols = 0;  // OS Schannel 기본 프로토콜 정책 사용
 cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;  // ← 핵심
 
 AcquireCredentialsHandle(
     nullptr, UNISP_NAME, SECPKG_CRED_OUTBOUND,
     nullptr, &cred, nullptr, nullptr,
-    &credentialsHandle, nullptr
+    &credHandle, nullptr
 )
 ```
 
@@ -164,7 +166,7 @@ AcquireCredentialsHandle(
 ## 4. 서버 핸드셰이크 — `AcceptSecurityContext` 루프
 
 ```cpp
-bool TLSHelperServer::Handshake(const SOCKET& clientSocket)
+bool TLSHelperServer::Handshake(SOCKET clientSocket)
 ```
 
 ```
@@ -182,14 +184,14 @@ while true:
   }
 
   status = AcceptSecurityContext(
-      &credentialsHandle,
+      &credHandle,
       pContext,      ← 첫 호출은 nullptr
       &InBufDesc,
       ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT |
-      ASC_REQ_CONFIDENTIALITY | ASC_REQ_EXTENDED_ERROR |
-      ASC_REQ_ALLOCATE_MEMORY | ASC_REQ_STREAM,
+      ASC_REQ_CONFIDENTIALITY | ASC_REQ_ALLOCATE_MEMORY |
+      ASC_REQ_STREAM,
       0,
-      &securityContext,
+      &ctxtHandle,
       &OutBufDesc,
       &contextAttributes,
       nullptr
@@ -214,8 +216,7 @@ while true:
       continue
 
     else:
-      LOG_ERROR("AcceptSecurityContext failed: " + hex(status))
-      return false
+      별도 로그 없이 return false
 ```
 
 **핸드셰이크 메시지 흐름:**
@@ -239,19 +240,18 @@ while true:
 ## 5. 클라이언트 핸드셰이크 — `InitializeSecurityContext` 루프
 
 ```cpp
-bool TLSHelperClient::Handshake(const SOCKET& serverSocket)
+bool TLSHelperClient::Handshake(SOCKET serverSocket)
 ```
 
 ```
 while true:
   status = InitializeSecurityContext(
-      &credentialsHandle,
+      &credHandle,
       pContext,
       nullptr,    ← 서버 이름 (nullptr = 검증 안 함)
       ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
-      ISC_REQ_CONFIDENTIALITY | ISC_REQ_EXTENDED_ERROR |
-      ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM |
-      ISC_REQ_MANUAL_CRED_VALIDATION,  ← 인증서 검증 생략
+      ISC_REQ_CONFIDENTIALITY | ISC_REQ_ALLOCATE_MEMORY |
+      ISC_REQ_STREAM,
       ...
       &OutBufDesc, &contextAttributes, nullptr
   )
@@ -293,7 +293,7 @@ bool TLSHelperBase::EncryptData(
   buffers[2] = {SECBUFFER_STREAM_TRAILER, cbTrailer, encryptedBuffer + cbHeader + plainDataSize}
   buffers[3] = {SECBUFFER_EMPTY, 0, nullptr}
 
-④ EncryptMessage(&securityContext, 0, &bufDesc, 0)
+④ EncryptMessage(&ctxtHandle, 0, &bufDesc, 0)
    → SChannel이 제자리(in-place)로 암호화
 
 ⑤ encryptedSize = cbHeader + plainDataSize + cbTrailer
@@ -321,22 +321,24 @@ TlsDecryptResult TLSHelperBase::DecryptDataStream(
   buffers[0] = {SECBUFFER_DATA, streamSize, streamData}
   buffers[1..3] = {SECBUFFER_EMPTY, 0, nullptr}
 
-③ DecryptMessage(&securityContext, &bufDesc, 0, nullptr)
+③ DecryptMessage(&ctxtHandle, &bufDesc, 0, nullptr)
 
   switch 결과:
     SEC_E_OK:
-      result buffer[1] = SECBUFFER_DATA → 복호화된 데이터
-      result buffer[3] = SECBUFFER_EXTRA → 남은 데이터 (다음 레코드)
-      
-      memcpy(plainBuffer, buffer[1].pvBuffer, buffer[1].cbBuffer)
-      plainSize = buffer[1].cbBuffer
-      
-      if buffer[3].BufferType == SECBUFFER_EXTRA:
-        encryptedStream.erase(처음 부분)  ← 처리된 레코드 제거
+      SECBUFFER_DATA를 찾아 plainBuffer + plainSize에 이어 붙임
+      SECBUFFER_EXTRA를 찾으면 encryptedStream으로 교체한 뒤
+      같은 호출 안에서 다음 완전한 레코드 복호화를 계속함
+
+      memcpy(plainBuffer + plainSize, dataBuffer, dataSize)
+      plainSize += dataSize
+
+      if extraBuffer가 있음:
+        encryptedStream = extraBuffer
+        continue
       else:
         encryptedStream.clear()
-      
-      return PlainData 또는 None
+
+      완전한 레코드를 모두 소비한 뒤 PlainData 또는 None 반환
 
     SEC_E_INCOMPLETE_MESSAGE:
       return None
@@ -348,6 +350,10 @@ TlsDecryptResult TLSHelperBase::DecryptDataStream(
       return Error
 ```
 
+> `DecryptDataStream`은 한 번의 호출에서 현재 스트림에 들어 있는 모든 완전한
+> TLS 레코드의 평문을 `plainBuffer`에 연속으로 기록한다. API에 출력 capacity
+> 인자가 없으므로 호출자는 누적 평문 전체를 담을 수 있는 버퍼를 제공해야 한다.
+
 **왜 SECBUFFER_EXTRA를 처리하는가:**
 
 ```
@@ -355,7 +361,8 @@ TCP recv로 받은 데이터:
   [TLS Record 1 완전] [TLS Record 2 일부]
                        ↑ SECBUFFER_EXTRA: 아직 복호화 못한 부분
   
-  → 다음 recv 호출 때 이 부분을 앞에 붙여서 계속 처리
+  → 완전한 다음 레코드가 있으면 현재 호출에서 계속 처리하고,
+    불완전한 레코드만 남으면 다음 recv까지 보존
 ```
 
 ---
@@ -373,19 +380,20 @@ bool TLSHelperBase::EncryptCloseNotify(
 ```
 
 ```
-ApplyControlToken(&securityContext, SCHANNEL_SHUTDOWN)
+ApplyControlToken(&ctxtHandle, SCHANNEL_SHUTDOWN)
 
-SecBuffer shutdownToken = {SECBUFFER_TOKEN, 0, nullptr}
-InitializeSecurityContext(
-    ...,
-    ISC_REQ_ALLOCATE_MEMORY, ...
-)
+SecBuffer shutdownToken = {
+  SECBUFFER_TOKEN,
+  bufferSize,
+  buffer               // 호출자가 소유한 출력 버퍼
+}
+EncryptMessage(&ctxtHandle, 0, &shutdownTokenDesc, 0)
 
-if OutBuf[0].cbBuffer > 0:
-  memcpy(buffer, OutBuf[0].pvBuffer, OutBuf[0].cbBuffer)
-  encryptedSize = OutBuf[0].cbBuffer
-  FreeContextBuffer(OutBuf[0].pvBuffer)
+encryptedSize = shutdownToken.cbBuffer
 ```
+
+이 함수는 Schannel이 별도로 할당한 토큰을 반환하지 않는다. 전달한 `buffer`의
+소유권은 호출자에게 계속 있으며, 구현에는 별도의 `FreeContextBuffer` 호출이 없다.
 
 **SessionBroker 세션 종료 순서:**
 
@@ -480,7 +488,7 @@ if (CompareFileTime(&now, &certContext->pCertInfo->NotAfter) > 0) {
 powershell -Command "& { ^
     $cert = New-SelfSignedCertificate ^
         -Subject 'CN=DevServerCert' ^
-        -CertStoreLocation 'Cert:\LocalMachine\MY' ^
+        -CertStoreLocation 'Cert:\CurrentUser\MY' ^
         -KeyExportPolicy Exportable ^
         -KeySpec Signature ^
         -KeyLength 2048 ^
@@ -492,7 +500,7 @@ powershell -Command "& { ^
 
 **생성 확인:**
 ```
-certmgr.msc → 로컬 컴퓨터 → 개인 → 인증서
+certmgr.msc → 현재 사용자 → 개인 → 인증서
 → "DevServerCert" 확인
 ```
 
@@ -500,7 +508,7 @@ certmgr.msc → 로컬 컴퓨터 → 개인 → 인증서
 
 ```batch
 powershell -Command "& { ^
-    $cert = Get-ChildItem -Path 'Cert:\LocalMachine\MY' ^
+    $cert = Get-ChildItem -Path 'Cert:\CurrentUser\MY' ^
         | Where-Object { $_.Subject -like '*DevServerCert*' }; ^
     if ($cert) { Remove-Item -Path $cert.PSPath; Write-Host 'Removed' } ^
     else { Write-Host 'Not found' } ^
@@ -509,9 +517,9 @@ powershell -Command "& { ^
 
 ### 관리자 권한 요구사항
 
-`LocalMachine` 저장소에 쓰려면 **관리자 권한**이 필요하다.  
-일반 사용자 권한으로는 `CurrentUser` 저장소만 사용 가능하며, 이 경우  
-`CERT_SYSTEM_STORE_LOCAL_MACHINE` → `CERT_SYSTEM_STORE_CURRENT_USER`로 변경해야 한다.
+현재 구현은 `CurrentUser` 저장소를 읽으므로 개발 인증서도
+`Cert:\CurrentUser\MY`에 설치해야 한다. `LocalMachine` 저장소를 사용하도록
+코드를 변경하는 경우에는 관리자 권한이 필요하다.
 
 ---
 
@@ -541,7 +549,7 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 ---
 
 ## 관련 문서
-- [[RUDPSessionBroker]] — TLSHelperServer 사용처
+- [[Server/RUDPSessionBroker]] — TLSHelperServer 사용처
 - [[RUDPClientCore]] — TLSHelperClient 사용처
 - [[CryptoSystem]] — 패킷 암호화 (TLS 이후 UDP 레벨)
 - [[Troubleshooting]] — TLS 핸드셰이크 실패 해결
@@ -550,6 +558,11 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 ## 현재 코드 기준 함수 설명 및 정정
 
 ### `TLSHelperBase`
+
+#### `SECURITY_STATUS GetLastStatus() const`
+- credential 획득 시 저장된 마지막 Schannel 상태를 반환한다.
+- 인증서 저장소 탐색, socket 송수신, handshake의 지역 `status` 실패는 모두
+  `lastStatus`에 저장되지 않으므로 모든 `false` 반환의 원인을 대표하지 않는다.
 
 #### `bool EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize)`
 - 핸드셰이크 완료 후 평문을 TLS 레코드로 암호화한다.
@@ -562,6 +575,12 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 
 #### `bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize)`
 - TLS `close_notify` 경고 레코드를 생성한다.
+
+### 실패 진단 범위
+
+- 인증서 저장소 열기·검색과 handshake 실패 경로는 현재 별도 로그 없이 `false`를 반환한다.
+- `GetLastStatus()`는 credential 획득 결과 확인에만 사용하고, 일반적인 handshake 오류
+  진단 API로 간주하지 않는다.
 
 ### `TLSHelperClient`
 

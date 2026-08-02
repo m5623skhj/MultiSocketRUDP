@@ -2,7 +2,7 @@
 
 > **RecvLogic Worker Thread에서 호출되는 패킷 타입 분류기.**  
 > `NetBuffer`를 `PACKET_TYPE`에 따라 해당 세션 메서드로 라우팅하고,  
-> SEND_TYPE 처리마다 TPS 카운터를 증가시킨다.
+> SEND_TYPE이 콘텐츠 수신 파이프라인을 성공적으로 통과한 경우에만 TPS 카운터를 증가시킨다.
 
 ---
 
@@ -82,16 +82,11 @@ static WORD GetPayloadLength(const NetBuffer& buffer)
 {
     // buffer[0] = HeaderCode (1B)
     // buffer[1..2] = PayloadLen (2B, uint16_t LE)
-    WORD payloadLen;
-    memcpy(&payloadLen,
-           &buffer.m_pSerializeBuffer[1],
-           sizeof(WORD));
-    return payloadLen + df_HEADER_SIZE;
-    // PayloadLen = 헤더 이후 바이트 수
-    // GetUseSize = 전체 바이트 수 (헤더 포함)
-    // → payloadLen + HEADER_SIZE == GetUseSize 이어야 함
+    return *reinterpret_cast<const WORD*>(&buffer.m_pSerializeBuffer[1]);
 }
 ```
+
+`NetBuffer`의 read index는 이 단계에서 `df_HEADER_SIZE` 뒤를 가리키므로 `GetUseSize()`도 헤더 이후 바이트 수다. 따라서 payload length에 header 크기를 다시 더하지 않고 두 값을 직접 비교한다.
 
 ---
 
@@ -100,10 +95,12 @@ static WORD GetPayloadLength(const NetBuffer& buffer)
 ```cpp
 void RUDPPacketProcessor::ProcessByPacketType(
     RUDPSession& session,
-    NetBuffer& recvPacket,
     const sockaddr_in& clientAddr,
-    BYTE packetTypeByte)
+    NetBuffer& recvPacket)
 {
+    PACKET_TYPE packetType;
+    recvPacket >> packetType;
+
     // 세션 암호화 컨텍스트 획득
     const auto* sessionSalt      = sessionDelegate.GetSessionSalt(session);
     const auto& sessionKeyHandle = sessionDelegate.GetSessionKeyHandle(session);

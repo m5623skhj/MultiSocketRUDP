@@ -177,10 +177,11 @@ void StopServer();
 2. CloseAllSessions()
    └─ for each session: sessionDelegate.CloseSocket(*session)
       → closesocket() 호출 → 진행 중인 RIO 작업에 에러 상태 유발
-      → IO Worker가 에러 상태를 감지하고 정리
+      → worker가 stop되기 전에 도착한 에러 completion은 처리할 수 있음
 
 3. SetEvent(recvLogicThreadEventStopHandle)   ← Logic Worker 종료 신호
 4. SetEvent(sessionReleaseStopEventHandle)    ← Release Thread 종료 신호
+   SetEvent(retransmissionStopEventHandle)    ← Retransmission Worker 종료 신호
 
 5. StopAllThreads()
    └─ 각 THREAD_GROUP별 stop_token 신호
@@ -205,6 +206,8 @@ void StopServer();
 13. WSACleanup()
 14. isServerStopped = true
 ```
+
+> **현재 종료 보장 범위:** `CloseAllSessions()` 뒤에 outstanding receive 수나 completion queue가 완전히 비었는지 기다리는 drain barrier는 없다. 이어서 stop event와 `stop_token`을 전달하므로, 모든 잔여 RIO completion이 처리된 뒤 worker가 멈춘다고 보장하지 않는다. 이 순서는 best-effort 종료 절차다.
 
 **종료 순서가 중요한 이유:**
 
@@ -513,17 +516,15 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
    └─ sessionDelegate.InitializeSessionRIO(session, rioFunctionTable, recvCQ, sendCQ)
         └─ session.InitializeRIO(...)
              ├─ SessionRecvContext::Initialize()
-             │    ├─ RIORegisterBuffer(recvBuffer, 16KB)
-             │    ├─ RIORegisterBuffer(clientAddrBuffer, sizeof SOCKADDR_INET)
-             │    └─ RIORegisterBuffer(localAddrBuffer, sizeof SOCKADDR_INET)
+             │    └─ 8개 RecvBufferSlot 각각에 data/local/remote buffer 등록
              ├─ SessionSendContext::Initialize()
              │    └─ RIORegisterBuffer(rioSendBuffer, 32KB)
-             └─ RIOCreateRequestQueue(sock, 1, 1, 1, 1, recvCQ, sendCQ, &sessionId)
+             └─ RIOCreateRequestQueue(sock, 8, 1, 1, 1, recvCQ, sendCQ, &cachedSessionId)
 
    실패 → RIO_INIT_FAILED 반환
 
 4. ioHandler->DoRecv(session)
-   └─ RIOReceiveEx(recvRIORQ, context, localAddrBuf, clientAddrBuf, ...)
+   └─ free receive context를 모두 RIOReceiveEx에 등록
    실패 → DO_RECV_FAILED 반환
 
 5. session.stateMachine.SetReserved()
@@ -543,7 +544,7 @@ RIOCreateRequestQueue(
     1,             // MaxSendDataBuffers
     recvCQ,        // 수신 완료 큐
     sendCQ,        // 송신 완료 큐
-    &sessionId     // RequestContext (완료 시 반환됨)
+    &cachedSessionId // SocketContext (완료 시 RIORESULT.SocketContext로 반환)
 );
 ```
 
@@ -596,10 +597,11 @@ RIOCreateRequestQueue(
 
 재전송 범위는 `0 < MIN_RETRANSMISSION_MS <= RETRANSMISSION_MS <= MAX_RETRANSMISSION_MS`를 만족해야 한다. 최소값과 최대값 중 하나만 제공하거나 범위를 어기면 옵션 로딩이 실패한다. `SIMULATED_PACKET_LOSS_PERCENT`는 코드에서 상한을 검사하지 않으므로 반드시 `[0, 100]` 범위로 설정한다.
 
+> **`WORKER_THREAD_ONE_FRAME_MS` 제한:** 현재 `BuildConfig.h`의 `USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME`은 `USE_WORKER_THREAD_SLEEP_ZERO`로 고정돼 IO Worker가 항상 `Sleep(0)`을 호출한다. 이 빌드에서는 옵션 파일의 `WORKER_THREAD_ONE_FRAME_MS` 값이 실행 동작에 반영되지 않는다. `USE_WORKER_THREAD_SLEEP_FOR_FRAME`로 다시 빌드한 경우에만 이 값으로 frame 잔여 시간을 sleep한다.
+
 | 시나리오 | 권장 설정 |
 |----------|-----------|
-| 저레이턴시 우선 (FPS 게임) | `WORKER_THREAD_ONE_FRAME_MS=0`, `RETRANSMISSION_MS=50` |
-| CPU 절약 우선 (MMO) | `WORKER_THREAD_ONE_FRAME_MS=1`, 예: `MIN_RETRANSMISSION_MS=50`, `RETRANSMISSION_MS=200`, `MAX_RETRANSMISSION_MS=400` |
+| IO Worker sleep 조정 | 현재 빌드에서는 `WORKER_THREAD_ONE_FRAME_MS`가 무효다. compile-time sleep mode 변경 후에만 조정 |
 | 세션 수 많음 (1000+) | `THREAD_COUNT` ≥ 4, `NUM_OF_SOCKET` 적절히 |
 | 불안정 네트워크 | `MAX_PACKET_RETRANSMISSION_COUNT` 증가, `RETRANSMISSION_MS`와 `MAX_RETRANSMISSION_MS`를 함께 조정 |
 | 고빈도 하트비트 필요 | `HEARTBEAT_THREAD_SLEEP_MS` 감소 |
@@ -692,7 +694,7 @@ RUDPSession* RUDPSessionBroker::ReserveSession(...) {
 
 ## 관련 문서
 - [[RUDPSession]] — 세션 상속 및 API 사용법
-- [[RUDPSessionBroker]] — TLS 세션 발급 상세
+- [[Server/RUDPSessionBroker]] — TLS 세션 발급 상세
 - [[ThreadModel]] — 스레드 그룹 상세 동작
 - [[PacketProcessing]] — 수신 파이프라인
 - [[RUDPSessionManager]] — 세션 풀 관리

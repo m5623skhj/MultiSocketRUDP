@@ -106,46 +106,41 @@ struct RIORESULT {
 bool RUDPIOHandler::RecvIOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const
 {
     auto& session = *context->session;
+    auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
 
     // ① 새 NetBuffer 할당 (메모리 풀에서, lock-free)
     NetBuffer* recvPacketBuffer = NetBuffer::Alloc();
     if (recvPacketBuffer == nullptr) {
-        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+        recvBuffer.ReleaseRecvContext(context);
         return false;
     }
 
     // ② RIO recv 버퍼에서 NetBuffer로 복사
-    auto& recvBuffer = session.rioContext.GetRecvBuffer();
     memcpy_s(
         recvPacketBuffer->m_pSerializeBuffer,
         RECV_BUFFER_SIZE,                        // 16KB
-        recvBuffer.buffer,                       // RIO 등록 버퍼 (고정 위치)
+        context->recvDataBuffer,                 // 완료된 slot의 RIO 등록 버퍼
         transferred
     );
     recvPacketBuffer->m_iWrite = static_cast<WORD>(transferred);
 
     // ③ 세션의 수신 버퍼 리스트에 삽입
-    session.EnqueueToRecvBufferList(recvPacketBuffer);
-    // → recvBuffer.recvBufferList.Enqueue(recvPacketBuffer)
+    sessionDelegate.EnqueueToRecvBufferList(session, recvPacketBuffer);
 
     // ④ RecvLogic Worker에게 알림
-    auto* completedContext = recvIOCompletedContextPool.Alloc();
-    completedContext->Initialize(context);       // session, clientAddrBuffer 복사
-    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(completedContext, threadId);
+    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(context, threadId);
     // → recvIOCompletedContexts[threadId].Enqueue(completedContext)
     // → ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr)
 
-    // ⑤ 즉시 다음 수신 등록 (연속 수신)
+    // ⑤ 완료 slot을 free queue로 돌려놓고 다음 수신 등록
+    recvBuffer.ReleaseRecvContext(context);
     return DoRecv(session);
 }
 ```
 
 **왜 복사가 필요한가?**
 
-RIO recv 버퍼(`recvBuffer.buffer`)는 세션 객체에 고정된 16KB 영역이다.  
-`DoRecv()`를 즉시 호출해 다음 패킷을 받아야 하므로, 이 버퍼를 그대로 사용하면  
-아직 Logic Worker가 처리 중인 상태에서 덮어써질 수 있다.  
-따라서 `NetBuffer`로 복사해 Logic Worker에게 전달하고, recv 버퍼는 즉시 재사용한다.
+세션에는 현재 8개의 `RecvBufferSlot`이 있고 각 slot은 독립 16KB buffer와 `IOContext`를 가진다. 완료된 slot을 free queue로 반환하면 `DoRecv()`가 그 slot을 다시 등록할 수 있으므로, Logic Worker에는 원본 slot이 아니라 별도 `NetBuffer`를 전달한다.
 
 ---
 
@@ -245,8 +240,6 @@ void RUDPPacketProcessor::ProcessByPacketType(
         // ...
     case PACKET_TYPE::DISCONNECT_TYPE:
         // ...
-    case PACKET_TYPE::HEARTBEAT_TYPE:
-        // ...
     case PACKET_TYPE::HEARTBEAT_REPLY_TYPE:
         // ...
     default:
@@ -299,15 +292,17 @@ case PACKET_TYPE::SEND_TYPE:
     DECODE_PACKET()
 
     // ④ 수신 파이프라인 (순서 보장 + 핸들러)
-    if (!session.OnRecvPacket(recvPacket)) {
+    if (session.OnRecvPacket(recvPacket)) {
+        // 성공적으로 콘텐츠 수신 파이프라인을 통과한 SEND_TYPE만 집계
+        tps.fetch_add(1, std::memory_order_relaxed);
+    } else {
         session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
     }
-
-    // ⑤ TPS 카운터
-    tps.fetch_add(1, std::memory_order_relaxed);
 }
 break;
 ```
+
+`HEARTBEAT_TYPE`은 서버가 클라이언트로 보내는 방향이므로 서버의 수신 switch에는 없다. 서버는 `HEARTBEAT_REPLY_TYPE`만 수신 처리한다.
 
 ### SEND_REPLY_TYPE 처리 (ACK 수신)
 

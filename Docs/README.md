@@ -1,132 +1,66 @@
-# MultiSocketRUDP 문서 (Obsidian Vault)
+# MultiSocketRUDP 문서
 
-> 이 폴더를 Obsidian에서 **Vault로 열기**하면 모든 링크와 다이어그램이 활성화됩니다.
+> GitHub와 Obsidian에서 함께 사용할 수 있는 문서 진입점이다.
 
----
-
-## 📂 폴더 구조
-
-```
-MultiSocketRUDP-Docs/
-├── README.md              ← Vault 진입 문서
-├── 00_Overview.md         ← 전체 개요 & 문서 탐색 허브
-├── GettingStarted.md      ← 콘텐츠 구현 빠른 시작
-├── ContentServerGuide.md  ← 콘텐츠 서버 구현 가이드
-├── Troubleshooting.md     ← 연결/패킷/성능 문제 해결
-├── PerformanceTuning.md   ← 성능 튜닝 가이드
-├── Testing.md             ← 테스트 구성 및 통합 테스트 가이드
-├── Glossary.md            ← 용어집
-├── style_guide.md         ← 문서 작성 스타일 가이드
-├── RTT_TEST_COMPARISON_CHECKLIST_KR.md
-│                           ← RTT 비교 테스트 체크리스트
-│
-├── Server/                ← 서버 컴포넌트
-│   ├── MultiSocketRUDPCore.md
-│   ├── RUDPSession.md
-│   ├── SessionLifecycle.md
-│   ├── SessionComponents.md
-│   ├── RUDPSessionBroker.md
-│   ├── RUDPSessionManager.md
-│   ├── PacketProcessing.md
-│   ├── PacketFormat.md
-│   ├── ThreadModel.md
-│   ├── RUDPIOHandler.md
-│   ├── RIOManager.md
-│   ├── RUDPPacketProcessor.md
-│   ├── RUDPThreadManager.md
-│   ├── SendPacketInfo.md
-│   ├── RetransmissionTimeoutEstimator.md
-│   ├── Ticker.md
-│   └── MemoryTracer.md
-│
-├── Client/                ← 클라이언트 컴포넌트
-│   ├── RUDPClientCore.md
-│   ├── RUDPClientCoreHooks.md
-│   ├── RUDPSessionBroker.md
-│   └── ServerAliveChecker.md
-│
-├── Common/                ← 공통 모듈
-│   ├── CryptoSystem.md
-│   ├── CryptoHelper.md
-│   ├── PacketCryptoHelper.md
-│   ├── PacketFormat.md
-│   ├── TLSHelper.md
-│   └── FlowController.md
-│
-├── Logger/
-│   └── Logger.md
-│
-├── ContentServer/
-│   └── PlayerManager.md
-│
-├── Tools/
-│   ├── PacketGenerator.md
-│   ├── PacketUploader.md
-│   └── DevelopmentScripts.md
-│
-└── Diagrams/              ← SVG 다이어그램 (문서에서 인라인 표시)
-    ├── README.md
-    ├── AiTreeFlow.svg
-    ├── Architecture_Overview.svg
-    ├── BotTester_Architecture.svg
-    ├── Connection_Sequence.svg
-    ├── CryptoStructure.svg
-    ├── GraphEditor_Layout.svg
-    ├── NodeHierarchy.svg
-    ├── ThreadModel.svg
-    ├── PacketFlow.svg
-    └── SessionStateMachine.svg
-```
+처음 방문했다면 [문서 읽기 가이드](ReadingGuide.md)에서 역할·목적·시간에 맞는 경로를 선택한다. 전체 문서 목록은 [문서 카탈로그](00_Overview.md)에서 확인한다.
 
 ---
 
-## 🚀 시작점
+## 목적별 바로가기
 
-- **처음 보는 경우** → [[00_Overview]]
-- **구현 바로 시작** → [[GettingStarted]]
-- **콘텐츠 서버 개발** → [[ContentServerGuide]]
-- **연결/패킷 문제 해결** → [[Troubleshooting]]
-- **성능 튜닝** → [[PerformanceTuning]]
-- **테스트 구성 확인** → [[Testing]]
-- **용어 모를 때** → [[Glossary]]
-- **다이어그램만 보기** → [[Diagrams/README]]
-
----
-
-## Obsidian 팁
-
-- `Ctrl+G` (Graph View): 문서 간 링크 관계 시각화
-- `Ctrl+Shift+F`: 전체 텍스트 검색
-- `[[` 입력 후 자동완성으로 링크 탐색
-- SVG는 `![[파일명.svg]]`로 인라인 렌더링됨
+| 목적 | 시작 문서 |
+|---|---|
+| 프로젝트를 처음 파악 | [문서 읽기 가이드](ReadingGuide.md) |
+| 서버·클라이언트를 실행 | [빠른 시작](GettingStarted.md) |
+| 콘텐츠 서버 구현 | [콘텐츠 서버 가이드](ContentServerGuide.md) |
+| 서버 구조 이해 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) |
+| 패킷 흐름 추적 | [패킷 처리 파이프라인](Server/PacketProcessing.md) |
+| 스레드·동시성 검토 | [스레드 모델 허브](Server/ThreadModel.md) |
+| 테스트 선택·실행 | [테스트 허브](Testing.md) |
+| 장애 조사 | [문제 해결](Troubleshooting.md) |
+| 성능 조정 | [성능 튜닝](PerformanceTuning.md) |
+| BotTester 사용 | [BotTester 개요](BotTester/00_BotTester_Overview.md) |
 
 ---
 
-## 🤖 BotTester 서브 프로젝트
+## 문서 탐색 구조
 
+```text
+README.md          짧은 진입점
+  → ReadingGuide   역할·목적별 읽기 순서
+  → 00_Overview    전체 문서 카탈로그
+  → 허브 문서      테스트·스레드처럼 범위가 큰 주제의 선택 화면
+  → 가이드/개념    작업 절차와 설계 흐름
+  → 컴포넌트       API, 전제 조건, 실패·동시성 계약
+  → *Reference     여러 영역을 한 번에 추적하는 상세 자료
 ```
-BotTester/
-├── 00_BotTester_Overview.md   ← 진입점
-├── Bot/
-│   ├── BotActionGraph.md      ← 행동 트리 엔진
-│   ├── ActionNodes.md         ← 전체 노드 레퍼런스
-│   ├── RuntimeContext.md      ← 실행 컨텍스트
-│   ├── GraphValidator.md      ← 검증기
-│   ├── NodeExecutionStats.md  ← 통계
-│   └── PacketSchema.md        ← 패킷 입력 schema
-├── Graph/
-│   └── GraphFileStorage.md    ← 그래프 파일 저장/복원
-├── UI/
-│   ├── BotActionGraphWindow.md ← 메인 에디터
-│   ├── CanvasRenderer.md       ← 렌더링·드래그·연결
-│   └── NodeConfigPanels.md    ← 설정 다이얼로그
-├── AI/
-│   ├── AiTreeGenerator.md     ← AI 트리 자동 생성
-│   └── GeminiClient.md        ← Gemini API 클라이언트
-└── ClientCore/
-    ├── BotTesterCore.md       ← 봇 세션 관리
-    ├── RudpSession_CS.md      ← C# RUDP 세션
-    ├── SessionGetter_CS.md    ← TLS 세션 수신
-    ├── BufferStore.md         ← 미응답 패킷 추적
-    └── PacketLossSimulator.md ← UDP 손실 시뮬레이션
-```
+
+허브와 진입 문서는 GitHub에서도 클릭 가능한 표준 Markdown 링크를 사용한다. 기술 문서의 `[[문서명]]`과 `![[다이어그램.svg]]`는 Obsidian용이다.
+
+---
+
+## 폴더 역할
+
+| 폴더 | 내용 |
+|---|---|
+| `Server/` | 서버 코어, 세션, RIO, 패킷, thread |
+| `Client/` | C++ 클라이언트와 연결 생존 감지 |
+| `Common/` | 패킷 포맷, 암호화, TLS, 흐름 제어 |
+| `Testing/` | 유닛·통합·CI와 상세 레퍼런스 |
+| `BotTester/` | WPF 부하 테스트 도구와 행동 graph |
+| `Tools/` | 패킷 생성·업로드와 개발 script |
+| `ContentServer/` | 콘텐츠 서버 샘플 컴포넌트 |
+| `Logger/` | 비동기 logger |
+| `Diagrams/` | 문서에서 사용하는 SVG |
+
+---
+
+## Obsidian 사용
+
+`Docs` 폴더를 Vault로 열면 위키링크, backlinks, graph view, SVG 임베드가 활성화된다.
+
+- `Ctrl+Shift+F`: Vault 전체 검색
+- `Ctrl+G`: 문서 관계 graph
+- `[[`: 위키링크 자동 완성
+
+문서를 추가하거나 나눌 때는 [문서 스타일 가이드](style_guide.md)의 분할·링크 규칙을 따른다.

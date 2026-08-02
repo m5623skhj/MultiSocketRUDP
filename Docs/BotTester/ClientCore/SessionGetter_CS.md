@@ -1,6 +1,6 @@
 # SessionGetter (C# TLS 세션 수신)
 
-> TLS 1.2 (`SslStream`)을 사용해 [[RUDPSessionBroker|세션 브로커]]로부터 세션 정보를 수신하는 클라이언트.
+> TLS 1.2 (`SslStream`)을 사용해 [[Server/RUDPSessionBroker|세션 브로커]]로부터 세션 정보를 수신하는 클라이언트.
 
 ---
 

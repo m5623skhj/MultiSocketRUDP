@@ -73,7 +73,7 @@ void OnReleased() override;
 ### 의미
 
 - `OnConnected()`: CONNECT 수락 직후
-- `OnDisconnected()`: 릴리즈 요청 진입 직후
+- `OnDisconnected()`: release worker가 대기 조건을 통과하고 최종 정리를 시작한 뒤, socket을 닫기 직전
 - `OnReleased()`: 풀 반환 직전, 재사용 전 상태 초기화 지점
 
 ---
@@ -117,6 +117,8 @@ void Player::OnPing(const Ping&)
 
 이 구간은 이미 종료 흐름에 들어간 뒤다.  
 새로운 일반 패킷 송신이나 긴 블로킹 작업을 넣는 용도로 쓰지 않는 편이 안전하다.
+
+`DoDisconnect()`가 `RELEASING` 전이와 release queue 등록을 수행하는 즉시 호출되는 훅은 아니다. release worker는 send I/O mode와 receive logic 처리 상태를 확인하고, 조건을 통과한 세션에 `Disconnect()`를 호출할 때 `OnDisconnected()`를 실행한다.
 
 ### 2. `OnReleased()`에서는 상태 초기화만 하는 편이 낫다
 

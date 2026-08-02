@@ -33,7 +33,7 @@
  │ PacketCryptoHelper  ← 패킷 버퍼 구조를 이해하는 래퍼   │
  │   EncodePacket() / DecodePacket()                       │
  ├─────────────────────────────────────────────────────────┤
- │ CryptoHelper (thread_local)  ← BCrypt 원시 연산        │
+ │ CryptoHelper (thread_local algorithm provider)         │
  │   EncryptAESGCM() / DecryptAESGCM()                    │
  │   FillNonce() / GetSymmetricKeyHandle()                 │
  ├─────────────────────────────────────────────────────────┤
@@ -46,7 +46,7 @@
 **파일 구조:**
 ```
 Common/
- ├── CryptoHelper.h / .cpp        ← BCrypt 래퍼, thread_local 인스턴스
+ ├── CryptoHelper.h / .cpp        ← BCrypt 래퍼, thread_local algorithm provider
  │                                   AUTH_TAG_SIZE 상수 정의
  └── PacketCryptoHelper.h         ← 패킷 버퍼 기반 암복호화
                                      bodyOffsetWithHeader 등 오프셋 상수 정의
@@ -204,7 +204,10 @@ bool CryptoHelper::FillNonce(
   packetSequence는 단조 증가 → 같은 sequence 두 번 없음
 
 다른 세션 간:
-  sessionSalt가 CSPRNG → 충돌 확률 ≈ 2^-96
+  nonce에 반영되는 salt는 30비트
+  (sessionSalt[0] 하위 6비트 + sessionSalt[1..3] 24비트)
+  → 두 세션의 nonce salt 부분이 같을 확률은 2^-30
+  → 세션 간 안전성은 독립적인 128비트 sessionKey 생성도 함께 전제
 
 같은 sequence라도 방향이 다르면:
   direction 비트가 다름 → 다른 Nonce
@@ -274,7 +277,7 @@ AAD는 **암호화하지 않지만** GCM 인증 태그 계산에 포함된다.
 
 ```
 AAD = [HeaderCode 1B][PayloadLength 2B][Reserved 2B][PacketType 1B][PacketSequence 8B]
-    = 총 12 bytes
+    = 총 14 bytes
 ```
 
 **왜 Header와 PacketType을 AAD에 포함하는가?**
@@ -284,7 +287,7 @@ AAD = [HeaderCode 1B][PayloadLength 2B][Reserved 2B][PacketType 1B][PacketSequen
 | `HeaderCode` | 헤더 코드 변조 감지 (서버/클라이언트 프로토콜 식별자) |
 | `PayloadLength` | 길이 필드 변조 감지 (버퍼 오버플로우 공격 방지) |
 | `PacketType` | 타입 변조 감지 (SEND_TYPE을 CONNECT_TYPE으로 위장 방지) |
-| `PacketSequence` | 재전송 공격 감지 (같은 시퀀스로 재생 불가) |
+| `PacketSequence` | 시퀀스 필드 변조 감지. 동일 ciphertext의 replay 자체는 별도 수신 윈도우가 거부해야 함 |
 
 > `PacketSequence`가 Nonce에도 포함되고 AAD에도 포함되는 이유:  
 > Nonce는 GCM의 암호화 기밀성에 사용되고,  
@@ -314,7 +317,9 @@ authInfo.dwFlags    = 0;    // 암호화: 0, 복호화: BCRYPT_AUTH_MODE_CHAIN_C
 - AAD 변조 (헤더/타입/시퀀스 조작)
 - 페이로드 변조 (중간자 공격)
 - AuthTag 변조 (태그 위조 시도)
-- 재전송 공격 (같은 Nonce 재사용 — Nonce에 시퀀스 포함으로 방지)
+
+동일한 ciphertext, AAD, nonce, AuthTag를 그대로 재전송하면 GCM 인증은 다시
+성공할 수 있다. replay 거부는 `RUDPReceiveWindow`와 세션의 sequence 검증 책임이다.
 
 ---
 
@@ -417,8 +422,10 @@ Step 7. AES-GCM 복호화 + 태그 검증 (in-place)
   if !ok → return false  (인증 실패 → 패킷 폐기)
 
 Step 8. 완료
-  m_iWrite -= AUTH_TAG_SIZE   ← AuthTag 제거 (이미 검증됨)
   return true
+
+  // 현재 DecodePacket은 body를 in-place 복호화하지만
+  // m_iWrite를 줄이거나 AuthTag를 버퍼에서 제거하지 않음
 ```
 
 ---
@@ -461,7 +468,7 @@ ACK와 데이터도 분리하는 이유: 같은 시퀀스로 ACK와 데이터가
 | 속성 | `isCorePacket = false` | `isCorePacket = true` |
 |------|------------------------|----------------------|
 | PacketId 포함 | ✅ (4 bytes) | ❌ |
-| 암호화 시작 오프셋 | 16 bytes | 12 bytes |
+| 암호화 시작 오프셋 | 18 bytes | 14 bytes |
 | 사용 패킷 | SEND_TYPE | CONNECT, DISCONNECT, HEARTBEAT, SEND_REPLY |
 | 재전송 추적 | ✅ | HEARTBEAT만 ✅ (REPLY류는 ❌) |
 
@@ -476,7 +483,8 @@ ACK와 데이터도 분리하는 이유: 같은 시퀀스로 ACK와 데이터가
 | 인증 (Authentication) | ✅ AAD 포함 | 별도 서명 필요 |
 | 병렬 처리 | ✅ CTR 모드 특성 | CBC는 순차적 |
 | 하드웨어 가속 | ✅ AES-NI + PCLMULQDQ | - |
-| 재전송 공격 방지 | ✅ Nonce에 시퀀스 포함 | 별도 replay window 필요 |
+| 송신 nonce 재사용 방지 | ✅ Nonce에 시퀀스 포함 | 별도 nonce 관리 필요 |
+| 수신 replay 거부 | 별도 receive window/sequence 검증 필요 | 별도 replay window 필요 |
 | Windows BCrypt 지원 | ✅ BCRYPT_CHAIN_MODE_GCM | - |
 
 ---

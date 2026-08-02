@@ -188,20 +188,21 @@ bool RIOManager::InitializeSessionRIO(
 ```cpp
 // SessionRIOContext::Initialize (sessionDelegate를 통해 호출)
 bool Initialize(
-    RUDPSession& session,
     const RIO_EXTENSION_FUNCTION_TABLE& rioFunc,
     RIO_CQ recvCQ,
     RIO_CQ sendCQ,
-    size_t pendingQueueCapacity)
+    SOCKET socket,
+    SessionIdType sessionId,
+    RUDPSession* ownerSession,
+    unsigned short pendingQueueCapacity)
 {
-    // ① RecvContext 초기화
-    rioContext.GetRecvBuffer().Initialize(rioFunc, sessionId, this);
-    // → RIORegisterBuffer(recvBuffer.buffer, 16KB)
-    // → RIORegisterBuffer(clientAddrBuffer, sizeof(SOCKADDR_INET))
-    // → RIORegisterBuffer(localAddrBuffer, sizeof(SOCKADDR_INET))
+    cachedSessionId = sessionId;
+
+    // ① RecvContext 초기화: 현재 8개 slot 각각에 data/local/remote buffer 등록
+    recvContext.Initialize(rioFunc, sessionId, ownerSession);
 
     // ② SendContext 초기화
-    rioContext.GetSendBuffer().Initialize(rioFunc, sessionId);
+    sendContext.Initialize(rioFunc, pendingQueueCapacity);
     // → RIORegisterBuffer(rioSendBuffer, 32KB)
 
     // ③ RIO Request Queue 생성
@@ -213,10 +214,11 @@ bool Initialize(
         1,          // MaxSendDataBuffers
         recvCQ,     // 수신 완료 큐
         sendCQ,     // 송신 완료 큐
-        reinterpret_cast<void*>(static_cast<uintptr_t>(sessionId))
-        // ↑ RequestContext: 완료 시 RIORESULT.SocketContext에 반환
+        &cachedSessionId
+        // ↑ SocketContext: 완료 시 session id를 읽는 세션 소유 메모리
     );
 
+    // 실패하면 recv/send 등록을 Cleanup한다.
     return rioRQ != RIO_INVALID_RQ;
 }
 ```
@@ -284,17 +286,16 @@ for (ULONG i = 0; i < count; ++i) {
 **`RIORegisterBuffer`** (SessionRecvContext, SessionSendContext에서 호출):
 
 ```cpp
-// 세션 recv 버퍼 (16KB)
-RIO_BUFFERID recvBufferId = rioFunc.RIORegisterBuffer(
-    recvBuffer.buffer,     // char[16384] 포인터
-    RECV_BUFFER_SIZE       // 16384
-);
-
-// 클라이언트 주소 버퍼 (sizeof SOCKADDR_INET = 28 bytes)
-RIO_BUFFERID clientAddrBufferId = rioFunc.RIORegisterBuffer(
-    clientAddrBuffer,
-    sizeof(SOCKADDR_INET)
-);
+// SessionRecvContext::Initialize(): 현재 8개 slot에 반복
+for (auto& slot : recvBuffer.slots) {
+    auto& context = slot.recvContext;
+    context->BufferId = rioFunc.RIORegisterBuffer(
+        slot.buffer, RECV_BUFFER_SIZE);
+    context->clientAddrRIOBuffer.BufferId = rioFunc.RIORegisterBuffer(
+        context->clientAddrBuffer, sizeof(SOCKADDR_INET));
+    context->localAddrRIOBuffer.BufferId = rioFunc.RIORegisterBuffer(
+        context->localAddrBuffer, sizeof(SOCKADDR_INET));
+}
 
 // 세션 send 버퍼 (32KB)
 RIO_BUFFERID sendBufferId = rioFunc.RIORegisterBuffer(
@@ -307,9 +308,11 @@ RIO_BUFFERID sendBufferId = rioFunc.RIORegisterBuffer(
 
 ```cpp
 // SessionRecvContext::Cleanup()
-rioFunc.RIODeregisterBuffer(recvBufferId);
-rioFunc.RIODeregisterBuffer(clientAddrBufferId);
-rioFunc.RIODeregisterBuffer(localAddrBufferId);
+for (const auto& slot : recvBuffer.slots) {
+    rioFunc.RIODeregisterBuffer(slot.recvContext->BufferId);
+    rioFunc.RIODeregisterBuffer(slot.recvContext->clientAddrRIOBuffer.BufferId);
+    rioFunc.RIODeregisterBuffer(slot.recvContext->localAddrRIOBuffer.BufferId);
+}
 
 // SessionSendContext::Cleanup()
 rioFunc.RIODeregisterBuffer(sendBufferId);

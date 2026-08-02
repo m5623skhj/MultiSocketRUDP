@@ -248,11 +248,9 @@ detach 호출 시점: coreStopFunction() 내부 (= RunServerAliveCheckerThread �
   → RunServerAliveCheckerThread의 break 직전
   → 스레드가 곧 return으로 자연 종료됨
   → detach된 스레드는 백그라운드에서 종료
-
-메모리 안전성:
-  serverAliveChecker는 RUDPClientCore의 멤버 → Stop() 종료까지 유효
-  detach 후 스레드가 접근하는 변수들이 모두 유효한 범위 내에 있음
 ```
+
+이 분기는 자기 자신을 `join()`하는 교착을 피한다. 다만 detach된 스레드의 완료를 `Stop()` 호출자가 기다릴 수 있는 별도 barrier는 없다. 따라서 현재 구현만으로 `Stop()` 반환 직후 `RUDPClientCore`가 파괴되는 모든 경우의 메모리 안전성을 절대적으로 보장한다고 설명해서는 안 된다. owner는 checker 함수가 완전히 빠져나갈 때까지 관련 객체의 수명이 유지되도록 해야 하며, 이 전제를 제거하려면 detach 없는 완료 동기화가 필요하다.
 
 ### `isStopped.exchange(true)` 원자 연산
 

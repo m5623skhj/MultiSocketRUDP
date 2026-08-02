@@ -180,8 +180,9 @@ TryConnectToSessionBroker() — 최대 5회, 1초 간격 재시도
   → 5회 모두 실패 → return false
 
 TLSHelperClient::Initialize()
-  → AcquireCredentialsHandle(SECPKG_CRED_OUTBOUND, SP_PROT_TLS1_2_CLIENT,
-                              SCH_CRED_MANUAL_CRED_VALIDATION)
+  → SCHANNEL_CRED.grbitEnabledProtocols = 0 (Windows 기본 프로토콜 정책)
+  → SCHANNEL_CRED.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION
+  → AcquireCredentialsHandle(SECPKG_CRED_OUTBOUND)
 
 TLSHelperClient::Handshake(sessionBrokerSocket)
   → InitializeSecurityContext 루프
@@ -342,24 +343,24 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
     PacketSequence seq = ++lastSendPacketSequence;
 
     // ② 직렬화
-    NetBuffer* buf = NetBuffer::Alloc();
+    NetBuffer* buffer = NetBuffer::Alloc();
     auto type = PACKET_TYPE::SEND_TYPE;
-    *buf << type << seq << packet.GetPacketId();
-    packet.PacketToBuffer(*buf);
+    *buffer << type << seq << packet.GetPacketId();
+    packet.PacketToBuffer(*buffer);
 
     // ③ 내부 전송 경로
-    SendPacket(buf, seq, /*isCorePacket=*/false);
+    SendPacket(*buffer, seq, /*isCorePacket=*/false);
 }
 ```
 
-### 내부 `SendPacket(NetBuffer*, PacketSequence, bool)`
+### 내부 `SendPacket(NetBuffer&, PacketSequence, bool)`
 
 ```cpp
-void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
+void SendPacket(NetBuffer& buffer, PacketSequence seq, bool isCorePacket)
 {
     // ① AES-GCM 암호화
     PacketCryptoHelper::EncodePacket(
-        *buf, seq,
+        buffer, seq,
         PACKET_DIRECTION::CLIENT_TO_SERVER,
         sessionSalt, SESSION_SALT_SIZE,
         sessionKeyHandle, isCorePacket
@@ -369,7 +370,7 @@ void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
     const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
     if (window == 0) {
         std::scoped_lock lock(pendingPacketQueueLock);
-        pendingPacketQueue.push({ seq, buf });
+        pendingPacketQueue.push({ seq, &buffer });
         return;
     }
 
@@ -381,12 +382,12 @@ void SendPacket(NetBuffer* buf, PacketSequence seq, bool isCorePacket)
 
     if (outstanding >= window) {
         std::scoped_lock lock(pendingPacketQueueLock);
-        pendingPacketQueue.push({ seq, buf });
+        pendingPacketQueue.push({ seq, &buffer });
         return;
     }
 
     // ③ 재전송 등록 + 송신 큐에 삽입
-    RegisterSendPacketInfo(buf, seq);
+    RegisterSendPacketInfo(buffer, seq);
 }
 ```
 
@@ -939,9 +940,9 @@ void TryFlushPendingQueue()
 - [[Client/RUDPClientCoreHooks]] — 기본 hook과 테스트 override 차이
 - [[TLSHelper]] — TLS 세션 수신 채널
 - [[CryptoSystem]] — AES-GCM 암호화
-- [[PacketFormat]] — 패킷 구조
+- [[Common/PacketFormat]] — 서버와 클라이언트가 공유하는 패킷 구조
 - [[FlowController]] — advertiseWindow 기반 흐름 제어 이론
-- [[RUDPSessionBroker]] — 서버 측 세션 발급
+- [[Server/RUDPSessionBroker]] — 서버 측 세션 발급
 - [[Troubleshooting]] — 연결 오류 해결
 ---
 
@@ -993,11 +994,12 @@ void TryFlushPendingQueue()
 #### `bool SetTargetSessionInfo(NetBuffer& receivedBuffer)`
 - SessionBroker TLS 연결, 세션 정보 수신, 세션 키와 포트 파싱을 담당한다.
 
-#### `void RunThreads()`
+#### `bool RunThreads()`
 #### `void RunRecvThread()`
 #### `void RunSendThread()`
 #### `void RunRetransmissionThread()`
-- recv/send/retransmission 스레드 수명주기를 담당한다.
+- `RunThreads()`는 recv/send/retransmission 스레드와 송신 이벤트 초기화 성공 여부를 반환한다.
+- 나머지 함수는 각 스레드의 실행 진입점이다.
 
 #### `void OnRecvStream(NetBuffer& recvBuffer, int recvSize)`
 #### `void ProcessRecvPacket(NetBuffer& receivedBuffer)`

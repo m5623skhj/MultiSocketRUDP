@@ -100,24 +100,23 @@ bool DoRecv(RUDPSession& session) const override;
 
 ```cpp
 {
-    auto& recvCtx = session.rioContext.GetRecvBuffer();
+    std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+    if (sessionDelegate.GetSocket(session) == INVALID_SOCKET) return false;
 
-    // 소켓 락 획득 (shared: CloseSocket의 unique_lock과 경쟁)
-    std::shared_lock lock(session.GetSocketContext().GetSocketMutex());
-    if (session.GetSocketContext().GetSocket() == INVALID_SOCKET) return false;
-
-    return rioManager.RIOReceiveEx(
-        recvCtx.GetRIORQ(),              // 세션 RIO 요청 큐
-        recvCtx.GetRecvRIOBuffer(),      // 수신 데이터 버퍼 (16KB)
-        1,                               // 버퍼 슬라이스 수
-        recvCtx.GetLocalAddrRIOBuffer(), // 로컬 주소 버퍼 (미사용, 등록 필요)
-        recvCtx.GetClientAddrRIOBuffer(),// 클라이언트 주소 버퍼 (→ CanProcessPacket)
-        nullptr, nullptr,                // 제어 메시지 (미사용)
-        0,                               // 플래그
-        reinterpret_cast<void*>(
-            reinterpret_cast<uintptr_t>(&session))
-        // RequestContext: IOCompleted에서 세션 포인터 복원
-    );
+    auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
+    while (IOContext* context = recvBuffer.AcquireFreeRecvContext()) {
+        if (!rioManager.RIOReceiveEx(
+                sessionDelegate.GetRecvRIORQ(session),
+                context, 1,
+                &context->localAddrRIOBuffer,
+                &context->clientAddrRIOBuffer,
+                nullptr, nullptr, 0,
+                context)) {               // RequestContext는 이 slot의 IOContext
+            recvBuffer.ReleaseRecvContext(context);
+            return false;
+        }
+    }
+    return true;
 }
 ```
 
@@ -259,28 +258,35 @@ MAX_SEND_BUFFER_SIZE = 32768 bytes
 ## 7. IOCompleted — 완료 처리 분기
 
 ```cpp
-void RUDPIOHandler::IOCompleted(
+bool RUDPIOHandler::IOCompleted(
     IOContext* context,
     ULONG bytesTransferred,
-    ThreadIdType threadId)
+    ThreadIdType threadId) const
 ```
 
 `IO Worker Thread`에서 `RIODequeueCompletion` 후 호출된다.
 
 ```cpp
 {
+    if (context == nullptr || context->session == nullptr) return false;
+
     switch (context->ioType) {
     case RIO_OPERATION_TYPE::OP_RECV:
-        RecvIOCompleted(context, bytesTransferred, threadId);
-        break;
+        if (!RecvIOCompleted(context, bytesTransferred, threadId)) {
+            context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+            return false;
+        }
+        return true;
 
     case RIO_OPERATION_TYPE::OP_SEND:
-        SendIOCompleted(context, threadId);
-        break;
+        if (!SendIOCompleted(context, threadId)) {
+            context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+            return false;
+        }
+        return true;
 
     default:
-        LOG_ERROR(std::format("Unknown IO type: {}", static_cast<int>(context->ioType)));
-        break;
+        return false;
     }
 }
 ```
@@ -289,14 +295,18 @@ void RUDPIOHandler::IOCompleted(
 
 ```cpp
 struct IOContext {
-    RIO_OPERATION_TYPE ioType; // OP_RECV 또는 OP_SEND
-    RUDPSession* session;     // 소유 세션 (GetIOCompletedContext에서 설정)
-    SessionIdType ownerSessionId;  // 세션 ID (소유권 확인용)
-
-    // RECV 전용: 클라이언트 주소 복사본
+    SessionIdType ownerSessionId;
+    RIO_OPERATION_TYPE ioType;
+    RUDPSession* session;
+    char* recvDataBuffer;                 // RECV slot의 16KB buffer
+    RIO_BUF clientAddrRIOBuffer;
+    RIO_BUF localAddrRIOBuffer;
     char clientAddrBuffer[sizeof(SOCKADDR_INET)];
+    char localAddrBuffer[sizeof(SOCKADDR_INET)];
 };
 ```
+
+receive용 `IOContext`는 `RecvBufferSlot`이 `shared_ptr`로 소유한다. 현재 context에는 generation 필드가 없으며 완료 시 `ownerSessionId`만으로 사용 중 세션을 찾는다.
 
 ---
 
@@ -306,40 +316,34 @@ struct IOContext {
 bool RUDPIOHandler::RecvIOCompleted(
     IOContext* context,
     ULONG bytesTransferred,
-    ThreadIdType threadId)
+    ThreadIdType threadId) const
 ```
 
 ```cpp
 {
     auto& session = *context->session;
+    auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
 
     // ① NetBuffer 할당 (메모리 풀, lock-free)
     NetBuffer* recvBuf = NetBuffer::Alloc();
     if (!recvBuf) {
-        LOG_ERROR("NetBuffer::Alloc failed");
-        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+        recvBuffer.ReleaseRecvContext(context);
         return false;
     }
 
-    // ② RIO recv 버퍼 → NetBuffer 복사 (page-locked → 일반 힙)
-    auto& recvCtx = session.rioContext.GetRecvBuffer();
+    // ② 완료된 slot의 RIO buffer → NetBuffer 복사
     memcpy_s(
         recvBuf->m_pSerializeBuffer, RECV_BUFFER_SIZE,
-        recvCtx.GetRecvBuffer(),     bytesTransferred
+        context->recvDataBuffer, bytesTransferred
     );
     recvBuf->m_iWrite = static_cast<WORD>(bytesTransferred);
 
-    // ③ 수신 버퍼 큐에 삽입 (RecvLogic Worker가 꺼냄)
-    session.EnqueueToRecvBufferList(recvBuf);
+    // ③ logic queue에 데이터와 주소 정보를 전달
+    sessionDelegate.EnqueueToRecvBufferList(session, recvBuf);
+    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(context, threadId);
 
-    // ④ RecvLogic Worker에 알림
-    auto* completedCtx = recvIOCompletedContextPool.Alloc();
-    completedCtx->Initialize(context);  // session + clientAddrBuffer 복사
-    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(completedCtx, threadId);
-    // → recvIOCompletedContexts[threadId].Enqueue(completedCtx)
-    // → ReleaseSemaphore(recvLogicEventHandles[threadId], 1, nullptr)
-
-    // ⑤ 즉시 다음 수신 등록 (연속 수신)
+    // ④ slot을 free queue로 반환한 뒤 사용 가능한 receive를 다시 등록
+    recvBuffer.ReleaseRecvContext(context);
     return DoRecv(session);
 }
 ```
@@ -347,8 +351,8 @@ bool RUDPIOHandler::RecvIOCompleted(
 **왜 복사가 필요한가:**
 
 ```
-RIO recv 버퍼: 세션 소켓에 page-locked된 고정 영역
-  → DoRecv() 즉시 재호출 → 다음 패킷이 같은 버퍼에 덮어씌워짐
+RIO recv slot: outstanding receive 하나에 연결된 page-locked 영역
+  → 완료 context를 free queue에 반환하면 이후 DoRecv()에서 같은 slot을 재사용할 수 있음
 
 NetBuffer: 메모리 풀에서 할당한 독립 버퍼
   → RecvLogic Worker가 자기 속도로 처리
@@ -360,29 +364,33 @@ NetBuffer: 메모리 풀에서 할당한 독립 버퍼
 ## 9. SendIOCompleted — 송신 완료
 
 ```cpp
-void RUDPIOHandler::SendIOCompleted(
+bool RUDPIOHandler::SendIOCompleted(
     IOContext* context,
-    ThreadIdType threadId)
+    ThreadIdType threadId) const
 ```
 
 ```cpp
 {
+    if (context == nullptr || context->session == nullptr) return false;
     auto& session = *context->session;
-    auto& sendCtx = session.rioContext.GetSendBuffer();
 
     // ① IO_NONE_SENDING 복원
-    sendCtx.ioMode.store(IO_MODE::IO_NONE_SENDING, std::memory_order_release);
+    sessionDelegate.GetSendIOMode(session).store(IO_MODE::IO_NONE_SENDING);
+
+    // release 중에는 후속 send를 등록하지 않는다.
+    if (session.IsReleasing()) {
+        contextPool.Free(context);
+        return true;
+    }
 
     // ② 큐에 남은 패킷이 있으면 즉시 재전송 시도
-    DoSend(session, threadId);
-    // → CAS IO_NONE_SENDING → IO_SENDING
-    // → MakeSendStream → RIOSend (패킷이 있으면)
-    // → 없으면 IO_NONE_SENDING 즉시 복원
-
-    // ③ IOContext 반환 (TLS 풀)
-    sendIOContextPool.Free(context);
+    const bool result = DoSend(session, threadId);
+    contextPool.Free(context);
+    return result;
 }
 ```
+
+수신 손실 시뮬레이션, `NetBuffer` 할당 실패, 복사 실패 경로도 완료 context를 free queue에 반환한다. `RecvIOCompleted()` 또는 `SendIOCompleted()`가 `false`를 반환하면 상위 `IOCompleted()`가 세션에 `BY_ERROR` disconnect를 요청한다.
 
 **SendIOCompleted → DoSend 재호출 패턴:**
 

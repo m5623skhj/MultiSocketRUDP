@@ -248,15 +248,23 @@ void RunRecvLogicWorkerThread(std::stop_token stopToken, ThreadIdType threadId)
 ```cpp
 void RunRetransmissionThread(std::stop_token stopToken, ThreadIdType threadId)
 {
-    TickSet tickSet;
+    auto& scheduler = *retransmissionSchedulers[threadId];
+    const HANDLE waitHandles[3] = {
+        scheduler.timerHandle,
+        scheduler.wakeEventHandle,
+        retransmissionStopEventHandle
+    };
+
     while (!stopToken.stop_requested()) {
-        // ... 재전송 로직 ...
-        SleepRemainingFrameTime(tickSet, retransmissionThreadSleepMs);
+        // heap에서 stale entry를 버리고 만료 항목을 처리한다.
+        // 다음 deadline이 있으면 waitable timer를 arm한다.
+        // 새 schedule은 wake event, 종료는 stop event로 wait를 해제한다.
+        WaitForMultipleObjects(3, waitHandles, FALSE, INFINITE);
     }
 }
 ```
 
-`stop_requested()` + sleep 패턴. sleep 중에는 최대 `retransmissionThreadSleepMs`ms 지연.
+고정 주기 sleep이나 polling 방식이 아니다. 가장 가까운 deadline의 waitable timer, 새 항목 등록용 wake event, 종료용 stop event를 함께 기다린다. 새로 추가된 더 이른 deadline은 wake event로 즉시 재계산하며, 종료도 `retransmissionStopEventHandle`로 대기를 해제한다.
 
 ### SESSION_RELEASE_THREAD / HEARTBEAT_THREAD
 

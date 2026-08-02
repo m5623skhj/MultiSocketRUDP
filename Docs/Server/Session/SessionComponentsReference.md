@@ -1,0 +1,527 @@
+# 세션 서브 컴포넌트 상세 레퍼런스
+
+> 세션의 모든 하위 컴포넌트와 상호 의존을 한 번에 추적하는 통합 레퍼런스다.
+> 일반적인 검토는 상위 [[SessionComponents|세션 컴포넌트 허브]]에서 상태·수신·송신 문서를 먼저 선택한다.
+
+> **`RUDPSession`을 구성하는 6개 서브 컴포넌트의 전체 멤버, 역할, 상호 관계.**  
+> 각 컴포넌트는 독립된 파일로 분리되어 있으며,  
+> `RUDPSession`이 이들을 조합해 상태 관리, 암호화, I/O, 흐름 제어를 수행한다.
+
+---
+
+## 목차
+
+1. [전체 구성 개요](#1-전체-구성-개요)
+2. [SessionStateMachine](#2-sessionstatemachine)
+3. [SessionCryptoContext](#3-sessioncryptocontext)
+4. [SessionSocketContext](#4-sessionsocketcontext)
+5. [SessionRecvContext (SessionRIOContext 포함)](#5-sessionrecvcontext-sessionriocontext-포함)
+6. [SessionSendContext](#6-sessionsendcontext)
+7. [RUDPFlowManager](#7-rudpflowmanager)
+8. [컴포넌트 간 상호 의존](#8-컴포넌트-간-상호-의존)
+
+---
+
+## 1. 전체 구성 개요
+
+```cpp
+class RUDPSession {
+    // ─── 서브 컴포넌트 ──────────────────────────────────────────────
+    SessionStateMachine   stateMachine;      // 세션 상태 (DISCONNECTED/RESERVED/CONNECTED/RELEASING)
+    SessionCryptoContext  cryptoContext;     // AES-GCM 키/솔트/핸들
+    SessionSocketContext  socketContext;     // 소켓 핸들, 클라이언트 주소, 락 (RUDPSession 미포함)
+    SessionRIOContext     rioContext;        // RIO 버퍼/컨텍스트 (Recv + Send, 시퀀스 포함)
+    RUDPFlowManager       flowManager;      // CWND + 수신 윈도우
+    SessionPacketOrderer  sessionPacketOrderer;  // 순서 보장 홀딩 큐
+
+    // ─── 스레드 안전 플래그 ──────────────────────────────────────────
+    std::atomic_bool nowInReleaseThread{ false };
+    std::atomic_bool nowInProcessingRecvPacket{ false };
+
+    // ─── 패킷 핸들러 맵 ──────────────────────────────────────────────
+    std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
+
+    // ─── 기타 멤버 ───────────────────────────────────────────────────
+    SessionIdType sessionId;
+    sockaddr_in clientAddr{};
+    SOCKADDR_INET clientSockAddrInet{};
+    ThreadIdType threadId{};
+    unsigned long long sessionReservedTime{};
+    // lastSendPacketSequence는 SessionSendContext (rioContext) 내부에서 관리
+};
+```
+
+---
+
+## 2. SessionStateMachine
+
+**파일:** `SessionStateMachine.h / .cpp`
+
+```cpp
+class SessionStateMachine {
+    std::atomic<SESSION_STATE> state{ SESSION_STATE::DISCONNECTED };
+
+public:
+    // ─── 조회 (memory_order_acquire) ─────────────────────────────────
+    SESSION_STATE GetSessionState() const noexcept;
+    bool IsConnected()    const noexcept;   // state == CONNECTED
+    bool IsReserved()     const noexcept;   // state == RESERVED
+    bool IsReleasing()    const noexcept;   // state == RELEASING
+    bool IsUsingSession() const noexcept;   // RESERVED || CONNECTED
+    // IsDisconnected()는 없음 — state == DISCONNECTED 확인 시 !IsUsingSession() && !IsReleasing() 사용
+
+    // ─── 전이 (단순 store) ────────────────────────────────────────────
+    void SetReserved();      // any → RESERVED (InitReserveSession에서)
+    void SetDisconnected();  // any → DISCONNECTED (Disconnect 완료 후)
+
+    // ─── 전이 (CAS, 경쟁 가능) ────────────────────────────────────────
+    bool TryTransitionToConnected();    // RESERVED → CONNECTED
+    bool TryTransitionToReleasing();    // RESERVED|CONNECTED → RELEASING (2회 시도)
+    bool TryAbortReserved();            // RESERVED → RELEASING (HeartbeatThread 전용)
+};
+```
+
+**메모리 순서 선택 이유:**
+
+| 연산 | 순서 | 이유 |
+|------|------|------|
+| 조회 (`IsConnected` 등) | `acquire` | 이전 쓰기가 반영된 최신 값 필요 |
+| `SetReserved/Disconnected` | `release` | 이후 읽기가 이 값 이후를 보도록 |
+| CAS 전이들 | `acq_rel` | 성공 시 읽기(acquire) + 쓰기(release) 모두 보장 |
+
+→ 상세 CAS 코드: [[SessionLifecycle]] 참조
+
+---
+
+## 3. SessionCryptoContext
+
+**파일:** `SessionCryptoContext.h / .cpp`
+
+```cpp
+class SessionCryptoContext {
+    unsigned char sessionKey[SESSION_KEY_SIZE];    // AES-128 키 (16 bytes)
+    unsigned char sessionSalt[SESSION_SALT_SIZE];  // Nonce 솔트 (16 bytes)
+    unsigned char* keyObjectBuffer;                // BCrypt 키 오브젝트 버퍼 (heap)
+    BCRYPT_KEY_HANDLE sessionKeyHandle;            // BCryptGenerateSymmetricKey 결과
+
+public:
+    void Initialize();
+    // → sessionKey/salt 0 초기화
+    // 의도 계약: BCryptDestroyKey(sessionKeyHandle) → delete[] keyObjectBuffer
+
+    // 접근자
+    const unsigned char* GetSessionKey()  const { return sessionKey;  }
+    const unsigned char* GetSessionSalt() const { return sessionSalt; }
+    BCRYPT_KEY_HANDLE     GetKeyHandle()  const { return sessionKeyHandle; }
+
+    // 설정자 (RUDPSessionFunctionDelegate를 통해 접근)
+    void SetSessionKey(const unsigned char* key);    // copy_n(key, 16, sessionKey)
+    void SetSessionSalt(const unsigned char* salt);  // copy_n(salt, 16, sessionSalt)
+    void SetKeyObjectBuffer(unsigned char* buf);
+    void SetSessionKeyHandle(BCRYPT_KEY_HANDLE handle);
+};
+```
+
+> **현재 구현 불일치:** `Release()`는 handle을 먼저 파괴하지만, `Initialize()`는 `keyObjectBuffer`를 먼저 해제한 뒤 `BCryptDestroyKey`를 호출한다. 위 주석은 안전한 수명 계약이며 현재 `Initialize()`의 실제 순서를 재현한 코드가 아니다.
+
+**`Initialize()` 호출 시점:**
+
+```cpp
+// RUDPSessionManager::ReleaseSession() → InitializeSession()
+void RUDPSession::InitializeSession() {
+    cryptoContext.Initialize();                              // ← 키 핸들 파괴 + 버퍼 해제
+    clientAddr = {};
+    clientSockAddrInet = {};
+    nowInReleaseThread.store(false, std::memory_order_release);
+    sessionReservedTime = {};
+
+    flowManager.Initialize(maximumHoldingPacketQueueSize);  // CWND/윈도우 재초기화
+    rioContext.GetSendContext().Reset();                     // sendPacketInfoMap 정리
+    sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
+}
+```
+
+**왜 키 핸들을 세션에 저장하는가:**
+
+```
+BCryptGenerateSymmetricKey는 비용이 크다 (수백 μs).
+세션당 1회 생성 후 재사용하면 패킷마다 생성하는 것보다 훨씬 빠르다.
+세션 해제(Initialize) 시 BCryptDestroyKey로 반환.
+```
+
+---
+
+## 4. SessionSocketContext
+
+**파일:** `SessionSocketContext.h / .cpp`
+
+```cpp
+class SessionSocketContext {
+    SOCKET socket = INVALID_SOCKET;
+    WORD serverPort = 0;             // 이 세션 소켓의 로컬 포트 (bind 후 설정)
+    mutable std::shared_mutex socketLock;
+    // DoRecv/DoSend: shared_lock (동시 실행 가능)
+    // CloseSocket:   unique_lock (독점)
+
+public:
+    void SetSocket(SOCKET s) { socket = s; }
+    SOCKET GetSocket() const { return socket; }
+    void SetServerPort(WORD port) { serverPort = port; }
+    WORD GetServerPort() const { return serverPort; }
+    std::shared_mutex& GetSocketMutex() const { return socketLock; }
+
+    // 호출자가 socketLock의 unique_lock을 보유해야 한다.
+    void CloseSocket() {
+        if (socket != INVALID_SOCKET) {
+            closesocket(socket);
+            socket = INVALID_SOCKET;
+        }
+    }
+};
+```
+
+**`shared_mutex` 사용 패턴:**
+
+```cpp
+// DoRecv / DoSend: 공유 잠금 (동시에 복수 허용)
+std::shared_lock lock(session.GetSocketContext().GetSocketMutex());
+if (socket == INVALID_SOCKET) return false;
+rioFunctionTable.RIOReceiveEx(...);   // 소켓이 열려 있음을 보장
+
+// RUDPSession::CloseSocket: 호출자 쪽에서 독점 잠금
+std::unique_lock lock(socketContext.GetSocketMutex());
+rioContext.Cleanup();
+socketContext.CloseSocket();
+```
+
+`SessionSocketContext::CloseSocket()`은 내부에서 다시 잠그지 않는다. 직접 호출하는 모든 경로가 먼저 `unique_lock`을 가져야 한다.
+
+**왜 shared_mutex인가:**
+
+```
+DoRecv와 DoSend는 동시에 실행될 수 있음 (수신 등록 + 송신 동시)
+CloseSocket은 두 작업이 모두 없을 때만 실행해야 함
+
+shared_lock: DoRecv, DoSend가 동시에 획득 가능
+unique_lock: CloseSocket이 획득하면 DoRecv, DoSend 모두 블락
+→ DoRecv/DoSend 중 소켓이 닫히는 race condition 방지
+```
+
+---
+
+## 5. SessionRecvContext (SessionRIOContext 포함)
+
+**파일:** `SessionRIOContext.h / .cpp`
+
+```cpp
+class SessionRIOContext {
+    SessionRecvContext recvContext;
+    SessionSendContext sendContext;
+public:
+    RecvBuffer& GetRecvBuffer() { return recvContext.GetRecvBuffer(); }
+    SessionSendContext& GetSendContext() { return sendContext; }
+    void Cleanup();  // 두 컨텍스트 모두 정리
+};
+
+struct RecvBufferSlot {
+    std::shared_ptr<IOContext> recvContext;
+    char buffer[RECV_BUFFER_SIZE];
+};
+
+struct RecvBuffer {
+    std::array<RecvBufferSlot, RECV_OUTSTANDING_COUNT> slots;
+    CListBaseQueue<IOContext*> freeRecvContexts;
+    CListBaseQueue<NetBuffer*> recvBufferList;
+
+    IOContext* AcquireFreeRecvContext();
+    void ReleaseRecvContext(IOContext* context);
+};
+
+class SessionRecvContext {
+    RecvBuffer recvBuffer;
+
+public:
+    bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rio,
+                    SessionIdType sessionId, RUDPSession* ownerSession);
+    void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rio) const;
+    void RecvContextReset();
+    RecvBuffer& GetRecvBuffer();
+};
+```
+
+**slot마다 RIO 버퍼 3개를 등록하는 이유:**
+
+```
+RIOReceiveEx의 파라미터:
+  pData                → slot.buffer
+  pLocalAddressBuffer  → slot IOContext.localAddrBuffer
+  pRemoteAddressBuffer → slot IOContext.clientAddrBuffer
+
+각 outstanding receive가 독립 메모리를 사용하도록 현재 8개 slot 각각에 세 buffer를 등록한다.
+```
+
+**`Initialize` 내부:**
+
+```cpp
+bool SessionRecvContext::Initialize(
+    const RIO_EXTENSION_FUNCTION_TABLE& rio,
+    SessionIdType sessionId, RUDPSession* ownerSession)
+{
+    recvBuffer.ClearFreeRecvContexts();
+    for (auto& slot : recvBuffer.slots) {
+        slot.recvContext = std::make_shared<IOContext>();
+        auto& context = slot.recvContext;
+        context->InitContext(sessionId, RIO_OPERATION_TYPE::OP_RECV);
+        context->session = ownerSession;
+        context->recvDataBuffer = slot.buffer;
+
+        context->BufferId = rio.RIORegisterBuffer(slot.buffer, RECV_BUFFER_SIZE);
+        context->clientAddrRIOBuffer.BufferId =
+            rio.RIORegisterBuffer(context->clientAddrBuffer, sizeof(SOCKADDR_INET));
+        context->localAddrRIOBuffer.BufferId =
+            rio.RIORegisterBuffer(context->localAddrBuffer, sizeof(SOCKADDR_INET));
+
+        // 등록 실패 시 Cleanup()으로 지금까지 등록한 slot을 해제한다.
+        recvBuffer.ReleaseRecvContext(context.get());
+    }
+    return true;
+}
+```
+
+`IOContext`에는 `ownerSessionId`와 session 포인터가 있지만 generation 필드는 없다. 완료 처리에서 generation 일치를 검증한다고 가정하면 안 된다.
+
+---
+
+## 6. SessionSendContext
+
+```cpp
+class SessionSendContext {
+    SendPacketInfo* reservedSendPacketInfo;
+
+    // ─── RIO send 버퍼 (배치 전송용) ────────────────────────────────
+    char rioSendBuffer[MAX_SEND_BUFFER_SIZE]; // 32KB
+    RIO_BUFFERID sendBufferId;
+
+    // ─── 송신 큐 ───────────────────────────────────────────────────
+    std::mutex sendPacketInfoQueueLock;
+    std::queue<SendPacketInfo*> sendPacketInfoQueue;
+
+    // ─── ACK 대기 추적 ──────────────────────────────────────────────
+    std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
+    mutable std::shared_mutex sendPacketInfoMapLock;
+    // Insert/Erase/FindAndErase/ForEachAndClear에서 보호
+
+    // ─── I/O 모드 제어 ───────────────────────────────────────────────
+    std::atomic<IO_MODE> ioMode{ IO_MODE::IO_NONE_SENDING };
+    // IO_NONE_SENDING: 현재 RIO Send 없음
+    // IO_SENDING:      RIO Send 진행 중
+
+    // ─── 패킷 시퀀스 ────────────────────────────────────────────────
+    std::atomic<PacketSequence> lastSendPacketSequence;
+
+    // ─── 시퀀스 캐시 (중복 전송 방지) ────────────────────────────────
+    std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
+    std::mutex cachedSequenceSetLock;
+
+    // ─── 보류 큐 (흐름 제어) ─────────────────────────────────────────
+    RingBuffer<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue;
+    std::mutex pendingPacketQueueLock;
+
+public:
+    char* GetRIOSendBuffer()    { return rioSendBuffer; }
+    RIO_BUFFERID GetSendBufferId() { return sendBufferId; }
+
+    std::atomic<IO_MODE>& GetIOMode();
+
+    // sendPacketInfoMap 접근
+    void InsertSendPacketInfo(PacketSequence seq, SendPacketInfo* info);
+    SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq);
+    void ForEachAndClearSendPacketInfoMap(
+        const std::function<void(SendPacketInfo*)>& func);
+
+    // pendingPacketQueue 접근
+    bool PushToPendingQueue(PacketSequence seq, NetBuffer* buf);
+    bool PopFromPendingQueue(std::pair<PacketSequence, NetBuffer*>& item);
+    bool IsPendingQueueEmpty() const noexcept;
+    std::mutex& GetPendingQueueLock() { return pendingPacketQueueLock; }
+};
+```
+
+**`cachedSequenceSet` 중복 전송 방지:**
+
+```cpp
+// MakeSendStream 내부 (RUDPIOHandler)
+auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
+packetSequenceSet.clear();
+
+const MultiSocketRUDP::PacketSequenceSetKey key{ info->isReplyType, info->sendPacketSequence };
+if (packetSequenceSet.contains(key)) {
+    SendPacketInfo::Free(info);
+    return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
+}
+
+packetSequenceSet.insert(key);
+memcpy_s(&rioSendBuffer[beforeSendSize],
+         MAX_SEND_BUFFER_SIZE - beforeSendSize,
+         info->buffer->GetBufferPtr(),
+         useSize);
+```
+
+**왜 중복이 발생하는가:**
+
+송신 큐의 front와 reserved slot이 같은 송신 배치에서 함께 처리되거나,
+ACK 수신 전 같은 sequence가 다시 schedule되는 경우
+같은 sequence의 패킷이 스트림에 두 번 포함될 수 있다.
+재전송 schedule 자체의 중복 entry는 `SendPacketInfo::scheduleVersion`으로 stale 처리된다.
+
+**`sendPacketInfoMap shared_mutex` 패턴:**
+
+```cpp
+// 송신 등록
+{
+    std::unique_lock lock(sendPacketInfoMapLock);
+    info->AddRefCount();
+    sendPacketInfoMap.insert({ sequence, info });
+}
+
+// ACK 수신
+SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq) {
+    std::unique_lock lock(sendPacketInfoMapLock);
+    auto it = sendPacketInfoMap.find(seq);
+    if (it == sendPacketInfoMap.end()) return nullptr;
+    auto* info = it->second;
+    sendPacketInfoMap.erase(it);
+    return info;
+}
+
+// 세션 해제
+ForEachAndClearSendPacketInfoMap(func);
+```
+
+---
+
+## 7. RUDPFlowManager
+
+**파일:** `RUDPFlowManager.h / .cpp`
+
+```cpp
+class RUDPFlowManager {
+    RUDPFlowController flowController;  // CWND 관리
+    RUDPReceiveWindow  receiveWindow;   // 수신 윈도우 관리
+    // lastAckedSequence는 flowController 내부에서 관리
+
+public:
+    void Reset(PacketSequence recvStartSequence) noexcept;
+
+    // 송신 제어
+    bool CanSend(PacketSequence nextSeq) noexcept;
+    void OnAckReceived(PacketSequence ackedSeq) noexcept;
+    void OnTimeout() noexcept;
+
+    // 수신 제어
+    bool CanAccept(PacketSequence sequence) const noexcept;
+    void MarkReceived(PacketSequence sequence) noexcept;
+    BYTE GetAdvertisableWindow() const noexcept;  // receiveWindow.GetAdvertiseWindow() 위임
+};
+```
+
+→ 상세 동작: [[FlowController]]
+
+**`Reset` 호출 시점:**
+
+```cpp
+// TryConnect() 성공 시
+flowManager.Reset(LOGIN_PACKET_SEQUENCE + 1);  // = 1
+
+// Reset 내부:
+// flowController.Reset():
+//   cwnd = INITIAL_CWND(4), lastReplySequence = 0, inRecovery = false
+// receiveWindow.Reset(1):
+//   windowStart = 1, startIndex = 0, usedCount = 0
+//   receivedFlags.fill(0)
+// (lastAckedSequence は flowController 내부에서 관리)
+```
+
+---
+
+## 8. 컴포넌트 간 상호 의존
+
+```
+stateMachine
+  → IsConnected(), TryTransitionToReleasing() 등
+  → 거의 모든 메서드에서 상태 확인 후 처리
+
+cryptoContext
+  → EncodePacket/DecodePacket에서 GetSessionSalt(), GetKeyHandle() 사용
+
+socketContext
+  → DoRecv/DoSend: GetSocket() + GetSocketMutex()
+  → socket과 local serverPort의 동기화된 접근
+
+clientAddr (RUDPSession)
+  → TryConnect에서 저장
+  → CanProcessPacket에서 비교
+
+rioContext (RecvContext + SendContext)
+  → RecvContext: DoRecv에서 RIO 버퍼 전달
+  → SendContext: DoSend, MakeSendStream에서 재전송 맵/IO 모드 관리
+
+flowManager
+  → OnRecvPacket: CanAccept(), MarkReceived(), GetAdvertisableWindow()
+  → OnSendReply: OnAckReceived(), CanSend()
+  → SendPacket: CanSend()
+
+sessionPacketOrderer
+  → OnRecvPacket: OnReceive(sequence, buffer, callback)
+  → 순서 보장 홀딩 큐 관리
+```
+
+**초기화 순서 (InitReserveSession):**
+
+```
+1. socketContext.SetSocket(newSocket)
+2. socketContext.SetServerPort(port)
+3. rioContext.recvContext.Initialize(rioFunctionTable, sessionId, ...)
+4. rioContext.sendContext.Initialize(rioFunctionTable)
+5. DoRecv() 등록
+6. stateMachine.SetReserved()
+```
+
+**해제 순서 (Disconnect — Session Release Thread 경유):**
+
+```
+1. OnDisconnected() 콘텐츠 훅
+2. CloseSocket()                     ← 소켓 먼저 닫기
+3. rioContext.GetSendContext()
+   .ForEachAndClearSendPacketInfoMap()  ← SendPacketInfo 정리
+4. OnReleased() 콘텐츠 훅
+5. DisconnectSession(id)
+   ├─ RUDPSessionManager::ReleaseSession(id)
+   ├─ InitializeSession()
+   ├─ cryptoContext.Initialize()        ← 키 핸들 파괴
+   ├─ clientAddr/clientSockAddrInet/sessionReservedTime 초기화
+   ├─ nowInReleaseThread = false
+   ├─ flowManager.Initialize(maxHoldingQueueSize)
+   ├─ rioContext.GetSendContext().Reset()
+   └─ sessionPacketOrderer.Initialize(maxHoldingQueueSize)
+6. InitializeSession() 내부에서 stateMachine.SetDisconnected()
+7. unusedSessionIdList.push_back(id)
+```
+
+**해제 순서 (AbortReservedSession — HeartbeatThread 직접 처리):**
+
+```
+1. nowInReleaseThread = true
+2. CloseSocket()           ← rioContext.Cleanup() + socketContext.CloseSocket()
+3. DisconnectSession(id)
+4. RUDPSessionManager::ReleaseSession(id)에서 InitializeSession() / stateMachine.SetDisconnected()
+```
+
+---
+
+## 관련 문서
+- [[SessionLifecycle]] — 상태 전이 코드
+- [[RUDPSession]] — 컴포넌트 사용처 (SendPacket, OnRecvPacket 등)
+- [[FlowController]] — RUDPFlowManager 상세
+- [[CryptoHelper]] — SessionCryptoContext에서 사용하는 BCrypt API
+- [[RIOManager]] — SessionRecvContext/SendContext RIO 초기화

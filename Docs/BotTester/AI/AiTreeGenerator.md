@@ -98,7 +98,8 @@ description + tree 추출 → AiTreeResponse 반환
 ValidateNode(node, result, path)
   ├─ "type" 프로퍼티 존재 여부
   ├─ KnownNodeTypes 목록에 포함 여부
-  └─ 재귀: next, true_branch, false_branch, loop_body, repeat_body, timeout_nodes
+  └─ 재귀: next, true_branch, false_branch, loop_body, exit_nodes,
+           repeat_body, retry_body, timeout_nodes, failure_nodes
 ```
 
 알려진 노드 타입 (`KnownNodeTypes`):

@@ -177,7 +177,8 @@ const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSeri
 
 **AAD를 포함한 인증의 의미:**
 - HeaderCode, PayloadLength, PacketType, Sequence는 평문이지만 위변조 불가
-- 공격자가 Sequence를 바꾸면 AuthTag 검증 실패 → 재전송 공격 방지
+- 공격자가 Sequence를 바꾸면 AuthTag 검증 실패 → 시퀀스 필드 변조 감지
+- 동일 패킷을 그대로 재전송하는 replay 거부는 수신 윈도우와 세션 sequence 검증이 담당
 - PacketType을 바꾸면 AuthTag 검증 실패 → 타입 위조 방지
 
 ---

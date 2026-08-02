@@ -65,6 +65,7 @@ TLS 설정은 `ServerCertificateConfig`로 전달된다.
 ```text
 [HeaderCode 1B]
 [PayloadLen 2B]
+[Reserved 2B]
 [CONNECT_RESULT_CODE 1B]
 [serverIp string]
 [serverPort 2B]
@@ -72,6 +73,8 @@ TLS 설정은 `ServerCertificateConfig`로 전달된다.
 [sessionKey 16B]
 [sessionSalt 16B]
 ```
+
+공통 `NetBuffer` header는 총 5B다. `ReserveSession()`은 기본 write offset 5부터 결과 코드를 기록하고, `PacketCryptoHelper::SetHeader()`가 offset 0의 code와 offset 1~2의 payload length를 채운다. 결과 코드를 offset 3에서 읽으면 안 된다.
 
 예전 문서의 `CONNECT_RESULT_CODE 4B` 설명은 현재 코드와 맞지 않는다.
 

@@ -166,7 +166,9 @@
 
 ---
 
-4. [문서](https://github.com/m5623skhj/MultiSocketRUDP/tree/main/Docs)
+4. 문서
+
+처음 보는 경우 [문서 읽기 가이드](./Docs/ReadingGuide.md)에서 역할과 목적에 맞는 순서를 선택합니다. 전체 목록은 [Docs](./Docs/README.md)에서 확인합니다.
 
 ---
 
@@ -189,7 +191,7 @@ GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지�
 | :--- | :--- | :--- | :--- |
 | PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류하고 필요한 테스트를 호출한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. |
 | PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
-| PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C++/C# 프로토콜 상호운용 테스트를 수행합니다. |
+| PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C# protocol vector 검증을 수행합니다. 공용 vector 변경 시에는 PR CI가 Native GTest도 함께 호출합니다. |
 | 리뷰 보조 | [Gemini PR Comment Bot](./.github/workflows/GeminiPRCommoentBot.yml) | PR 생성, 갱신, 재오픈 | 코드 diff를 분석해 AI 리뷰 주석을 남깁니다. 병합 필수 체크로 사용하지 않습니다. |
 | 문서 자동화 | [docs-bot](./.github/workflows/docs-bot.yml) | 매일, `docs-review` 라벨, 수동 실행 | 병합된 코드의 인터페이스 변경을 분석해 문서 최신화 PR을 제안합니다. |
 | 품질 분석 | [Daily Static Analysis](./.github/workflows/StaticAnalysis.yml) | 매일 09:30 KST, 수동 실행 | C++ MSVC Native Analysis와 .NET Roslyn Analysis를 수행하고 분석 로그를 artifact로 보관합니다. |
