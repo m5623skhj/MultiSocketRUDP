@@ -9,6 +9,7 @@
 #include "MultiSocketRUDPCore.h"
 #include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "SendPacketInfo.h"
+#include "../Common/etc/UtilFunc.h"
 
 RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, ISessionDelegate& inSessionDelegate
@@ -30,7 +31,7 @@ RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	}
 }
 
-bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, const BYTE threadId) const
+bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, const BYTE threadId, const LONG status) const
 {
 	if (context == nullptr)
 	{
@@ -43,13 +44,97 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 		return false;
 	}
 
+	RUDPSession* session = context->session;
+	session->BeginIOCompletion();
+
+	auto completionGuard = Util::MakeScopeExit([session]()
+		{
+			session->CompleteIOCompletion();
+		});
+	const bool isCurrentGeneration =
+		context->ownerSessionId == session->GetSessionId() &&
+		context->ownerSessionGeneration == session->GetSessionGeneration();
+
+	if (not isCurrentGeneration)
+	{
+		return HandleStaleCompletion(context);
+	}
+
+	if (status != 0)
+	{
+		return HandleFailedCompletion(context, *session, status);
+	}
+
+	return DispatchSuccessfulCompletion(context, *session, transferred, threadId);
+}
+
+bool RUDPIOHandler::HandleStaleCompletion(IOContext* context) const
+{
+	LOG_ERROR(std::format("Discarding stale RIO completion for session {} generation {}",
+		context->ownerSessionId,
+		context->ownerSessionGeneration));
+
+	if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+	{
+		ReleaseRecvContext(context);
+		return true;
+	}
+
+	if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+	{
+		contextPool.Free(context);
+		return true;
+	}
+
+	return false;
+}
+
+bool RUDPIOHandler::HandleFailedCompletion(IOContext* context, RUDPSession& session, const LONG status) const
+{
+	if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+	{
+		ReleaseRecvContext(context);
+	}
+	else if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+	{
+		sessionDelegate.GetSendIOMode(session).store(IO_MODE::IO_NONE_SENDING, std::memory_order_release);
+		contextPool.Free(context);
+	}
+	else
+	{
+		return false;
+	}
+
+	const bool isExpectedCancellation =
+		status == WSA_OPERATION_ABORTED && session.IsReleasing();
+	if (isExpectedCancellation)
+	{
+		return true;
+	}
+
+	const DISCONNECT_REASON reason = status == WSAECONNRESET ?
+		DISCONNECT_REASON::NORMAL : DISCONNECT_REASON::BY_ERROR;
+	session.DoDisconnect(reason);
+	if (reason == DISCONNECT_REASON::BY_ERROR)
+	{
+		LOG_ERROR(std::format("RIO operation failed with error code {}", status));
+	}
+	return true;
+}
+
+bool RUDPIOHandler::DispatchSuccessfulCompletion(
+	IOContext* context,
+	RUDPSession& session,
+	const ULONG transferred,
+	const BYTE threadId) const
+{
 	switch (context->ioType)
 	{
 	case RIO_OPERATION_TYPE::OP_RECV:
 	{
 		if (not RecvIOCompleted(context, transferred, threadId))
 		{
-			context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+			session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			break;
 		}
 
@@ -59,7 +144,7 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 	{
 		if (not SendIOCompleted(context, threadId))
 		{
-			context->session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+			session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 			break;
 		}
 
@@ -78,6 +163,10 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 bool RUDPIOHandler::DoRecv(RUDPSession& session) const
 {
 	std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+	if (session.IsReleasing())
+	{
+		return true;
+	}
 	if (sessionDelegate.GetSocket(session) == INVALID_SOCKET)
 	{
 		return false;
@@ -86,6 +175,8 @@ bool RUDPIOHandler::DoRecv(RUDPSession& session) const
 	auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
 	while (IOContext* context = recvBuffer.AcquireFreeRecvContext())
 	{
+		context->ownerSessionGeneration = session.GetSessionGeneration();
+		recvBuffer.BeginRecvIo();
 		if (not rioManager.RIOReceiveEx(sessionDelegate.GetRecvRIORQ(session)
 			, context
 			, 1
@@ -96,6 +187,7 @@ bool RUDPIOHandler::DoRecv(RUDPSession& session) const
 			, 0
 			, context))
 		{
+			recvBuffer.CompleteRecvIo();
 			recvBuffer.ReleaseRecvContext(context);
 			return false;
 		}
@@ -171,7 +263,7 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 
 	if (lossSimulator != nullptr && lossSimulator->ShouldDropReceivedDatagram())
 	{
-		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+		ReleaseRecvContext(contextResult);
 		return DoRecv(*contextResult->session);
 	}
 	
@@ -179,7 +271,7 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	if (buffer == nullptr)
 	{
 		LOG_ERROR("RecvIOCompleted NetBuffer::Allock() failed");
-		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+		ReleaseRecvContext(contextResult);
 		
 		return false;
 	}
@@ -187,17 +279,31 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->recvDataBuffer, transferred) != 0)
 	{
 		NetBuffer::Free(buffer);
-		sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+		ReleaseRecvContext(contextResult);
 
 		return false;
 	}
 	buffer->m_iWrite = static_cast<WORD>(transferred);
 
-	sessionDelegate.EnqueueToRecvBufferList(*contextResult->session, buffer);
-	MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(contextResult, threadId);
+	if (not MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(contextResult, buffer, threadId))
+	{
+		NetBuffer::Free(buffer);
+		ReleaseRecvContext(contextResult);
+		return false;
+	}
 
-	sessionDelegate.GetRecvBuffer(*contextResult->session).ReleaseRecvContext(contextResult);
+	ReleaseRecvContext(contextResult);
 	return DoRecv(*contextResult->session);
+}
+
+void RUDPIOHandler::ReleaseRecvContext(IOContext* context) const
+{
+	assert(context != nullptr);
+	assert(context->ownerRecvBuffer != nullptr);
+
+	RecvBuffer* recvBuffer = context->ownerRecvBuffer;
+	recvBuffer->ReleaseRecvContext(context);
+	recvBuffer->CompleteRecvIo();
 }
 
 bool RUDPIOHandler::SendIOCompleted(IOContext* context, const BYTE threadId) const
@@ -228,6 +334,7 @@ bool RUDPIOHandler::TryRIOSend(RUDPSession& session, IOContext* context) const
 	};
 
 	context->session = &session;
+	context->ownerSessionGeneration = session.GetSessionGeneration();
 
 	{
 		std::shared_lock lock(sessionDelegate.GetSocketMutex(session));

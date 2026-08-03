@@ -45,11 +45,6 @@ public:
     void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 
     // ----------------------------------------
-    // @brief NetBuffer를 수신 버퍼 리스트에 추가합니다.
-    // @param buffer 추가할 NetBuffer 포인터
-    // ----------------------------------------
-    void EnqueueToRecvBufferList(NetBuffer* buffer);
-    // ----------------------------------------
     // @brief 내부 수신 버퍼 객체를 반환합니다.
     // @return RecvBuffer 참조
     // ----------------------------------------
@@ -78,6 +73,8 @@ public:
     // ----------------------------------------
     [[nodiscard]]
 	const SessionSendContext& GetSendContext() const;
+	[[nodiscard]]
+	bool IsDrained();
 
     // ----------------------------------------
     // @brief 생성된 RIO Request Queue 핸들을 반환합니다.

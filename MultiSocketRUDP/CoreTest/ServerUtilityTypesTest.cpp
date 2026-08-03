@@ -9,6 +9,8 @@
 #include "MockSessionDelegate.h"
 #include "RIOManager.h"
 #include "RUDPIOHandler.h"
+#include "MultiSocketRUDPCore.h"
+#include "MultiSocketRUDPCoreTestAccess.h"
 
 // ------------------------------------------------------------
 // IOContext 초기화가 소유 세션 ID와 작업 종류만 설정하고 RIO 버퍼 필드는 보존하는지 확인합니다.
@@ -127,4 +129,48 @@ TEST(RIOManagerTest, OperationsBeforeInitializeReturnSafeGuardValues)
 	manager.DeregisterBuffer(reinterpret_cast<RIO_BUFFERID>(1));
 	manager.Shutdown();
 	manager.Shutdown();
+}
+
+TEST(MultiSocketRUDPCoreFatalErrorTest, ReportsOnlyFirstFatalErrorToUpperLayer)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	std::vector<ServerFatalError> reportedErrors;
+	core.SetFatalErrorHandler([&reportedErrors](const ServerFatalError& error)
+		{
+			reportedErrors.emplace_back(error);
+		});
+
+	MultiSocketRUDPCoreTestAccess::ReportFatalError(core,
+		{ SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT, 2, 0 });
+	MultiSocketRUDPCoreTestAccess::ReportFatalError(core,
+		{ SERVER_FATAL_ERROR_CODE::RECV_LOGIC_WAIT_FAILED, 1, ERROR_INVALID_HANDLE });
+
+	ASSERT_EQ(reportedErrors.size(), 1u);
+	EXPECT_EQ(reportedErrors[0].code, SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT);
+	EXPECT_EQ(reportedErrors[0].threadId, 2);
+	EXPECT_EQ(reportedErrors[0].nativeErrorCode, 0u);
+	ASSERT_TRUE(core.GetFatalError().has_value());
+	EXPECT_EQ(core.GetFatalError()->code, SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT);
+}
+
+TEST(MultiSocketRUDPCoreFatalErrorTest, LateHandlerReceivesStoredFatalError)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	const ServerFatalError expected{
+		SERVER_FATAL_ERROR_CODE::RECV_LOGIC_EVENT_SIGNAL_FAILED,
+		3,
+		ERROR_INVALID_HANDLE
+	};
+	MultiSocketRUDPCoreTestAccess::ReportFatalError(core, expected);
+
+	std::optional<ServerFatalError> reportedError;
+	core.SetFatalErrorHandler([&reportedError](const ServerFatalError& error)
+		{
+			reportedError = error;
+		});
+
+	ASSERT_TRUE(reportedError.has_value());
+	EXPECT_EQ(reportedError->code, expected.code);
+	EXPECT_EQ(reportedError->threadId, expected.threadId);
+	EXPECT_EQ(reportedError->nativeErrorCode, expected.nativeErrorCode);
 }

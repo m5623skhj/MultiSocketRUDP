@@ -109,22 +109,21 @@ TEST(SessionRecvContextTest, InitializePopulatesEveryContextAndFreeQueue)
 }
 
 // ------------------------------------------------------------
-// 수신 패킷 enqueue와 컨텍스트 reset 이후 버퍼 목록 및 자유 큐 상태가 올바른지 확인합니다.
+// 수신 I/O와 로직 작업 추적 및 컨텍스트 reset 상태를 확인합니다.
 // ------------------------------------------------------------
-TEST(SessionRecvContextTest, EnqueueAndResetExposeExpectedBufferState)
+TEST(SessionRecvContextTest, ReceiveTrackingAndResetExposeExpectedState)
 {
 	TestRIOState state;
 	const auto table = MakeTestRioTable(state);
 	SessionRecvContext context;
 	ASSERT_TRUE(context.Initialize(table, 3, nullptr));
-	NetBuffer* packet = NetBuffer::Alloc();
-	ASSERT_NE(packet, nullptr);
-
-	context.EnqueueToRecvBufferList(packet);
-	NetBuffer* dequeued = nullptr;
-	ASSERT_TRUE(context.GetRecvBuffer().recvBufferList.Dequeue(&dequeued));
-	EXPECT_EQ(dequeued, packet);
-	NetBuffer::Free(dequeued);
+	auto& recvBuffer = context.GetRecvBuffer();
+	recvBuffer.BeginRecvIo();
+	recvBuffer.BeginRecvLogic();
+	EXPECT_FALSE(recvBuffer.IsDrained());
+	recvBuffer.CompleteRecvIo();
+	recvBuffer.CompleteRecvLogic();
+	EXPECT_TRUE(recvBuffer.IsDrained());
 
 	context.Cleanup(table);
 	context.RecvContextReset();
@@ -173,16 +172,10 @@ TEST(SessionRIOContextTest, WrapperMethodsForwardToRecvAndSendContexts)
 	SessionRIOContext context;
 	context.GetSendContext().InitializePendingQueue(1);
 	NetBuffer* pending = NetBuffer::Alloc();
-	NetBuffer* received = NetBuffer::Alloc();
 	ASSERT_NE(pending, nullptr);
-	ASSERT_NE(received, nullptr);
 
 	EXPECT_TRUE(context.GetSendContext().PushToPendingQueue(8, pending));
-	context.EnqueueToRecvBufferList(received);
-	NetBuffer* dequeued = nullptr;
-	ASSERT_TRUE(context.GetRecvBuffer().recvBufferList.Dequeue(&dequeued));
-	EXPECT_EQ(dequeued, received);
-	NetBuffer::Free(dequeued);
+	EXPECT_TRUE(context.GetRecvBuffer().IsDrained());
 
 	context.GetSendContext().ClearPendingQueue();
 }

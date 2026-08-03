@@ -18,11 +18,6 @@ void RUDPSessionFunctionDelegate::SetThreadId(RUDPSession& session, const Thread
 	session.SetThreadId(threadId);
 }
 
-void RUDPSessionFunctionDelegate::CloseSocket(RUDPSession& session)
-{
-	session.CloseSocket();
-}
-
 void RUDPSessionFunctionDelegate::RecvContextReset(RUDPSession& session)
 {
 	session.RecvContextReset();
@@ -109,11 +104,6 @@ SendPacketInfo* RUDPSessionFunctionDelegate::TakeReservedSendPacketInfo(RUDPSess
 bool RUDPSessionFunctionDelegate::IsNothingToSend(RUDPSession& session)
 {
 	return session.GetSendContext().IsNothingToSend();
-}
-
-void RUDPSessionFunctionDelegate::EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer)
-{
-	session.EnqueueToRecvBufferList(buffer);
 }
 
 std::set<MultiSocketRUDP::PacketSequenceSetKey>& RUDPSessionFunctionDelegate::GetCachedSequenceSet(RUDPSession& session)

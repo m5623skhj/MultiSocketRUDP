@@ -34,6 +34,7 @@
 | 문서 | 핵심 내용 |
 |------|-----------|
 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) | 서버 시작/종료 API, 세션 조회, 옵션 설정, 멀티소켓 구조 |
+| [FatalErrorHandling](Server/FatalErrorHandling.md) | 치명 worker·RIO 오류 통지, 상위 레이어 callback, 프로세스 재시작 절차 |
 | [RUDPSession](Server/RUDPSession.md) | 상속 방법, 핸들러 등록, 송신 API, 이벤트 훅, 동시성 보호 |
 | [RUDPSessionBroker](Server/RUDPSessionBroker.md) | TLS 세션 발급 흐름, 실패 처리, 인증서 설정 |
 | [RUDPSessionManager](Server/RUDPSessionManager.md) | 세션 풀 O(1) 할당/반환, 이중 반환 방지 |

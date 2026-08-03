@@ -107,7 +107,7 @@ class SessionCryptoContext {
 public:
     void Initialize();
     // → sessionKey/salt 0 초기화
-    // 의도 계약: BCryptDestroyKey(sessionKeyHandle) → delete[] keyObjectBuffer
+    // Release()로 BCryptDestroyKey(sessionKeyHandle) → delete[] keyObjectBuffer
 
     // 접근자
     const unsigned char* GetSessionKey()  const { return sessionKey;  }
@@ -122,7 +122,7 @@ public:
 };
 ```
 
-> **현재 구현 불일치:** `Release()`는 handle을 먼저 파괴하지만, `Initialize()`는 `keyObjectBuffer`를 먼저 해제한 뒤 `BCryptDestroyKey`를 호출한다. 위 주석은 안전한 수명 계약이며 현재 `Initialize()`의 실제 순서를 재현한 코드가 아니다.
+`Initialize()`는 `Release()`를 호출해 handle과 key object buffer를 안전한 순서로 정리한 뒤 key와 salt를 `SecureZeroMemory`로 초기화한다.
 
 **`Initialize()` 호출 시점:**
 
@@ -190,7 +190,6 @@ rioFunctionTable.RIOReceiveEx(...);   // 소켓이 열려 있음을 보장
 
 // RUDPSession::CloseSocket: 호출자 쪽에서 독점 잠금
 std::unique_lock lock(socketContext.GetSocketMutex());
-rioContext.Cleanup();
 socketContext.CloseSocket();
 ```
 
@@ -200,12 +199,16 @@ socketContext.CloseSocket();
 
 ```
 DoRecv와 DoSend는 동시에 실행될 수 있음 (수신 등록 + 송신 동시)
-CloseSocket은 두 작업이 모두 없을 때만 실행해야 함
+CloseSocket은 등록 중인 DoRecv/DoSend가 빠져나온 뒤 소켓만 닫음
 
 shared_lock: DoRecv, DoSend가 동시에 획득 가능
 unique_lock: CloseSocket이 획득하면 DoRecv, DoSend 모두 블락
 → DoRecv/DoSend 중 소켓이 닫히는 race condition 방지
 ```
+
+소켓 close는 기존 RIO 작업의 취소 완료를 유도하기 위해 drain보다 먼저 수행한다. 이때
+RIO buffer는 유지하며, `outstandingRecvIo`, `pendingRecvLogic`, `activeIOCompletions`, send I/O가 모두 끝난 뒤
+`FinalizeRIOCleanup()`에서만 deregister한다.
 
 ---
 
@@ -231,10 +234,12 @@ struct RecvBufferSlot {
 struct RecvBuffer {
     std::array<RecvBufferSlot, RECV_OUTSTANDING_COUNT> slots;
     CListBaseQueue<IOContext*> freeRecvContexts;
-    CListBaseQueue<NetBuffer*> recvBufferList;
+    std::atomic_uint32_t outstandingRecvIo;
+    std::atomic_uint32_t pendingRecvLogic;
 
     IOContext* AcquireFreeRecvContext();
     void ReleaseRecvContext(IOContext* context);
+    bool IsDrained() const;
 };
 
 class SessionRecvContext {
@@ -288,7 +293,7 @@ bool SessionRecvContext::Initialize(
 }
 ```
 
-`IOContext`에는 `ownerSessionId`와 session 포인터가 있지만 generation 필드는 없다. 완료 처리에서 generation 일치를 검증한다고 가정하면 안 된다.
+`IOContext`에는 `ownerSessionId`, `ownerSessionGeneration`, session 포인터, 수명 카운터를 가진 `ownerRecvBuffer`가 있다. generation은 각 `RIOReceiveEx`/`RIOSendEx` 등록 직전에 갱신한다.
 
 ---
 
@@ -479,23 +484,27 @@ sessionPacketOrderer
 **초기화 순서 (InitReserveSession):**
 
 ```
-1. socketContext.SetSocket(newSocket)
-2. socketContext.SetServerPort(port)
-3. rioContext.recvContext.Initialize(rioFunctionTable, sessionId, ...)
-4. rioContext.sendContext.Initialize(rioFunctionTable)
-5. DoRecv() 등록
-6. stateMachine.SetReserved()
+1. stateMachine.SetReserved() + 실패 release guard
+2. socketContext.SetSocket(newSocket)
+3. socketContext.SetServerPort(port)
+4. rioContext.recvContext.Initialize(rioFunctionTable, sessionId, ...)
+5. rioContext.sendContext.Initialize(rioFunctionTable)
+6. DoRecv() 등록
 ```
 
 **해제 순서 (Disconnect — Session Release Thread 경유):**
 
 ```
-1. OnDisconnected() 콘텐츠 훅
-2. CloseSocket()                     ← 소켓 먼저 닫기
-3. rioContext.GetSendContext()
+1. BeginIOShutdown()
+   ├─ pendingRecvLogic / 처리 중 사용자 logic이 0일 때 시작
+   ├─ OnDisconnected() 콘텐츠 훅
+   └─ CloseSocket()                  ← RIO buffer는 유지
+2. send I/O, outstandingRecvIo, pendingRecvLogic, activeIOCompletions drain
+3. FinalizeRIOCleanup()              ← drain 뒤 RIO buffer deregister
+4. rioContext.GetSendContext()
    .ForEachAndClearSendPacketInfoMap()  ← SendPacketInfo 정리
-4. OnReleased() 콘텐츠 훅
-5. DisconnectSession(id)
+5. OnReleased() 콘텐츠 훅
+6. DisconnectSession(id)
    ├─ RUDPSessionManager::ReleaseSession(id)
    ├─ InitializeSession()
    ├─ cryptoContext.Initialize()        ← 키 핸들 파괴
@@ -504,17 +513,18 @@ sessionPacketOrderer
    ├─ flowManager.Initialize(maxHoldingQueueSize)
    ├─ rioContext.GetSendContext().Reset()
    └─ sessionPacketOrderer.Initialize(maxHoldingQueueSize)
-6. InitializeSession() 내부에서 stateMachine.SetDisconnected()
-7. unusedSessionIdList.push_back(id)
+7. InitializeSession() 내부에서 stateMachine.SetDisconnected()
+8. unusedSessionIdList.push_back(id)
 ```
 
-**해제 순서 (AbortReservedSession — HeartbeatThread 직접 처리):**
+**해제 순서 (AbortReservedSession — 공통 release queue 사용):**
 
 ```
 1. nowInReleaseThread = true
-2. CloseSocket()           ← rioContext.Cleanup() + socketContext.CloseSocket()
-3. DisconnectSession(id)
-4. RUDPSessionManager::ReleaseSession(id)에서 InitializeSession() / stateMachine.SetDisconnected()
+2. release target queue에 session id 등록
+3. Session Release Thread가 recv logic quiescence 확인 후 socket close-only와 RIO drain 수행
+4. FinalizeRIOCleanup() 뒤 DisconnectSession(id)
+5. RUDPSessionManager::ReleaseSession(id)에서 InitializeSession() / stateMachine.SetDisconnected()
 ```
 
 ---

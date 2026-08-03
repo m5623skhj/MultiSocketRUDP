@@ -49,4 +49,8 @@ public:
 	static int GetSimulatedPacketLossSeed(const MultiSocketRUDPCore& core) { return core.simulatedPacketLossSeed; }
 	static const std::string& GetCoreServerIp(const MultiSocketRUDPCore& core) { return core.coreServerIp; }
 	static PortType GetSessionBrokerPort(const MultiSocketRUDPCore& core) { return core.sessionBrokerPort; }
+	static void ReportFatalError(MultiSocketRUDPCore& core, const ServerFatalError& error)
+	{
+		core.ReportFatalError(error);
+	}
 };

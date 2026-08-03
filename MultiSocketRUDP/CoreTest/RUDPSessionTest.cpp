@@ -16,6 +16,19 @@ namespace
 		explicit SessionBehaviorTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
 	};
 
+	class LifecycleHookTestSession final : public RUDPSession
+	{
+	public:
+		explicit LifecycleHookTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
+
+		void OnDisconnected() override
+		{
+			++disconnectedCount;
+		}
+
+		int disconnectedCount{};
+	};
+
 	class NoOpPacket final : public IPacket
 	{
 	public:
@@ -97,6 +110,48 @@ TEST(RUDPSessionBehaviorTest, OnRecvPacketUnknownPacketIdReturnsFalse)
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *buffer));
 
 	NetBuffer::Free(buffer);
+}
+
+TEST(RUDPSessionBehaviorTest, FinalizeBarrierWaitsForReceiveIoLogicAndSendCompletion)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	SessionBehaviorTestSession session{ core };
+	auto& recvBuffer = RUDPSessionBehaviorAccess::GetRecvBuffer(session);
+	auto& sendMode = RUDPSessionBehaviorAccess::GetSendContext(session).GetIOMode();
+
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	recvBuffer.BeginRecvIo();
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	recvBuffer.BeginRecvLogic();
+	recvBuffer.CompleteRecvIo();
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	recvBuffer.CompleteRecvLogic();
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	sendMode.store(IO_MODE::IO_SENDING);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	sendMode.store(IO_MODE::IO_NONE_SENDING);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOCompletion(session);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::CompleteIOCompletion(session);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+TEST(RUDPSessionBehaviorTest, IOShutdownWaitsForRecvLogicBeforeCallingDisconnectedHook)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	LifecycleHookTestSession session{ core };
+	RUDPSessionBehaviorAccess::SetReleasing(session);
+	auto& recvBuffer = RUDPSessionBehaviorAccess::GetRecvBuffer(session);
+	recvBuffer.BeginRecvLogic();
+
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 0);
+
+	recvBuffer.CompleteRecvLogic();
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
 }
 
 TEST(RUDPSessionBehaviorTest, ReceiveOrderComparisonUsesFullPacketSequenceWidth)

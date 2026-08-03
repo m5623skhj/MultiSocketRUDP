@@ -5,6 +5,7 @@
 
 bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable, const SessionIdType sessionId, RUDPSession* ownerSession)
 {
+    assert(recvBuffer.IsDrained());
     recvBuffer.ClearFreeRecvContexts();
 
     for (auto& slot : recvBuffer.slots)
@@ -20,6 +21,7 @@ bool SessionRecvContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunct
         context->Length = RECV_BUFFER_SIZE;
         context->Offset = 0;
         context->session = ownerSession;
+        context->ownerRecvBuffer = &recvBuffer;
         context->recvDataBuffer = slot.buffer;
 
         context->clientAddrRIOBuffer.Length = sizeof(SOCKADDR_INET);
@@ -81,11 +83,6 @@ void SessionRecvContext::RecvContextReset()
             slot.recvContext.reset();
         }
     }
-}
-
-void SessionRecvContext::EnqueueToRecvBufferList(NetBuffer* buffer)
-{
-    recvBuffer.recvBufferList.Enqueue(buffer);
 }
 
 RecvBuffer& SessionRecvContext::GetRecvBuffer()

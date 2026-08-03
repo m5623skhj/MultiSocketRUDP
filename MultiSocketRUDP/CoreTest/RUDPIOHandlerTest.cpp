@@ -8,6 +8,7 @@
 #include "RetransmissionScheduler.h"
 #include "MockRIOManager.h"
 #include "MockSessionDelegate.h"
+#include "RUDPSessionTestAccess.h"
 #ifndef LOG_ERROR
 #define LOG_ERROR(...) ((void)0)
 #endif
@@ -111,6 +112,9 @@ protected:
     void SetupValidRecvContext()
     {
         mockDelegate.recvBufferContextReturn = std::make_shared<IOContext>();
+		mockDelegate.recvBufferContextReturn->InitContext(session.GetSessionId(), RIO_OPERATION_TYPE::OP_RECV);
+		mockDelegate.recvBufferContextReturn->session = &session;
+		mockDelegate.recvBufferContextReturn->ownerRecvBuffer = &mockDelegate.dummyRecvBuffer;
         mockDelegate.dummyRecvBuffer.ReleaseRecvContext(mockDelegate.recvBufferContextReturn.get());
         mockDelegate.getSocketReturn = SOCKET(1);
     }
@@ -472,6 +476,26 @@ TEST_F(RUDPIOHandlerTest, DoRecv_RIOReceiveExFails_CallsRIOReceiveExOnce)
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 1);
 }
 
+TEST_F(RUDPIOHandlerTest, DoRecv_ReleasingSessionDoesNotPostReceive)
+{
+    SetupValidRecvContext();
+    RUDPSessionBehaviorAccess::SetReleasing(session);
+    RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+
+    EXPECT_TRUE(handler->DoRecv(session));
+    EXPECT_EQ(mockRIO.rioReceiveExCallCount, 0);
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 0u);
+}
+
+TEST_F(RUDPIOHandlerTest, DoRecv_RIOReceiveExFails_RollsBackOutstandingCount)
+{
+    SetupValidRecvContext();
+    mockRIO.rioReceiveExReturn = false;
+
+    EXPECT_FALSE(handler->DoRecv(session));
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 0u);
+}
+
 // ============================================================
 // 8. DoRecv — 정상 경로
 // ============================================================
@@ -495,6 +519,54 @@ TEST_F(RUDPIOHandlerTest, DoRecv_Success_CallsRIOReceiveExExactlyOnce)
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 1);
 }
 
+TEST_F(RUDPIOHandlerTest, DoRecv_Success_CapturesGenerationAndTracksOutstandingReceive)
+{
+    SetupValidRecvContext();
+    mockRIO.rioReceiveExReturn = true;
+
+    ASSERT_TRUE(handler->DoRecv(session));
+    EXPECT_EQ(mockDelegate.recvBufferContextReturn->ownerSessionGeneration, session.GetSessionGeneration());
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 1u);
+}
+
+TEST_F(RUDPIOHandlerTest, IOCompleted_RecvErrorReleasesSlotAndOutstandingCount)
+{
+    SetupValidRecvContext();
+    mockRIO.rioReceiveExReturn = true;
+    IOContext* context = mockDelegate.recvBufferContextReturn.get();
+    ASSERT_TRUE(handler->DoRecv(session));
+
+    EXPECT_TRUE(handler->IOCompleted(context, 0, THREAD_ID, WSA_OPERATION_ABORTED));
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 0u);
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.AcquireFreeRecvContext(), context);
+    EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+TEST_F(RUDPIOHandlerTest, IOCompleted_StaleRecvCompletionOnlyReleasesOriginalReceive)
+{
+    SetupValidRecvContext();
+    mockRIO.rioReceiveExReturn = true;
+    IOContext* context = mockDelegate.recvBufferContextReturn.get();
+    ASSERT_TRUE(handler->DoRecv(session));
+    ++context->ownerSessionGeneration;
+
+    EXPECT_TRUE(handler->IOCompleted(context, 0, THREAD_ID));
+    EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 0u);
+    EXPECT_EQ(mockRIO.rioReceiveExCallCount, 1);
+    EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+TEST_F(RUDPIOHandlerTest, IOCompleted_StaleSendCompletionDoesNotChangeCurrentSendMode)
+{
+    IOContext* context = AllocSendContext();
+    context->ownerSessionId = session.GetSessionId();
+    context->ownerSessionGeneration = session.GetSessionGeneration() + 1;
+    mockDelegate.dummyIOMode.store(IO_MODE::IO_SENDING);
+
+    EXPECT_TRUE(handler->IOCompleted(context, 0, THREAD_ID));
+    EXPECT_EQ(mockDelegate.dummyIOMode.load(), IO_MODE::IO_SENDING);
+}
+
 // ============================================================
 // 9. DoRecv — 반복 / 상태 전환 안전성
 // ============================================================
@@ -508,6 +580,7 @@ TEST_F(RUDPIOHandlerTest, DoRecv_RepeatedSuccessfulCalls_CountAccumulates)
     for (int i = 0; i < 5; ++i)
     {
         EXPECT_TRUE(handler->DoRecv(session)) << "Failed on iteration " << i;
+        mockDelegate.dummyRecvBuffer.CompleteRecvIo();
         mockDelegate.dummyRecvBuffer.ReleaseRecvContext(mockDelegate.recvBufferContextReturn.get());
     }
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 5);

@@ -17,7 +17,6 @@ public:
     void SetSessionId(RUDPSession&, SessionIdType id) override { lastSetSessionId = id; }
     void SetThreadId(RUDPSession&, ThreadIdType id)  override { lastSetThreadId = id; }
 
-    void CloseSocket(RUDPSession&) override { ++closeSocketCount; }
     [[nodiscard]]
     SOCKET GetSocket(const RUDPSession&) override { return getSocketReturn; }
     [[nodiscard]]
@@ -28,7 +27,6 @@ public:
     std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession&) override { return recvBufferContextReturn; }
     [[nodiscard]]
     RecvBuffer& GetRecvBuffer(RUDPSession& session) override { return dummyRecvBuffer; }
-    void EnqueueToRecvBufferList(RUDPSession&, NetBuffer* buf) override { enqueueBuffer = buf; }
     [[nodiscard]]
     RIO_RQ GetRecvRIORQ(const RUDPSession&) override { return recvRIORQReturn; }
 
@@ -137,7 +135,7 @@ public:
 
     void ResetCounts()
     {
-        initializeSessionRIOCount = closeSocketCount = recvContextResetCount
+        initializeSessionRIOCount = recvContextResetCount
             = tryConnectCount = onRecvPacketCount = onSendReplyCount
             = disconnectCount = sendHeartbeatCount = abortReservedCount
             = refreshLastRecvPacketTimeCount = 0;
@@ -185,13 +183,11 @@ public:
     SessionIdType lastSetSessionId = INVALID_SESSION_ID;
     ThreadIdType  lastSetThreadId = 0;
 
-    int    closeSocketCount = 0;
     SOCKET getSocketReturn = INVALID_SOCKET;
     mutable std::shared_mutex dummyMutex;
 
     int recvContextResetCount = 0;
     std::shared_ptr<IOContext> recvBufferContextReturn;
     RecvBuffer dummyRecvBuffer{};
-    NetBuffer* enqueueBuffer = nullptr;
     RIO_RQ recvRIORQReturn = RIO_INVALID_RQ;
 };

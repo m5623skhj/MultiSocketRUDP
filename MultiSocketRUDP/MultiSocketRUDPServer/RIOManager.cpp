@@ -5,6 +5,7 @@
 #include "LogExtension.h"
 #include "RUDPSessionFunctionDelegate.h"
 #include "../Common/etc/UtilFunc.h"
+#include <limits>
 
 RIOManager::RIOManager(ISessionDelegate& inSessionDelegate)
 	: sessionDelegate(inSessionDelegate)
@@ -24,6 +25,12 @@ bool RIOManager::Initialize(const size_t numOfSockets, const size_t inNumOfWorke
 	}
 
 	numOfWorkerThreads = inNumOfWorkerThreads;
+	if (numOfSockets == 0 || numOfWorkerThreads == 0)
+	{
+		LOG_ERROR("RIOManager requires at least one socket and one worker thread");
+		return false;
+	}
+
 	if (const auto result = LoadRIOFunctionTable(); not result)
 	{
 		LOG_ERROR("Failed to load RIO function table");
@@ -31,7 +38,16 @@ bool RIOManager::Initialize(const size_t numOfSockets, const size_t inNumOfWorke
 	}
 
 	rioCompletionQueues.reserve(numOfWorkerThreads);
-	const size_t queueSize = numOfSockets / numOfWorkerThreads * MAX_OUTSTANDING_RECEIVE;
+	const size_t sessionsPerWorker =
+		numOfSockets / numOfWorkerThreads + (numOfSockets % numOfWorkerThreads != 0);
+	constexpr size_t MAX_COMPLETIONS_PER_SESSION = RECV_OUTSTANDING_COUNT + 1;
+	if (sessionsPerWorker > (std::numeric_limits<ULONG>::max)() / MAX_COMPLETIONS_PER_SESSION)
+	{
+		LOG_ERROR("RIO completion queue size exceeds ULONG capacity");
+		return false;
+	}
+
+	const size_t queueSize = sessionsPerWorker * MAX_COMPLETIONS_PER_SESSION;
 	for (size_t i = 0; i < numOfWorkerThreads; ++i)
 	{
 		auto rioCQ = CreateCompletionQueue(queueSize);

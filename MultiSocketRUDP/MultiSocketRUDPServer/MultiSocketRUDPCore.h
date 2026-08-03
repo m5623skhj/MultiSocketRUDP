@@ -7,12 +7,14 @@
 #include <MSWSock.h>
 #include "../Common/TLS/TLSHelper.h"
 #include "RUDPSession.h"
-#include <mutex>
 #include <queue>
 #include <vector>
 #include "RUDPSessionFunctionDelegate.h"
 #include "IOContext.h"
 #include "RUDPSessionManager.h"
+#include <functional>
+#include <mutex>
+#include <optional>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -26,6 +28,22 @@ class RUDPIOHandler;
 class RUDPSessionBroker;
 class RUDPSessionManager;
 class MultiSocketRUDPCoreTestAccess;
+
+enum class SERVER_FATAL_ERROR_CODE : unsigned char
+{
+	RIO_COMPLETION_QUEUE_CORRUPT,
+	RECV_LOGIC_WAIT_FAILED,
+	RECV_LOGIC_EVENT_SIGNAL_FAILED,
+};
+
+struct ServerFatalError
+{
+	SERVER_FATAL_ERROR_CODE code{};
+	ThreadIdType threadId{};
+	unsigned long nativeErrorCode{};
+};
+
+using ServerFatalErrorHandler = std::function<void(const ServerFatalError&)>;
 
 class MultiSocketRUDPCore : public ICore
 {
@@ -56,6 +74,16 @@ public:
 	[[nodiscard]]
 	bool StartServer(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath, SessionFactoryFunc&& factoryFunc, bool printLogToConsole = false);
 	void StopServer();
+
+	// ----------------------------------------
+	// @brief 서버가 안전하게 계속 실행될 수 없는 오류를 상위 레이어에 전달할 콜백을 설정합니다.
+	// @details 콜백은 오류가 발생한 worker thread에서 호출되므로 StopServer()를 동기적으로 호출하지 말고,
+	//          상위 레이어의 제어 스레드에 종료 또는 재시작 요청을 전달해야 합니다.
+	//          오류 발생 후 콜백을 설정해도 저장된 최초 오류를 즉시 전달합니다.
+	// ----------------------------------------
+	void SetFatalErrorHandler(ServerFatalErrorHandler inHandler);
+	[[nodiscard]]
+	std::optional<ServerFatalError> GetFatalError() const;
 
 	// ----------------------------------------
 	// @brief 현재 서버에 연결된 사용자 수를 반환합니다.
@@ -111,9 +139,12 @@ private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
 	void PushToDisconnectTargetSession(RUDPSession& session) override;
 	void StopLoggerThread();
+	void ReportFatalError(const ServerFatalError& error);
+	static void NotifyFatalErrorHandler(const ServerFatalErrorHandler& handler, const ServerFatalError& error) noexcept;
 
 private:
-	void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);
+	[[nodiscard]]
+	bool EnqueueContextResult(const IOContext* contextResult, NetBuffer* buffer, BYTE threadId);
 
 private:
 	[[nodiscard]]
@@ -133,14 +164,30 @@ private:
 	bool InitRIO();
 	[[nodiscard]]
 	bool RunAllThreads();
+	[[nodiscard]]
+	bool CreateWorkerEventHandles();
+	[[nodiscard]]
+	bool InitializeWorkerResources();
+	[[nodiscard]]
+	std::unique_ptr<RetransmissionScheduler> CreateRetransmissionScheduler() const;
+	void StartWorkerThreads();
+	[[nodiscard]]
+	bool StartSessionBroker();
 
 private:
 	void CloseAllSessions() const;
+	void WaitForAllSessionsReleased() const;
+	void SignalWorkerStopEvents() const;
+	void CloseWorkerEventHandles();
+	void CloseRetransmissionSchedulerHandles();
 	void ClearAllSession();
 	void ReleaseAllSession() const;
 
 private:
 	bool isServerStopped{};
+	mutable std::mutex fatalErrorLock;
+	ServerFatalErrorHandler fatalErrorHandler;
+	std::optional<ServerFatalError> fatalError;
 	unsigned short numOfSockets{};
 	PortType sessionBrokerPort{};
 	std::string coreServerIp{};
@@ -170,6 +217,12 @@ private:
 	void RunRetransmissionThread(const std::stop_token& stopToken, ThreadIdType threadId);
 	void ProcessRetransmission(SendPacketInfo* sendPacketInfo, ThreadIdType threadId);
 	void RunSessionReleaseThread(const std::stop_token& stopToken);
+	[[nodiscard]]
+	std::vector<SessionIdType> TakeReleaseSessionIds();
+	[[nodiscard]]
+	bool TryFinalizeSessionRelease(SessionIdType sessionId, unsigned long long now);
+	void LogSessionReleaseStall(RUDPSession& session, SessionIdType sessionId, unsigned long long now);
+	void RequeueReleaseSessionIds(const std::vector<SessionIdType>& sessionIds);
 	void RunHeartbeatThread(const std::stop_token& stopToken) const;
 
 private:
@@ -204,8 +257,12 @@ private:
 
 private:
 	[[nodiscard]]
-	IOContext* GetIOCompletedContext(const RIORESULT& rioResult);
 	void OnRecvPacket(BYTE threadId);
+	void ProcessRecvIOCompletedContext(RecvIOCompletedContext* context);
+	[[nodiscard]]
+	bool TryDispatchRecvPacket(RecvIOCompletedContext* context);
+	void CompleteRecvIOCompletedContext(RecvIOCompletedContext* context, bool processingStarted);
+	void SignalRecvLogicThread(BYTE threadId);
 
 private:
 	// Dependencies below retain references to this delegate, so it must outlive them.

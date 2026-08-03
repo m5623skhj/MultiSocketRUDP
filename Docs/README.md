@@ -16,6 +16,7 @@
 | 서버 구조 이해 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) |
 | 패킷 흐름 추적 | [패킷 처리 파이프라인](Server/PacketProcessing.md) |
 | 스레드·동시성 검토 | [스레드 모델 허브](Server/ThreadModel.md) |
+| 치명 오류·프로세스 재시작 연동 | [치명 오류 통지와 프로세스 재시작](Server/FatalErrorHandling.md) |
 | 테스트 선택·실행 | [테스트 허브](Testing.md) |
 | 장애 조사 | [문제 해결](Troubleshooting.md) |
 | 성능 조정 | [성능 튜닝](PerformanceTuning.md) |

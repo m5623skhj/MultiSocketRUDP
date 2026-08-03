@@ -32,7 +32,6 @@ public:
 	virtual void SetSessionId(RUDPSession& session, SessionIdType sessionId) = 0;
 	virtual void SetThreadId(RUDPSession& session, ThreadIdType threadId) = 0;
 
-	virtual void CloseSocket(RUDPSession& session) = 0;
 	[[nodiscard]]
 	virtual SOCKET GetSocket(const RUDPSession& session) = 0;
 	[[nodiscard]]
@@ -43,7 +42,6 @@ public:
 	virtual std::shared_ptr<IOContext> GetRecvBufferContext(const RUDPSession& session) = 0;
 	[[nodiscard]]
 	virtual RecvBuffer& GetRecvBuffer(RUDPSession& session) = 0;
-	virtual void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) = 0;
 	[[nodiscard]]
 	virtual RIO_RQ GetRecvRIORQ(const RUDPSession& session) = 0;
 

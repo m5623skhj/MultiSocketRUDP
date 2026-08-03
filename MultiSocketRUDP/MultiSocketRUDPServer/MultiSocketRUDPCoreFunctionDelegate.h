@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include "../Common/etc/CoreType.h"
+#include "NetServerSerializeBuffer.h"
 
 enum class CONNECT_RESULT_CODE : unsigned char;
 struct IOContext;
@@ -47,7 +48,8 @@ private:
     }
 
 private:
-    static void EnqueueContextResult(const IOContext* contextResult, BYTE threadId);
+    [[nodiscard]]
+    static bool EnqueueContextResult(const IOContext* contextResult, NetBuffer* buffer, BYTE threadId);
 	static RUDPSession* AcquireSession();
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
     static void DisconnectSession(SessionIdType sessionId);

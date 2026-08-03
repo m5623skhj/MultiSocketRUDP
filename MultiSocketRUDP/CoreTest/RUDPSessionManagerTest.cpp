@@ -199,7 +199,7 @@ TEST_F(RUDPSessionManagerTest, ReleasingSessionReturnsToPoolAndIsReinitializedFo
 }
 
 // ------------------------------------------------------------
-// 전체 종료와 정리가 모든 세션을 방문하고 관리자 상태와 보유 세션을 초기화하는지 확인합니다.
+// 전체 종료는 활성 세션만 release 경로로 보내며, 최종 정리가 관리자 상태를 초기화하는지 확인합니다.
 // ------------------------------------------------------------
 TEST_F(RUDPSessionManagerTest, CloseAndClearVisitEverySessionAndResetManagerState)
 {
@@ -210,14 +210,30 @@ TEST_F(RUDPSessionManagerTest, CloseAndClearVisitEverySessionAndResetManagerStat
 	manager.IncrementConnectedCount();
 
 	manager.CloseAllSessions();
-	EXPECT_EQ(mockDelegate.closeSocketCount, 3);
-	EXPECT_EQ(manager.GetNowSessionCount(), 0);
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
 
 	manager.ClearAllSessions();
 	EXPECT_EQ(mockDelegate.recvContextResetCount, 3);
 	EXPECT_EQ(ManagerTestSession::destroyedCount.load(), 3);
 	EXPECT_FALSE(manager.IsInitialized());
 	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
+}
+
+TEST_F(RUDPSessionManagerTest, CloseAllSessionsRoutesReservedSessionsToAbortPath)
+{
+	MockSessionDelegate mockDelegate;
+	RUDPSessionManager manager{ 1, core, mockDelegate };
+	ASSERT_TRUE(manager.Initialize(1, [this](MultiSocketRUDPCore&) { return new ManagerTestSession(core); }));
+	RUDPSession* reserved = manager.AcquireSession();
+	ASSERT_NE(reserved, nullptr);
+	RUDPSessionBehaviorAccess::SetReserved(*reserved);
+	manager.IncrementConnectedCount();
+
+	manager.CloseAllSessions();
+
+	EXPECT_EQ(mockDelegate.abortReservedCount, 1);
+	EXPECT_TRUE(reserved->IsReserved());
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
 }
 
 // ------------------------------------------------------------

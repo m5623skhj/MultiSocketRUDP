@@ -64,6 +64,7 @@ GitHub에서는 이 문서와 허브 문서의 표준 Markdown 링크를 따라�
 |---|---|---|
 | 콘텐츠 서버 개발자 | [GettingStarted](GettingStarted.md) → [ContentServerGuide](ContentServerGuide.md) | [RUDPSession](Server/RUDPSession.md), [PlayerManager](ContentServer/PlayerManager.md) |
 | 코어 서버 개발자 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) → [ThreadModel](Server/ThreadModel.md) | [RUDPIOHandler](Server/RUDPIOHandler.md), [RIOManager](Server/RIOManager.md), [SessionComponents](Server/SessionComponents.md) |
+| 서버 운영·장애 대응자 | [Troubleshooting](Troubleshooting.md) → [치명 오류 통지와 프로세스 재시작](Server/FatalErrorHandling.md) | [WorkerThreads](Server/Threading/WorkerThreads.md), [LifecycleAndSynchronization](Server/Threading/LifecycleAndSynchronization.md) |
 | 클라이언트 개발자 | [GettingStarted](GettingStarted.md) → [RUDPClientCore](Client/RUDPClientCore.md) | [ServerAliveChecker](Client/ServerAliveChecker.md), [FlowController](Common/FlowController.md) |
 | 프로토콜·보안 검토자 | [PacketFormat](Common/PacketFormat.md) → [CryptoSystem](Common/CryptoSystem.md) | [PacketCryptoHelper](Common/PacketCryptoHelper.md), [TLSHelper](Common/TLSHelper.md), [서버 패킷 포맷](Server/PacketFormat.md) |
 | 테스트 작성자 | [테스트 허브](Testing.md) | [유닛 테스트](Testing/UnitTests.md), [통합 테스트](Testing/IntegrationTests.md), [CI](Testing/CI.md) |
@@ -81,6 +82,7 @@ GitHub에서는 이 문서와 허브 문서의 표준 Markdown 링크를 따라�
 | ACK 또는 재전송이 이상하다 | [SendPacketInfo](Server/SendPacketInfo.md), [RetransmissionTimeoutEstimator](Server/RetransmissionTimeoutEstimator.md) |
 | 암복호화가 C++/C#에서 다르다 | [CryptoSystem](Common/CryptoSystem.md), [IntegrationTests](Testing/IntegrationTests.md) |
 | 테스트가 CI에서만 실패한다 | [Testing CI](Testing/CI.md), [IntegrationTests](Testing/IntegrationTests.md) |
+| worker가 종료됐거나 서버 재시작 로그가 발생했다 | [치명 오류 통지와 프로세스 재시작](Server/FatalErrorHandling.md), [WorkerThreads](Server/Threading/WorkerThreads.md) |
 | 옵션 값을 조정하고 싶다 | [PerformanceTuning](PerformanceTuning.md), 해당 컴포넌트의 옵션 섹션 |
 
 ---
