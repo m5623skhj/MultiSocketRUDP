@@ -10,4 +10,4 @@ The JSON file keeps the complete official history. Charts render the latest 10 `
 
 ![RTT loss 10%](./rtt-loss-10.svg)
 
-Last updated by `cb43718ce26c137b352541376fcae7fb6111ca4a` at 2026-08-03T07:27:01.0305755+00:00.
+Last updated by `03293c8f5918ecf5ff439340d1fb40464d2895f4` at 2026-08-03T10:24:05.601426+00:00.
