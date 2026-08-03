@@ -45,6 +45,30 @@ namespace
 	}
 }
 
+void MultiSocketRUDPCore::RecvIOCompletedQueue::Enqueue(RecvIOCompletedContext* const inContext)
+{
+	std::scoped_lock lock(queueLock);
+	contexts.push(inContext);
+}
+
+bool MultiSocketRUDPCore::RecvIOCompletedQueue::Dequeue(RecvIOCompletedContext** const outContext)
+{
+	if (outContext == nullptr)
+	{
+		return false;
+	}
+
+	std::scoped_lock lock(queueLock);
+	if (contexts.empty())
+	{
+		return false;
+	}
+
+	*outContext = contexts.front();
+	contexts.pop();
+	return true;
+}
+
 MultiSocketRUDPCore::MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName
 	, std::wstring&& inSessionBrokerCertSubjectName)
 	: MultiSocketRUDPCore(TLSHelper::ServerCertificateConfig::FromStore(inSessionBrokerCertStoreName, inSessionBrokerCertSubjectName))
@@ -376,7 +400,7 @@ void MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, c
 	}
 
 	recvIOContext->InitContext(contextResult->session, contextResult->clientAddrBuffer);
-	recvIOCompletedContexts[threadId].Enqueue(recvIOContext);
+	recvIOCompletedContexts[threadId]->Enqueue(recvIOContext);
 	ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr);
 }
 
@@ -450,7 +474,7 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	Ticker::GetInstance().Start(timerTickMs);
 	for (unsigned char id = 0; id < numOfWorkerThread; ++id)
 	{
-		recvIOCompletedContexts.emplace_back();
+		recvIOCompletedContexts.emplace_back(std::make_unique<RecvIOCompletedQueue>());
 
 		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
 
@@ -634,10 +658,14 @@ IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult
 
 void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 {
-	while (recvIOCompletedContexts[threadId].GetRestSize() > 0)
+	while (true)
 	{
 		RecvIOCompletedContext* context = nullptr;
-		if (recvIOCompletedContexts[threadId].Dequeue(&context) == false || context == nullptr)
+		if (not recvIOCompletedContexts[threadId]->Dequeue(&context))
+		{
+			break;
+		}
+		if (context == nullptr)
 		{
 			continue;
 		}
