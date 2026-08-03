@@ -43,6 +43,17 @@ namespace
 
 		return sock;
 	}
+
+	void CloseHandleIfValid(HANDLE& handle)
+	{
+		if (handle == NULL)
+		{
+			return;
+		}
+
+		CloseHandle(handle);
+		handle = NULL;
+	}
 }
 
 void MultiSocketRUDPCore::RecvIOCompletedQueue::Enqueue(RecvIOCompletedContext* const inContext)
@@ -141,81 +152,15 @@ void MultiSocketRUDPCore::StopServer()
 {
 	if (sessionBroker != nullptr)
 	{
-		 sessionBroker->Stop();
+		sessionBroker->Stop();
 	}
+
 	CloseAllSessions();
-
-	if (recvLogicThreadEventStopHandle != NULL)
-	{
-		SetEvent(recvLogicThreadEventStopHandle);
-	}
-
-	if (sessionReleaseStopEventHandle != NULL)
-	{
-		SetEvent(sessionReleaseStopEventHandle);
-	}
-
-	if (retransmissionStopEventHandle != NULL)
-	{
-		SetEvent(retransmissionStopEventHandle);
-	}
-
+	WaitForAllSessionsReleased();
+	SignalWorkerStopEvents();
 	StopAllThreads();
-
-	for (auto const recvLogicThreadEventHandle : recvLogicThreadEventHandles)
-	{
-		if (recvLogicThreadEventHandle == NULL)
-		{
-			continue;
-		}
-
-		CloseHandle(recvLogicThreadEventHandle);
-	}
-	recvLogicThreadEventHandles.clear();
-
-	if (recvLogicThreadEventStopHandle != NULL)
-	{
-		CloseHandle(recvLogicThreadEventStopHandle);
-		recvLogicThreadEventStopHandle = NULL;
-	}
-
-	if (sessionReleaseEventHandle != NULL)
-	{
-		CloseHandle(sessionReleaseEventHandle);
-		sessionReleaseEventHandle = NULL;
-	}
-
-	if (sessionReleaseStopEventHandle != NULL)
-	{
-		CloseHandle(sessionReleaseStopEventHandle);
-		sessionReleaseStopEventHandle = NULL;
-	}
-
-	if (retransmissionStopEventHandle != NULL)
-	{
-		CloseHandle(retransmissionStopEventHandle);
-		retransmissionStopEventHandle = NULL;
-	}
-
-	for (const auto& scheduler : retransmissionSchedulers)
-	{
-		if (scheduler == nullptr)
-		{
-			continue;
-		}
-
-		if (scheduler->timerHandle != NULL)
-		{
-			CloseHandle(scheduler->timerHandle);
-			scheduler->timerHandle = NULL;
-		}
-
-		if (scheduler->wakeEventHandle != NULL)
-		{
-			CloseHandle(scheduler->wakeEventHandle);
-			scheduler->wakeEventHandle = NULL;
-		}
-	}
+	CloseWorkerEventHandles();
+	CloseRetransmissionSchedulerHandles();
 	retransmissionSchedulers.clear();
 
 	Ticker::GetInstance().Stop();
@@ -226,6 +171,73 @@ void MultiSocketRUDPCore::StopServer()
 
 	WSACleanup();
 	isServerStopped = true;
+}
+
+void MultiSocketRUDPCore::SetFatalErrorHandler(ServerFatalErrorHandler inHandler)
+{
+	ServerFatalErrorHandler handlerToNotify;
+	std::optional<ServerFatalError> errorToNotify;
+	{
+		std::scoped_lock lock(fatalErrorLock);
+		fatalErrorHandler = std::move(inHandler);
+		if (fatalErrorHandler != nullptr && fatalError.has_value())
+		{
+			handlerToNotify = fatalErrorHandler;
+			errorToNotify = fatalError;
+		}
+	}
+
+	if (handlerToNotify != nullptr)
+	{
+		NotifyFatalErrorHandler(handlerToNotify, *errorToNotify);
+	}
+}
+
+std::optional<ServerFatalError> MultiSocketRUDPCore::GetFatalError() const
+{
+	std::scoped_lock lock(fatalErrorLock);
+	return fatalError;
+}
+
+void MultiSocketRUDPCore::ReportFatalError(const ServerFatalError& error)
+{
+	ServerFatalErrorHandler handlerToNotify;
+	{
+		std::scoped_lock lock(fatalErrorLock);
+		if (fatalError.has_value())
+		{
+			return;
+		}
+
+		fatalError = error;
+		handlerToNotify = fatalErrorHandler;
+	}
+
+	if (handlerToNotify == nullptr)
+	{
+		LOG_ERROR("Fatal server error occurred without a registered upper-layer handler");
+		return;
+	}
+
+	NotifyFatalErrorHandler(handlerToNotify, error);
+}
+
+void MultiSocketRUDPCore::NotifyFatalErrorHandler(
+	const ServerFatalErrorHandler& handler,
+	const ServerFatalError& error) noexcept
+{
+	try
+	{
+		handler(error);
+	}
+	catch (const std::exception& exception)
+	{
+		LOG_ERROR(std::format("Fatal server error handler threw an exception: {}", exception.what()));
+	}
+	catch (...)
+	{
+		LOG_ERROR("Fatal server error handler threw an unknown exception");
+	}
 }
 
 bool MultiSocketRUDPCore::IsServerStopped() const
@@ -383,25 +395,44 @@ void MultiSocketRUDPCore::StopLoggerThread()
 	Logger::GetInstance().StopLoggerThread();
 }
 
-void MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, const BYTE threadId)
+bool MultiSocketRUDPCore::EnqueueContextResult(const IOContext* contextResult, NetBuffer* buffer, const BYTE threadId)
 {
-	if (contextResult == nullptr)
+	if (contextResult == nullptr || contextResult->session == nullptr ||
+		contextResult->ownerRecvBuffer == nullptr || buffer == nullptr)
 	{
-		LOG_ERROR("ContextResult is nullptr in EnqueueContextResult()");
-		return;
+		LOG_ERROR("Invalid context or buffer in EnqueueContextResult()");
+		return false;
 	}
 
 	const auto recvIOContext = recvIOCompletedContextPool.Alloc();
 	if (recvIOContext == nullptr)
 	{
 		LOG_ERROR("recvIOContext is nullptr in EnqueueContextResult()");
-		DisconnectSession(contextResult->ownerSessionId);
+		return false;
+	}
+
+	contextResult->ownerRecvBuffer->BeginRecvLogic();
+	recvIOContext->InitContext(contextResult->session,
+		contextResult->ownerRecvBuffer,
+		contextResult->ownerSessionGeneration,
+		buffer,
+		contextResult->clientAddrBuffer);
+	recvIOCompletedContexts[threadId]->Enqueue(recvIOContext);
+	SignalRecvLogicThread(threadId);
+
+	return true;
+}
+
+void MultiSocketRUDPCore::SignalRecvLogicThread(const BYTE threadId)
+{
+	if (SetEvent(recvLogicThreadEventHandles[threadId]))
+	{
 		return;
 	}
 
-	recvIOContext->InitContext(contextResult->session, contextResult->clientAddrBuffer);
-	recvIOCompletedContexts[threadId]->Enqueue(recvIOContext);
-	ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr);
+	const unsigned long errorCode = GetLastError();
+	LOG_ERROR(std::format("SetEvent failed in EnqueueContextResult() with error {}", errorCode));
+	ReportFatalError({ SERVER_FATAL_ERROR_CODE::RECV_LOGIC_EVENT_SIGNAL_FAILED, threadId, errorCode });
 }
 
 bool MultiSocketRUDPCore::InitNetwork() const
@@ -454,6 +485,17 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		return false;
 	}
 
+	if (not CreateWorkerEventHandles() || not InitializeWorkerResources())
+	{
+		return false;
+	}
+
+	StartWorkerThreads();
+	return StartSessionBroker();
+}
+
+bool MultiSocketRUDPCore::CreateWorkerEventHandles()
+{
 	retransmissionSchedulers.reserve(numOfWorkerThread);
 
 	recvLogicThreadEventStopHandle = CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -469,6 +511,11 @@ bool MultiSocketRUDPCore::RunAllThreads()
 		return false;
 	}
 
+	return true;
+}
+
+bool MultiSocketRUDPCore::InitializeWorkerResources()
+{
 	recvIOCompletedContexts.reserve(numOfWorkerThread);
 
 	Ticker::GetInstance().Start(timerTickMs);
@@ -476,41 +523,60 @@ bool MultiSocketRUDPCore::RunAllThreads()
 	{
 		recvIOCompletedContexts.emplace_back(std::make_unique<RecvIOCompletedQueue>());
 
-		recvLogicThreadEventHandles.emplace_back(CreateSemaphore(nullptr, 0, LONG_MAX, nullptr));
-
-		auto scheduler = std::make_unique<RetransmissionScheduler>();
-		scheduler->timerHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-		if (scheduler->timerHandle == nullptr)
+		const HANDLE recvLogicEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (recvLogicEventHandle == NULL)
 		{
-			scheduler->timerHandle = CreateWaitableTimerExW(nullptr, nullptr, 0, TIMER_ALL_ACCESS);
+			LOG_ERROR(std::format("Recv logic event handle creation failed. error is {}", GetLastError()));
+			return false;
 		}
-		scheduler->wakeEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		if (scheduler->timerHandle == nullptr || scheduler->wakeEventHandle == nullptr)
+		recvLogicThreadEventHandles.emplace_back(recvLogicEventHandle);
+
+		auto scheduler = CreateRetransmissionScheduler();
+		if (scheduler == nullptr)
 		{
-			LOG_ERROR("Retransmission scheduler handle creation failed");
-			if (scheduler->timerHandle != NULL)
-			{
-				CloseHandle(scheduler->timerHandle);
-				scheduler->timerHandle = NULL;
-			}
-			if (scheduler->wakeEventHandle != NULL)
-			{
-				CloseHandle(scheduler->wakeEventHandle);
-				scheduler->wakeEventHandle = NULL;
-			}
 			return false;
 		}
 
 		retransmissionSchedulers.push_back(std::move(scheduler));
 	}
 
+	return true;
+}
+
+std::unique_ptr<RetransmissionScheduler> MultiSocketRUDPCore::CreateRetransmissionScheduler() const
+{
+	auto scheduler = std::make_unique<RetransmissionScheduler>();
+	scheduler->timerHandle = CreateWaitableTimerExW(
+		nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+	if (scheduler->timerHandle == nullptr)
+	{
+		scheduler->timerHandle = CreateWaitableTimerExW(nullptr, nullptr, 0, TIMER_ALL_ACCESS);
+	}
+
+	scheduler->wakeEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (scheduler->timerHandle != nullptr && scheduler->wakeEventHandle != nullptr)
+	{
+		return scheduler;
+	}
+
+	LOG_ERROR("Retransmission scheduler handle creation failed");
+	CloseHandleIfValid(scheduler->timerHandle);
+	CloseHandleIfValid(scheduler->wakeEventHandle);
+	return nullptr;
+}
+
+void MultiSocketRUDPCore::StartWorkerThreads()
+{
 	threadManager->StartThreads(THREAD_GROUP::SESSION_RELEASE_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunSessionReleaseThread(stopToken); }, 1);
 	threadManager->StartThreads(THREAD_GROUP::HEARTBEAT_THREAD, [this](const std::stop_token& stopToken, unsigned char _) { this->RunHeartbeatThread(stopToken); }, 1);
 
 	threadManager->StartThreads(THREAD_GROUP::IO_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunIOWorkerThread(stopToken, id); }, numOfWorkerThread);
 	threadManager->StartThreads(THREAD_GROUP::RECV_LOGIC_WORKER_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRecvLogicWorkerThread(stopToken, id); }, numOfWorkerThread);
 	threadManager->StartThreads(THREAD_GROUP::RETRANSMISSION_THREAD, [this](const std::stop_token& stopToken, const unsigned char id) { this->RunRetransmissionThread(stopToken, id); }, numOfWorkerThread);
+}
 
+bool MultiSocketRUDPCore::StartSessionBroker()
+{
 	Sleep(1000);
 	sessionBroker = std::make_unique<RUDPSessionBroker>(*this, sessionDelegate, sessionBrokerCertificateConfig);
 	if (not sessionBroker->Start(sessionBrokerPort, coreServerIp))
@@ -530,6 +596,75 @@ void MultiSocketRUDPCore::CloseAllSessions() const
 	}
 
 	sessionManager->CloseAllSessions();
+}
+
+void MultiSocketRUDPCore::WaitForAllSessionsReleased() const
+{
+	if (sessionManager == nullptr || not sessionManager->IsInitialized())
+	{
+		return;
+	}
+
+	unsigned long long lastWarningTime = GetTickCount64();
+	while (sessionManager->GetUnusedSessionCount() < sessionManager->GetMaxSessions())
+	{
+		Sleep(1);
+		const auto now = GetTickCount64();
+		if (now - lastWarningTime < 10000)
+		{
+			continue;
+		}
+
+		LOG_ERROR(std::format(
+			"StopServer is waiting for session I/O drain. released={}/{}",
+			sessionManager->GetUnusedSessionCount(),
+			sessionManager->GetMaxSessions()));
+		lastWarningTime = now;
+	}
+}
+
+void MultiSocketRUDPCore::SignalWorkerStopEvents() const
+{
+	if (recvLogicThreadEventStopHandle != NULL)
+	{
+		SetEvent(recvLogicThreadEventStopHandle);
+	}
+	if (sessionReleaseStopEventHandle != NULL)
+	{
+		SetEvent(sessionReleaseStopEventHandle);
+	}
+	if (retransmissionStopEventHandle != NULL)
+	{
+		SetEvent(retransmissionStopEventHandle);
+	}
+}
+
+void MultiSocketRUDPCore::CloseWorkerEventHandles()
+{
+	for (auto& recvLogicThreadEventHandle : recvLogicThreadEventHandles)
+	{
+		CloseHandleIfValid(recvLogicThreadEventHandle);
+	}
+	recvLogicThreadEventHandles.clear();
+
+	CloseHandleIfValid(recvLogicThreadEventStopHandle);
+	CloseHandleIfValid(sessionReleaseEventHandle);
+	CloseHandleIfValid(sessionReleaseStopEventHandle);
+	CloseHandleIfValid(retransmissionStopEventHandle);
+}
+
+void MultiSocketRUDPCore::CloseRetransmissionSchedulerHandles()
+{
+	for (const auto& scheduler : retransmissionSchedulers)
+	{
+		if (scheduler == nullptr)
+		{
+			continue;
+		}
+
+		CloseHandleIfValid(scheduler->timerHandle);
+		CloseHandleIfValid(scheduler->wakeEventHandle);
+	}
 }
 
 void MultiSocketRUDPCore::ClearAllSession()
@@ -569,6 +704,12 @@ RUDPSession* MultiSocketRUDPCore::GetReleasingSession(const SessionIdType sessio
 
 CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& session) const
 {
+	session.sessionReservedTime = GetTickCount64();
+	session.stateMachine.SetReserved();
+	auto releaseOnFailure = Util::MakeScopeExit([&session]() {
+		session.AbortReservedSession();
+	});
+
 	session.socketContext.SetSocket(CreateRUDPSocket());
 	const SOCKET sock = session.GetSocket();
 	if (sock == INVALID_SOCKET)
@@ -576,13 +717,6 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		LOG_ERROR(std::format("CreateRUDPSocket failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
-
-	auto raii = Util::MakeScopeExit([&session]() {
-		if (session.GetSocket() != INVALID_SOCKET)
-		{
-			session.CloseSocket();
-		}
-	});
 
 	sockaddr_in serverAddr;
 	socklen_t len = sizeof(serverAddr);
@@ -600,9 +734,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
 	}
-	session.stateMachine.SetReserved();
-
-	raii.Dismiss();
+	releaseOnFailure.Dismiss();
 	return CONNECT_RESULT_CODE::SUCCESS;
 }
 
@@ -614,46 +746,6 @@ void MultiSocketRUDPCore::StopAllThreads() const
 	}
 
 	threadManager->StopAllThreads();
-}
-
-IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult)
-{
-	const auto context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
-	if (context == nullptr)
-	{
-		return nullptr;
-	}
-
-	context->session = sessionManager->GetUsingSession(context->ownerSessionId);
-	if (context->session == nullptr)
-	{
-		return nullptr;
-	}
-
-	if (rioResult.Status != 0)
-	{
-		DISCONNECT_REASON reason = rioResult.Status == WSAECONNRESET ?
-			DISCONNECT_REASON::NORMAL : DISCONNECT_REASON::BY_ERROR;
-
-		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
-		{
-			context->session->GetSendContext().GetIOMode().exchange(IO_MODE::IO_NONE_SENDING);
-		}
-
-		context->session->DoDisconnect(reason);
-		if (reason == DISCONNECT_REASON::BY_ERROR)
-		{
-			LOG_ERROR(std::format("RIO operation failed with error code {}", rioResult.Status));
-		}
-
-		if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
-		{
-			contextPool.Free(context);
-		}
-		return nullptr;
-	}
-
-	return context;
 }
 
 void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
@@ -670,36 +762,54 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 			continue;
 		}
 
-		NetBuffer* buffer = nullptr;
-		do
-		{
-			if (context->session == nullptr)
-			{
-				break;
-			}
-
-			context->session->nowInProcessingRecvPacket.store(true, std::memory_order_seq_cst);
-			if (context->session->rioContext.GetRecvBuffer().recvBufferList.Dequeue(&buffer) == false || buffer == nullptr)
-			{
-				break;
-			}
-			packetProcessor->OnRecvPacket(*context->session
-				, *buffer
-				, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer)
-				, sizeof(context->clientAddrBuffer)));
-		} while (false);
-
-		if (buffer != nullptr)
-		{
-			NetBuffer::Free(buffer);
-		}
-
-		if (context->session != nullptr)
-		{
-			context->session->nowInProcessingRecvPacket.store(false, std::memory_order_seq_cst);
-		}
-		recvIOCompletedContextPool.Free(context);
+		ProcessRecvIOCompletedContext(context);
 	}
+}
+
+void MultiSocketRUDPCore::ProcessRecvIOCompletedContext(RecvIOCompletedContext* const context)
+{
+	const bool processingStarted = TryDispatchRecvPacket(context);
+	CompleteRecvIOCompletedContext(context, processingStarted);
+}
+
+bool MultiSocketRUDPCore::TryDispatchRecvPacket(RecvIOCompletedContext* const context)
+{
+	if (context->session == nullptr || context->buffer == nullptr || context->ownerRecvBuffer == nullptr)
+	{
+		return false;
+	}
+	if (context->session->GetSessionGeneration() != context->ownerSessionGeneration || context->session->IsReleasing())
+	{
+		return false;
+	}
+
+	context->session->nowInProcessingRecvPacket.store(true, std::memory_order_release);
+	packetProcessor->OnRecvPacket(*context->session
+		, *context->buffer
+		, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer)
+		, sizeof(context->clientAddrBuffer)));
+	return true;
+}
+
+void MultiSocketRUDPCore::CompleteRecvIOCompletedContext(
+	RecvIOCompletedContext* const context,
+	const bool processingStarted)
+{
+	if (context->buffer != nullptr)
+	{
+		NetBuffer::Free(context->buffer);
+	}
+
+	if (processingStarted)
+	{
+		context->session->nowInProcessingRecvPacket.store(false, std::memory_order_release);
+	}
+
+	if (context->ownerRecvBuffer != nullptr)
+	{
+		context->ownerRecvBuffer->CompleteRecvLogic();
+	}
+	recvIOCompletedContextPool.Free(context);
 }
 
 

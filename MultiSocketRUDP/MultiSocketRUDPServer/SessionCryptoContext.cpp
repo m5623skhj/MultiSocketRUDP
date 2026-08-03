@@ -8,20 +8,10 @@ SessionCryptoContext::~SessionCryptoContext()
 
 void SessionCryptoContext::Initialize()
 {
-	ZeroMemory(sessionKey, SESSION_KEY_SIZE);
-	ZeroMemory(sessionSalt, SESSION_SALT_SIZE);
+	Release();
 
-	if (keyObjectBuffer != nullptr)
-	{
-		delete[] keyObjectBuffer;
-		keyObjectBuffer = nullptr;
-	}
-
-	if (sessionKeyHandle != nullptr)
-	{
-		std::ignore = BCryptDestroyKey(sessionKeyHandle);
-		sessionKeyHandle = nullptr;
-	}
+	SecureZeroMemory(sessionKey, sizeof(sessionKey));
+	SecureZeroMemory(sessionSalt, sizeof(sessionSalt));
 }
 
 const unsigned char* SessionCryptoContext::GetSessionKey() const

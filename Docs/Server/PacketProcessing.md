@@ -34,7 +34,7 @@
 │    ├─ BytesTransferred=0 → 빈 데이터그램 처리 후 DoRecv() 재등록                     │
 │    ├─ Status=WSAECONNRESET → DoDisconnect(DISCONNECT_REASON::NORMAL)                  │
 │    ├─ 그 외 Status≠0      → RIO 에러 → DoDisconnect(DISCONNECT_REASON::BY_ERROR)       │
-│    └─ 정상 완료          → IOCompleted(context, transferred, threadId)       │
+│    └─ 모든 완료          → IOCompleted(context, transferred, threadId, status)│
 │                                   │                                          │
 │                          ┌────────┴────────┐                                │
 │                          │ ioType?         │                                 │
@@ -42,16 +42,16 @@
 │                          ▼                 ▼                                 │
 │              RecvIOCompleted()     SendIOCompleted()                         │
 │              NetBuffer 복사        IO_NONE_SENDING 복원                      │
-│              Semaphore.Release(1)  DoSend() 재호출                           │
+│              AutoResetEvent.Set()  DoSend() 재호출                           │
 │              DoRecv() 재등록                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
                           │
-                     Semaphore
+                   AutoResetEvent
                           │
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [RecvLogic Worker Thread id=N]                                               │
 │                                                                              │
-│  WaitForMultipleObjects(semaphore, stopEvent)                                │
+│  WaitForMultipleObjects(recvEvent, stopEvent)                                │
 │    │                                                                         │
 │    └─ OnRecvPacket(threadId)                                                 │
 │         │                                                                    │
@@ -82,7 +82,7 @@ ULONG numOfResults = rioManager->DequeueCompletions(threadId, rioResults, 1024);
 
 ```cpp
 struct RIORESULT {
-    LONG    Status;               // 0 = 성공, 양수 = NTSTATUS 에러
+    LONG    Status;               // 0 = 성공, 그 외 = 작업별 오류 코드
     ULONG   BytesTransferred;     // 전송된 바이트 수
     ULONGLONG SocketContext;      // RIOCreateRequestQueue 3번째 파라미터
     ULONGLONG RequestContext;     // RIOReceiveEx/RIOSendEx 마지막 파라미터
@@ -94,9 +94,9 @@ struct RIORESULT {
 
 | Status 예시 | 의미 |
 |------------|------|
-| `0xC0000120` (STATUS_CANCELLED) | 소켓이 닫힘 (`CloseAllSessions()` 후 발생) |
-| `0xC000014B` (STATUS_PIPE_BROKEN) | 원격 측에서 강제 종료 |
-| `0xC0000005` (STATUS_ACCESS_VIOLATION) | 버퍼 접근 오류 (RIO 버퍼 미등록 등) |
+| `WSA_OPERATION_ABORTED` (995) | 해제 중 소켓 close로 취소된 작업. 컨텍스트와 카운터만 정리 |
+| `WSAECONNRESET` (10054) | 원격 측 연결 재설정. 정상 연결 종료로 전환 |
+| 그 외 | 컨텍스트와 카운터를 정리한 뒤 `BY_ERROR`로 연결 종료 |
 
 ---
 
@@ -124,16 +124,15 @@ bool RUDPIOHandler::RecvIOCompleted(IOContext* context, ULONG transferred, BYTE 
     );
     recvPacketBuffer->m_iWrite = static_cast<WORD>(transferred);
 
-    // ③ 세션의 수신 버퍼 리스트에 삽입
-    sessionDelegate.EnqueueToRecvBufferList(session, recvPacketBuffer);
-
-    // ④ RecvLogic Worker에게 알림
-    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(context, threadId);
+    // ③ NetBuffer 소유권과 generation을 완료 컨텍스트로 함께 전달
+    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(
+        context, recvPacketBuffer, threadId);
+    // → pendingRecvLogic 증가
     // → recvIOCompletedContexts[threadId].Enqueue(completedContext)
-    // → ReleaseSemaphore(recvLogicThreadEventHandles[threadId], 1, nullptr)
+    // → SetEvent(recvLogicThreadEventHandles[threadId])
 
-    // ⑤ 완료 slot을 free queue로 돌려놓고 다음 수신 등록
-    recvBuffer.ReleaseRecvContext(context);
+    // ④ 완료 slot과 outstandingRecvIo를 정리하고 다음 수신 등록
+    ReleaseRecvContext(context);
     return DoRecv(session);
 }
 ```
@@ -146,24 +145,12 @@ bool RUDPIOHandler::RecvIOCompleted(IOContext* context, ULONG transferred, BYTE 
 
 ## 4. 단계 3: RecvLogic Worker 깨우기
 
-`ReleaseSemaphore(handle, 1, nullptr)` 호출로 Semaphore 카운트가 1 증가한다.
+`SetEvent(handle)`로 thread별 AutoResetEvent를 signal한다.
 
-```
-Semaphore 카운트:
-  초기: 0
-  RecvIOCompleted 호출: +1
-  Logic Worker WaitForSingleObject 해소: -1
-```
-
-**Semaphore vs AutoResetEvent 선택 이유:**
-
-Semaphore는 Release 횟수를 누적한다.  
-IO Worker가 빠르게 여러 패킷을 처리하면, Logic Worker가 대기 중에도  
-`Release(1)`이 여러 번 쌓일 수 있다. Logic Worker는 재시작 후 남은 카운트만큼  
-즉시 처리한다.
-
-AutoResetEvent는 단 하나의 Signal만 저장하므로 패킷이 여러 개 도착하면  
-일부를 놓칠 수 있다.
+완료 컨텍스트 큐가 처리 대상의 source of truth이며 Logic Worker는 깨어날 때 큐를
+끝까지 drain한다. 따라서 여러 signal이 하나로 합쳐져도 패킷은 유실되지 않는다.
+enqueue 이후 `SetEvent()`를 호출하므로 정상 경로에는 lost wake-up 간극이 없다.
+`SetEvent()` 또는 wait 실패는 폴링으로 숨기지 않고 오류로 기록한다.
 
 ---
 

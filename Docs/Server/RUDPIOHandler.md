@@ -43,9 +43,9 @@ RUDPIOHandler
 - RIO 매니저, 세션 delegate, IOContext 풀, 스레드별 재전송 scheduler를 주입받는다.
 - 재전송 기본 주기와 테스트용 datagram 손실 시뮬레이션 설정도 생성 시점에 고정된다.
 
-#### `bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId) const`
+#### `bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId, LONG status) const`
 - IO Worker에서 호출되는 완료 분기 진입점이다.
-- `context->ioType`에 따라 RECV와 SEND 완료 처리를 분기한다.
+- 요청 당시 generation과 현재 세대를 비교한 뒤 `context->ioType`에 따라 RECV와 SEND 완료 처리를 분기한다. 오류·취소 completion도 이 함수에서 수명 정리를 수행한다.
 
 ### `DoRecv`
 
@@ -101,10 +101,13 @@ bool DoRecv(RUDPSession& session) const override;
 ```cpp
 {
     std::shared_lock lock(sessionDelegate.GetSocketMutex(session));
+    if (session.IsReleasing()) return true;
     if (sessionDelegate.GetSocket(session) == INVALID_SOCKET) return false;
 
     auto& recvBuffer = sessionDelegate.GetRecvBuffer(session);
     while (IOContext* context = recvBuffer.AcquireFreeRecvContext()) {
+        context->ownerSessionGeneration = session.GetSessionGeneration();
+        recvBuffer.BeginRecvIo();
         if (!rioManager.RIOReceiveEx(
                 sessionDelegate.GetRecvRIORQ(session),
                 context, 1,
@@ -112,6 +115,7 @@ bool DoRecv(RUDPSession& session) const override;
                 &context->clientAddrRIOBuffer,
                 nullptr, nullptr, 0,
                 context)) {               // RequestContext는 이 slot의 IOContext
+            recvBuffer.CompleteRecvIo();
             recvBuffer.ReleaseRecvContext(context);
             return false;
         }
@@ -261,7 +265,8 @@ MAX_SEND_BUFFER_SIZE = 32768 bytes
 bool RUDPIOHandler::IOCompleted(
     IOContext* context,
     ULONG bytesTransferred,
-    ThreadIdType threadId) const
+    ThreadIdType threadId,
+    LONG status) const
 ```
 
 `IO Worker Thread`에서 `RIODequeueCompletion` 후 호출된다.
@@ -269,6 +274,36 @@ bool RUDPIOHandler::IOCompleted(
 ```cpp
 {
     if (context == nullptr || context->session == nullptr) return false;
+    RUDPSession* session = context->session;
+
+    const bool currentGeneration =
+        context->ownerSessionId == session->GetSessionId() &&
+        context->ownerSessionGeneration == session->GetSessionGeneration();
+    if (!currentGeneration) {
+        // 현재 세션 상태는 건드리지 않고 원래 작업만 정리
+        if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+            ReleaseRecvContext(context);
+        else if (context->ioType == RIO_OPERATION_TYPE::OP_SEND)
+            contextPool.Free(context);
+        return true;
+    }
+
+    if (status != 0) {
+        // recv slot·outstandingRecvIo 또는 send context·I/O mode를 먼저 정리
+        if (context->ioType == RIO_OPERATION_TYPE::OP_RECV)
+            ReleaseRecvContext(context);
+        else {
+            sessionDelegate.GetSendIOMode(*session).store(IO_MODE::IO_NONE_SENDING);
+            contextPool.Free(context);
+        }
+        if (status == WSA_OPERATION_ABORTED && session->IsReleasing())
+            return true;
+        const auto reason = status == WSAECONNRESET
+            ? DISCONNECT_REASON::NORMAL
+            : DISCONNECT_REASON::BY_ERROR;
+        session->DoDisconnect(reason);
+        return true;
+    }
 
     switch (context->ioType) {
     case RIO_OPERATION_TYPE::OP_RECV:
@@ -296,8 +331,10 @@ bool RUDPIOHandler::IOCompleted(
 ```cpp
 struct IOContext {
     SessionIdType ownerSessionId;
+    uint32_t ownerSessionGeneration;
     RIO_OPERATION_TYPE ioType;
     RUDPSession* session;
+    RecvBuffer* ownerRecvBuffer;
     char* recvDataBuffer;                 // RECV slot의 16KB buffer
     RIO_BUF clientAddrRIOBuffer;
     RIO_BUF localAddrRIOBuffer;
@@ -306,7 +343,7 @@ struct IOContext {
 };
 ```
 
-receive용 `IOContext`는 `RecvBufferSlot`이 `shared_ptr`로 소유한다. 현재 context에는 generation 필드가 없으며 완료 시 `ownerSessionId`만으로 사용 중 세션을 찾는다.
+receive용 `IOContext`는 `RecvBufferSlot`이 `shared_ptr`로 소유한다. receive/send 요청은 RIO 등록 직전에 `ownerSessionGeneration`을 기록하며, 완료 처리는 저장된 session 포인터·ID·generation을 함께 검증한다.
 
 ---
 
@@ -338,12 +375,12 @@ bool RUDPIOHandler::RecvIOCompleted(
     );
     recvBuf->m_iWrite = static_cast<WORD>(bytesTransferred);
 
-    // ③ logic queue에 데이터와 주소 정보를 전달
-    sessionDelegate.EnqueueToRecvBufferList(session, recvBuf);
-    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(context, threadId);
+    // ③ logic queue에 버퍼 소유권, 주소, generation을 함께 전달
+    MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(
+        context, recvBuf, threadId);
 
-    // ④ slot을 free queue로 반환한 뒤 사용 가능한 receive를 다시 등록
-    recvBuffer.ReleaseRecvContext(context);
+    // ④ slot과 outstandingRecvIo를 정리한 뒤 사용 가능한 receive를 다시 등록
+    ReleaseRecvContext(context);
     return DoRecv(session);
 }
 ```

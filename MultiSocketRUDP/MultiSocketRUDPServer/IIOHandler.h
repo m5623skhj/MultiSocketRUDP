@@ -24,7 +24,10 @@ public:
   // @return 성공적으로 완료 처리되었는지 여부.
   // ----------------------------------------
   [[nodiscard]]
-  virtual bool IOCompleted(IOContext* context, const unsigned long transferred, const ThreadIdType threadId) const = 0;
+  virtual bool IOCompleted(IOContext* context,
+    unsigned long transferred,
+    ThreadIdType threadId,
+    long status) const = 0;
   // ----------------------------------------
   // @brief RUDP 세션에 대한 데이터 수신 작업을 시작하는 함수입니다.
   // 해당 세션에 대한 데이터 수신 로직을 정의합니다.

@@ -159,10 +159,16 @@ void RUDPSessionManager::CloseAllSessions()
 			continue;
 		}
 
-		sessionDelegate.CloseSocket(*session);
+		if (session->IsReserved())
+		{
+			sessionDelegate.AbortReservedSession(*session);
+		}
+	
+		if (session->IsConnected())
+		{
+			session->DoDisconnect(DISCONNECT_REASON::NORMAL);
+		}
 	}
-
-	connectedUserCount.store(0);
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "All sessions closed";

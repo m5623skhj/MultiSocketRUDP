@@ -43,7 +43,6 @@ private:
 #pragma region For SessionManager
 	void SetSessionId(RUDPSession& session, SessionIdType sessionId) override;
 	void SetThreadId(RUDPSession& session, ThreadIdType threadId) override;
-	void CloseSocket(RUDPSession& session) override;
 	void RecvContextReset(RUDPSession& session) override;
 	void SendHeartbeatPacket(RUDPSession& session, const unsigned long long now) override;
 	bool CheckReservedSessionTimeout(const RUDPSession& session, unsigned long long now) override;
@@ -68,7 +67,6 @@ private:
 	SendPacketInfo* GetReservedSendPacketInfo(RUDPSession& session) override;
 	SendPacketInfo* TakeReservedSendPacketInfo(RUDPSession& session) override;
 	bool IsNothingToSend(RUDPSession& session) override;
-	void EnqueueToRecvBufferList(RUDPSession& session, NetBuffer* buffer) override;
 	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet(RUDPSession& session) override;
 	size_t GetSendPacketInfoQueueSize(RUDPSession& session) override;
 	char* GetRIOSendBuffer(RUDPSession& session) override;

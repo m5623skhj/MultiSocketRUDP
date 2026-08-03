@@ -232,7 +232,9 @@ unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
 - 세션 매니저 초기화 여부를 반환한다.
 
 #### `void CloseAllSessions()`
-- 모든 활성 세션 소켓을 닫는다.
+- CONNECTED 세션은 `NORMAL`, RESERVED 세션은 `BY_ABORT_RESERVED` 경로로
+  `RELEASING` 상태에 전달한다.
+- 실제 소켓 close와 풀 반환은 release worker의 drain 절차가 수행한다.
 
 #### `void ClearAllSessions()`
 - 세션 객체 메모리를 정리한다.
@@ -329,17 +331,20 @@ unsigned short MultiSocketRUDPCore::GetNowSessionCount() const {
 ```cpp
 // MultiSocketRUDPCore::StopServer에서의 정리 순서:
 
-// ① 모든 세션 소켓 닫기
+// ① 모든 활성 세션을 RELEASING으로 전환
 CloseAllSessions();
 for (auto* session : sessionList) {
-    sessionDelegate.CloseSocket(*session);
-    // → IO Worker의 RIO 작업에 에러 유발 → IOCompleted에서 에러 처리
+    if (session->IsUsingSession()) {
+        session->DoDisconnect(DISCONNECT_REASON::NORMAL);
+    }
 }
 
-// ② 스레드 종료 (join)
+// ② IO/logic/release worker를 유지해 모든 세션 drain 및 pool 반환 대기
+
+// ③ 스레드 종료 (join)
 StopAllThreads();
 
-// ③ 실제 메모리 해제
+// ④ 실제 메모리 해제
 ClearAllSessions();
 {
     unusedSessionIdList.clear();

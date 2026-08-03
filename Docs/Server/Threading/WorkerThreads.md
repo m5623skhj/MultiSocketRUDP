@@ -41,9 +41,10 @@ ACK timeout
 ## IO Worker
 
 - 입력: thread별 RIO completion queue의 `RIORESULT`
-- 처리: context와 세션 유효성 확인 후 `RUDPIOHandler::IOCompleted` 호출
+- 처리: 요청 당시 generation과 세션 유효성을 확인하고, 성공·오류·취소 completion을 모두 `RUDPIOHandler::IOCompleted`로 전달
 - 출력: 수신 context enqueue, 다음 receive 등록, send mode 해제와 후속 send
 - 주의: completion queue가 비어 있으면 polling이 계속된다. 현재 빌드는 compile-time 설정에 따라 항상 `Sleep(0)`을 사용하므로 `WORKER_THREAD_ONE_FRAME_MS`는 반영되지 않는다.
+- 치명 오류: `RIODequeueCompletion()`이 `RIO_CORRUPT_CQ`를 반환하면 해당 worker는 오류를 상위 레이어에 전달하고 종료한다. CQ 완료를 더 이상 신뢰할 수 없으므로 프로세스 재시작이 필요하다.
 
 [상세 코드 해설](ThreadModelReference.md#2-io-worker-thread-상세)
 
@@ -52,7 +53,8 @@ ACK timeout
 - 입력: IO Worker가 enqueue한 수신 완료 context와 worker별 semaphore 신호
 - 처리: 세션 처리 상태 표시, 패킷 사전 검증, type 분기, 복호화, 순서 보장
 - 출력: 콘텐츠 handler 호출, ACK 송신, `SendPacketInfo` 정리
-- 주의: 처리 중 플래그는 release worker가 확인하지만 현재 receive `IOContext`에는 generation 검증이 없다. session id 재사용과 stale completion 가능성을 별도로 검토한다.
+- 주의: 완료 context가 보관한 generation을 실행 직전에 다시 확인한다. stale이거나 `RELEASING`인 작업은 자신이 소유한 `NetBuffer`만 해제하고 콘텐츠 처리로 전달하지 않는다.
+- 치명 오류: `WaitForMultipleObjects()`의 `WAIT_FAILED` 또는 IO Worker의 recv logic event `SetEvent()` 실패는 queue drain을 보장할 수 없으므로 상위 레이어 재시작 요청 대상으로 전달한다.
 
 [상세 코드 해설](ThreadModelReference.md#3-recvlogic-worker-thread-상세)
 
@@ -68,9 +70,9 @@ ACK timeout
 ## Session Release Worker
 
 - 입력: `DoDisconnect`가 만든 release 대상과 event 신호
-- 처리: send I/O mode와 receive logic 처리 플래그를 확인한 뒤 소켓, 패킷 정보, 콘텐츠 상태 정리
+- 처리: 소켓만 먼저 닫은 뒤 send I/O, outstanding receive, 대기 중인 receive logic을 drain하고 RIO buffer와 콘텐츠 상태 정리
 - 출력: session 초기화와 unused pool 반환
-- 주의: outstanding receive 전체를 drain하지 않으며, 대기가 10초를 넘으면 send mode를 강제로 해제하고 정리하는 best-effort 경로다.
+- 주의: 10초 대기는 강제 해제 기준이 아니라 진단 로그 기준이다. drain되지 않은 세션은 pool에 반환하지 않는다.
 
 [상세 코드 해설](ThreadModelReference.md#5-session-release-thread-상세)
 
@@ -91,3 +93,4 @@ ACK timeout
 - [시작·종료와 공유 상태](LifecycleAndSynchronization.md)
 - [RUDPIOHandler](../RUDPIOHandler.md)
 - [PacketProcessing](../PacketProcessing.md)
+- [치명 오류 통지와 프로세스 재시작](../FatalErrorHandling.md)

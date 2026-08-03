@@ -65,15 +65,25 @@ void MultiSocketRUDPCore::RunIOWorkerThread(
             threadId, rioResults, MAX_RIO_RESULT);
         // → RIODequeueCompletion(rioCompletionQueues[threadId], results, maxResults)
         // → 블로킹 없음 (완료된 작업 없으면 0 반환)
+        if (numOfResults == RIO_CORRUPT_CQ) {
+            LOG_ERROR("Fatal RIO completion queue corruption; server restart is required");
+            ReportFatalError({
+                SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT,
+                threadId,
+                0
+            });
+            return;
+        }
 
         for (ULONG i = 0; i < numOfResults; ++i) {
-            auto* context = GetIOCompletedContext(rioResults[i]);
-            if (context == nullptr) continue;   // 세션 이미 해제됨
+            auto* context = reinterpret_cast<IOContext*>(rioResults[i].RequestContext);
+            if (context == nullptr) continue;
 
             ioHandler->IOCompleted(
                 context,
                 rioResults[i].BytesTransferred,
-                threadId);
+                threadId,
+                rioResults[i].Status);
         }
 
         // compile-time sleep mode
@@ -86,44 +96,26 @@ void MultiSocketRUDPCore::RunIOWorkerThread(
 }
 ```
 
-### `GetIOCompletedContext` 상세
+### completion 유효성 확인과 정리
 
 ```cpp
-IOContext* MultiSocketRUDPCore::GetIOCompletedContext(const RIORESULT& rioResult)
-{
-    auto* context = reinterpret_cast<IOContext*>(rioResult.RequestContext);
-    if (context == nullptr) return nullptr;
+const bool isCurrentGeneration =
+    context->ownerSessionId == context->session->GetSessionId() &&
+    context->ownerSessionGeneration == context->session->GetSessionGeneration();
 
-    // 세션이 아직 사용 중인지 session id로 확인
-    context->session = sessionManager->GetUsingSession(context->ownerSessionId);
-    // → sessionList[ownerSessionId]->IsUsingSession() ? 반환 : nullptr
+if (!isCurrentGeneration) {
+    // 새 세션 상태는 건드리지 않고 원래 request의 context만 정리한다.
+}
 
-    if (context->session == nullptr) return nullptr;  // 해제된 세션
-
-    // RIO 에러 처리
-    if (rioResult.Status != 0) {
-        const auto reason = rioResult.Status == WSAECONNRESET
-            ? DISCONNECT_REASON::NORMAL
-            : DISCONNECT_REASON::BY_ERROR;
-
-        if (context->ioType == RIO_OPERATION_TYPE::OP_SEND) {
-            context->session->GetSendContext().GetIOMode()
-                .exchange(IO_MODE::IO_NONE_SENDING);
-        }
-        context->session->DoDisconnect(reason);
-        if (context->ioType == RIO_OPERATION_TYPE::OP_SEND) {
-            contextPool.Free(context);
-        }
-        return nullptr;
-    }
-
-    return context;
+if (status != 0) {
+    // RECV는 outstandingRecvIo 감소와 slot 반환,
+    // SEND는 실제 completion에서만 IO_NONE_SENDING 복구와 context 반환.
 }
 ```
 
-`IOContext`에는 generation이 없으므로 위 조회는 session id 재사용 뒤 도착한 stale completion을 generation으로 거르지 못한다.
+RIO 오류나 `RELEASING` 상태도 context를 먼저 버리지 않는다. 성공·오류·취소 completion 모두 `RUDPIOHandler::IOCompleted`를 통과해야 수신 카운터와 slot을 정확히 한 번 정리할 수 있다.
 
-> **`rioResult.Status != 0` 의미:** `WSAECONNRESET`은 정상 종료 사유로 매핑하고 나머지는 오류 종료로 처리한다. send completion 오류에서는 `IO_NONE_SENDING` 복원과 context 반환도 수행한다. `StopServer()`는 별도의 stop event와 `stop_token`으로 worker를 종료하며, 오류 completion이 모두 처리되는 것을 종료 조건으로 사용하지 않는다.
+> **`rioResult.Status != 0` 의미:** `WSAECONNRESET`은 정상 종료 사유로 매핑하고, 해제 중 `WSA_OPERATION_ABORTED`는 예상된 취소로 처리한다. 그 외는 오류 종료로 전환한다. recv/send completion은 상태와 무관하게 slot·카운터·context를 먼저 정리한다. `StopServer()`는 모든 세션의 I/O와 logic이 drain되어 풀로 반환된 뒤에만 worker stop을 요청한다.
 
 ### 폴링 vs 이벤트
 
@@ -144,7 +136,7 @@ USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=0: 완전 폴링 → 최저 레이턴시, �
 
 ### 역할
 
-IO Worker가 Semaphore를 Release하면 깨어나 수신 패킷의 암호화 해제,  
+IO Worker가 AutoResetEvent를 signal하면 깨어나 수신 패킷의 암호화 해제,
 타입 분기, 콘텐츠 핸들러 호출을 수행한다.
 
 ### 코드 해석
@@ -154,7 +146,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(
     const std::stop_token& stopToken, ThreadIdType threadId)
 {
     // 두 개의 핸들 동시 대기:
-    //   eventHandles[0] = Semaphore (패킷 도착 시 Release(1))
+    //   eventHandles[0] = AutoResetEvent (패킷 도착 시 SetEvent)
     //   eventHandles[1] = ManualResetEvent (StopServer 시 SetEvent)
     const HANDLE eventHandles[2] = {
         recvLogicThreadEventHandles[threadId],
@@ -174,21 +166,36 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(
             Sleep(LOGIC_THREAD_STOP_SLEEP_TIME);
             OnRecvPacket(threadId);
             return;
+
+        case WAIT_FAILED:
+            const unsigned long errorCode = GetLastError();
+            LOG_ERROR(std::format("Recv logic wait failed: {}", errorCode));
+            ReportFatalError({
+                SERVER_FATAL_ERROR_CODE::RECV_LOGIC_WAIT_FAILED,
+                threadId,
+                errorCode
+            });
+            return;
         }
     }
 }
 ```
 
+IO Worker가 완료 context를 logic queue에 넣은 뒤 `SetEvent()`에 실패한 경우에도 `RECV_LOGIC_EVENT_SIGNAL_FAILED`를 보고한다. 세 치명 오류의 callback 계약과 재시작 절차는 [[FatalErrorHandling]]에서 확인한다.
+
 ### 10초 대기의 의미
 
 서버 종료 시퀀스:
 ```
-1. CloseAllSessions()  ← 소켓 닫힘 → RIO 에러 완료 → IO Worker가 세션 DoDisconnect
-2. SetEvent(recvLogicThreadEventStopHandle)  ← Logic Worker 종료 신호
+1. CloseAllSessions()  ← 활성 세션을 RELEASING으로 전환
+2. Release Thread가 socket close를 시작
+3. IO/Logic Worker가 취소 완료와 큐 작업을 처리
+4. recv I/O·logic·send drain 완료 후 세션을 풀로 반환
+5. 모든 세션 반환 후 SetEvent(recvLogicThreadEventStopHandle)
 
-그러나 CloseAllSessions 이후에도 Semaphore에 이미 올라간 패킷이 존재.
-→ 10초 대기 후 OnRecvPacket()으로 잔여 패킷 처리
-→ 패킷 유실 없이 그레이스풀 셧다운
+현재 `Sleep(LOGIC_THREAD_STOP_SLEEP_TIME)`은 종료 이벤트 처리 시 남은 큐를 한 번 더
+확인하는 방어적 유예다. 정상 종료에서는 4단계 drain이 먼저 완료되므로 이 지연에
+수명 안전성을 의존하지 않는다.
 ```
 
 ### `OnRecvPacket` 상세
@@ -199,26 +206,33 @@ void MultiSocketRUDPCore::OnRecvPacket(ThreadIdType threadId)
     RecvIOCompletedContext* completedContext = nullptr;
     while (recvIOCompletedContexts[threadId].Dequeue(&completedContext)) {
 
-        // 패킷 처리 중 플래그 설정 (Session Release Thread 대기용)
-        completedContext->session->nowInProcessingRecvPacket.store(
-            true, std::memory_order_seq_cst);
+        NetBuffer* recvBuffer = completedContext->buffer;
+        RUDPSession* session = completedContext->session;
+        bool processingStarted = false;
 
-        NetBuffer* recvBuffer = nullptr;
-        completedContext->session->rioContext.GetRecvBuffer()
-            .recvBufferList.Dequeue(&recvBuffer);
-
-        if (recvBuffer != nullptr) {
+        if (recvBuffer != nullptr &&
+            completedContext->ownerSessionGeneration == session->GetSessionGeneration() &&
+            !session->IsReleasing()) {
+            completedContext->session->nowInProcessingRecvPacket.store(
+                true, std::memory_order_release);
+            processingStarted = true;
             packetProcessor->OnRecvPacket(
-                *completedContext->session,
+                *session,
                 *recvBuffer,
                 span(completedContext->clientAddrBuffer,
                      sizeof(completedContext->clientAddrBuffer))
             );
         }
 
-        // 처리 완료 플래그 해제
-        completedContext->session->nowInProcessingRecvPacket.store(
-            false, std::memory_order_seq_cst);
+        if (recvBuffer != nullptr) {
+            NetBuffer::Free(recvBuffer);
+        }
+        if (processingStarted) {
+            session->nowInProcessingRecvPacket.store(
+                false, std::memory_order_release);
+        }
+
+        completedContext->ownerRecvBuffer->CompleteRecvLogic();
 
         // 컨텍스트 메모리 풀 반환
         recvIOCompletedContextPool.Free(completedContext);
@@ -226,10 +240,9 @@ void MultiSocketRUDPCore::OnRecvPacket(ThreadIdType threadId)
 }
 ```
 
-**`nowInProcessingRecvPacket` seq_cst 이유:**  
-Session Release Thread가 `nowInProcessingRecvPacket.load(seq_cst)`로 확인할 때,  
-Logic Worker의 `store(false, seq_cst)`보다 먼저 읽힐 수 없음을 보장하기 위해  
-`memory_order_seq_cst`를 사용한다. `relaxed`를 쓰면 CPU 재정렬로 오탐이 발생할 수 있다.
+`pendingRecvLogic`은 완료 컨텍스트가 큐에 들어가기 전에 증가하고, 버퍼 처리와 폐기가
+끝난 뒤 감소한다. Release Thread는 이 카운터를 `acquire`로 확인하므로 처리 시작 전후의
+짧은 구간까지 drain barrier에 포함된다. `nowInProcessingRecvPacket`은 추가 방어 조건이다.
 
 ---
 
@@ -367,27 +380,16 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
             auto* session = sessionManager->GetReleasingSession(id);
             if (session == nullptr) continue;
 
-            // 안전 체크 ①: RIO Send 완료 대기
-            bool isSending =
-                session->GetSendContext().GetIOMode() == IO_MODE::IO_SENDING;
-
-            // 안전 체크 ②: RecvLogic Worker 처리 완료 대기
-            bool isProcessing =
-                session->nowInProcessingRecvPacket.load(std::memory_order_seq_cst);
-
-            if (isSending || isProcessing) {
-                if (session->onSessionReleaseTime + 10000 > GetTickCount64()) {
-                    remainList.push_back(id);
-                    continue;
-                }
-
-                // 10초를 넘기면 send mode만 강제로 해제하고 정리를 진행한다.
-                session->GetSendContext().GetIOMode().store(IO_MODE::IO_NONE_SENDING);
+            session->BeginIOShutdown(); // recv logic quiescence 뒤 OnDisconnected + socket close-only
+            if (!session->CanFinalizeIO()) {
+                // 10초 경과 시 카운터와 send mode를 로그로 남기되 강제로 변경하지 않는다.
+                remainList.push_back(id);
+                continue;
             }
 
             // 안전 확인 완료 → 실제 해제
             session->Disconnect();
-            // → OnDisconnected(), CloseSocket(), OnReleased()
+            // → FinalizeRIOCleanup(), OnReleased()
             // → DisconnectSession(id) → ReleaseSession에서 InitializeSession()/SetDisconnected()
         }
 
@@ -403,7 +405,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 }
 ```
 
-이 worker는 outstanding receive 개수를 확인하거나 completion queue를 drain하지 않는다. 확인 대상은 send I/O mode와 `nowInProcessingRecvPacket`이며, 10초 제한 뒤에는 강제로 정리를 진행하는 best-effort 수명 관리다. `OnDisconnected()`는 release 요청 즉시가 아니라 위 조건을 통과해 `Disconnect()`가 호출될 때 실행된다.
+이 worker는 사용자 recv logic이 끝난 뒤 `OnDisconnected()`를 한 번 호출하고 소켓만 먼저 닫는다. 이후 send I/O, `outstandingRecvIo`, `activeIOCompletions`가 끝날 때까지 세션을 `RELEASING`으로 유지한다. close와 경합해 들어온 stale logic도 `pendingRecvLogic`으로 추적한다. 10초 제한은 강제 반환이 아니라 지연 진단 기준이다.
 
 ### AutoResetEvent vs ManualResetEvent
 
@@ -449,8 +451,8 @@ void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) c
                     // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
                     sessionDelegate.AbortReservedSession(*session);
                     // → TryAbortReserved() CAS: RESERVED → RELEASING
-                    // → CloseSocket()
-                    // → DisconnectSession(id) → ReleaseSession에서 InitializeSession()/SetDisconnected()
+                    // → 공통 release queue 등록
+                    // → close → drain → cleanup → ReleaseSession
                 }
             }
         }
@@ -488,7 +490,7 @@ SendHeartbeatPacket()
    └─ 이유: 타이머 이벤트가 스레드 시작 전에 활성화될 수 있어야 함
 
 2. 이벤트 핸들 생성 (for N스레드)
-   └─ recvLogicThreadEventHandles[i] = CreateSemaphore(NULL, 0, LONG_MAX, NULL)
+   └─ recvLogicThreadEventHandles[i] = CreateEvent(NULL, FALSE, FALSE, NULL)
    └─ 이유: RecvLogic Worker가 시작 전에 핸들이 준비되어야 함
 
 3. SESSION_RELEASE_THREAD 시작
@@ -501,7 +503,7 @@ SendHeartbeatPacket()
    └─ 이유: 실제 I/O 처리의 핵심; RIO 큐 디큐 시작
 
 6. RECV_LOGIC_WORKER_THREAD × N 시작
-   └─ 이유: IO Worker의 Semaphore Release에 응답 준비
+   └─ 이유: IO Worker의 AutoResetEvent signal에 응답 준비
 
 7. RETRANSMISSION_THREAD × N 시작
    └─ 이유: 이 시점에 retransmissionSchedulers와 wake/timer handle이 초기화됨
@@ -522,28 +524,33 @@ SendHeartbeatPacket()
    └─ 이유: 새 클라이언트 차단 (이후 진행 중 세션들만 정리)
 
 2. CloseAllSessions()
-   └─ 이유: 새 RIO 등록과 진행 중인 socket 작업을 중단하도록 유도
+   └─ 이유: 활성 세션을 RELEASING으로 전환
 
-3. SetEvent(recvLogicThreadEventStopHandle)
+3. 세션 socket close-only 후 모든 send/receive/logic 작업 drain
+   └─ 이유: RIO buffer와 context를 worker보다 먼저 파괴하지 않기 위해
+
+4. 모든 세션의 RIO cleanup과 pool 반환 완료
+
+5. SetEvent(recvLogicThreadEventStopHandle)
    └─ 이유: Logic Worker들에게 종료 신호 (10초 후 잔여 패킷 처리 후 종료)
 
-4. SetEvent(sessionReleaseStopEventHandle)
+6. SetEvent(sessionReleaseStopEventHandle)
    └─ 이유: Release Thread에게 종료 신호
 
    SetEvent(retransmissionStopEventHandle)
    └─ 이유: Retransmission Thread의 event wait 해제
 
-5. StopAllThreads()
+7. StopAllThreads()
    └─ RUDPThreadManager::RequestStop(각 그룹)
    └─ stop_token 신호 → jthread 자동 join
 
 종료 순서가 중요한 이유:
-  - IO Worker보다 먼저 Logic Worker를 종료하면: Semaphore에 신호가 쌓이지만 처리 안 됨
+  - IO Worker보다 먼저 Logic Worker를 종료하면: 완료 컨텍스트 큐가 남지만 처리되지 않음
   - 세션 해제 전 스레드 종료: DoDisconnect 후 Disconnect가 호출 안 됨 → 세션 풀 고갈
   - Logger 이전에 다른 스레드 종료: 종료 중 발생한 로그 유실 가능
 ```
 
-현재 종료 경로에는 outstanding receive 수나 completion queue의 완전한 소진을 기다리는 drain barrier가 없다. 따라서 모든 잔여 I/O 정리가 끝난 뒤 worker가 종료된다고 보장하지 않는 best-effort 순서다.
+worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다. drain이 지연되면 로그를 남기며, 카운터나 send mode를 강제로 완료 상태로 바꾸지 않는다.
 
 ---
 
@@ -554,10 +561,10 @@ SendHeartbeatPacket()
   │
   ├─ RIODequeueCompletion → OP_RECV 완료 감지
   │   → NetBuffer::Alloc() + memcpy(recvBuffer → newBuffer)
-  │   → session.recvBufferList.Enqueue(newBuffer)
-  │   → recvIOCompletedContextPool.Alloc() → init
+  │   → recvIOCompletedContextPool.Alloc()
+  │   → context가 newBuffer + session generation 직접 소유
   │   → recvIOCompletedContexts[0].Enqueue(context)
-  │   → ReleaseSemaphore(recvLogicEventHandles[0], 1)    ← 깨움
+  │   → SetEvent(recvLogicEventHandles[0])               ← 깨움
   │   → DoRecv(session)                                  ← 다음 수신 즉시 등록
   │
   └─ RIODequeueCompletion → OP_SEND 완료 감지
@@ -571,7 +578,7 @@ SendHeartbeatPacket()
   │
   ├─ recvIOCompletedContexts[0].Dequeue(context)
   │   → session.nowInProcessingRecvPacket = true
-  │   → session.recvBufferList.Dequeue(buffer)
+  │   → context generation 재검증 + context.buffer 사용
   │   → packetProcessor.OnRecvPacket(session, buffer, clientAddr)
   │       → [타입 분기] → session.OnRecvPacket(buffer)
   │           → SessionPacketOrderer.OnReceive()
@@ -602,12 +609,13 @@ SendHeartbeatPacket()
   │   → sessionReleaseEventHandle 신호 (PushToDisconnectTargetSession에서 Set)
   │
   ├─ GetReleasingSession(id)
-  │   → IO_SENDING 체크 (IO Worker 상태)
-  │   → nowInProcessingRecvPacket 체크 (Logic Worker 상태)
+  │   → recv logic quiescence 확인
+  │   → BeginIOShutdown(): OnDisconnected + socket close-only
+  │   → send I/O / outstandingRecvIo / pendingRecvLogic / activeIOCompletions 체크
+  │   → nowInProcessingRecvPacket 추가 확인
   │
   └─ 안전 확인 후 session.Disconnect()
-      → OnDisconnected()
-      → CloseSocket()
+      → FinalizeRIOCleanup()
       → ForEachAndClearSendPacketInfoMap
           → core.MarkSendPacketInfoErased(info, threadId)
           → SendPacketInfo::Free(info)

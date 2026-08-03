@@ -24,7 +24,7 @@
 
 ## SessionCryptoContext
 
-세션 key, salt, BCrypt key object buffer와 key handle을 소유한다. key handle 생성 비용을 패킷마다 지불하지 않도록 세션 동안 재사용한다. 안전한 수명 계약에서는 `BCryptDestroyKey` 후 buffer를 해제해야 하며, 현재 구현에서는 `Release()`만 이 순서를 지킨다.
+세션 key, salt, BCrypt key object buffer와 key handle을 소유한다. key handle 생성 비용을 패킷마다 지불하지 않도록 세션 동안 재사용한다. `Initialize()`와 `Release()`는 모두 `BCryptDestroyKey` 후 buffer를 해제한다.
 
 수명 순서는 다음과 같다.
 
@@ -40,7 +40,7 @@ key/salt 설정
 
 handle이 buffer를 참조하는 동안 buffer를 먼저 해제하면 안 된다. 로그와 dump에는 key, salt, 평문을 남기지 않는다.
 
-> **현재 구현 주의:** `SessionCryptoContext::Release()`는 위 순서를 지키지만, `Initialize()`는 현재 `keyObjectBuffer`를 먼저 해제한 뒤 `BCryptDestroyKey`를 호출한다. 이 문서의 순서는 안전한 수명 계약을 설명하며, `Initialize()`의 현재 순서는 알려진 코드 불일치다. 코드가 수정되기 전에는 초기화 경로가 이 계약을 충족한다고 가정하지 않는다.
+`Initialize()`는 `Release()`로 기존 handle과 buffer를 정리한 뒤 `SecureZeroMemory`로 key와 salt를 초기화한다. 두 초기화 경로가 같은 해제 순서를 사용하므로 한쪽만 변경해 수명 계약이 다시 달라지는 것을 방지한다.
 
 [상세 코드](SessionComponentsReference.md#3-sessioncryptocontext)
 
@@ -51,6 +51,8 @@ handle이 buffer를 참조하는 동안 buffer를 먼저 해제하면 안 된다
 socket과 local server port를 보관한다. send/receive는 shared access를, close는 exclusive access를 사용해 I/O 등록 중 socket close와의 race를 제한한다.
 
 `SessionSocketContext::CloseSocket()` 자체는 lock을 획득하지 않는다. 호출자가 `GetSocketMutex()`의 `unique_lock`을 먼저 획득해야 하며, 현재 `RUDPSession::CloseSocket()`이 이 조건을 만족한다. 이미 lock을 보유한 상태에서 내부에서도 다시 잠근다고 가정하면 안 된다.
+
+`RUDPSession::BeginIOShutdown()`은 사용자 recv logic이 끝난 것을 먼저 확인한 뒤 `CloseSocket()`으로 신규 RIO 등록을 중단시키지만 RIO buffer는 즉시 해제하지 않는다. send I/O와 receive I/O·logic 카운터가 모두 0이 된 뒤 `FinalizeRIOCleanup()`이 buffer를 deregister한다.
 
 socket lock은 socket handle 접근만 보호한다. 세션 상태, 원격 주소, RIO context, 완료 callback의 수명은 별도 계약이다. lock을 획득한 채 외부 callback이나 장시간 대기를 추가하면 종료 경로와 deadlock 가능성을 함께 검토한다.
 

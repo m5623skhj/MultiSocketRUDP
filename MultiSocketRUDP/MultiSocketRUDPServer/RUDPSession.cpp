@@ -41,6 +41,10 @@ void RUDPSession::InitializeSession()
 	clientAddr = {};
 	clientSockAddrInet = {};
 	nowInReleaseThread.store(false, std::memory_order_release);
+	nowInProcessingRecvPacket.store(false, std::memory_order_release);
+	ioShutdownStarted.store(false, std::memory_order_release);
+	assert(activeIOCompletions.load(std::memory_order_acquire) == 0);
+	activeIOCompletions.store(0, std::memory_order_release);
 	sessionReservedTime = {};
 	onSessionReleaseTime = {};
 	lastReceivedPacketTime.store(0, std::memory_order_relaxed);
@@ -86,9 +90,13 @@ void RUDPSession::Disconnect()
 		return;
 	}
 
-	OnDisconnected();
+	BeginIOShutdown();
+	if (not CanFinalizeIO())
+	{
+		return;
+	}
 
-	CloseSocket();
+	FinalizeRIOCleanup();
 	{
 		rioContext.GetSendContext().ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info)
 		{
@@ -96,7 +104,10 @@ void RUDPSession::Disconnect()
 			SendPacketInfo::Free(info);
 		});
 	}
-	OnReleased();
+	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	{
+		OnReleased();
+	}
 
 	const SessionIdType disconnectTargetSessionId = sessionId;
 	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
@@ -315,28 +326,71 @@ void RUDPSession::AbortReservedSession()
 		return;
 	}
 
-	const SessionIdType disconnectTargetSessionId = sessionId;
 	nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
-	CloseSocket();
-	MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
+	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
 void RUDPSession::CloseSocket()
 {
 	std::unique_lock lock(socketContext.GetSocketMutex());
 	socketContext.CloseSocket();
+}
+
+void RUDPSession::BeginIOShutdown()
+{
+	if (ioShutdownStarted.load(std::memory_order_acquire))
+	{
+		return;
+	}
+
+	const auto& recvBuffer = rioContext.GetRecvBuffer();
+	if (recvBuffer.pendingRecvLogic.load(std::memory_order_acquire) != 0 ||
+		nowInProcessingRecvPacket.load(std::memory_order_acquire))
+	{
+		return;
+	}
+
+	bool expected = false;
+	if (not ioShutdownStarted.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+	{
+		return;
+	}
+
+	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	{
+		OnDisconnected();
+	}
+	CloseSocket();
+}
+
+void RUDPSession::BeginIOCompletion()
+{
+	activeIOCompletions.fetch_add(1, std::memory_order_acq_rel);
+}
+
+void RUDPSession::CompleteIOCompletion()
+{
+	const auto previous = activeIOCompletions.fetch_sub(1, std::memory_order_acq_rel);
+	assert(previous > 0);
+}
+
+void RUDPSession::FinalizeRIOCleanup()
+{
+	assert(CanFinalizeIO());
 	rioContext.Cleanup(core.GetRIOFunctionTable());
+}
+
+bool RUDPSession::CanFinalizeIO()
+{
+	return rioContext.IsDrained() &&
+		activeIOCompletions.load(std::memory_order_acquire) == 0 &&
+		not nowInProcessingRecvPacket.load(std::memory_order_acquire);
 }
 
 void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
 {
 	maximumHoldingPacketQueueSize = size;
-}
-
-void RUDPSession::EnqueueToRecvBufferList(NetBuffer* buffer)
-{
-	rioContext.EnqueueToRecvBufferList(buffer);
 }
 
 RecvBuffer& RUDPSession::GetRecvBuffer()

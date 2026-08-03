@@ -76,8 +76,27 @@ MemoryTracer::GetThreadStatistics();
 
 ---
 
+## 서버 재시작 필요 로그가 발생했을 때
+
+다음 오류는 개별 session 문제가 아니라 공유 worker pipeline을 신뢰할 수 없는 상태다.
+
+- `Fatal RIO completion queue corruption detected`
+- `Recv logic wait failed`
+- `SetEvent failed in EnqueueContextResult()`
+
+1. `SERVER_FATAL_ERROR_CODE`, `threadId`, `nativeErrorCode`를 확인한다.
+2. 상위 레이어가 health를 unhealthy로 전환했는지 확인한다.
+3. callback thread에서 `StopServer()`를 직접 호출하지 않았는지 확인한다.
+4. 외부 supervisor가 프로세스 교체 요청을 받았는지 확인한다.
+5. 재시작 후 CQ 크기, event handle 수명, 종료 순서, 메모리 손상 로그를 조사한다.
+
+정상적인 session disconnect나 해제 중 `WSA_OPERATION_ABORTED`는 이 절의 재시작 대상이 아니다. 오류별 발생 조건과 상위 레이어 callback 예시는 [[Server/FatalErrorHandling|치명 오류 통지와 프로세스 재시작]]을 참고한다.
+
+---
+
 ## 관련 문서
 
 - [[GettingStarted]] - 기본 기동 순서
 - [[TLSHelper]] - TLS 설정
 - [[MemoryTracer]] - 추적 도구
+- [[Server/FatalErrorHandling]] - 치명 오류 통지와 프로세스 재시작 절차

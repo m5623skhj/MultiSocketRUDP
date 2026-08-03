@@ -15,8 +15,8 @@
   <text x="112" y="107" text-anchor="middle" font-size="8" fill="#bfdbfe">RIORESULT 배열 (최대 1024)</text>
   <line x1="197" y1="96" x2="215" y2="96" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
   <rect x="217" y="75" width="165" height="42" rx="6" fill="#1d4ed8"/>
-  <text x="299" y="92"  text-anchor="middle" font-size="9" font-weight="600" fill="#fff">GetIOCompletedContext</text>
-  <text x="299" y="107" text-anchor="middle" font-size="8" fill="#bfdbfe">session = GetUsingSession(id)</text>
+  <text x="299" y="92"  text-anchor="middle" font-size="9" font-weight="600" fill="#fff">IOCompleted + generation check</text>
+  <text x="299" y="107" text-anchor="middle" font-size="8" fill="#bfdbfe">stable session + status cleanup</text>
   <line x1="384" y1="96" x2="402" y2="96" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
   <rect x="404" y="75" width="160" height="42" rx="6" fill="#1d4ed8"/>
   <text x="484" y="92"  text-anchor="middle" font-size="9" font-weight="600" fill="#fff">RecvIOCompleted</text>
@@ -35,7 +35,7 @@
   <line x1="187" y1="189" x2="205" y2="189" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
   <rect x="207" y="168" width="155" height="42" rx="6" fill="#065f46"/>
   <text x="284" y="185" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">Context Dequeue</text>
-  <text x="284" y="200" text-anchor="middle" font-size="8" fill="#a7f3d0">recvBufferList.Dequeue</text>
+  <text x="284" y="200" text-anchor="middle" font-size="8" fill="#a7f3d0">context-&gt;buffer (direct owner)</text>
   <line x1="364" y1="189" x2="382" y2="189" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
   <rect x="384" y="168" width="155" height="42" rx="6" fill="#065f46"/>
   <text x="461" y="185" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">PacketProcessor</text>

@@ -40,13 +40,10 @@ bool SessionRIOContext::Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFuncti
 
 void SessionRIOContext::Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable)
 {
+    assert(IsDrained());
     recvContext.Cleanup(rioFunctionTable);
     sendContext.Cleanup(rioFunctionTable);
-}
-
-void SessionRIOContext::EnqueueToRecvBufferList(NetBuffer* buffer)
-{
-    recvContext.EnqueueToRecvBufferList(buffer);
+    rioRQ = RIO_INVALID_RQ;
 }
 
 RecvBuffer& SessionRIOContext::GetRecvBuffer()
@@ -72,6 +69,12 @@ SessionSendContext& SessionRIOContext::GetSendContext()
 const SessionSendContext& SessionRIOContext::GetSendContext() const
 {
 	return sendContext;
+}
+
+bool SessionRIOContext::IsDrained()
+{
+    return recvContext.GetRecvBuffer().IsDrained() &&
+        sendContext.GetIOMode().load(std::memory_order_acquire) != IO_MODE::IO_SENDING;
 }
 
 RIO_RQ SessionRIOContext::GetRIORQ() const

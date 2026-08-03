@@ -32,8 +32,8 @@
   <text x="278" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">IO_NONE_SENDING 복원</text>
 
   <rect x="368" y="100" width="148" height="42" rx="6" fill="#1d4ed8"/>
-  <text x="442" y="117" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">GetIOCompletedContext</text>
-  <text x="442" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">GetUsingSession(ownerId)</text>
+  <text x="442" y="117" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">generation + status check</text>
+  <text x="442" y="133" text-anchor="middle" font-size="9" fill="#bfdbfe">stable context session</text>
 
   <rect x="532" y="100" width="150" height="42" rx="6" fill="#1e3a5f"/>
   <text x="607" y="117" text-anchor="middle" font-size="10" fill="#93c5fd">workerThreadOneFrameMs</text>

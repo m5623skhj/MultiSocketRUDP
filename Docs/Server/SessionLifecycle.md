@@ -43,8 +43,10 @@ DISCONNECTED ──────────────────► RESERVED
     │                              ▼
     │                          RELEASING
     │                              │
-    │         IO_SENDING 아님 AND  │
-    │      nowInProcessingRecvPacket=false
+    │         IO_SENDING 아님 AND
+    │ outstandingRecvIo/pendingRecvLogic=0 AND
+    │ activeIOCompletions=0 AND
+    │ nowInProcessingRecvPacket=false
     │                              │
     │                      Disconnect() 호출
     │                    (Release Thread)
@@ -91,6 +93,10 @@ auto code = InitReserveSession(*session);
 
 // InitReserveSession 내부:
 {
+	// 초기화 실패도 안전하게 release queue로 전달할 수 있도록 먼저 예약 상태로 전이
+	session->stateMachine.SetReserved();
+	auto releaseOnFailure = MakeScopeExit([&] { session->AbortReservedSession(); });
+
     // UDP 소켓 생성
     SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
     bind(sock, INADDR_ANY, 0);
@@ -102,8 +108,7 @@ auto code = InitReserveSession(*session);
     // 수신 대기 등록
     ioHandler->DoRecv(*session);
 
-    // ← 여기서 전이
-    session->stateMachine.SetReserved();  // store: any → RESERVED
+	releaseOnFailure.Dismiss();
 }
 
 // 3. 암호화 키 생성
@@ -191,15 +196,11 @@ void AbortReservedSession() {
     if (!stateMachine.TryAbortReserved()) return;
     // → 이미 CONNECTED이면 실패 → 정상 연결 흐름으로
 
-    const SessionIdType disconnectTargetSessionId = sessionId;
     nowInReleaseThread.store(true, std::memory_order_seq_cst);
+    disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
 
-    // 소켓 닫기 (RIO Cleanup + socketContext.CloseSocket())
-    CloseSocket();
-
-    // reserved 세션은 Release Thread를 거치지 않고 즉시 풀 반환 요청
-    MultiSocketRUDPCoreFunctionDelegate::DisconnectSession(disconnectTargetSessionId);
-    // → unusedSessionIdList.push_back(id)
+    // 예약 세션도 공통 Release Thread에서 close → drain → cleanup 순서를 따른다.
+    MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 ```
 
@@ -217,7 +218,7 @@ void AbortReservedSession() {
 | 재전송 횟수 초과 | `RunRetransmissionThread` |
 | 패킷 처리 실패 | `ProcessPacket` / `OnRecvPacket` 반환 false |
 | 클라이언트 `DISCONNECT_TYPE` | `ProcessByPacketType` |
-| RIO 오류 | `GetIOCompletedContext` `Status != 0` |
+| RIO 오류 | `RUDPIOHandler::IOCompleted`의 `Status != 0` 처리 |
 
 **코드 경로:**
 
@@ -272,10 +273,10 @@ bool SessionStateMachine::TryTransitionToReleasing()
 
 ```cpp
 // Session Release Thread 루프
-bool isSending    = session.GetSendContext().GetIOMode() == IO_MODE::IO_SENDING;
-bool isProcessing = session.nowInProcessingRecvPacket.load(std::memory_order_seq_cst);
+session.BeginIOShutdown();  // recv logic이 끝났으면 OnDisconnected → socket close-only
 
-if (isSending || isProcessing) {
+if (!session.CanFinalizeIO()) {
+    // send I/O, outstandingRecvIo, pendingRecvLogic, activeIOCompletions, 처리 중 플래그 확인
     remainList.push_back(id);  // 다음 루프에 재시도
     continue;
 }
@@ -289,11 +290,11 @@ session.Disconnect();
 ```cpp
 void RUDPSession::Disconnect()
 {
-    OnDisconnected();
+    BeginIOShutdown();
+    if (!CanFinalizeIO()) return;
 
-    // ① 소켓 닫기 (unique_lock)
-    CloseSocket();
-    // → unique_lock(socketLock) → closesocket() → INVALID_SOCKET
+    // ① drain 완료 후 RIO request queue와 등록 buffer 정리
+    FinalizeRIOCleanup();
 
     // ② 미처리 sendPacketInfo 전체 정리
     rioContext.GetSendContext().ForEachAndClearSendPacketInfoMap([this](SendPacketInfo* info) {
@@ -315,15 +316,16 @@ void RUDPSession::Disconnect()
 }
 ```
 
-**`IO_SENDING` 대기 이유:**
+**소켓 close와 `IO_SENDING` drain을 분리하는 이유:**
 
 ```
-RIO Send가 진행 중인 상태에서 소켓을 닫으면:
-  → RIO 완료 큐에 에러 상태로 완료됨
-  → IOCompleted에서 세션 포인터를 접근하지만 이미 해제됨 → crash
+소켓 close:
+  → 신규 I/O 등록 차단 및 기존 receive/send 취소 완료 유도
+  → RIO buffer와 session 객체는 계속 유지
 
-IO_SENDING이 아닐 때 닫으면:
-  → 진행 중인 RIO Send 없음 → 안전하게 닫기 가능
+send/receive/logic drain 완료:
+  → 그 뒤 RIO buffer deregister와 session pool 반환
+  → completion의 session/context 접근 중 use-after-free 방지
 ```
 
 **`nowInProcessingRecvPacket` 대기 이유:**
@@ -388,8 +390,8 @@ public:
 | 훅 | 호출 시점 | 순서 보장 |
 |----|-----------|-----------|
 | `OnConnected()` | `TryConnect()` → ACK 전송 **전** | CONNECTED 전이 직후, 단 1회 |
-| `OnDisconnected()` | `Disconnect()` → `CloseSocket()` **전** | Release Thread에서 실제 정리를 시작할 때 단 1회 |
-| `OnReleased()` | `Disconnect()` → `DisconnectSession(id)` **전** | `OnDisconnected` 이후 반드시 호출 |
+| `OnDisconnected()` | `BeginIOShutdown()` → `CloseSocket()` **전** | 일반 세션의 정리를 시작할 때 단 1회 |
+| `OnReleased()` | `Disconnect()` → `DisconnectSession(id)` **전** | 일반 세션에서 drain과 RIO cleanup 이후 호출 |
 
 **`OnDisconnected → OnReleased` 순서 보장:**
 
@@ -398,12 +400,13 @@ DoDisconnect():
   TryTransitionToReleasing() → PushToDisconnectTargetSession
 
 (Session Release Thread)
-  IO 완료 대기 → Disconnect():
-    OnDisconnected() → CloseSocket() → OnReleased() → DisconnectSession(id)
+  BeginIOShutdown(): OnDisconnected() → CloseSocket()
+  IO/Logic drain 대기
+  Disconnect(): FinalizeRIOCleanup() → OnReleased() → DisconnectSession(id)
       → ReleaseSession(id)에서 InitializeSession() / SetDisconnected()
 ```
 
-`OnDisconnected`와 `OnReleased`는 모두 Session Release Thread의 `Disconnect()` 경로에서 순서대로 실행된다.
+일반 세션의 `OnDisconnected`와 `OnReleased`는 Session Release Thread에서 위 순서로 실행된다. `BY_ABORT_RESERVED` 경로는 아직 연결되지 않은 예약 세션이므로 두 콘텐츠 훅을 모두 생략하지만, 동일한 close/drain/cleanup 경로를 사용한다.
 두 훅이 다른 스레드에서 실행될 수 있으므로 공유 자원 접근 시 주의해야 한다.
 
 ---

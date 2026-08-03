@@ -8,6 +8,7 @@
 #include "RUDPSessionManager.h"
 #include "SendPacketInfo.h"
 #include <chrono>
+#include "BuildConfig.h"
 
 namespace
 {
@@ -73,17 +74,27 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 		RIORESULT rioResults[MAX_RIO_RESULT];
 
 		const ULONG numOfResults = rioManager->DequeueCompletions(threadId, rioResults, MAX_RIO_RESULT);
+		if (numOfResults == RIO_CORRUPT_CQ)
+		{
+			LOG_ERROR(std::format(
+				"Fatal RIO completion queue corruption detected on worker {}. "
+				"I/O processing cannot continue safely; server restart is required.",
+				threadId));
+			ReportFatalError({ SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT, threadId, 0 });
+			return;
+		}
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
-			const auto context = GetIOCompletedContext(rioResults[i]);
+			const auto context = reinterpret_cast<IOContext*>(rioResults[i].RequestContext);
 			if (context == nullptr)
 			{
 				continue;
 			}
 
-			if (not ioHandler->IOCompleted(context, rioResults[i].BytesTransferred, threadId))
+			const auto ioType = context->ioType;
+			if (not ioHandler->IOCompleted(context, rioResults[i].BytesTransferred, threadId, rioResults[i].Status))
 			{
-				LOG_ERROR(std::format("IOCompleted() failed with io type {}", static_cast<INT8>(context->ioType)));
+				LOG_ERROR(std::format("IOCompleted() failed with io type {}", static_cast<INT8>(ioType)));
 			}
 		}
 
@@ -118,9 +129,18 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopTo
 				Logger::GetInstance().WriteLog(log);
 			}
 			return;
+		case WAIT_FAILED:
+		{
+			const unsigned long errorCode = GetLastError();
+			LOG_ERROR(std::format("Recv logic wait failed. error is {}", errorCode));
+			ReportFatalError({ SERVER_FATAL_ERROR_CODE::RECV_LOGIC_WAIT_FAILED, threadId, errorCode });
+			return;
+		}
 		default:
-			LOG_ERROR(std::format("Invalid logic thread wait result. Error is {}", WSAGetLastError()));
-			break;
+		{
+			LOG_ERROR("Recv logic wait returned an unexpected result");
+			return;
+		}
 		}
 	}
 }
@@ -286,7 +306,6 @@ void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, 
 
 void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopToken)
 {
-	static unsigned long long constexpr FORCE_CHANGE_SENDING_MODE_MS_IN_RELEASE_THREAD = 10000;
 	const HANDLE eventHandles[2] = { sessionReleaseEventHandle, sessionReleaseStopEventHandle };
 	while (not stopToken.stop_requested())
 	{
@@ -296,46 +315,15 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 		{
 		case WAIT_OBJECT_0:
 		{
-			std::vector<SessionIdType> copyList;
-			{
-				std::scoped_lock lock(releaseSessionIdListLock);
-				copyList.assign(releaseSessionIdList.begin(), releaseSessionIdList.end());
-				releaseSessionIdList.clear();
-			}
-
 			std::vector<SessionIdType> remainList;
-			for (const auto releaseSessionId : copyList)
+			for (const auto releaseSessionId : TakeReleaseSessionIds())
 			{
-				const auto releaseSession = GetReleasingSession(releaseSessionId);
-				if (releaseSession == nullptr)
+				if (not TryFinalizeSessionRelease(releaseSessionId, now))
 				{
-					continue;
+					remainList.emplace_back(releaseSessionId);
 				}
-
-				if (releaseSession->GetSendContext().GetIOMode().load(std::memory_order_seq_cst) == IO_MODE::IO_SENDING ||
-					releaseSession->nowInProcessingRecvPacket.load(std::memory_order_seq_cst))
-				{
-					if ((releaseSession->onSessionReleaseTime + FORCE_CHANGE_SENDING_MODE_MS_IN_RELEASE_THREAD) > now)
-					{
-						remainList.emplace_back(releaseSessionId);
-						continue;
-					}
-
-					releaseSession->GetSendContext().GetIOMode().store(IO_MODE::IO_NONE_SENDING, std::memory_order_seq_cst);
-				}
-
-				releaseSession->Disconnect();
 			}
-
-			if (not remainList.empty())
-			{
-				std::scoped_lock lock(releaseSessionIdListLock);
-				for (const auto remainId : remainList)
-				{
-					releaseSessionIdList.emplace_back(remainId);
-				}
-				SetEvent(sessionReleaseEventHandle);
-			}
+			RequeueReleaseSessionIds(remainList);
 		}
 		break;
 		case WAIT_OBJECT_0 + 1:
@@ -352,4 +340,68 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 		break;
 		}
 	}
+}
+
+std::vector<SessionIdType> MultiSocketRUDPCore::TakeReleaseSessionIds()
+{
+	std::scoped_lock lock(releaseSessionIdListLock);
+	std::vector<SessionIdType> sessionIds(releaseSessionIdList.begin(), releaseSessionIdList.end());
+	releaseSessionIdList.clear();
+	return sessionIds;
+}
+
+bool MultiSocketRUDPCore::TryFinalizeSessionRelease(const SessionIdType sessionId, const unsigned long long now)
+{
+	const auto releaseSession = GetReleasingSession(sessionId);
+	if (releaseSession == nullptr)
+	{
+		return true;
+	}
+
+	releaseSession->BeginIOShutdown();
+	if (releaseSession->CanFinalizeIO())
+	{
+		releaseSession->Disconnect();
+		return true;
+	}
+
+	LogSessionReleaseStall(*releaseSession, sessionId, now);
+	return false;
+}
+
+void MultiSocketRUDPCore::LogSessionReleaseStall(
+	RUDPSession& session,
+	const SessionIdType sessionId,
+	const unsigned long long now)
+{
+	static unsigned long long constexpr RELEASE_STALL_WARNING_MS = 10000;
+	if ((session.onSessionReleaseTime + RELEASE_STALL_WARNING_MS) > now)
+	{
+		return;
+	}
+
+	const auto& recvBuffer = session.rioContext.GetRecvBuffer();
+	LOG_ERROR(std::format(
+		"Session {} release is waiting for RIO drain. recvIo={}, recvLogic={}, sendMode={}",
+		sessionId,
+		recvBuffer.outstandingRecvIo.load(std::memory_order_acquire),
+		recvBuffer.pendingRecvLogic.load(std::memory_order_acquire),
+		static_cast<unsigned int>(session.GetSendContext().GetIOMode().load(std::memory_order_acquire))));
+	session.onSessionReleaseTime = now;
+}
+
+void MultiSocketRUDPCore::RequeueReleaseSessionIds(const std::vector<SessionIdType>& sessionIds)
+{
+	if (sessionIds.empty())
+	{
+		return;
+	}
+
+	Sleep(1);
+	std::scoped_lock lock(releaseSessionIdListLock);
+	for (const auto sessionId : sessionIds)
+	{
+		releaseSessionIdList.emplace_back(sessionId);
+	}
+	SetEvent(sessionReleaseEventHandle);
 }

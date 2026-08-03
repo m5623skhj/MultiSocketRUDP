@@ -203,17 +203,30 @@ void RunIOWorkerThread(std::stop_token stopToken, ThreadIdType threadId)
     while (!stopToken.stop_requested()) {
         RIORESULT results[1024];
         ULONG count = rioManager->DequeueCompletions(threadId, results, 1024);
+        if (count == RIO_CORRUPT_CQ) {
+            LOG_ERROR("Fatal RIO completion queue corruption; server restart is required");
+            ReportFatalError({
+                SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT,
+                threadId,
+                0
+            });
+            return;
+        }
         for (ULONG i = 0; i < count; ++i) {
-            ioHandler->IOCompleted(GetIOCompletedContext(results[i]),
-                                   results[i].BytesTransferred, threadId);
+            auto* context = reinterpret_cast<IOContext*>(results[i].RequestContext);
+            ioHandler->IOCompleted(context,
+                                   results[i].BytesTransferred,
+                                   threadId,
+                                   results[i].Status);
         }
         // sleep_for (USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME)
     }
 }
 ```
 
-`stop_requested()`는 폴링 루프의 조건문에서 체크. `CloseAllSessions()`에 의한 소켓 닫힘으로  
-IO 완료가 에러 상태로 유입되어 루프가 자연스럽게 처리됨.
+`stop_requested()`는 폴링 루프의 조건문에서 체크한다. `StopServer()`는 먼저 세션을
+`RELEASING`으로 전환하고, IO/Logic/Release worker가 close 취소 완료와 잔여 logic을 모두
+drain하여 세션을 풀로 반환한 뒤에만 IO worker의 stop을 요청한다.
 
 ### RECV_LOGIC_WORKER_THREAD
 
@@ -221,7 +234,7 @@ IO 완료가 에러 상태로 유입되어 루프가 자연스럽게 처리됨.
 void RunRecvLogicWorkerThread(std::stop_token stopToken, ThreadIdType threadId)
 {
     HANDLE handles[2] = {
-        recvLogicThreadEventHandles[threadId],  // Semaphore
+        recvLogicThreadEventHandles[threadId],  // AutoResetEvent
         recvLogicThreadEventStopHandle           // ManualResetEvent (Stop 신호)
     };
 
@@ -233,6 +246,9 @@ void RunRecvLogicWorkerThread(std::stop_token stopToken, ThreadIdType threadId)
         case WAIT_OBJECT_0 + 1:
             Sleep(LOGIC_THREAD_STOP_SLEEP_TIME);  // 10초 대기 후 잔여 처리
             OnRecvPacket(threadId);
+            return;
+        case WAIT_FAILED:
+            LOG_ERROR(std::format("Recv logic wait failed: {}", GetLastError()));
             return;
         }
     }
@@ -282,3 +298,4 @@ while (!stopToken.stop_requested()) {
 ## 관련 문서
 - [[ThreadModel]] — 각 스레드 그룹 동작 상세
 - [[MultiSocketRUDPCore]] — RunAllThreads / StopServer에서 사용
+- [[FatalErrorHandling]] — worker 치명 오류 callback과 프로세스 재시작 정책

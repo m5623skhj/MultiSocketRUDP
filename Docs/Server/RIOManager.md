@@ -79,8 +79,11 @@ bool RIOManager::Initialize(
     if (!LoadRIOFunctionTable()) return false;
 
     // ② 스레드당 완료 큐 생성
-    const size_t queueSize = numOfSockets / numOfWorkerThreads
-        * MAX_OUTSTANDING_RECEIVE;
+    const size_t sessionsPerWorker =
+        numOfSockets / numOfWorkerThreads
+        + (numOfSockets % numOfWorkerThreads != 0);
+    const size_t queueSize =
+        sessionsPerWorker * (RECV_OUTSTANDING_COUNT + 1);
     for (size_t i = 0; i < numOfWorkerThreads; ++i) {
 
         RIO_CQ cq = rioFunctionTable.RIOCreateCompletionQueue(
@@ -253,7 +256,7 @@ ULONG RIOManager::DequeueCompletions(
 
 ```cpp
 struct RIORESULT {
-    LONG     Status;          // 0=성공, 음수=NTSTATUS 오류 코드
+    LONG     Status;          // 0=성공, 그 외=작업별 오류 코드
     ULONG    BytesTransferred; // 전송된 바이트 수
     ULONGLONG SocketContext;   // RIOCreateRequestQueue의 RequestContext
                                //  = sessionId (uintptr_t 캐스팅)
@@ -272,12 +275,15 @@ for (ULONG i = 0; i < count; ++i) {
     // RequestContext에서 IOContext 복원
     IOContext* context = reinterpret_cast<IOContext*>(rioResults[i].RequestContext);
 
-    // SocketContext에서 sessionId 복원 (보조 확인)
-    SessionIdType sessionId = static_cast<SessionIdType>(rioResults[i].SocketContext);
-
-    ioHandler->IOCompleted(context, rioResults[i].BytesTransferred, threadId);
+    ioHandler->IOCompleted(context,
+                           rioResults[i].BytesTransferred,
+                           threadId,
+                           rioResults[i].Status);
 }
 ```
+
+`IOCompleted`는 컨텍스트에 저장된 session 포인터·ID·generation을 검증한다. 오류나
+취소 완료도 같은 함수로 전달되어 recv slot/카운터 또는 send context를 반드시 정리한다.
 
 ---
 
@@ -327,17 +333,22 @@ rioFunc.RIODeregisterBuffer(sendBufferId);
 ## 8. 완료 큐 크기 계산
 
 ```
-CQ 크기 = (numOfSockets / numOfWorkerThreads) × MAX_OUTSTANDING_RECEIVE
+스레드당 세션 수 = ceil(numOfSockets / numOfWorkerThreads)
+세션당 최대 완료 수 = RECV_OUTSTANDING_COUNT + 최대 동시 Send(1)
+CQ 크기 = 스레드당 세션 수 × 세션당 최대 완료 수
 
-현재 샘플: numOfSockets=500, numOfWorkerThreads=4, MAX_OUTSTANDING_RECEIVE=1000
-  → (500/4) × 1000 = 125000
+현재 샘플: numOfSockets=500, numOfWorkerThreads=4, RECV_OUTSTANDING_COUNT=8
+  → ceil(500/4) × (8+1) = 1125
 
-구현은 정수 나눗셈을 사용한다. 이 크기는 각 IO Worker Thread의 RIO 완료 결과를 수용하는 CQ 용량으로 전달된다.
+나머지 세션이 특정 worker에 배정되는 경우까지 포함하도록 올림 계산한다.
 ```
 
 **CQ 크기가 너무 작으면:**  
 `RIODequeueCompletion`이 완료 결과를 잃을 수 있다.  
-서버 시작 시 `RIOCreateCompletionQueue` 성공 여부를 반드시 확인해야 한다.
+서버 시작 시 `RIOCreateCompletionQueue` 성공 여부를 확인하고,
+`RIODequeueCompletion`의 `RIO_CORRUPT_CQ` 반환값을 결과 개수로 사용하지 않아야 한다.
+CQ 손상은 안전하게 복구할 수 없는 치명적 상태이므로 오류를 기록하고 해당 IO Worker를
+종료하며, `ServerFatalError` callback을 통해 상위 레이어에 전달한다. 실제 프로세스 재시작 요청과 운영 처리 절차는 [[FatalErrorHandling|치명 오류 통지와 프로세스 재시작]]을 따른다.
 
 ---
 
@@ -373,3 +384,4 @@ RIO 기반 UDP 서버 흐름:
 - [[ThreadModel]] — IO Worker Thread의 DequeueCompletions 루프
 - [[SessionComponents]] — SessionRecvContext/SendContext RIO 버퍼 초기화
 - [[PerformanceTuning]] — 완료 큐 크기 및 스레드 설정
+- [[FatalErrorHandling]] — CQ 손상 통지와 프로세스 재시작 정책

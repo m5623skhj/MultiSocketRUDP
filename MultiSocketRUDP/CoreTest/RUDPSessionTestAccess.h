@@ -32,6 +32,31 @@ public:
 		session.InitializeSession();
 	}
 
+	static RecvBuffer& GetRecvBuffer(RUDPSession& session)
+	{
+		return session.GetRecvBuffer();
+	}
+
+	static bool CanFinalizeIO(RUDPSession& session)
+	{
+		return session.CanFinalizeIO();
+	}
+
+	static void BeginIOShutdown(RUDPSession& session)
+	{
+		session.BeginIOShutdown();
+	}
+
+	static void BeginIOCompletion(RUDPSession& session)
+	{
+		session.BeginIOCompletion();
+	}
+
+	static void CompleteIOCompletion(RUDPSession& session)
+	{
+		session.CompleteIOCompletion();
+	}
+
 	static void RefreshLastReceivedPacketTime(
 		RUDPSession& session,
 		const unsigned long long now)

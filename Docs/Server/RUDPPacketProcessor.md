@@ -26,7 +26,8 @@
     │
     ├─ recvIOCompletedContexts[threadId].Dequeue(&context)
     ├─ session->nowInProcessingRecvPacket = true
-    ├─ session->recvBufferList.Dequeue(&buffer)
+    ├─ context의 session generation 재검증
+    ├─ context->buffer 사용
     │
     └─ packetProcessor->OnRecvPacket(
            *context->session,

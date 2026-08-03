@@ -1,6 +1,10 @@
 #include "PreCompile.h"
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <array>
+#include <memory>
 
+#include "../Common/Crypto/CryptoHelper.h"
 #include "../MultiSocketRUDPServer/SessionCryptoContext.h"
 
 class SessionCryptoContextTest : public ::testing::Test
@@ -96,6 +100,28 @@ TEST_F(SessionCryptoContextTest, Initialize_AfterRelease_RemainsSafe)
 	context.Release();
 
 	EXPECT_NO_FATAL_FAILURE(context.Initialize());
+	EXPECT_EQ(context.GetKeyObjectBuffer(), nullptr);
+	EXPECT_EQ(context.GetSessionKeyHandle(), nullptr);
+}
+
+TEST_F(SessionCryptoContextTest, Initialize_ReleasesRealKeyHandleAndOwnedBuffer)
+{
+	std::array<unsigned char, SESSION_KEY_SIZE> key{};
+	std::fill(key.begin(), key.end(), 0xAB);
+
+	auto& cryptoHelper = CryptoHelper::GetTLSInstance();
+	const size_t keyObjectSize = cryptoHelper.GetKeyObjectSize();
+	ASSERT_GT(keyObjectSize, 0);
+
+	auto keyObjectBuffer = std::make_unique<unsigned char[]>(keyObjectSize);
+	const BCRYPT_KEY_HANDLE keyHandle = cryptoHelper.GetSymmetricKeyHandle(keyObjectBuffer.get(), key.data());
+	ASSERT_NE(keyHandle, nullptr);
+
+	context.SetKeyObjectBuffer(keyObjectBuffer.release());
+	context.SetSessionKeyHandle(keyHandle);
+
+	context.Initialize();
+
 	EXPECT_EQ(context.GetKeyObjectBuffer(), nullptr);
 	EXPECT_EQ(context.GetSessionKeyHandle(), nullptr);
 }

@@ -265,7 +265,14 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	{
 		if (session != nullptr)
 		{
-			session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+			if (session->IsReserved())
+			{
+				sessionDelegate.AbortReservedSession(*session);
+			}
+			else
+			{
+				session->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+			}
 		}
 	}
 

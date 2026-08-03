@@ -19,6 +19,7 @@
 8. [옵션 파일 설정값 전체](#8-옵션-파일-설정값-전체)
 9. [멀티소켓 구조의 의미](#9-멀티소켓-구조의-의미)
 10. [의존 컴포넌트](#10-의존-컴포넌트)
+11. [치명 오류 통지 API](#11-치명-오류-통지-api)
 
 ---
 
@@ -86,7 +87,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
    ├─ ioHandler = make_unique<RUDPIOHandler>(...)
    └─ rioManager->Initialize(numOfSockets, numOfWorkerThread)
         └─ LoadRIOFunctionTable() (WSAIoctl WSAID_MULTIPLE_RIO)
-        └─ for i in 0..N: RIOCreateCompletionQueue(numOfSockets/N * MAX_OUTSTANDING_RECEIVE)
+        └─ for i in 0..N: RIOCreateCompletionQueue(ceil(numOfSockets/N) * (RECV_OUTSTANDING_COUNT + 1))
 
 8. RunAllThreads()
    ├─ recvLogicThreadEventStopHandle = CreateEvent(manual, FALSE)
@@ -97,7 +98,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
    │
    ├─ for id in 0..N:
    │    recvIOCompletedContexts.emplace_back()
-   │    recvLogicThreadEventHandles.push_back(CreateSemaphore(0, LONG_MAX))
+   │    recvLogicThreadEventHandles.push_back(CreateEvent(auto, FALSE))
    │    retransmissionSchedulers.emplace_back()
    │    scheduler.timerHandle = CreateWaitableTimerExW(...)
    │    scheduler.wakeEventHandle = CreateEvent(auto, FALSE)
@@ -175,15 +176,19 @@ void StopServer();
    └─ 워커 스레드 4개 request_stop() + join() (condition_variable 신호)
 
 2. CloseAllSessions()
-   └─ for each session: sessionDelegate.CloseSocket(*session)
-      → closesocket() 호출 → 진행 중인 RIO 작업에 에러 상태 유발
-      → worker가 stop되기 전에 도착한 에러 completion은 처리할 수 있음
+   └─ for each active session: session.DoDisconnect(NORMAL)
+      → Session Release Thread가 socket만 먼저 닫음
+      → IO/RecvLogic Worker가 취소 completion과 대기 작업을 drain
 
-3. SetEvent(recvLogicThreadEventStopHandle)   ← Logic Worker 종료 신호
-4. SetEvent(sessionReleaseStopEventHandle)    ← Release Thread 종료 신호
+3. 모든 세션이 unused pool로 반환될 때까지 대기
+   └─ send I/O, outstandingRecvIo, pendingRecvLogic, activeIOCompletions == 0
+   └─ RIO buffer deregister 후 generation 증가
+
+4. SetEvent(recvLogicThreadEventStopHandle)   ← Logic Worker 종료 신호
+5. SetEvent(sessionReleaseStopEventHandle)    ← Release Thread 종료 신호
    SetEvent(retransmissionStopEventHandle)    ← Retransmission Worker 종료 신호
 
-5. StopAllThreads()
+6. StopAllThreads()
    └─ 각 THREAD_GROUP별 stop_token 신호
    └─ jthread 소멸 → join() 자동 호출 (블로킹)
 
@@ -207,7 +212,7 @@ void StopServer();
 14. isServerStopped = true
 ```
 
-> **현재 종료 보장 범위:** `CloseAllSessions()` 뒤에 outstanding receive 수나 completion queue가 완전히 비었는지 기다리는 drain barrier는 없다. 이어서 stop event와 `stop_token`을 전달하므로, 모든 잔여 RIO completion이 처리된 뒤 worker가 멈춘다고 보장하지 않는다. 이 순서는 best-effort 종료 절차다.
+> `StopServer()`는 모든 세션이 drain되어 pool로 돌아오기 전에는 worker stop event를 전달하지 않는다. 10초 경과는 강제 해제가 아니라 drain 지연 로그 기준이다.
 
 **종료 순서가 중요한 이유:**
 
@@ -238,6 +243,14 @@ void StopServer();
 #### `void StopServer()`
 - 서버 전체 종료 진입점이다.
 - 브로커 중단, 세션 소켓 정리, 워커 스레드 정지, 세션 메모리 반환, Logger 종료, `WSACleanup()`를 순서대로 수행한다.
+
+#### `void SetFatalErrorHandler(ServerFatalErrorHandler inHandler)`
+- 공유 worker pipeline을 계속 신뢰할 수 없는 치명 오류를 상위 레이어에 전달할 callback을 등록한다.
+- callback은 오류 발생 worker thread에서 호출되므로 제어 스레드에 재시작 요청을 전달하는 짧은 작업만 수행해야 한다.
+
+#### `std::optional<ServerFatalError> GetFatalError() const`
+- 코어 instance 수명 동안 저장된 최초 치명 오류를 반환한다.
+- 오류가 없으면 `std::nullopt`를 반환한다.
 
 #### `bool IsServerStopped() const`
 - 서버가 완전히 종료되었는지 반환한다.
@@ -474,11 +487,10 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 [Session Release Thread] WaitForMultipleObjects
     ↓ GetReleasingSession(id) → 세션 획득
     ↓
-    ├─ IO_SENDING 중? → remainList 보관, SetEvent 재시도
-    ├─ nowInProcessingRecvPacket? → remainList 보관, SetEvent 재시도
+    ├─ recv logic quiescence 뒤 BeginIOShutdown() → OnDisconnected(), socket close-only
+    ├─ send I/O / outstandingRecvIo / pendingRecvLogic / activeIOCompletions 남음? → remainList 재시도
     └─ 안전 확인 완료 → session->Disconnect()
-            ↓ OnDisconnected() 콘텐츠 훅
-            ↓ CloseSocket() (unique_lock)
+            ↓ FinalizeRIOCleanup() (drain 이후 deregister)
             ↓ ForEachAndClearSendPacketInfoMap → MarkSendPacketInfoErased 후 Free
             ↓ OnReleased() 콘텐츠 훅
             ↓ DisconnectSession(id)
@@ -500,15 +512,16 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 ```
 
 ```
-1. CreateRUDPSocket()
+1. session을 RESERVED로 표시하고 실패 시 release할 scope guard 설정
+
+2. CreateRUDPSocket()
    ├─ WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, WSA_FLAG_REGISTERED_IO)
    ├─ bind(INADDR_ANY, port=0)     ← OS가 자동으로 포트 할당
    └─ getsockname() → session.socketContext.SetServerPort(ntohs(addr.sin_port))
 
    실패 → CREATE_SOCKET_FAILED 반환
 
-2. RAII 가드 설정
-   └─ ScopeExit: 실패 시 session.rioContext.Cleanup() + CloseSocket() 자동 호출
+   실패 → scope guard가 AbortReservedSession()으로 공통 drain 경로에 전달
 
 3. rioManager->InitializeSessionRIO(session, session.GetThreadId())
    ├─ recvCQ = rioCompletionQueues[threadId]
@@ -527,9 +540,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
    └─ free receive context를 모두 RIOReceiveEx에 등록
    실패 → DO_RECV_FAILED 반환
 
-5. session.stateMachine.SetReserved()
-
-6. raii.Dismiss()    ← 성공, RAII 가드 해제
+5. releaseOnFailure.Dismiss()    ← 성공, release 가드 해제
    return SUCCESS
 ```
 
@@ -660,7 +671,7 @@ MultiSocketRUDPCore
  ├── CTLSMemoryPool<RecvIOCompletedContext> ← Recv 완료 컨텍스트 TLS 풀
  │
  ├── vector<CListBaseQueue<RecvIOCompletedContext*>> recvIOCompletedContexts[N]
- ├── vector<HANDLE> recvLogicThreadEventHandles[N]  ← Semaphore
+ ├── vector<HANDLE> recvLogicThreadEventHandles[N]  ← AutoResetEvent
  ├── vector<unique_ptr<RetransmissionScheduler>> retransmissionSchedulers[N]
  │    ├── priority_queue<RetransmissionHeapEntry> heap
  │    ├── HANDLE timerHandle
@@ -692,6 +703,16 @@ RUDPSession* RUDPSessionBroker::ReserveSession(...) {
 
 ---
 
+## 11. 치명 오류 통지 API
+
+코어는 `RIO_CORRUPT_CQ`, RecvLogic wait 실패, recv logic event signal 실패를 `ServerFatalError`로 저장하고 등록된 상위 레이어 callback에 전달한다. 코어 자체가 새 프로세스를 실행하거나 `StopServer()`를 자동 호출하지는 않는다.
+
+callback은 worker thread에서 호출된다. callback 안에서 `StopServer()`를 동기 호출하면 자기 worker join 또는 끝나지 않는 I/O drain을 기다릴 수 있다. callback은 오류를 제어 스레드에 전달하고, 실제 재시작은 외부 supervisor가 수행해야 한다.
+
+오류별 발생 조건, 전달 필드, 권장 운영 순서는 [[FatalErrorHandling|치명 오류 통지와 프로세스 재시작]]에서 확인한다.
+
+---
+
 ## 관련 문서
 - [[RUDPSession]] — 세션 상속 및 API 사용법
 - [[Server/RUDPSessionBroker]] — TLS 세션 발급 상세
@@ -700,3 +721,4 @@ RUDPSession* RUDPSessionBroker::ReserveSession(...) {
 - [[RUDPSessionManager]] — 세션 풀 관리
 - [[GettingStarted]] — 처음부터 서버 구축하기
 - [[Troubleshooting]] — 자주 발생하는 문제와 해결
+- [[FatalErrorHandling]] — 치명 오류 callback과 프로세스 재시작 연동

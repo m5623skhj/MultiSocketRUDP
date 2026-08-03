@@ -18,6 +18,7 @@ namespace MultiSocketRUDP
 
 class MultiSocketRUDPCore;
 class RUDPSessionFunctionDelegate;
+class RUDPIOHandler;
 class IPacket;
 
 struct SendPacketInfo;
@@ -28,6 +29,7 @@ class RUDPSession
 {
 	friend MultiSocketRUDPCore;
 	friend RUDPSessionFunctionDelegate;
+	friend RUDPIOHandler;
 	friend class RUDPSessionBehaviorAccess;
 
 protected:
@@ -94,8 +96,13 @@ private:
 	// ----------------------------------------
 	void AbortReservedSession();
 	void CloseSocket();
+	void BeginIOShutdown();
+	void BeginIOCompletion();
+	void CompleteIOCompletion();
+	void FinalizeRIOCleanup();
+	[[nodiscard]]
+	bool CanFinalizeIO();
 	static void SetMaximumPacketHoldingQueueSize(BYTE size);
-	void EnqueueToRecvBufferList(NetBuffer* buffer);
 	RecvBuffer& GetRecvBuffer();
 
 	void RecvContextReset();
@@ -108,7 +115,7 @@ private:
 	bool TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientAddr);
 	// ----------------------------------------
 	// @brief RELEASING 상태의 세션을 최종적으로 해제하고 DISCONNECTED 상태로 전환합니다.
-	// @details 세션의 소켓을 닫고 리소스 풀로 반환합니다.
+	// @details 소켓 종료가 시작됐고 모든 RIO/로직 작업이 drain된 경우에만 RIO 리소스를 정리하고 풀로 반환합니다.
 	// ----------------------------------------
 	void Disconnect();
 	// Call this function when the client sends a disconnect packet
@@ -224,6 +231,8 @@ private:
 	SOCKADDR_INET clientSockAddrInet{};
 	std::atomic_bool nowInReleaseThread{};
 	std::atomic_bool nowInProcessingRecvPacket{};
+	std::atomic_bool ioShutdownStarted{};
+	std::atomic_uint32_t activeIOCompletions{};
 	ThreadIdType threadId{};
 	std::atomic_uint32_t sessionGeneration{};
 

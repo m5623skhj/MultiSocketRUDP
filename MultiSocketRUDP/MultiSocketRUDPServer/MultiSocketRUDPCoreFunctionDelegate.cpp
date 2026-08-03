@@ -2,12 +2,12 @@
 #include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "MultiSocketRUDPCore.h"
 
-void MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(const IOContext* contextResult, const BYTE threadId)
+bool MultiSocketRUDPCoreFunctionDelegate::EnqueueContextResult(const IOContext* contextResult, NetBuffer* buffer, const BYTE threadId)
 {
     const auto& inst = Instance();
     assert(inst.core != nullptr);
 
-    inst.core->EnqueueContextResult(contextResult, threadId);
+    return inst.core->EnqueueContextResult(contextResult, buffer, threadId);
 }
 
 RUDPSession* MultiSocketRUDPCoreFunctionDelegate::AcquireSession()

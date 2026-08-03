@@ -35,11 +35,6 @@ public:
     void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable) const;
 
     // ----------------------------------------
-    // @brief NetBuffer를 수신 버퍼 리스트에 추가합니다.
-    // @param buffer 추가할 NetBuffer 포인터
-    // ----------------------------------------
-    void EnqueueToRecvBufferList(NetBuffer* buffer);
-    // ----------------------------------------
     // @brief 내부 RecvBuffer 객체를 반환합니다.
     // @return RecvBuffer 참조
     // ----------------------------------------
