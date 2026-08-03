@@ -205,6 +205,8 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 기존 수동 측정 조건과 결과는 [RTT 측정 이슈](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)를 참고합니다. 아래 그래프는 `main`에 기록된 최근 10회 공식 측정의 반복 중앙값을 보여줍니다. 첫 자동 측정이 완료된 이후 표시됩니다.
 
+> 자동 측정은 공개 저장소용 [GitHub-hosted `windows-latest` runner](https://docs.github.com/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)(x64, 4 vCPU, 16 GB RAM, 14 GB SSD)에서 수행됩니다. 실제 CPU 모델과 runner 이미지는 실행 시점에 따라 달라질 수 있으므로, 결과는 특정 PC의 절대 성능보다 동일한 CI 조건에서의 커밋 간 RTT 변화 추세를 비교하는 용도로 해석해야 합니다.
+
 ### 패킷 유실률 0%
 
 ![최근 10회 RTT P95/P99 추세 - 유실률 0%](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-loss-0.svg)
