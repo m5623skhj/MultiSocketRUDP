@@ -111,7 +111,7 @@ AI 리뷰 status `ai-review-check`는 외부 API의 rate limit과 일시 장애 
 4. IntegrationTest면 인증서 생성, child process 종료, 포트·timeout 영향을 확인한다.
 5. retry 성공만으로 종료하지 말고 최초 실패가 timing 의존인지 조사한다.
 
-Native GTest 실행은 CoreTest 10분, IntegrationTest 15분을 상한으로 두며 전체 job은 45분으로 제한한다. `MissingReplyAckTriggersServerRetransmissionDisconnect`는 반복 서버 생성·정리와 재전송 종료 경로의 타이밍 간섭을 피하기 위해 나머지 IntegrationTest와 분리된 프로세스에서 실행하고 120초 상한을 적용한다. 제한 시간을 넘기면 프로세스 트리를 종료하고 해당 실행 이름과 제한 시간을 crash 항목 및 콘솔에 보고한다. IntegrationTest의 child process 출력은 pipe EOF를 무기한 기다리지 않고 현재 읽을 수 있는 데이터만 회수한다.
+Native GTest 실행은 CoreTest에 10분 상한을 적용하고 전체 job은 45분으로 제한한다. IntegrationTest는 반복 서버 생성·정리 과정의 RIO 종료 상태가 다음 fixture에 영향을 주지 않도록 `--gtest_list_tests` 결과의 각 테스트를 별도 프로세스에서 실행하며 테스트별 180초 상한을 적용한다. 제한 시간을 넘기면 프로세스 트리를 종료하고 해당 테스트 이름과 제한 시간을 crash 항목 및 콘솔에 보고한다. IntegrationTest의 child process 출력은 pipe EOF를 무기한 기다리지 않고 현재 읽을 수 있는 데이터만 회수한다.
 
 RTT workflow가 실패하면 다음 순서로 확인한다.
 
