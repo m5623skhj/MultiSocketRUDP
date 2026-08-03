@@ -47,3 +47,6 @@ MultiSocketRUDP/IntegrationTest/x64/
 MultiSocketRUDP/IntegrationTest/TestCert.pfx
 MultiSocketRUDP/MultiSocketRUDPServer/MultiSoc.16f99c50/
 MultiSocketRUDP/MultiSocketRUDPClient/MultiSoc.f3949482/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/obj/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/bin/
+Scripts/RTTBenchmark/__pycache__/update_rtt_history.cpython-312.pyc

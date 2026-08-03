@@ -9,7 +9,7 @@
 
 ## 테스트 구성
 
-현재 테스트는 네 범위로 구성한다.
+현재 검증 도구는 다섯 범위로 구성한다.
 
 - `CoreTest`
   - 서버 코어 내부 컴포넌트를 대상으로 하는 GoogleTest 기반 유닛 테스트
@@ -22,6 +22,9 @@
   - C++ CoreTest와 8개의 공용 protocol vector를 사용해 방향·core/full packet별 AES-GCM 결과 호환성을 검증
 - `MultiSocketRUDPBotTester.UnitTests`
   - BotTester의 저장소, 암호화, graph, 실행 통계, AI 응답 파서, 조건 평가, 패킷 schema, 손실 시뮬레이터를 검증하는 xUnit 프로젝트
+- `MultiSocketRUDPBotTester.RttBenchmark`
+  - Release 서버와 전용 콘솔 클라이언트를 별도 프로세스로 실행해 0%·10% 유실 조건의 RTT 추세를 수집하는 성능 벤치마크
+  - 기능 정합성 테스트가 아니라 P95/P99 회귀 후보를 찾기 위한 정보성 측정
 
 `IntegrationClientHarness`는 `IntegrationTest`가 별도 프로세스로 실행하는 테스트용 클라이언트 실행 파일이다.
 
@@ -102,7 +105,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj
 ```
 
-현재 9개 테스트 파일에 `[Fact]`/`[Theory]` 선언 96개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
+현재 10개 테스트 파일에 `[Fact]`/`[Theory]` 선언 100개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
 
 ```powershell
 rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests -g "*Tests.cs"
@@ -119,6 +122,7 @@ rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.Un
 | `BotPolicyRegressionTests.cs` | packet 후보, AI child 경로, schema·validator 및 pending task 회귀 |
 | `NetBufferBoundaryTests.cs` | read/write 경계, 문자열 최대 길이, 짧거나 길이가 불일치한 패킷 거부 |
 | `RudpPureComponentsTests.cs` | broker 응답 parsing, datagram framing, 수신 순서·waiter·RTT 통계 |
+| `RttBenchmarkAggregationTests.cs` | 여러 RTT run의 Average/P95/P99/Max 중앙값 집계 |
 
 실행:
 
@@ -241,7 +245,7 @@ GitHub Actions에서는 `GoogleTest.yml`에서 테스트 전에 이 스크립트
 
 ## CI 흐름
 
-PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
+PR 필수 CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 
 ```text
 .github/workflows/CI.yml          # 변경 경로 분류 및 최종 상태 집계
@@ -249,22 +253,25 @@ PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 .github/workflows/BotTester.yml   # C# BotTester 빌드 및 프로토콜 테스트
 ```
 
-별도 PR 자동화 workflow도 있다.
+RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 
 ```text
+.github/workflows/RttBenchmark.yml          # Release RTT 측정 및 공식 이력 갱신
 .github/workflows/GeminiPRCommoentBot.yml # PR AI 리뷰 status
 .github/workflows/docs-bot.yml             # schedule/label/manual 문서 자동화
 ```
 
 `CI.yml`은 모든 PR에서 실행되고 변경 파일을 기준으로 필요한 workflow만 호출한다.
 
-| 변경 경로 | Native GTest | BotTester |
-|---|---:|---:|
-| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 |
-| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 |
-| 공용 `ProtocolInteropVector.json` | 실행 | 실행 |
-| `CI.yml` | 실행 | 실행 |
-| 관련 없는 문서만 변경 | 미실행 | 미실행 |
+| 변경 경로 | Native GTest | BotTester | RTT Benchmark |
+|---|---:|---:|---:|
+| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 | 실행 |
+| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 실행 |
+| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 실행 |
+| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 실행 |
+| `.github/workflows/CI.yml` | 실행 | 실행 | 미실행 |
+| `.github/workflows/RttBenchmark.yml` | 미실행 | 미실행 | 실행 |
+| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 |
 
 ### Native GTest
 
@@ -274,8 +281,9 @@ PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 4. GoogleTest 및 solution Debug x64 빌드
 5. `CoreTest.exe`, `IntegrationTest.exe`만 실행
 6. 실행 파일별 XML과 exit code 검증
-7. 실패 테스트만 retry
-8. PR comment와 OpenCppCoverage 결과 갱신
+7. CoreTest 10분, IntegrationTest 15분 초과 시 프로세스 트리 종료
+8. 실패 테스트만 retry
+9. PR comment와 OpenCppCoverage 결과 갱신
 
 ### BotTester
 
@@ -286,6 +294,16 @@ PR CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
 5. C# 결과가 공용 `ProtocolInteropVector.json`의 예상 패킷과 일치하는지 검증
 
 C++ consumer는 Native GTest의 `PacketCryptoTest.AesGcmMatchesCppCSharpGoldenVectors`가 검증한다.
+
+### RTT Benchmark
+
+`RttBenchmark.yml`은 Windows hosted runner에서 서버를 MSVC x64 Release `/O2`로 빌드하고, `RUDP_RTT_BENCHMARK_BUILD`로 IO worker sleep을 제거한 뒤 0%와 TX/RX 각각 10% 유실 시나리오를 순차 측정한다.
+
+- PR: 직전 공식 측정 대비 P95/P99 변화율을 Job Summary와 PR 코멘트에 표시
+- `main` push: 측정 후 `benchmark-data` 브랜치의 전체 JSON 이력과 최근 10회 SVG 그래프를 자동 갱신
+- 수동 실행: 진단 결과와 artifact만 만들고 공식 이력은 변경하지 않음
+
+측정 조건, 변화율 해석, 권한 및 실패 조사 절차는 [CI 가이드 — RTT 성능 벤치마크](CI.md#rtt-성능-벤치마크)를 따른다. 로컬 실행과 결과 파일 형식은 [RTT Benchmark 자동화](../../Scripts/RTTBenchmark/README.md)에 정리되어 있다.
 
 ### 필수 체크
 
@@ -359,8 +377,11 @@ error C1083: Cannot open source file
 - `.github/workflows/CI.yml`
 - `.github/workflows/GoogleTest.yml`
 - `.github/workflows/BotTester.yml`
+- `.github/workflows/RttBenchmark.yml`
 - `MultiSocketRUDPBotTester/ProtocolInteropTest`
 - `MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests`
+- `MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark`
+- `Scripts/RTTBenchmark`
 
 ---
 

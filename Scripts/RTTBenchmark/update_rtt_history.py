@@ -68,6 +68,7 @@ def create_entry(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "runCount": result["runCount"],
                 "warmupSampleCount": result["warmupSampleCount"],
                 "timeoutMs": result["timeoutMs"],
+                "runTimeoutSeconds": result["runTimeoutSeconds"],
                 "seedBase": result["seedBase"],
                 "aggregate": result["aggregate"],
             }

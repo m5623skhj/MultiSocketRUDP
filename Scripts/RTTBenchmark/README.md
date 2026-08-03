@@ -9,12 +9,14 @@ RTT Benchmark는 `ContentsServer`와 BotTester를 서로 다른 프로세스로 
 | 서버 | MSVC x64 Release, `/O2` |
 | IO worker | `/DRUDP_RTT_BENCHMARK_BUILD`로 `NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME` 강제 |
 | BotTester | .NET 9 Release, `Optimize=true` |
-| 유실률 0% | 워밍업 2,000회, 100,000회 × 5 runs |
+| 유실률 0% | 워밍업 2,000회, 10,000회 × 5 runs |
 | 유실률 10% | 워밍업 200회, 5,000회 × 5 runs |
 | 유실 모델 | BotTester 송신과 수신에 각각 독립 적용 |
 | 대표값 | 각 run 통계의 중앙값 |
+| 실행 제한 | warmup과 각 run은 최대 300초, workflow는 최대 45분 |
 
 두 유실 시나리오는 같은 러너에서 순차 실행합니다. 병렬 실행은 CPU 경합으로 RTT를 왜곡하고 singleton BotTester 상태를 공유할 수 있으므로 사용하지 않습니다.
+각 warmup/run의 시작과 완료, P95/P99는 콘솔에 출력되어 CI에서 진행 상태를 확인할 수 있습니다.
 
 ## GitHub Actions 동작
 

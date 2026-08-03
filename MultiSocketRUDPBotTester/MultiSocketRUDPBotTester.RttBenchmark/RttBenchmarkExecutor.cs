@@ -15,21 +15,34 @@ public static class RttBenchmarkExecutor
         {
             if (options.WarmupSampleCount > 0)
             {
-                await core.StartRttTest(
+                Console.WriteLine(
+                    $"[{options.ScenarioName}] warmup started: {options.WarmupSampleCount:N0} samples");
+                var warmup = core.StartRttTest(
                     options.WarmupSampleCount,
                     options.TimeoutMs,
                     options.LossRate,
                     unchecked(options.SeedBase - 1));
+                await WaitForRunAsync(warmup, options, "warmup");
+                Console.WriteLine($"[{options.ScenarioName}] warmup completed");
             }
 
             var runs = new List<RttTestSummary>(options.RunCount);
             for (var runIndex = 0; runIndex < options.RunCount; ++runIndex)
             {
-                runs.Add(await core.StartRttTest(
+                var runNumber = runIndex + 1;
+                Console.WriteLine(
+                    $"[{options.ScenarioName}] run {runNumber}/{options.RunCount} started: " +
+                    $"{options.SampleCount:N0} samples");
+                var run = core.StartRttTest(
                     options.SampleCount,
                     options.TimeoutMs,
                     options.LossRate,
-                    unchecked(options.SeedBase + runIndex)));
+                    unchecked(options.SeedBase + runIndex));
+                var summary = await WaitForRunAsync(run, options, $"run {runNumber}");
+                runs.Add(summary);
+                Console.WriteLine(
+                    $"[{options.ScenarioName}] run {runNumber}/{options.RunCount} completed: " +
+                    $"P95={summary.P95RttMs:F6} ms P99={summary.P99RttMs:F6} ms");
             }
 
             return new RttBenchmarkResult
@@ -42,6 +55,7 @@ public static class RttBenchmarkExecutor
                 RunCount = options.RunCount,
                 WarmupSampleCount = options.WarmupSampleCount,
                 TimeoutMs = options.TimeoutMs,
+                RunTimeoutSeconds = options.RunTimeoutSeconds,
                 SeedBase = options.SeedBase,
                 Environment = CaptureEnvironment(),
                 Runs = runs,
@@ -51,6 +65,24 @@ public static class RttBenchmarkExecutor
         finally
         {
             core.StopBotTest();
+        }
+    }
+
+    private static async Task<RttTestSummary> WaitForRunAsync(
+        Task<RttTestSummary> run,
+        RttBenchmarkOptions options,
+        string phase)
+    {
+        try
+        {
+            // A bounded wait keeps a stalled socket or server shutdown from consuming the whole CI job.
+            return await run.WaitAsync(TimeSpan.FromSeconds(options.RunTimeoutSeconds));
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"{options.ScenarioName} {phase} exceeded {options.RunTimeoutSeconds} seconds.",
+                exception);
         }
     }
 
