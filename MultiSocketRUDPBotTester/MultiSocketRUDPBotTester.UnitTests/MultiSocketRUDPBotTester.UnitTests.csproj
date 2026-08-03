@@ -19,5 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.csproj" />
+    <ProjectReference Include="..\MultiSocketRUDPBotTester.RttBenchmark\MultiSocketRUDPBotTester.RttBenchmark.csproj" />
   </ItemGroup>
 </Project>

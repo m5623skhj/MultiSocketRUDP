@@ -140,10 +140,13 @@ namespace MultiSocketRUDPBotTester.Contents.Client
                 summary.SampleCount,
                 summary.AverageRttMs,
                 summary.MinRttMs,
-                summary.MaxRttMs,
                 summary.P50RttMs,
                 summary.P95RttMs,
                 summary.P99RttMs,
+                summary.MaxRttMs,
+                summary.RetransmissionSuspectedCount,
+                summary.LossRate,
+                summary.LossSeed,
                 summary.ElapsedSeconds);
 
             return summary;
