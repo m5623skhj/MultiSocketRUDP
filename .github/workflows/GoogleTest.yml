@@ -138,6 +138,33 @@ jobs:
             }
           }
 
+          function Get-GTestCases([string]$Executable) {
+            $listOutput = & $Executable --gtest_list_tests 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to list tests from $Executable (exit=$LASTEXITCODE)"
+              return @()
+            }
+
+            $testCases = @()
+            $suiteName = ""
+            foreach ($line in $listOutput) {
+              $text = $line.ToString()
+              if ($text -match '^([^\s].*\.)\s*(?:#.*)?$') {
+                $suiteName = $Matches[1].Trim()
+                continue
+              }
+
+              if ($suiteName -and $text -match '^\s+([^\s#]+)') {
+                $testName = $Matches[1]
+                if (-not $suiteName.StartsWith("DISABLED_") -and -not $testName.StartsWith("DISABLED_")) {
+                  $testCases += "$suiteName$testName"
+                }
+              }
+            }
+
+            return $testCases
+          }
+
           $gtestExecutables = @(Get-ChildItem -Recurse -Filter "*Test.exe" |
             Where-Object {
               $_.Name -in @("CoreTest.exe", "IntegrationTest.exe") -and
@@ -148,71 +175,72 @@ jobs:
               $crashedRuns += "Expected 2 native GTest executables, found $($gtestExecutables.Count)"
           }
 
-          # Isolate the retransmission teardown path so its RIO cleanup timing cannot
-          # interfere with repeated server lifecycles in the main IntegrationTest process.
-          $isolatedIntegrationTest = "IntegrationFixture.MissingReplyAckTriggersServerRetransmissionDisconnect"
-          $isolatedIntegrationTimeoutSeconds = 120
-
           foreach ($testExecutable in $gtestExecutables) {
               $exePath = $testExecutable.FullName
+              if ($testExecutable.Name -eq "IntegrationTest.exe") {
+                  # Every integration case gets a fresh process so server/RIO teardown state
+                  # cannot leak into the next fixture instance.
+                  $integrationTests = @(Get-GTestCases $exePath)
+                  if ($integrationTests.Count -eq 0) {
+                    $crashedRuns += "No IntegrationTest cases were discovered"
+                    continue
+                  }
+
+                  foreach ($integrationTest in $integrationTests) {
+                    $safeTestName = $integrationTest -replace '[^A-Za-z0-9_.-]', '_'
+                    $xmlPath = Join-Path $testExecutable.DirectoryName "IntegrationTest_$safeTestName.xml"
+                    Remove-Item $xmlPath -Force -ErrorAction SilentlyContinue
+                    Write-Host "Running isolated integration test: $integrationTest"
+
+                    $testRun = Invoke-GTestProcess `
+                      -Executable $exePath `
+                      -Arguments @(
+                        "--gtest_filter=$integrationTest",
+                        "--gtest_output=xml:$xmlPath"
+                      ) `
+                      -TimeoutSeconds 180
+
+                    $temp = @()
+                    $xmlValid = Parse-XmlFailures $xmlPath ([ref]$temp)
+                    if ($testRun.TimedOut) {
+                      $timeoutMessage = "$integrationTest timed out after 180 seconds"
+                      Write-Error $timeoutMessage
+                      $crashedRuns += $timeoutMessage
+                    }
+                    elseif ($testRun.StartFailed -or -not $xmlValid -or $testRun.ExitCode -notin @(0, 1) -or
+                      ($testRun.ExitCode -ne 0 -and $temp.Count -eq 0)) {
+                      $crashedRuns += "$integrationTest (exit=$($testRun.ExitCode), valid result XML=$xmlValid)"
+                    }
+
+                    foreach ($t in $temp) {
+                      $failedTests += "$($t.classname).$($t.name)"
+                    }
+                  }
+
+                  continue
+              }
+
               $xmlPath = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_test_result.xml"
               Remove-Item $xmlPath -Force -ErrorAction SilentlyContinue
-
-              $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 900 } else { 600 }
-              $testArguments = @("--gtest_output=xml:$xmlPath")
-              if ($testExecutable.Name -eq "IntegrationTest.exe") {
-                  $testArguments = @(
-                    "--gtest_filter=-$isolatedIntegrationTest",
-                    "--gtest_output=xml:$xmlPath"
-                  )
-              }
               $testRun = Invoke-GTestProcess `
                 -Executable $exePath `
-                -Arguments $testArguments `
-                -TimeoutSeconds $timeoutSeconds
-              $exeExitCode = $testRun.ExitCode
+                -Arguments @("--gtest_output=xml:$xmlPath") `
+                -TimeoutSeconds 600
 
               $temp = @()
               $xmlValid = Parse-XmlFailures $xmlPath ([ref]$temp)
               if ($testRun.TimedOut) {
-                  $timeoutMessage = "$($testExecutable.Name) timed out after $timeoutSeconds seconds"
-                  Write-Error $timeoutMessage
-                  $crashedRuns += $timeoutMessage
+                $timeoutMessage = "$($testExecutable.Name) timed out after 600 seconds"
+                Write-Error $timeoutMessage
+                $crashedRuns += $timeoutMessage
               }
-              elseif ($testRun.StartFailed -or -not $xmlValid -or $exeExitCode -notin @(0, 1) -or ($exeExitCode -ne 0 -and $temp.Count -eq 0)) {
-                  $crashedRuns += "$($testExecutable.Name) (exit=$exeExitCode, valid result XML=$xmlValid)"
-              }
-
-              if ($testExecutable.Name -eq "IntegrationTest.exe") {
-                  $isolatedXmlPath = Join-Path $testExecutable.DirectoryName "IntegrationTest_isolated_result.xml"
-                  Remove-Item $isolatedXmlPath -Force -ErrorAction SilentlyContinue
-                  Write-Host "Running isolated integration test: $isolatedIntegrationTest"
-
-                  $isolatedRun = Invoke-GTestProcess `
-                    -Executable $exePath `
-                    -Arguments @(
-                      "--gtest_filter=$isolatedIntegrationTest",
-                      "--gtest_output=xml:$isolatedXmlPath"
-                    ) `
-                    -TimeoutSeconds $isolatedIntegrationTimeoutSeconds
-
-                  $isolatedFailures = @()
-                  $isolatedXmlValid = Parse-XmlFailures $isolatedXmlPath ([ref]$isolatedFailures)
-                  if ($isolatedRun.TimedOut) {
-                      $timeoutMessage = "$isolatedIntegrationTest timed out after $isolatedIntegrationTimeoutSeconds seconds"
-                      Write-Error $timeoutMessage
-                      $crashedRuns += $timeoutMessage
-                  }
-                  elseif ($isolatedRun.StartFailed -or -not $isolatedXmlValid -or $isolatedRun.ExitCode -notin @(0, 1) -or
-                    ($isolatedRun.ExitCode -ne 0 -and $isolatedFailures.Count -eq 0)) {
-                      $crashedRuns += "$isolatedIntegrationTest (exit=$($isolatedRun.ExitCode), valid result XML=$isolatedXmlValid)"
-                  }
-
-                  $temp += $isolatedFailures
+              elseif ($testRun.StartFailed -or -not $xmlValid -or $testRun.ExitCode -notin @(0, 1) -or
+                ($testRun.ExitCode -ne 0 -and $temp.Count -eq 0)) {
+                $crashedRuns += "$($testExecutable.Name) (exit=$($testRun.ExitCode), valid result XML=$xmlValid)"
               }
 
               foreach ($t in $temp) {
-                  $failedTests += "$($t.classname).$($t.name)"
+                $failedTests += "$($t.classname).$($t.name)"
               }
           }
 
@@ -224,7 +252,7 @@ jobs:
                   $retryXml = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_retry_result.xml"
                   Remove-Item $retryXml -Force -ErrorAction SilentlyContinue
 
-                  $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 900 } else { 600 }
+                  $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 180 } else { 600 }
                   $retryRun = Invoke-GTestProcess `
                     -Executable $exePath `
                     -Arguments @("--gtest_filter=$filter", "--gtest_output=xml:$retryXml") `

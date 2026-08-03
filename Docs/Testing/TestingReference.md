@@ -279,10 +279,10 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 2. NuGet restore
 3. IntegrationTest 인증서 생성
 4. GoogleTest 및 solution Debug x64 빌드
-5. `CoreTest.exe`와 재전송 종료 테스트를 제외한 `IntegrationTest.exe` 실행
-6. `MissingReplyAckTriggersServerRetransmissionDisconnect`를 별도 프로세스에서 실행
+5. `CoreTest.exe` 실행
+6. `--gtest_list_tests`로 IntegrationTest 목록을 구한 뒤 테스트별 별도 프로세스 실행
 7. 실행별 XML과 exit code 검증
-8. CoreTest 10분, IntegrationTest 15분, 격리 테스트 120초 초과 시 프로세스 트리 종료
+8. CoreTest 10분, 개별 IntegrationTest 180초 초과 시 프로세스 트리 종료
 9. 실패 테스트만 retry
 10. PR comment와 OpenCppCoverage 결과 갱신
 
