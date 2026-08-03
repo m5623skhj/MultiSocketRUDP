@@ -15,6 +15,7 @@ MultiSocketRUDP/MultiSocketRUDPServer/x64/
 test/
 MultiSocketRUDP/backup/
 MultiSocketRUDP/Tool/PacketGenerator/__pycache__/
+Scripts/RTTBenchmark/__pycache__/
 MultiSocketRUDP/Logger/x64/
 MultiSocketRUDP/ContentsServer/Log Folder/log_2025-01-23_16.txt
 MultiSocketRUDP/MultiSocketRUDP.slnLaunch.user
@@ -27,6 +28,8 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/Debug/net9.0-windows/Multi
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/Debug/net9.0-windows/MultiSocketRUDPBotTester.dll
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/bin/
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/obj/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/bin/
+MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/obj/
 MultiSocketRUDP/Tool/PacketUploader/credentials.json
 MultiSocketRUDP/CoreTest/x64/
 .vs/

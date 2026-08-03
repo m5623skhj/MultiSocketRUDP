@@ -1,0 +1,239 @@
+name: RTT Benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'MultiSocketRUDP/**'
+      - 'MultiSocketRUDPBotTester/**'
+      - 'Scripts/RTTBenchmark/**'
+      - '.github/workflows/RttBenchmark.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'MultiSocketRUDP/**'
+      - 'MultiSocketRUDPBotTester/**'
+      - 'Scripts/RTTBenchmark/**'
+      - '.github/workflows/RttBenchmark.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: rtt-benchmark-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  benchmark:
+    name: Release RTT benchmark
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      BENCHMARK_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN || github.token }}
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore native dependencies
+        run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
+
+      - name: Build server (Release x64 /O2, no IO worker sleep)
+        env:
+          _CL_: /O2 /DRUDP_RTT_BENCHMARK_BUILD
+        run: >-
+          msbuild MultiSocketRUDP/MultiSocketRUDP.sln
+          /m
+          /t:ContentsServer
+          /p:Configuration=Release
+          /p:Platform=x64
+
+      - name: Build RTT benchmark client (Release optimized)
+        run: >-
+          dotnet build
+          MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/MultiSocketRUDPBotTester.RttBenchmark.csproj
+          --configuration Release
+          -p:Optimize=true
+
+      - name: Run history generator unit tests
+        run: python Scripts/RTTBenchmark/test_update_rtt_history.py
+
+      - name: Run RTT scenarios
+        shell: pwsh
+        run: |
+          ./Scripts/RTTBenchmark/Invoke-RttBenchmark.ps1 `
+            -ServerExecutable "MultiSocketRUDP/x64/Release/ContentsServer.exe" `
+            -ServerWorkingDirectory "MultiSocketRUDP/ContentsServer" `
+            -BenchmarkDll "MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/bin/Release/net9.0-windows7.0/MultiSocketRUDPBotTester.RttBenchmark.dll" `
+            -OutputDirectory "rtt-results" `
+            -CommitSha $env:BENCHMARK_COMMIT_SHA
+
+      - name: Load official benchmark history
+        shell: pwsh
+        run: |
+          git ls-remote --exit-code --heads origin benchmark-data | Out-Null
+          $remoteCheckExitCode = $LASTEXITCODE
+          if ($remoteCheckExitCode -eq 0) {
+            git fetch origin benchmark-data --depth=1
+            if ($LASTEXITCODE -ne 0) { throw "Failed to fetch benchmark-data." }
+            git show FETCH_HEAD:rtt-history.json | Set-Content -LiteralPath previous-rtt-history.json -Encoding utf8
+            if ($LASTEXITCODE -ne 0) { throw "Failed to read rtt-history.json." }
+          } elseif ($remoteCheckExitCode -eq 2) {
+            Write-Host "No benchmark-data branch exists yet."
+            $global:LASTEXITCODE = 0
+          } else {
+            throw "Failed to inspect benchmark-data branch. Exit code: $remoteCheckExitCode"
+          }
+
+      - name: Generate benchmark summary and preview charts
+        shell: pwsh
+        run: |
+          $historyArguments = @()
+          if (Test-Path -LiteralPath "previous-rtt-history.json") {
+            $historyArguments = @("--history", "previous-rtt-history.json")
+          }
+
+          & python Scripts/RTTBenchmark/update_rtt_history.py `
+            @historyArguments `
+            --results rtt-results/rtt-loss-0.json rtt-results/rtt-loss-10.json `
+            --output-history rtt-results/preview-history.json `
+            --output-dir rtt-results/preview `
+            --markdown rtt-results/rtt-summary.md `
+            --max-points 10
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate RTT summary." }
+
+          Get-Content -LiteralPath "rtt-results/rtt-summary.md" -Raw |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Upsert PR benchmark comment
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- RTT_BENCHMARK_SUMMARY_MARKER -->';
+            const body = fs.readFileSync('rtt-results/rtt-summary.md', 'utf8');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            const existing = comments.find(comment => comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
+
+      - name: Upload RTT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtt-benchmark-${{ env.BENCHMARK_COMMIT_SHA }}
+          path: rtt-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+  record-history:
+    name: Record official RTT history
+    if: github.event_name == 'push'
+    needs: benchmark
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Download RTT results
+        uses: actions/download-artifact@v4
+        with:
+          name: rtt-benchmark-${{ github.sha }}
+          path: results
+
+      - name: Update benchmark-data branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          history_root="$RUNNER_TEMP/rtt-history"
+          git clone --no-checkout \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "$history_root"
+
+          if git -C "$history_root" show-ref --verify --quiet refs/remotes/origin/benchmark-data; then
+            git -C "$history_root" checkout -B benchmark-data origin/benchmark-data
+          else
+            git -C "$history_root" switch --orphan benchmark-data
+          fi
+
+          history_arguments=()
+          if [[ -f "$history_root/rtt-history.json" ]]; then
+            history_arguments=(--history "$history_root/rtt-history.json")
+          fi
+
+          python source/Scripts/RTTBenchmark/update_rtt_history.py \
+            "${history_arguments[@]}" \
+            --results results/rtt-loss-0.json results/rtt-loss-10.json \
+            --output-history "$history_root/rtt-history.json" \
+            --output-dir "$history_root" \
+            --markdown "$history_root/latest-summary.md" \
+            --max-points 10
+
+          git -C "$history_root" config user.name "github-actions[bot]"
+          git -C "$history_root" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$history_root" add \
+            rtt-history.json \
+            rtt-loss-0.svg \
+            rtt-loss-10.svg \
+            latest-summary.md \
+            README.md
+
+          if git -C "$history_root" diff --cached --quiet; then
+            echo "Benchmark history is already current."
+            exit 0
+          fi
+
+          short_sha="${GITHUB_SHA:0:12}"
+          git -C "$history_root" commit -m "* RTT 벤치마크 이력 갱신 (${short_sha})"
+          git -C "$history_root" push origin HEAD:benchmark-data

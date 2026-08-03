@@ -192,6 +192,7 @@ GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지�
 | PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류하고 필요한 테스트를 호출한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. |
 | PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
 | PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C# protocol vector 검증을 수행합니다. 공용 vector 변경 시에는 PR CI가 Native GTest도 함께 호출합니다. |
+| 성능 추세 | [RTT Benchmark](./.github/workflows/RttBenchmark.yml) | 관련 PR, `main` 병합, 수동 실행 | 서버와 BotTester를 Release 최적화로 빌드해 유실률 0%·10% RTT를 측정합니다. `main` 측정만 공식 이력과 그래프에 자동 반영합니다. |
 | 리뷰 보조 | [Gemini PR Comment Bot](./.github/workflows/GeminiPRCommoentBot.yml) | PR 생성, 갱신, 재오픈 | 코드 diff를 분석해 AI 리뷰 주석을 남깁니다. 병합 필수 체크로 사용하지 않습니다. |
 | 문서 자동화 | [docs-bot](./.github/workflows/docs-bot.yml) | 매일, `docs-review` 라벨, 수동 실행 | 병합된 코드의 인터페이스 변경을 분석해 문서 최신화 PR을 제안합니다. |
 | 품질 분석 | [Daily Static Analysis](./.github/workflows/StaticAnalysis.yml) | 매일 09:30 KST, 수동 실행 | C++ MSVC Native Analysis와 .NET Roslyn Analysis를 수행하고 분석 로그를 artifact로 보관합니다. |
@@ -202,6 +203,16 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 7. 측정
 
-[RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
+기존 수동 측정 조건과 결과는 [RTT 측정 이슈](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)를 참고합니다. 아래 그래프는 `main`에 기록된 최근 10회 공식 측정의 반복 중앙값을 보여줍니다. 첫 자동 측정이 완료된 이후 표시됩니다.
+
+### 패킷 유실률 0%
+
+![최근 10회 RTT P95/P99 추세 - 유실률 0%](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-loss-0.svg)
+
+### BotTester 송신·수신 유실률 각각 10%
+
+![최근 10회 RTT P95/P99 추세 - 송수신 유실률 10%](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-loss-10.svg)
+
+[전체 RTT 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-history.json) · [벤치마크 자동화 상세](./Scripts/RTTBenchmark/README.md)
 
 ---
