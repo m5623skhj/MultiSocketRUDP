@@ -44,6 +44,9 @@ namespace
 		return sock;
 	}
 
+	// ----------------------------------------
+	// @brief Closes a valid Windows handle and resets it to NULL to prevent double close.
+	// ----------------------------------------
 	void CloseHandleIfValid(HANDLE& handle)
 	{
 		if (handle == NULL)

@@ -131,6 +131,9 @@ TEST(RIOManagerTest, OperationsBeforeInitializeReturnSafeGuardValues)
 	manager.Shutdown();
 }
 
+// ------------------------------------------------------------
+// 여러 치명 오류가 보고되어도 최초 오류만 저장하고 상위 레이어에 한 번 전달하는지 확인합니다.
+// ------------------------------------------------------------
 TEST(MultiSocketRUDPCoreFatalErrorTest, ReportsOnlyFirstFatalErrorToUpperLayer)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -153,6 +156,9 @@ TEST(MultiSocketRUDPCoreFatalErrorTest, ReportsOnlyFirstFatalErrorToUpperLayer)
 	EXPECT_EQ(core.GetFatalError()->code, SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT);
 }
 
+// ------------------------------------------------------------
+// 치명 오류 발생 후 콜백을 등록해도 저장된 최초 오류를 즉시 전달하는지 확인합니다.
+// ------------------------------------------------------------
 TEST(MultiSocketRUDPCoreFatalErrorTest, LateHandlerReceivesStoredFatalError)
 {
 	MultiSocketRUDPCore core{ L"", L"" };

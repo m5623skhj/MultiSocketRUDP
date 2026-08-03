@@ -44,28 +44,46 @@ struct RecvBuffer
         }
     }
 
+    // ----------------------------------------
+    // @brief Adds one successfully posted receive I/O to the drain barrier.
+    // ----------------------------------------
     void BeginRecvIo()
     {
         outstandingRecvIo.fetch_add(1, std::memory_order_acq_rel);
     }
 
+    // ----------------------------------------
+    // @brief Removes one completed receive I/O from the drain barrier.
+    // @details Each call must match exactly one BeginRecvIo() call.
+    // ----------------------------------------
     void CompleteRecvIo()
     {
         const auto previous = outstandingRecvIo.fetch_sub(1, std::memory_order_acq_rel);
         assert(previous > 0);
     }
 
+    // ----------------------------------------
+    // @brief Adds one packet handed to a logic worker to the drain barrier.
+    // ----------------------------------------
     void BeginRecvLogic()
     {
         pendingRecvLogic.fetch_add(1, std::memory_order_acq_rel);
     }
 
+    // ----------------------------------------
+    // @brief Removes one processed receive packet from the drain barrier.
+    // @details Each call must match exactly one BeginRecvLogic() call.
+    // ----------------------------------------
     void CompleteRecvLogic()
     {
         const auto previous = pendingRecvLogic.fetch_sub(1, std::memory_order_acq_rel);
         assert(previous > 0);
     }
 
+    // ----------------------------------------
+    // @brief Checks whether all posted receive I/O and pending receive logic are complete.
+    // @return true when both tracking counters are zero.
+    // ----------------------------------------
     [[nodiscard]]
     bool IsDrained() const
     {

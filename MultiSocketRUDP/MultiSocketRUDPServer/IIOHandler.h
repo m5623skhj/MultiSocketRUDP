@@ -21,6 +21,7 @@ public:
   // @param context 완료된 I/O 작업의 컨텍스트.
   // @param transferred 전송되거나 수신된 바이트 수.
   // @param threadId 작업을 처리한 스레드의 ID.
+  // @param status RIORESULT에 기록된 작업 상태 코드입니다. 0이면 성공입니다.
   // @return 성공적으로 완료 처리되었는지 여부.
   // ----------------------------------------
   [[nodiscard]]

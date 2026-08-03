@@ -219,6 +219,9 @@ TEST_F(RUDPSessionManagerTest, CloseAndClearVisitEverySessionAndResetManagerStat
 	EXPECT_EQ(manager.GetUnusedSessionCount(), 0);
 }
 
+// ------------------------------------------------------------
+// 전체 종료 시 예약 세션이 일반 연결 해제가 아닌 예약 중단 경로로 전달되는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPSessionManagerTest, CloseAllSessionsRoutesReservedSessionsToAbortPath)
 {
 	MockSessionDelegate mockDelegate;
