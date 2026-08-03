@@ -15,6 +15,7 @@ public sealed class RttBenchmarkResult
     public required int WarmupSampleCount { get; init; }
     public required int TimeoutMs { get; init; }
     public required int RunTimeoutSeconds { get; init; }
+    public required int ServerThreadCount { get; init; }
     public required int SeedBase { get; init; }
     public string ServerBuild { get; init; } = "Release /O2";
     public string BotTesterBuild { get; init; } = "Release / Optimize=true";

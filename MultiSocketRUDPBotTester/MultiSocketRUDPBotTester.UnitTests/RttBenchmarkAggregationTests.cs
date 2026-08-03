@@ -65,6 +65,7 @@ public sealed class RttBenchmarkOptionsTests
         var options = RttBenchmarkOptions.Parse(CreateArguments("300"));
 
         Assert.Equal(300, options.RunTimeoutSeconds);
+        Assert.Equal(1, options.ServerThreadCount);
     }
 
     [Fact]
@@ -87,6 +88,7 @@ public sealed class RttBenchmarkOptionsTests
             "--warmup-samples", "10",
             "--timeout-ms", "5000",
             "--run-timeout-seconds", runTimeoutSeconds,
+            "--server-thread-count", "1",
             "--loss-rate", "0",
             "--seed-base", "1",
             "--commit", "abc123",

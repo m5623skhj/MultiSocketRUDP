@@ -15,13 +15,15 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CommitSha,
 
-    [int]$ZeroLossSamples = 10000,
-    [int]$LossSamples = 5000,
+    [int]$ZeroLossSamples = 1000,
+    [int]$LossSamples = 1000,
     [int]$RunCount = 5,
-    [int]$ZeroLossWarmupSamples = 2000,
-    [int]$LossWarmupSamples = 200,
+    [int]$ZeroLossWarmupSamples = 500,
+    [int]$LossWarmupSamples = 100,
     [int]$TimeoutMs = 5000,
     [int]$RunTimeoutSeconds = 300,
+    [ValidateRange(1, 255)]
+    [int]$ServerThreadCount = 1,
     [int]$SeedBase = 20260803,
     [string]$BenchmarkHost = "127.0.0.1",
     [int]$SessionBrokerPort = 11011
@@ -83,6 +85,7 @@ function Invoke-Scenario {
         --warmup-samples $WarmupSamples `
         --timeout-ms $TimeoutMs `
         --run-timeout-seconds $RunTimeoutSeconds `
+        --server-thread-count $ServerThreadCount `
         --loss-rate $lossRateText `
         --seed-base $ScenarioSeed `
         --commit $CommitSha `
@@ -93,9 +96,31 @@ function Invoke-Scenario {
     }
 }
 
+function Set-ServerThreadCount {
+    param(
+        [string]$CoreOptionPath,
+        [int]$ThreadCount
+    )
+
+    $contents = [System.IO.File]::ReadAllText($CoreOptionPath)
+    $pattern = '(?m)^([ \t]*THREAD_COUNT[ \t]*=[ \t]*)\d+([ \t]*\r?)$'
+    if ([regex]::Matches($contents, $pattern).Count -ne 1) {
+        throw "Expected exactly one THREAD_COUNT entry in '$CoreOptionPath'."
+    }
+
+    $updatedContents = [regex]::Replace(
+        $contents,
+        $pattern,
+        { param($match) $match.Groups[1].Value + $ThreadCount + $match.Groups[2].Value })
+    $utf8WithBom = [System.Text.UTF8Encoding]::new($true)
+    [System.IO.File]::WriteAllText($CoreOptionPath, $updatedContents, $utf8WithBom)
+}
+
 $serverExecutablePath = (Resolve-Path -LiteralPath $ServerExecutable).Path
 $serverWorkingDirectoryPath = (Resolve-Path -LiteralPath $ServerWorkingDirectory).Path
 $script:benchmarkDllPath = (Resolve-Path -LiteralPath $BenchmarkDll).Path
+$serverCoreOptionPath = Join-Path $serverWorkingDirectoryPath "ServerOptionFile/CoreOption.txt"
+$serverCoreOptionOriginalBytes = [System.IO.File]::ReadAllBytes($serverCoreOptionPath)
 $outputDirectoryPath = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $outputDirectoryPath -Force | Out-Null
 
@@ -105,6 +130,9 @@ $serverProcess = $null
 $certificate = $null
 
 try {
+    Set-ServerThreadCount -CoreOptionPath $serverCoreOptionPath -ThreadCount $ServerThreadCount
+    Write-Host "RTT benchmark server THREAD_COUNT=$ServerThreadCount"
+
     $certificate = New-SelfSignedCertificate `
         -DnsName "DevServerCert" `
         -CertStoreLocation "cert:\CurrentUser\My" `
@@ -152,4 +180,6 @@ finally {
         $certificatePath = "cert:\CurrentUser\My\$($certificate.Thumbprint)"
         Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
     }
+
+    [System.IO.File]::WriteAllBytes($serverCoreOptionPath, $serverCoreOptionOriginalBytes)
 }

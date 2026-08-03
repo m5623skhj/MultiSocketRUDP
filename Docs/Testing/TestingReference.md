@@ -297,7 +297,7 @@ C++ consumer는 Native GTest의 `PacketCryptoTest.AesGcmMatchesCppCSharpGoldenVe
 
 ### RTT Benchmark
 
-`RttBenchmark.yml`은 Windows hosted runner에서 서버를 MSVC x64 Release `/O2`로 빌드하고, `RUDP_RTT_BENCHMARK_BUILD`로 IO worker sleep을 제거한 뒤 0%와 TX/RX 각각 10% 유실 시나리오를 순차 측정한다.
+`RttBenchmark.yml`은 Windows hosted runner에서 서버를 MSVC x64 Release `/O2`로 빌드하고, `RUDP_RTT_BENCHMARK_BUILD`로 IO worker sleep을 제거한다. 측정 중에는 hosted runner CPU 경합을 줄이기 위해 서버 `THREAD_COUNT`를 1로 고정하며 0%와 TX/RX 각각 10% 유실 시나리오를 순차 측정한다.
 
 - PR: 직전 공식 측정 대비 P95/P99 변화율을 Job Summary와 PR 코멘트에 표시
 - `main` push: 측정 후 `benchmark-data` 브랜치의 전체 JSON 이력과 최근 10회 SVG 그래프를 자동 갱신
