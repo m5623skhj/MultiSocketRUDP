@@ -192,12 +192,13 @@ private:
 	void OnRecvPacket(BYTE threadId);
 
 private:
+	// Dependencies below retain references to this delegate, so it must outlive them.
+	RUDPSessionFunctionDelegate sessionDelegate;
 	CTLSMemoryPool<IOContext> contextPool;
 	std::unique_ptr<RIOManager> rioManager;
 	std::unique_ptr<RUDPPacketProcessor> packetProcessor;
 	std::unique_ptr<RUDPIOHandler> ioHandler;
 	std::unique_ptr<RUDPSessionBroker> sessionBroker;
 	std::unique_ptr<RUDPSessionManager> sessionManager;
-	RUDPSessionFunctionDelegate sessionDelegate;
 };
 
