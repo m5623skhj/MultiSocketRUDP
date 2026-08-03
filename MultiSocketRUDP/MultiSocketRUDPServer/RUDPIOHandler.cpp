@@ -47,6 +47,7 @@ bool RUDPIOHandler::IOCompleted(IOContext* context, const ULONG transferred, con
 	RUDPSession* session = context->session;
 	session->BeginIOCompletion();
 
+	// 모든 generation 및 status 분기는 동일한 session drain barrier를 해제해야 합니다.
 	auto completionGuard = Util::MakeScopeExit([session]()
 		{
 			session->CompleteIOCompletion();

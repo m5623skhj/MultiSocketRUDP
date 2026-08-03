@@ -476,6 +476,9 @@ TEST_F(RUDPIOHandlerTest, DoRecv_RIOReceiveExFails_CallsRIOReceiveExOnce)
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 1);
 }
 
+// ------------------------------------------------------------
+// 해제 중인 세션에는 새 RIO Receive를 게시하거나 outstanding 수를 증가시키지 않는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, DoRecv_ReleasingSessionDoesNotPostReceive)
 {
     SetupValidRecvContext();
@@ -487,6 +490,9 @@ TEST_F(RUDPIOHandlerTest, DoRecv_ReleasingSessionDoesNotPostReceive)
     EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 0u);
 }
 
+// ------------------------------------------------------------
+// RIOReceiveEx 게시 실패 시 선점한 outstanding 수신 I/O 카운터를 되돌리는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, DoRecv_RIOReceiveExFails_RollsBackOutstandingCount)
 {
     SetupValidRecvContext();
@@ -519,6 +525,9 @@ TEST_F(RUDPIOHandlerTest, DoRecv_Success_CallsRIOReceiveExExactlyOnce)
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 1);
 }
 
+// ------------------------------------------------------------
+// 수신 게시 성공 시 현재 세션 generation을 저장하고 outstanding 수신 I/O를 추적하는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, DoRecv_Success_CapturesGenerationAndTracksOutstandingReceive)
 {
     SetupValidRecvContext();
@@ -529,6 +538,9 @@ TEST_F(RUDPIOHandlerTest, DoRecv_Success_CapturesGenerationAndTracksOutstandingR
     EXPECT_EQ(mockDelegate.dummyRecvBuffer.outstandingRecvIo.load(), 1u);
 }
 
+// ------------------------------------------------------------
+// 수신 완료 오류가 컨텍스트 슬롯과 outstanding 카운터를 모두 반환하여 drain을 허용하는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, IOCompleted_RecvErrorReleasesSlotAndOutstandingCount)
 {
     SetupValidRecvContext();
@@ -542,6 +554,9 @@ TEST_F(RUDPIOHandlerTest, IOCompleted_RecvErrorReleasesSlotAndOutstandingCount)
     EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
 }
 
+// ------------------------------------------------------------
+// 이전 generation의 수신 완료가 현재 세션에 새 수신을 게시하지 않고 원래 자원만 정리하는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, IOCompleted_StaleRecvCompletionOnlyReleasesOriginalReceive)
 {
     SetupValidRecvContext();
@@ -556,6 +571,9 @@ TEST_F(RUDPIOHandlerTest, IOCompleted_StaleRecvCompletionOnlyReleasesOriginalRec
     EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
 }
 
+// ------------------------------------------------------------
+// 이전 generation의 송신 완료가 재사용된 현재 세션의 송신 모드를 변경하지 않는지 확인합니다.
+// ------------------------------------------------------------
 TEST_F(RUDPIOHandlerTest, IOCompleted_StaleSendCompletionDoesNotChangeCurrentSendMode)
 {
     IOContext* context = AllocSendContext();

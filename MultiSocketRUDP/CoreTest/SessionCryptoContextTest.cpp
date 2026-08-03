@@ -104,6 +104,9 @@ TEST_F(SessionCryptoContextTest, Initialize_AfterRelease_RemainsSafe)
 	EXPECT_EQ(context.GetSessionKeyHandle(), nullptr);
 }
 
+// ------------------------------------------------------------
+// Verifies that reinitialization releases both the real key handle and the owned key-object buffer.
+// ------------------------------------------------------------
 TEST_F(SessionCryptoContextTest, Initialize_ReleasesRealKeyHandleAndOwnedBuffer)
 {
 	std::array<unsigned char, SESSION_KEY_SIZE> key{};

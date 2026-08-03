@@ -112,6 +112,9 @@ TEST(RUDPSessionBehaviorTest, OnRecvPacketUnknownPacketIdReturnsFalse)
 	NetBuffer::Free(buffer);
 }
 
+// ------------------------------------------------------------
+// Verifies that receive I/O, receive logic, send, and completion work each block finalization.
+// ------------------------------------------------------------
 TEST(RUDPSessionBehaviorTest, FinalizeBarrierWaitsForReceiveIoLogicAndSendCompletion)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -137,6 +140,9 @@ TEST(RUDPSessionBehaviorTest, FinalizeBarrierWaitsForReceiveIoLogicAndSendComple
 	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
 }
 
+// ------------------------------------------------------------
+// Verifies that I/O shutdown waits for receive logic drain and calls OnDisconnected exactly once.
+// ------------------------------------------------------------
 TEST(RUDPSessionBehaviorTest, IOShutdownWaitsForRecvLogicBeforeCallingDisconnectedHook)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
