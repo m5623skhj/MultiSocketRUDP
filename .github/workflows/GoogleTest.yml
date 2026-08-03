@@ -148,25 +148,67 @@ jobs:
               $crashedRuns += "Expected 2 native GTest executables, found $($gtestExecutables.Count)"
           }
 
+          # Isolate the retransmission teardown path so its RIO cleanup timing cannot
+          # interfere with repeated server lifecycles in the main IntegrationTest process.
+          $isolatedIntegrationTest = "IntegrationFixture.MissingReplyAckTriggersServerRetransmissionDisconnect"
+          $isolatedIntegrationTimeoutSeconds = 120
+
           foreach ($testExecutable in $gtestExecutables) {
               $exePath = $testExecutable.FullName
               $xmlPath = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_test_result.xml"
               Remove-Item $xmlPath -Force -ErrorAction SilentlyContinue
 
               $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 900 } else { 600 }
+              $testArguments = @("--gtest_output=xml:$xmlPath")
+              if ($testExecutable.Name -eq "IntegrationTest.exe") {
+                  $testArguments = @(
+                    "--gtest_filter=-$isolatedIntegrationTest",
+                    "--gtest_output=xml:$xmlPath"
+                  )
+              }
               $testRun = Invoke-GTestProcess `
                 -Executable $exePath `
-                -Arguments @("--gtest_output=xml:$xmlPath") `
+                -Arguments $testArguments `
                 -TimeoutSeconds $timeoutSeconds
               $exeExitCode = $testRun.ExitCode
 
               $temp = @()
               $xmlValid = Parse-XmlFailures $xmlPath ([ref]$temp)
               if ($testRun.TimedOut) {
-                  $crashedRuns += "$($testExecutable.Name) timed out after $timeoutSeconds seconds"
+                  $timeoutMessage = "$($testExecutable.Name) timed out after $timeoutSeconds seconds"
+                  Write-Error $timeoutMessage
+                  $crashedRuns += $timeoutMessage
               }
               elseif ($testRun.StartFailed -or -not $xmlValid -or $exeExitCode -notin @(0, 1) -or ($exeExitCode -ne 0 -and $temp.Count -eq 0)) {
                   $crashedRuns += "$($testExecutable.Name) (exit=$exeExitCode, valid result XML=$xmlValid)"
+              }
+
+              if ($testExecutable.Name -eq "IntegrationTest.exe") {
+                  $isolatedXmlPath = Join-Path $testExecutable.DirectoryName "IntegrationTest_isolated_result.xml"
+                  Remove-Item $isolatedXmlPath -Force -ErrorAction SilentlyContinue
+                  Write-Host "Running isolated integration test: $isolatedIntegrationTest"
+
+                  $isolatedRun = Invoke-GTestProcess `
+                    -Executable $exePath `
+                    -Arguments @(
+                      "--gtest_filter=$isolatedIntegrationTest",
+                      "--gtest_output=xml:$isolatedXmlPath"
+                    ) `
+                    -TimeoutSeconds $isolatedIntegrationTimeoutSeconds
+
+                  $isolatedFailures = @()
+                  $isolatedXmlValid = Parse-XmlFailures $isolatedXmlPath ([ref]$isolatedFailures)
+                  if ($isolatedRun.TimedOut) {
+                      $timeoutMessage = "$isolatedIntegrationTest timed out after $isolatedIntegrationTimeoutSeconds seconds"
+                      Write-Error $timeoutMessage
+                      $crashedRuns += $timeoutMessage
+                  }
+                  elseif ($isolatedRun.StartFailed -or -not $isolatedXmlValid -or $isolatedRun.ExitCode -notin @(0, 1) -or
+                    ($isolatedRun.ExitCode -ne 0 -and $isolatedFailures.Count -eq 0)) {
+                      $crashedRuns += "$isolatedIntegrationTest (exit=$($isolatedRun.ExitCode), valid result XML=$isolatedXmlValid)"
+                  }
+
+                  $temp += $isolatedFailures
               }
 
               foreach ($t in $temp) {
@@ -192,7 +234,9 @@ jobs:
                   $retryFailures = @()
                   $retryXmlValid = Parse-XmlFailures $retryXml ([ref]$retryFailures)
                   if ($retryRun.TimedOut) {
-                      $crashedRuns += "$($testExecutable.Name) retry timed out after $timeoutSeconds seconds"
+                      $timeoutMessage = "$($testExecutable.Name) retry timed out after $timeoutSeconds seconds"
+                      Write-Error $timeoutMessage
+                      $crashedRuns += $timeoutMessage
                   }
                   elseif ($retryRun.StartFailed -or -not $retryXmlValid -or $retryExitCode -notin @(0, 1) -or ($retryExitCode -ne 0 -and $retryFailures.Count -eq 0)) {
                       $crashedRuns += "$($testExecutable.Name) retry (exit=$retryExitCode, valid result XML=$retryXmlValid)"
@@ -233,6 +277,7 @@ jobs:
               $summary += "Total Final Failed: $($finalFailed.Count)"
           }
 
+          Write-Host $summary
           $summary | Out-File -FilePath test_summary.txt -Encoding utf8
 
           if ($finalFailed.Count -gt 0 -or $crashedRuns.Count -gt 0) {
