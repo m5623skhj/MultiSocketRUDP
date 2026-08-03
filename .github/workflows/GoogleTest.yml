@@ -9,6 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-latest
+    timeout-minutes: 45
 
     permissions:
       contents: read
@@ -98,6 +99,45 @@ jobs:
               return $true
           }
 
+          function Invoke-GTestProcess(
+            [string]$Executable,
+            [string[]]$Arguments,
+            [int]$TimeoutSeconds
+          ) {
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $Executable
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $false
+            $startInfo.Arguments = $Arguments -join " "
+
+            $process = [System.Diagnostics.Process]::new()
+            $process.StartInfo = $startInfo
+            try {
+              if (-not $process.Start()) {
+                return [pscustomobject]@{ TimedOut = $false; ExitCode = -1; StartFailed = $true }
+              }
+
+              if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+                try { $process.Kill($true) } catch { Write-Warning $_ }
+                $process.WaitForExit(10000) | Out-Null
+                return [pscustomobject]@{ TimedOut = $true; ExitCode = -1; StartFailed = $false }
+              }
+
+              return [pscustomobject]@{
+                TimedOut = $false
+                ExitCode = $process.ExitCode
+                StartFailed = $false
+              }
+            }
+            catch {
+              Write-Error "Failed to run $Executable`: $_"
+              return [pscustomobject]@{ TimedOut = $false; ExitCode = -1; StartFailed = $true }
+            }
+            finally {
+              $process.Dispose()
+            }
+          }
+
           $gtestExecutables = @(Get-ChildItem -Recurse -Filter "*Test.exe" |
             Where-Object {
               $_.Name -in @("CoreTest.exe", "IntegrationTest.exe") -and
@@ -113,12 +153,19 @@ jobs:
               $xmlPath = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_test_result.xml"
               Remove-Item $xmlPath -Force -ErrorAction SilentlyContinue
 
-              & $exePath --gtest_output=xml:$xmlPath
-              $exeExitCode = $LASTEXITCODE
+              $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 900 } else { 600 }
+              $testRun = Invoke-GTestProcess `
+                -Executable $exePath `
+                -Arguments @("--gtest_output=xml:$xmlPath") `
+                -TimeoutSeconds $timeoutSeconds
+              $exeExitCode = $testRun.ExitCode
 
               $temp = @()
               $xmlValid = Parse-XmlFailures $xmlPath ([ref]$temp)
-              if (-not $xmlValid -or $exeExitCode -notin @(0, 1) -or ($exeExitCode -ne 0 -and $temp.Count -eq 0)) {
+              if ($testRun.TimedOut) {
+                  $crashedRuns += "$($testExecutable.Name) timed out after $timeoutSeconds seconds"
+              }
+              elseif ($testRun.StartFailed -or -not $xmlValid -or $exeExitCode -notin @(0, 1) -or ($exeExitCode -ne 0 -and $temp.Count -eq 0)) {
                   $crashedRuns += "$($testExecutable.Name) (exit=$exeExitCode, valid result XML=$xmlValid)"
               }
 
@@ -135,12 +182,19 @@ jobs:
                   $retryXml = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_retry_result.xml"
                   Remove-Item $retryXml -Force -ErrorAction SilentlyContinue
 
-                  & $exePath --gtest_filter=$filter --gtest_output=xml:$retryXml
-                  $retryExitCode = $LASTEXITCODE
+                  $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 900 } else { 600 }
+                  $retryRun = Invoke-GTestProcess `
+                    -Executable $exePath `
+                    -Arguments @("--gtest_filter=$filter", "--gtest_output=xml:$retryXml") `
+                    -TimeoutSeconds $timeoutSeconds
+                  $retryExitCode = $retryRun.ExitCode
 
                   $retryFailures = @()
                   $retryXmlValid = Parse-XmlFailures $retryXml ([ref]$retryFailures)
-                  if (-not $retryXmlValid -or $retryExitCode -notin @(0, 1) -or ($retryExitCode -ne 0 -and $retryFailures.Count -eq 0)) {
+                  if ($retryRun.TimedOut) {
+                      $crashedRuns += "$($testExecutable.Name) retry timed out after $timeoutSeconds seconds"
+                  }
+                  elseif ($retryRun.StartFailed -or -not $retryXmlValid -or $retryExitCode -notin @(0, 1) -or ($retryExitCode -ne 0 -and $retryFailures.Count -eq 0)) {
                       $crashedRuns += "$($testExecutable.Name) retry (exit=$retryExitCode, valid result XML=$retryXmlValid)"
                   }
 

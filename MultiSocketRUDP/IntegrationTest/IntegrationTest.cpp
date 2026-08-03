@@ -432,13 +432,31 @@ namespace
 			}
 			else if (waitResult == WAIT_TIMEOUT)
 			{
-				TerminateProcess(processInfo.hProcess, 1);
-				WaitForSingleObject(processInfo.hProcess, 5000);
+				result.output = "Client harness timed out; terminating the process.\n";
+				if (TerminateProcess(processInfo.hProcess, 1) == FALSE)
+				{
+					result.output += "TerminateProcess failed with error " +
+						std::to_string(GetLastError()) + ".\n";
+				}
+				const DWORD terminationWait = WaitForSingleObject(processInfo.hProcess, 5000);
+				if (terminationWait != WAIT_OBJECT_0)
+				{
+					result.output += "Client harness did not exit within 5 seconds after termination.\n";
+				}
 				result.completed = false;
 				GetExitCodeProcess(processInfo.hProcess, &result.exitCode);
 			}
+			else
+			{
+				const DWORD waitError = GetLastError();
+				result.output = "WaitForSingleObject failed with error " +
+					std::to_string(waitError) + ".\n";
+				TerminateProcess(processInfo.hProcess, 1);
+				WaitForSingleObject(processInfo.hProcess, 5000);
+				GetExitCodeProcess(processInfo.hProcess, &result.exitCode);
+			}
 
-			result.output = ReadRemainingOutput();
+			result.output += ReadAvailableOutput();
 			Close();
 			return result;
 		}
@@ -451,7 +469,7 @@ namespace
 			return (std::filesystem::path(modulePath.data()).parent_path() / L"IntegrationClientHarness.exe").wstring();
 		}
 
-		std::string ReadRemainingOutput()
+		std::string ReadAvailableOutput()
 		{
 			std::string output;
 			if (readHandle == nullptr)
@@ -460,9 +478,25 @@ namespace
 			}
 
 			char buffer[512];
-			DWORD bytesRead = 0;
-			while (ReadFile(readHandle, buffer, sizeof(buffer), &bytesRead, nullptr) && bytesRead > 0)
+			// Do not wait for EOF: an inherited writer handle can otherwise block test cleanup indefinitely.
+			while (true)
 			{
+				DWORD availableBytes = 0;
+				if (not PeekNamedPipe(readHandle, nullptr, 0, nullptr, &availableBytes, nullptr) ||
+					availableBytes == 0)
+				{
+					break;
+				}
+
+				const DWORD bytesToRead = (std::min)(
+					availableBytes,
+					static_cast<DWORD>(sizeof(buffer)));
+				DWORD bytesRead = 0;
+				if (not ReadFile(readHandle, buffer, bytesToRead, &bytesRead, nullptr) ||
+					bytesRead == 0)
+				{
+					break;
+				}
 				output.append(buffer, buffer + bytesRead);
 			}
 
@@ -528,7 +562,9 @@ namespace
 		{
 			if (server != nullptr && serverStarted)
 			{
+				std::cout << "[IntegrationTest] stopping server" << std::endl;
 				server->Stop();
+				std::cout << "[IntegrationTest] server stopped" << std::endl;
 			}
 
 			if (optionFiles.has_value())
@@ -705,13 +741,19 @@ namespace
 		// retransmission path, including dynamic RTO backoff and final disconnect.
 		ClientHarnessProcess process;
 		ASSERT_TRUE(process.Start(BuildClientArgs({ L"--scenario", L"drop-ack" })));
+		std::cout << "[IntegrationTest] drop-ack client started" << std::endl;
 
-		EXPECT_TRUE(WaitUntil(30s, [this]()
+		const bool retransmissionDisconnectObserved = WaitUntil(30s, [this]()
 		{
 			return server->GetAllDisconnectedByRetransmissionCount() == 1;
-		}));
+		});
+		EXPECT_TRUE(retransmissionDisconnectObserved);
+		std::cout << "[IntegrationTest] retransmission disconnect observed="
+			<< std::boolalpha << retransmissionDisconnectObserved << std::endl;
 
 		const auto result = process.Wait(60s);
+		std::cout << "[IntegrationTest] drop-ack client wait completed="
+			<< std::boolalpha << result.completed << " exitCode=" << result.exitCode << std::endl;
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}

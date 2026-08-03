@@ -13,6 +13,7 @@
 | 실제 서버·클라이언트 연결 | [통합 테스트](Testing/IntegrationTests.md) | `IntegrationTest.exe` |
 | C++/C# 패킷 호환성 | [통합 테스트](Testing/IntegrationTests.md) | C++ `PacketCryptoTest` + C# `ProtocolInteropTest` |
 | PR에서 어떤 검사가 실행되는지 | [CI 가이드](Testing/CI.md) | `build-and-test` |
+| PR·`main`의 RTT 성능 추세 | [CI 가이드 — RTT 성능 벤치마크](Testing/CI.md#rtt-성능-벤치마크) | `RTT Benchmark` |
 | 구현 코드까지 한 번에 추적 | [상세 레퍼런스](Testing/TestingReference.md) | 전체 테스트 구조 |
 
 ---
@@ -23,6 +24,7 @@
 2. 네트워크, TLS, 세션 상태, 재전송, 패킷 포맷 변경이면 관련 통합 시나리오를 실행한다.
 3. C++/C# 공통 포맷 변경이면 양쪽 protocol interop 테스트를 실행한다.
 4. PR 전에는 [CI 가이드](Testing/CI.md)에서 경로별 실행 범위와 필수 체크를 확인한다.
+5. 서버 I/O, 재전송, 타이밍 관련 변경이면 RTT 결과의 P95/P99 추세도 확인한다.
 
 통합 테스트는 실제 스레드, UDP 소켓, TLS, timeout을 사용한다. CI 부하에 따른 flakiness를 피하려면 실패 시 전체 suite를 반복하기 전에 단일 `--gtest_filter`로 재현한다.
 

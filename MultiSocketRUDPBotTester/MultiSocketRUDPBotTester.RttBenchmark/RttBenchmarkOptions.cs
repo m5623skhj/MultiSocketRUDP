@@ -7,7 +7,8 @@ public sealed class RttBenchmarkOptions
     public const string Usage =
         "Usage: RttBenchmark --host <ip> --port <port> --scenario <name> " +
         "--samples <count> --runs <count> --warmup-samples <count> " +
-        "--timeout-ms <milliseconds> --loss-rate <0..1> --seed-base <integer> " +
+        "--timeout-ms <milliseconds> --run-timeout-seconds <seconds> " +
+        "--loss-rate <0..1> --seed-base <integer> " +
         "--commit <sha> --output <path>";
 
     public required string Host { get; init; }
@@ -17,6 +18,7 @@ public sealed class RttBenchmarkOptions
     public required int RunCount { get; init; }
     public required int WarmupSampleCount { get; init; }
     public required int TimeoutMs { get; init; }
+    public required int RunTimeoutSeconds { get; init; }
     public required double LossRate { get; init; }
     public required int SeedBase { get; init; }
     public required string CommitSha { get; init; }
@@ -45,6 +47,7 @@ public sealed class RttBenchmarkOptions
         var runCount = ParseInt(values, "runs", minimum: 1);
         var warmupSampleCount = ParseInt(values, "warmup-samples", minimum: 0);
         var timeoutMs = ParseInt(values, "timeout-ms", minimum: 1);
+        var runTimeoutSeconds = ParseInt(values, "run-timeout-seconds", minimum: 1);
         var seedBase = ParseInt(values, "seed-base", int.MinValue);
         var lossRate = ParseDouble(values, "loss-rate");
         if (lossRate is < 0.0 or >= 1.0)
@@ -61,6 +64,7 @@ public sealed class RttBenchmarkOptions
             RunCount = runCount,
             WarmupSampleCount = warmupSampleCount,
             TimeoutMs = timeoutMs,
+            RunTimeoutSeconds = runTimeoutSeconds,
             LossRate = lossRate,
             SeedBase = seedBase,
             CommitSha = commitSha,

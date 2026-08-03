@@ -56,3 +56,41 @@ public sealed class RttBenchmarkAggregationTests
         };
     }
 }
+
+public sealed class RttBenchmarkOptionsTests
+{
+    [Fact]
+    public void ParseAcceptsPositiveRunTimeout()
+    {
+        var options = RttBenchmarkOptions.Parse(CreateArguments("300"));
+
+        Assert.Equal(300, options.RunTimeoutSeconds);
+    }
+
+    [Fact]
+    public void ParseRejectsNonPositiveRunTimeout()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            RttBenchmarkOptions.Parse(CreateArguments("0")));
+    }
+
+    private static string[] CreateArguments(string runTimeoutSeconds)
+    {
+        return
+        [
+            "run",
+            "--host", "127.0.0.1",
+            "--port", "11011",
+            "--scenario", "Loss 0%",
+            "--samples", "100",
+            "--runs", "1",
+            "--warmup-samples", "10",
+            "--timeout-ms", "5000",
+            "--run-timeout-seconds", runTimeoutSeconds,
+            "--loss-rate", "0",
+            "--seed-base", "1",
+            "--commit", "abc123",
+            "--output", "result.json"
+        ];
+    }
+}

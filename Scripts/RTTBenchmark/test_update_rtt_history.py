@@ -20,6 +20,7 @@ def make_result(commit: str, loss_rate: float, p95: float, p99: float) -> dict:
         "runCount": 3,
         "warmupSampleCount": 10,
         "timeoutMs": 5000,
+        "runTimeoutSeconds": 300,
         "seedBase": 1000,
         "serverBuild": "Release /O2",
         "botTesterBuild": "Release / Optimize=true",

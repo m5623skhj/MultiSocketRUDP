@@ -15,12 +15,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CommitSha,
 
-    [int]$ZeroLossSamples = 100000,
+    [int]$ZeroLossSamples = 10000,
     [int]$LossSamples = 5000,
     [int]$RunCount = 5,
     [int]$ZeroLossWarmupSamples = 2000,
     [int]$LossWarmupSamples = 200,
     [int]$TimeoutMs = 5000,
+    [int]$RunTimeoutSeconds = 300,
     [int]$SeedBase = 20260803,
     [string]$BenchmarkHost = "127.0.0.1",
     [int]$SessionBrokerPort = 11011
@@ -81,6 +82,7 @@ function Invoke-Scenario {
         --runs $RunCount `
         --warmup-samples $WarmupSamples `
         --timeout-ms $TimeoutMs `
+        --run-timeout-seconds $RunTimeoutSeconds `
         --loss-rate $lossRateText `
         --seed-base $ScenarioSeed `
         --commit $CommitSha `
