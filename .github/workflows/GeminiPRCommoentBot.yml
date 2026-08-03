@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: gemini-pr-comment-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   comment:
     runs-on: ubuntu-latest
@@ -37,19 +41,22 @@ jobs:
           LINE_COUNT=$(wc -l < diff.txt)
           echo "line_count=$LINE_COUNT" >> $GITHUB_OUTPUT
 
-      - name: Stop If Too Large
+      - name: Report Skipped Large Diff
         if: ${{ steps.diffcheck.outputs.line_count > 1000 }}
         run: |
           echo "Diff too large. Skipping AI comment and review."
           exit 0
           
       - name: RunCommentBot
+        if: ${{ steps.diffcheck.outputs.line_count > 0 && steps.diffcheck.outputs.line_count <= 1000 }}
         env:
           GEMINI_API_KEY: ${{ secrets.COMMENT_BOT_API_KEY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          MAX_REVIEW_COMMENTS: "8"
+          REVIEW_BOT_LOGIN: github-actions[bot]
         run: python Scripts/GeminiComment.py
         
       - name: Report AI Review Status

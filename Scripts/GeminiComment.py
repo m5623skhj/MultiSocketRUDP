@@ -5,6 +5,7 @@ import time
 import logging
 import requests
 import base64
+import hashlib
 from google import genai
 
 logging.basicConfig(
@@ -20,8 +21,10 @@ MAX_BATCH_CHARS = 20000
 GEMINI_MAX_RETRIES = 3
 RATE_LIMIT_BUFFER = 10
 NON_RETRYABLE_STATUSES = {401, 403, 404, 409, 422}
+DEFAULT_MAX_REVIEW_COMMENTS = 8
 
 MARKER = "<!-- GEMINI_FUNCTION_SUMMARY -->"
+REVIEW_KEY_MARKER = "<!-- GEMINI_REVIEW_KEY:{} -->"
 VALID_STATUSES = {"ok", "new", "improve"}
 
 FENCE_MAP = {
@@ -40,6 +43,7 @@ _RE_HUNK_HEADER = re.compile(r"@@ -\d+(?:,\d+)? \+(\d+)")
 _RE_FUNC_NAME = re.compile(r'([~\w:<>]+)\s*\(')
 _RE_CODE_FENCE = re.compile(r'```(?:json)?\s*')
 _RE_FIRST_WORD = re.compile(r'(\w+)')
+_RE_REVIEW_KEY = re.compile(r'<!--\s*GEMINI_REVIEW_KEY:([0-9a-f]{16})\s*-->')
 
 _CSHARP_MODIFIERS = frozenset({
     "public", "private", "protected", "internal",
@@ -65,6 +69,21 @@ api_key      = os.environ["GEMINI_API_KEY"]
 pr_number    = os.environ["PR_NUMBER"]
 repo         = os.environ["REPO"]
 github_token = os.environ["GITHUB_TOKEN"]
+review_bot_login = os.environ.get("REVIEW_BOT_LOGIN", "github-actions[bot]")
+
+
+def read_positive_int_env(name, default):
+    raw_value = os.environ.get(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError:
+        log.warning("Invalid %s=%r; using %d", name, raw_value, default)
+        return default
+    return value if value > 0 else default
+
+
+MAX_REVIEW_COMMENTS = read_positive_int_env(
+    "MAX_REVIEW_COMMENTS", DEFAULT_MAX_REVIEW_COMMENTS)
 
 
 def gh_headers():
@@ -201,6 +220,23 @@ def parse_added_lines(diff):
             new_line_num += 1
 
     return results
+
+
+def parse_changed_files(diff):
+    changed_files = set()
+    previous_path = None
+
+    for line in diff.splitlines():
+        if line.startswith("--- a/"):
+            previous_path = line[6:].strip()
+        elif line.startswith("+++ b/"):
+            changed_files.add(line[6:].strip())
+            previous_path = None
+        elif line == "+++ /dev/null" and previous_path:
+            changed_files.add(previous_path)
+            previous_path = None
+
+    return changed_files
 
 
 def strip_strings_and_comments(line):
@@ -693,6 +729,27 @@ def extract_function_name(file_path, lines, start):
     return None
 
 
+def extract_function_signature(file_path, lines, start):
+    signature_end = find_comment_line(file_path, lines, start)
+    signature_lines = []
+
+    for line in lines[start:signature_end]:
+        cleaned = strip_strings_and_comments(line).strip()
+        if cleaned:
+            signature_lines.append(cleaned)
+
+    signature = " ".join(signature_lines)
+    signature = signature.split("{", 1)[0].split("=>", 1)[0].strip()
+    if file_path.endswith(".py"):
+        signature = signature.rstrip(":").strip()
+    return re.sub(r"\s+", " ", signature)
+
+
+def make_review_key(file_path, signature):
+    identity = f"{file_path}\n{signature}".encode("utf-8")
+    return hashlib.sha256(identity).hexdigest()[:16]
+
+
 def find_comment_line(file_path, lines, start):
     search_start = start
     if file_path.endswith(".py"):
@@ -785,20 +842,29 @@ def build_batch_prompt(batch):
 ]
 
 규칙:
-- 기존 주석이 충분하면 status = ok
-- 없으면 new
-- 부족하면 improve + reason
+- 기존 주석이 정확하고 유지보수에 충분하면 status = ok
+- 주석이 없어도 함수 이름과 짧은 구현만으로 계약이 명확하면 status = ok
+- 다음 중 하나 이상이 코드만으로 명확하지 않을 때만 new 또는 improve를 사용
+  - public API 계약
+  - 소유권과 수명주기
+  - thread-safety 또는 동기화 조건
+  - 중요한 상태 변화
+  - 실패·취소·정리 조건
+  - 호출자가 알아야 하는 비직관적 side effect
+- 기존 주석을 실질적으로 고쳐야 할 때만 improve + reason
 - 언어별 스타일 맞출 것 (cpp / csharp / python)
 - 코드 기반 설명만 작성
 
-반드시 포함:
-- 상태 변화
-- 실패 조건
-- side effect
+작성 지침:
+- 해당 함수에 실제로 존재하는 계약만 포함
+- 짧고 직접적으로 작성
+- private trivial helper에는 새 주석을 제안하지 않음
 
 금지:
 - 함수 이름 반복
 - 모호한 표현 ("처리합니다", "수행합니다")
+- 코드 한 줄씩 설명
+- 미래 가능성이나 코드에서 확인되지 않는 내용 추측
 """
 
 
@@ -836,14 +902,241 @@ def get_all_comments():
     return comments
 
 
-def build_existing_map(comments):
-    result = {}
+def graphql_request(query, variables):
+    r = safe_request(
+        requests.post,
+        "https://api.github.com/graphql",
+        headers=gh_headers(),
+        json={"query": query, "variables": variables},
+        timeout=REQUEST_TIMEOUT
+    )
+    if not r:
+        return None
+
+    try:
+        payload = r.json()
+    except ValueError:
+        log.error("GitHub GraphQL returned invalid JSON")
+        return None
+
+    if payload.get("errors"):
+        log.error("GitHub GraphQL failed: %s", payload["errors"])
+        return None
+    return payload.get("data")
+
+
+def get_review_threads():
+    try:
+        owner, name = repo.split("/", 1)
+        number = int(pr_number)
+    except (ValueError, TypeError):
+        log.error("Invalid repository or PR number: %s #%s", repo, pr_number)
+        return []
+
+    query = """
+    query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100, after: $cursor) {
+            nodes {
+              id
+              isResolved
+              isOutdated
+              path
+              resolvedBy { login }
+              comments(first: 100) {
+                nodes {
+                  databaseId
+                  body
+                  author { login }
+                }
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      }
+    }
+    """
+
+    threads = []
+    cursor = None
+    while True:
+        data = graphql_request(query, {
+            "owner": owner,
+            "name": name,
+            "number": number,
+            "cursor": cursor
+        })
+        if not data:
+            break
+
+        repository_data = data.get("repository") or {}
+        pull_request_data = repository_data.get("pullRequest") or {}
+        connection = pull_request_data.get("reviewThreads")
+        if not connection:
+            break
+
+        threads.extend(connection.get("nodes") or [])
+        page_info = connection.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+
+    return threads
+
+
+def extract_review_key(body):
+    match = _RE_REVIEW_KEY.search(body or "")
+    return match.group(1) if match else None
+
+
+def is_managed_comment(comment):
+    author = comment.get("user") or comment.get("author") or {}
+    return (
+        MARKER in (comment.get("body") or "") and
+        author.get("login") == review_bot_login
+    )
+
+
+def build_existing_maps(comments):
+    by_review_key = {}
+    by_location = {}
+
     for c in comments:
-        if MARKER not in c.get("body", ""):
+        if not is_managed_comment(c):
             continue
-        key = (c["path"], c.get("line"))
-        result.setdefault(key, []).append(c)
-    return result
+
+        review_key = extract_review_key(c.get("body"))
+        if review_key:
+            by_review_key.setdefault(review_key, []).append(c)
+
+        line = c.get("line") or c.get("original_line")
+        by_location.setdefault((c.get("path"), line), []).append(c)
+
+    return by_review_key, by_location
+
+
+def build_thread_maps(threads):
+    thread_by_comment_id = {}
+    bot_threads = []
+
+    for thread in threads:
+        is_bot_thread = False
+        for comment in (thread.get("comments") or {}).get("nodes") or []:
+            comment_id = comment.get("databaseId")
+            if comment_id is not None:
+                thread_by_comment_id[int(comment_id)] = thread
+            if is_managed_comment(comment):
+                is_bot_thread = True
+        if is_bot_thread:
+            bot_threads.append(thread)
+
+    return thread_by_comment_id, bot_threads
+
+
+def find_existing_comments(task, by_review_key, by_location):
+    comments = by_review_key.get(task["review_key"])
+    if comments:
+        return comments
+    return by_location.get((task["file"], task["line"]), [])
+
+
+def set_review_thread_resolved(thread, should_resolve):
+    if not thread or thread.get("isResolved") == should_resolve:
+        return False
+
+    if should_resolve:
+        mutation = """
+        mutation($threadId: ID!) {
+          resolveReviewThread(input: {threadId: $threadId}) {
+            thread { id isResolved }
+          }
+        }
+        """
+    else:
+        mutation = """
+        mutation($threadId: ID!) {
+          unresolveReviewThread(input: {threadId: $threadId}) {
+            thread { id isResolved }
+          }
+        }
+        """
+
+    data = graphql_request(mutation, {"threadId": thread["id"]})
+    if not data:
+        return False
+
+    thread["isResolved"] = should_resolve
+    thread["resolvedBy"] = (
+        {"login": review_bot_login} if should_resolve else None
+    )
+    return True
+
+
+def set_comment_threads_resolved(comments, thread_by_comment_id, should_resolve):
+    changed = 0
+    visited_thread_ids = set()
+
+    for comment in comments:
+        thread = thread_by_comment_id.get(int(comment["id"]))
+        if not thread or thread["id"] in visited_thread_ids:
+            continue
+        visited_thread_ids.add(thread["id"])
+        if set_review_thread_resolved(thread, should_resolve):
+            changed += 1
+    return changed
+
+
+def select_current_comment(comments, task, thread_by_comment_id):
+    for comment in comments:
+        thread = thread_by_comment_id.get(int(comment["id"]))
+        anchor_matches = (
+            comment.get("path") == task["file"] and
+            comment.get("line") == task["line"]
+        )
+        if anchor_matches and (not thread or not thread.get("isOutdated")):
+            return comment
+    return comments[0] if comments else None
+
+
+def was_resolved_by_bot(thread):
+    resolved_by = (thread or {}).get("resolvedBy") or {}
+    return resolved_by.get("login") == review_bot_login
+
+
+def build_comment_body(task, result):
+    fence = FENCE_MAP.get(task["language"], "text")
+    if task["language"] == "python":
+        comment_block = f'"""\n{result.get("comment", "")}\n"""'
+    else:
+        comment_block = result.get("comment", "")
+
+    identity_marker = REVIEW_KEY_MARKER.format(task["review_key"])
+    if result.get("status") == "improve":
+        return f"""{MARKER}
+{identity_marker}
+### 💬 Suggested Improvement
+
+```{fence}
+{comment_block}
+```
+
+📌 이유:
+{result.get("reason", "")}
+"""
+
+    return f"""{MARKER}
+{identity_marker}
+### ✨ Suggested Comment
+
+```{fence}
+{comment_block}
+```
+"""
 
 
 def set_status(state, desc, commit_sha):
@@ -872,6 +1165,7 @@ def main():
         return
 
     additions = parse_added_lines(diff)
+    changed_files = parse_changed_files(diff)
 
     added_map = {}
     for a in additions:
@@ -882,7 +1176,7 @@ def main():
     tasks = []
     task_id = 1
 
-    for file_path in file_set:
+    for file_path in sorted(file_set):
         content = get_file_content(file_path, commit_sha)
         if not content:
             continue
@@ -897,6 +1191,7 @@ def main():
             code = "\n".join(lines[start:end+1])
             existing = extract_existing_comment(file_path, lines, start)
             name = extract_function_name(file_path, lines, start)
+            signature = extract_function_signature(file_path, lines, start)
 
             lang = "cpp"
             if file_path.endswith(".cs"):
@@ -912,157 +1207,193 @@ def main():
                 "line": comment_line,
                 "language": lang,
                 "name": name,
+                "review_key": make_review_key(file_path, signature),
                 "code": code,
                 "existing_comment": existing
             })
             task_id += 1
 
-    if not tasks:
-        log.info("No functions to review")
-        set_status("success", "No functions to review", commit_sha)
-        return
-
     valid_ids = {t["id"] for t in tasks}
 
     # --- Gemini API ---
 
-    client = genai.Client(api_key=api_key)
     results = []
     fail_count = 0
 
-    try:
-        for batch_tasks in chunked_by_size(tasks):
-            prompt = build_batch_prompt(batch_tasks)
+    if not tasks:
+        log.info("No functions to review; checking outdated bot threads")
+    else:
+        client = genai.Client(api_key=api_key)
+        try:
+            for batch_tasks in chunked_by_size(tasks):
+                prompt = build_batch_prompt(batch_tasks)
 
-            response = None
-            for attempt in range(GEMINI_MAX_RETRIES):
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt,
-                        config={
-                            "response_mime_type": "application/json"
-                        }
-                    )
-                    if response and response.text:
-                        break
-                except Exception as e:
-                    log.warning("Gemini API attempt %d failed: %s", attempt + 1, e)
-                    response = None
+                response = None
+                for attempt in range(GEMINI_MAX_RETRIES):
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=prompt,
+                            config={
+                                "response_mime_type": "application/json"
+                            }
+                        )
+                        if response and response.text:
+                            break
+                    except Exception as e:
+                        log.warning("Gemini API attempt %d failed: %s", attempt + 1, e)
+                        response = None
+                        continue
+
+                if not response or not response.text:
+                    fail_count += 1
                     continue
 
-            if not response or not response.text:
-                fail_count += 1
-                continue
+                json_text = extract_json(response.text)
+                if not json_text:
+                    fail_count += 1
+                    continue
 
-            json_text = extract_json(response.text)
-            if not json_text:
-                fail_count += 1
-                continue
-
-            try:
-                parsed = json.loads(json_text)
-                validated = validate_results(parsed, valid_ids)
-                results.extend(validated)
-            except json.JSONDecodeError as e:
-                log.warning("JSON parse failed: %s", e)
-                fail_count += 1
-                continue
-    finally:
-        client.close()
+                try:
+                    parsed = json.loads(json_text)
+                    validated = validate_results(parsed, valid_ids)
+                    results.extend(validated)
+                except json.JSONDecodeError as e:
+                    log.warning("JSON parse failed: %s", e)
+                    fail_count += 1
+                    continue
+        finally:
+            client.close()
 
     # --- GitHub 코멘트 관리 ---
 
     existing_comments = get_all_comments()
-    existing_map = build_existing_map(existing_comments)
+    review_threads = get_review_threads()
+    comments_by_key, comments_by_location = build_existing_maps(existing_comments)
+    thread_by_comment_id, bot_threads = build_thread_maps(review_threads)
 
     task_map = {t["id"]: t for t in tasks}
-    current_keys = set()
-    stats = {"created": 0, "updated": 0, "deleted": 0, "skipped_ok": 0}
+    comments_by_task_id = {
+        task_id: find_existing_comments(task, comments_by_key, comments_by_location)
+        for task_id, task in task_map.items()
+    }
+    active_comment_ids = set()
+    stats = {
+        "created": 0,
+        "updated": 0,
+        "resolved": 0,
+        "reopened": 0,
+        "suppressed": 0,
+        "skipped_ok": 0
+    }
 
     for result in results:
+        task = task_map.get(result.get("id"))
+        if not task or result.get("status") != "ok":
+            continue
+
+        stats["skipped_ok"] += 1
+        stats["resolved"] += set_comment_threads_resolved(
+            comments_by_task_id.get(task["id"], []),
+            thread_by_comment_id,
+            True
+        )
+
+    actionable = []
+    for result in results:
         if result.get("status") == "ok":
-            stats["skipped_ok"] += 1
+            continue
+        task = task_map.get(result.get("id"))
+        if not task:
             continue
 
-        t = task_map.get(result.get("id"))
-        if not t:
-            continue
+        existing = comments_by_task_id.get(task["id"], [])
+        priority = (
+            0 if existing else 1,
+            0 if result.get("status") == "improve" else 1,
+            task["id"]
+        )
+        actionable.append((priority, task, result, existing))
 
-        key = (t["file"], t["line"])
-        current_keys.add(key)
+    actionable.sort(key=lambda item: item[0])
+    selected = actionable[:MAX_REVIEW_COMMENTS]
+    suppressed = actionable[MAX_REVIEW_COMMENTS:]
+    stats["suppressed"] = len(suppressed)
 
-        fence = FENCE_MAP.get(t["language"], "text")
+    for _, task, _, existing in suppressed:
+        active_comment_ids.update(int(comment["id"]) for comment in existing)
 
-        if t["language"] == "python":
-            comment_block = f'"""\n{result.get("comment","")}\n"""'
-        else:
-            comment_block = result.get("comment", "")
+    result_task_ids = {result.get("id") for result in results}
+    for task_id, existing in comments_by_task_id.items():
+        if task_id not in result_task_ids:
+            active_comment_ids.update(int(comment["id"]) for comment in existing)
 
-        if result.get("status") == "improve":
-            body = f"""{MARKER}
-### 💬 Suggested Improvement
+    for _, task, result, existing in selected:
+        body = build_comment_body(task, result)
+        primary = select_current_comment(existing, task, thread_by_comment_id)
 
-```{fence}
-{comment_block}
-```
+        if primary:
+            primary_thread = thread_by_comment_id.get(int(primary["id"]))
+            if primary_thread and primary_thread.get("isOutdated"):
+                stats["resolved"] += set_comment_threads_resolved(
+                    existing, thread_by_comment_id, True)
+                primary = None
 
-📌 이유:
-{result.get("reason","")}
-"""
-        else:
-            body = f"""{MARKER}
-### ✨ Suggested Comment
-
-```{fence}
-{comment_block}
-```
-"""
-
-        if key in existing_map:
-            comment_list = existing_map[key]
-            safe_request(
+        if primary:
+            active_comment_ids.add(int(primary["id"]))
+            if safe_request(
                 requests.patch,
-                f"https://api.github.com/repos/{repo}/pulls/comments/{comment_list[0]['id']}",
+                f"https://api.github.com/repos/{repo}/pulls/comments/{primary['id']}",
                 headers=gh_headers(),
                 json={"body": body},
                 timeout=REQUEST_TIMEOUT
-            )
-            stats["updated"] += 1
-            for dup in comment_list[1:]:
-                safe_request(
-                    requests.delete,
-                    f"https://api.github.com/repos/{repo}/pulls/comments/{dup['id']}",
-                    headers=gh_headers(),
-                    timeout=REQUEST_TIMEOUT
-                )
-                stats["deleted"] += 1
-        else:
-            safe_request(
-                requests.post,
-                f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments",
-                headers=gh_headers(),
-                json={
-                    "body": body,
-                    "commit_id": commit_sha,
-                    "path": t["file"],
-                    "line": t["line"],
-                    "side": "RIGHT"
-                },
-                timeout=REQUEST_TIMEOUT
-            )
+            ):
+                stats["updated"] += 1
+
+            primary_thread = thread_by_comment_id.get(int(primary["id"]))
+            if was_resolved_by_bot(primary_thread) and set_review_thread_resolved(primary_thread, False):
+                stats["reopened"] += 1
+
+            duplicates = [
+                comment for comment in existing
+                if int(comment["id"]) != int(primary["id"])
+            ]
+            stats["resolved"] += set_comment_threads_resolved(
+                duplicates, thread_by_comment_id, True)
+            continue
+
+        if safe_request(
+            requests.post,
+            f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments",
+            headers=gh_headers(),
+            json={
+                "body": body,
+                "commit_id": commit_sha,
+                "path": task["file"],
+                "line": task["line"],
+                "side": "RIGHT"
+            },
+            timeout=REQUEST_TIMEOUT
+        ):
             stats["created"] += 1
 
-    for key, comment_list in existing_map.items():
-        if key not in current_keys:
-            for c in comment_list:
-                safe_request(
-                    requests.delete,
-                    f"https://api.github.com/repos/{repo}/pulls/comments/{c['id']}",
-                    headers=gh_headers(),
-                    timeout=REQUEST_TIMEOUT
-                )
-                stats["deleted"] += 1
+    if fail_count == 0:
+        for thread in bot_threads:
+            if thread.get("isResolved") or not thread.get("isOutdated"):
+                continue
+            if thread.get("path") not in changed_files:
+                continue
+
+            bot_comment_ids = {
+                int(comment["databaseId"])
+                for comment in (thread.get("comments") or {}).get("nodes") or []
+                if comment.get("databaseId") is not None and
+                is_managed_comment(comment)
+            }
+            if bot_comment_ids & active_comment_ids:
+                continue
+            if set_review_thread_resolved(thread, True):
+                stats["resolved"] += 1
 
     log.info("")
     log.info("=" * 50)
@@ -1071,7 +1402,9 @@ def main():
     log.info("Gemini batches    : failed %d", fail_count)
     log.info("Comments created  : %d", stats['created'])
     log.info("Comments updated  : %d", stats['updated'])
-    log.info("Comments deleted  : %d", stats['deleted'])
+    log.info("Threads resolved  : %d", stats['resolved'])
+    log.info("Threads reopened  : %d", stats['reopened'])
+    log.info("Comments suppressed: %d", stats['suppressed'])
     log.info("Skipped (ok)      : %d", stats['skipped_ok'])
     log.info("=" * 50)
 
