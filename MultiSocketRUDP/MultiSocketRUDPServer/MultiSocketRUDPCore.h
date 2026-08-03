@@ -7,7 +7,8 @@
 #include <MSWSock.h>
 #include "../Common/TLS/TLSHelper.h"
 #include "RUDPSession.h"
-#include "Queue.h"
+#include <mutex>
+#include <queue>
 #include <vector>
 #include "RUDPSessionFunctionDelegate.h"
 #include "IOContext.h"
@@ -30,6 +31,21 @@ class MultiSocketRUDPCore : public ICore
 {
 	friend MultiSocketRUDPCoreFunctionDelegate;
 	friend MultiSocketRUDPCoreTestAccess;
+
+private:
+	// Receives are produced by an I/O worker and consumed by its paired logic worker.
+	// Owning synchronization here also gives the queue a deterministic, cycle-free teardown.
+	class RecvIOCompletedQueue final
+	{
+	public:
+		void Enqueue(RecvIOCompletedContext* inContext);
+		[[nodiscard]]
+		bool Dequeue(RecvIOCompletedContext** outContext);
+
+	private:
+		std::mutex queueLock;
+		std::queue<RecvIOCompletedContext*> contexts;
+	};
 
 public:
 	explicit MultiSocketRUDPCore(std::wstring&& inSessionBrokerCertStoreName, std::wstring&& inSessionBrokerCertSubjectName);
@@ -179,7 +195,7 @@ private:
 	HANDLE retransmissionStopEventHandle{};
 
 	// objects
-	std::vector<CListBaseQueue<RecvIOCompletedContext*>> recvIOCompletedContexts;
+	std::vector<std::unique_ptr<RecvIOCompletedQueue>> recvIOCompletedContexts;
 	std::list<SessionIdType> releaseSessionIdList;
 	std::mutex releaseSessionIdListLock;
 	CTLSMemoryPool<RecvIOCompletedContext> recvIOCompletedContextPool;
