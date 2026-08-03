@@ -84,7 +84,14 @@ jobs:
             -ServerWorkingDirectory "MultiSocketRUDP/ContentsServer" `
             -BenchmarkDll "MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/bin/Release/net9.0-windows7.0/MultiSocketRUDPBotTester.RttBenchmark.dll" `
             -OutputDirectory "rtt-results" `
-            -CommitSha $env:BENCHMARK_COMMIT_SHA
+            -CommitSha $env:BENCHMARK_COMMIT_SHA `
+            -ServerThreadCount 1 `
+            -ZeroLossWarmupSamples 500 `
+            -ZeroLossSamples 1000 `
+            -LossWarmupSamples 100 `
+            -LossSamples 1000 `
+            -RunCount 5 `
+            -RunTimeoutSeconds 300
 
       - name: Load official benchmark history
         shell: pwsh

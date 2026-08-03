@@ -80,6 +80,7 @@ def create_entry(results: list[dict[str, Any]]) -> dict[str, Any]:
         "serverBuild": first["serverBuild"],
         "botTesterBuild": first["botTesterBuild"],
         "ioWorkerSleepMode": first["ioWorkerSleepMode"],
+        "serverThreadCount": first["serverThreadCount"],
         "environment": first["environment"],
         "scenarios": scenarios,
     }
@@ -136,6 +137,7 @@ def render_markdown(history_before_update: dict[str, Any], entry: dict[str, Any]
         "",
         f"Commit: `{entry['commitSha'][:12]}`  ",
         f"Server: `{entry['serverBuild']}`, IO worker: `{entry['ioWorkerSleepMode']}`  ",
+        f"Server threads: `{entry['serverThreadCount']}`  ",
         f"BotTester: `{entry['botTesterBuild']}`",
         "",
         "| Scenario | Samples × Runs | Median Avg | Median P95 | Δ P95 | Median P99 | Δ P99 | Worst Max |",

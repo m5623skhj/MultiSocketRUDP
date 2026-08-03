@@ -22,8 +22,11 @@ public static class RttBenchmarkExecutor
                     options.TimeoutMs,
                     options.LossRate,
                     unchecked(options.SeedBase - 1));
-                await WaitForRunAsync(warmup, options, "warmup");
-                Console.WriteLine($"[{options.ScenarioName}] warmup completed");
+                var warmupSummary = await WaitForRunAsync(warmup, options, "warmup");
+                Console.WriteLine(
+                    $"[{options.ScenarioName}] warmup completed: " +
+                    $"elapsed={warmupSummary.ElapsedSeconds:F2}s " +
+                    $"rate={CalculateSamplesPerSecond(options.WarmupSampleCount, warmupSummary):F2} samples/s");
             }
 
             var runs = new List<RttTestSummary>(options.RunCount);
@@ -42,7 +45,9 @@ public static class RttBenchmarkExecutor
                 runs.Add(summary);
                 Console.WriteLine(
                     $"[{options.ScenarioName}] run {runNumber}/{options.RunCount} completed: " +
-                    $"P95={summary.P95RttMs:F6} ms P99={summary.P99RttMs:F6} ms");
+                    $"P95={summary.P95RttMs:F6} ms P99={summary.P99RttMs:F6} ms " +
+                    $"elapsed={summary.ElapsedSeconds:F2}s " +
+                    $"rate={CalculateSamplesPerSecond(options.SampleCount, summary):F2} samples/s");
             }
 
             return new RttBenchmarkResult
@@ -56,6 +61,7 @@ public static class RttBenchmarkExecutor
                 WarmupSampleCount = options.WarmupSampleCount,
                 TimeoutMs = options.TimeoutMs,
                 RunTimeoutSeconds = options.RunTimeoutSeconds,
+                ServerThreadCount = options.ServerThreadCount,
                 SeedBase = options.SeedBase,
                 Environment = CaptureEnvironment(),
                 Runs = runs,
@@ -66,6 +72,11 @@ public static class RttBenchmarkExecutor
         {
             core.StopBotTest();
         }
+    }
+
+    private static double CalculateSamplesPerSecond(int sampleCount, RttTestSummary summary)
+    {
+        return sampleCount / Math.Max(summary.ElapsedSeconds, double.Epsilon);
     }
 
     private static async Task<RttTestSummary> WaitForRunAsync(
