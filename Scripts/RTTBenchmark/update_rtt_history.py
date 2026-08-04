@@ -7,6 +7,7 @@ import argparse
 import html
 import json
 import math
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
@@ -15,7 +16,6 @@ from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
 CHART_WIDTH = 960
-CHART_HEIGHT = 420
 PLOT_LEFT = 78
 PLOT_RIGHT = 930
 PLOT_TOP = 112
@@ -54,7 +54,7 @@ def load_results(paths: Iterable[Path]) -> list[dict[str, Any]]:
     return sorted(results, key=lambda result: float(result["lossRate"]))
 
 
-def create_entry(results: list[dict[str, Any]]) -> dict[str, Any]:
+def create_entry(results: list[dict[str, Any]], commit_subject: str | None = None) -> dict[str, Any]:
     first = results[0]
     recorded_at = max(result["recordedAtUtc"] for result in results)
     scenarios = []
@@ -76,6 +76,7 @@ def create_entry(results: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "commitSha": first["commitSha"],
+        "commitSubject": commit_subject.strip() if commit_subject else None,
         "recordedAtUtc": recorded_at,
         "serverBuild": first["serverBuild"],
         "botTesterBuild": first["botTesterBuild"],
@@ -93,6 +94,25 @@ def upsert_entry(history: dict[str, Any], entry: dict[str, Any]) -> None:
             entries[index] = entry
             return
     entries.append(entry)
+
+
+def populate_commit_subjects(history: dict[str, Any], repository_path: Path | None) -> None:
+    if repository_path is None:
+        return
+
+    for entry in history["entries"]:
+        if entry.get("commitSubject"):
+            continue
+        completed_process = subprocess.run(
+            ["git", "-C", str(repository_path), "log", "-1", "--format=%s", entry["commitSha"]],
+            capture_output=True,
+            check=False,
+            encoding="utf-8",
+            text=True,
+        )
+        commit_subject = completed_process.stdout.strip()
+        if completed_process.returncode == 0 and commit_subject:
+            entry["commitSubject"] = commit_subject
 
 
 def find_scenario(entry: dict[str, Any], loss_rate: float) -> dict[str, Any] | None:
@@ -118,6 +138,20 @@ def format_rtt(value_ms: float) -> str:
     if abs(value_ms) < 1.0:
         return f"{value_ms * 1000.0:.3f} µs"
     return f"{value_ms:.3f} ms"
+
+
+def format_rtt_ms(value_ms: float) -> str:
+    return f"{value_ms:.3f} ms"
+
+
+def format_recorded_date(recorded_at_utc: str) -> str:
+    return datetime.fromisoformat(recorded_at_utc.replace("Z", "+00:00")).strftime("%Y-%m-%d")
+
+
+def truncate_text(value: str, max_characters: int) -> str:
+    if len(value) <= max_characters:
+        return value
+    return value[: max_characters - 1] + "…"
 
 
 def previous_scenario(history: dict[str, Any], entry: dict[str, Any], loss_rate: float) -> dict[str, Any] | None:
@@ -176,6 +210,9 @@ def render_markdown(history_before_update: dict[str, Any], entry: dict[str, Any]
     lines.extend(
         [
             "",
+            f"Measured at (UTC): `{entry['recordedAtUtc']}`  ",
+            f"Commit log: {entry.get('commitSubject') or '-'}",
+            "",
             "Positive deltas mean RTT increased. The 10% scenario applies loss independently to BotTester TX and RX.",
             "",
         ]
@@ -221,6 +258,7 @@ def render_svg(history: dict[str, Any], loss_rate: float, max_points: int) -> st
 
     p95_values = [float(find_scenario(entry, loss_rate)["aggregate"]["medianP95RttMs"]) for entry in entries]
     p99_values = [float(find_scenario(entry, loss_rate)["aggregate"]["medianP99RttMs"]) for entry in entries]
+    chart_height = 500 + max(0, len(entries) - 1) * 21
     all_values = p95_values + p99_values
     use_microseconds = max(all_values) < 1.0
     axis_min, axis_max = _axis_range(all_values)
@@ -243,9 +281,9 @@ def render_svg(history: dict[str, Any], loss_rate: float, max_points: int) -> st
     )
 
     svg = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{CHART_WIDTH}" height="{CHART_HEIGHT}" viewBox="0 0 {CHART_WIDTH} {CHART_HEIGHT}">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{CHART_WIDTH}" height="{chart_height}" viewBox="0 0 {CHART_WIDTH} {chart_height}">',
         '<rect width="100%" height="100%" fill="#0d1117" rx="12"/>',
-        '<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}</style>',
+        '<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}.table-header{font-size:12px;font-weight:600}.table-row{font-size:12px}</style>',
         f'<text x="28" y="38" class="title">{html.escape(title)}</text>',
         f'<text x="28" y="65" class="subtitle">{html.escape(subtitle)}</text>',
         '<line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>',
@@ -275,29 +313,93 @@ def render_svg(history: dict[str, Any], loss_rate: float, max_points: int) -> st
             svg.append(f'<circle cx="{x_position(index):.2f}" cy="{y_position(value):.2f}" r="4" fill="{color}"><title>{format_rtt(value)}</title></circle>')
 
     svg.append('<text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>')
+    svg.extend(
+        [
+            '<line x1="28" y1="426" x2="932" y2="426" stroke="#30363d" stroke-width="1"/>',
+            '<text x="28" y="447" class="table-header">Date (UTC)</text>',
+            '<text x="122" y="447" class="table-header">Commit</text>',
+            '<text x="210" y="447" class="table-header">Commit log</text>',
+            '<text x="815" y="447" text-anchor="end" class="table-header">P95</text>',
+            '<text x="930" y="447" text-anchor="end" class="table-header">P99</text>',
+            '<line x1="28" y1="456" x2="932" y2="456" stroke="#30363d" stroke-width="1"/>',
+        ]
+    )
+
+    for index, entry in enumerate(entries):
+        scenario = find_scenario(entry, loss_rate)
+        aggregate = scenario["aggregate"]
+        y = 478 + index * 21
+        commit_subject = truncate_text(entry.get("commitSubject") or "-", 66)
+        svg.append(f'<text x="28" y="{y}" class="table-row">{format_recorded_date(entry["recordedAtUtc"])}</text>')
+        svg.append(f'<text x="122" y="{y}" class="table-row">{html.escape(entry["commitSha"][:7])}</text>')
+        svg.append(f'<text x="210" y="{y}" class="table-row">{html.escape(commit_subject)}</text>')
+        svg.append(
+            f'<text x="815" y="{y}" text-anchor="end" class="table-row">'
+            f'{format_rtt_ms(float(aggregate["medianP95RttMs"]))}</text>'
+        )
+        svg.append(
+            f'<text x="930" y="{y}" text-anchor="end" class="table-row">'
+            f'{format_rtt_ms(float(aggregate["medianP99RttMs"]))}</text>'
+        )
+
     svg.append("</svg>")
     return "\n".join(svg)
 
 
-def render_data_readme(entry: dict[str, Any]) -> str:
-    return "\n".join(
+def render_data_readme(history: dict[str, Any], entry: dict[str, Any], max_points: int) -> str:
+    lines = [
+        "# RTT benchmark history",
+        "",
+        f"The JSON file keeps the complete official history. Charts and the table render the latest {max_points} `main` measurements.",
+        "",
+        "## Packet loss 0%",
+        "",
+        "![RTT loss 0%](./rtt-loss-0.svg)",
+        "",
+        "## BotTester TX/RX loss 10%",
+        "",
+        "![RTT loss 10%](./rtt-loss-10.svg)",
+        "",
+        "## Recent measurements",
+        "",
+        "| Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+
+    for history_entry in reversed(history["entries"][-max_points:]):
+        zero_loss = find_scenario(history_entry, 0.0)
+        ten_percent_loss = find_scenario(history_entry, 0.1)
+        zero_aggregate = zero_loss["aggregate"] if zero_loss else None
+        ten_percent_aggregate = ten_percent_loss["aggregate"] if ten_percent_loss else None
+
+        def table_value(aggregate: dict[str, Any] | None, metric: str) -> str:
+            return format_rtt_ms(float(aggregate[metric])) if aggregate else "-"
+
+        commit_subject = (history_entry.get("commitSubject") or "-").replace("|", "\\|")
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_recorded_date(history_entry["recordedAtUtc"]),
+                    f"`{history_entry['commitSha'][:7]}`",
+                    commit_subject,
+                    table_value(zero_aggregate, "medianP95RttMs"),
+                    table_value(zero_aggregate, "medianP99RttMs"),
+                    table_value(ten_percent_aggregate, "medianP95RttMs"),
+                    table_value(ten_percent_aggregate, "medianP99RttMs"),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
         [
-            "# RTT benchmark history",
-            "",
-            "The JSON file keeps the complete official history. Charts render the latest 10 `main` measurements.",
-            "",
-            "## Packet loss 0%",
-            "",
-            "![RTT loss 0%](./rtt-loss-0.svg)",
-            "",
-            "## BotTester TX/RX loss 10%",
-            "",
-            "![RTT loss 10%](./rtt-loss-10.svg)",
             "",
             f"Last updated by `{entry['commitSha']}` at {entry['recordedAtUtc']}.",
             "",
         ]
     )
+    return "\n".join(lines)
 
 
 def write_outputs(
@@ -307,12 +409,15 @@ def write_outputs(
     output_directory: Path,
     markdown_path: Path,
     max_points: int,
+    commit_subject: str | None = None,
+    repository_path: Path | None = None,
 ) -> None:
     history = load_history(history_path)
     history_before_update = json.loads(json.dumps(history))
     results = load_results(result_paths)
-    entry = create_entry(results)
+    entry = create_entry(results, commit_subject)
     upsert_entry(history, entry)
+    populate_commit_subjects(history, repository_path)
 
     output_history_path.parent.mkdir(parents=True, exist_ok=True)
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -325,7 +430,7 @@ def write_outputs(
     markdown_path.write_text(render_markdown(history_before_update, entry), encoding="utf-8")
     (output_directory / "rtt-loss-0.svg").write_text(render_svg(history, 0.0, max_points), encoding="utf-8")
     (output_directory / "rtt-loss-10.svg").write_text(render_svg(history, 0.1, max_points), encoding="utf-8")
-    (output_directory / "README.md").write_text(render_data_readme(entry), encoding="utf-8")
+    (output_directory / "README.md").write_text(render_data_readme(history, entry, max_points), encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
@@ -336,6 +441,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--markdown", type=Path, required=True)
     parser.add_argument("--max-points", type=int, default=10)
+    parser.add_argument("--repository", type=Path)
     args = parser.parse_args()
     if args.max_points <= 0:
         parser.error("--max-points must be positive")
@@ -351,6 +457,7 @@ def main() -> int:
         args.output_dir,
         args.markdown,
         args.max_points,
+        repository_path=args.repository,
     )
     return 0
 

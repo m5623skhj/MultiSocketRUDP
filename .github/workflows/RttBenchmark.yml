@@ -124,6 +124,7 @@ jobs:
             --output-history rtt-results/preview-history.json `
             --output-dir rtt-results/preview `
             --markdown rtt-results/rtt-summary.md `
+            --repository . `
             --max-points 10
           if ($LASTEXITCODE -ne 0) { throw "Failed to generate RTT summary." }
 
@@ -184,6 +185,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: source
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -225,6 +227,7 @@ jobs:
             --output-history "$history_root/rtt-history.json" \
             --output-dir "$history_root" \
             --markdown "$history_root/latest-summary.md" \
+            --repository source \
             --max-points 10
 
           git -C "$history_root" config user.name "github-actions[bot]"
