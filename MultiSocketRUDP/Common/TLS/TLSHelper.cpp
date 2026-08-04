@@ -1,34 +1,36 @@
 #include "PreCompile.h"
 #include "TLSHelper.h"
-#include <fstream>
+#include <utility>
 #include <vector>
-#include <sstream>
 
 namespace TLSHelper
 {
-    constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
-
-    [[nodiscard]]
-    SECURITY_STATUS AcquireServerCredentials(PCCERT_CONTEXT certContext, OUT CredHandle& credHandle)
+    namespace
     {
-        SCHANNEL_CRED cred = {};
-        cred.dwVersion = SCHANNEL_CRED_VERSION;
-        cred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER;
-        cred.cCreds = 1;
-        cred.paCred = &certContext;
-        cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
+        constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
 
-        return AcquireCredentialsHandle(
-            nullptr,
-            const_cast<LPWSTR>(UNISP_NAME),
-            SECPKG_CRED_INBOUND,
-            nullptr,
-            &cred,
-            nullptr,
-            nullptr,
-            &credHandle,
-            nullptr
-        );
+        class ContextBufferGuard
+        {
+        public:
+            explicit ContextBufferGuard(SecBuffer& inBuffer)
+                : buffer(inBuffer)
+            {
+            }
+
+            ~ContextBufferGuard()
+            {
+                if (buffer.pvBuffer)
+                {
+                    FreeContextBuffer(buffer.pvBuffer);
+                }
+            }
+
+            ContextBufferGuard(const ContextBufferGuard&) = delete;
+            ContextBufferGuard& operator=(const ContextBufferGuard&) = delete;
+
+        private:
+            SecBuffer& buffer;
+        };
     }
 
     TLSHelperBase::TLSHelperBase()
@@ -259,375 +261,71 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperClient::Initialize()
+    bool TLSHelperBase::SendHandshakeToken(const SOCKET socket, SecBuffer& tokenBuffer)
     {
-        SCHANNEL_CRED cred = {};
-        cred.dwVersion = SCHANNEL_CRED_VERSION;
-        cred.grbitEnabledProtocols = 0;
-        cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;
-
-        lastStatus = AcquireCredentialsHandle(
-            nullptr,
-            const_cast<LPWSTR>(UNISP_NAME),
-            SECPKG_CRED_OUTBOUND,
-            nullptr,
-            &cred,
-            nullptr,
-            nullptr,
-            &credHandle,
-            nullptr
-        );
-
-        return lastStatus == SEC_E_OK;
-    }
-
-    bool TLSHelperClient::Handshake(const SOCKET socket)
-    {
-        handshakeCompleted = false;
-        CtxtHandle* pContext = nullptr;
-        std::vector<char> recvBuffer;
-        recvBuffer.reserve(HANDSHAKE_BUFFER_SIZE);
-
-        SECURITY_STATUS status;
-        do
+        ContextBufferGuard bufferGuard(tokenBuffer);
+        if (tokenBuffer.cbBuffer == 0 || tokenBuffer.pvBuffer == nullptr)
         {
-            SecBuffer outBuffers[1] = {};
-            outBuffers[0].BufferType = SECBUFFER_TOKEN;
-            outBuffers[0].pvBuffer = nullptr;
-            outBuffers[0].cbBuffer = 0;
+            return true;
+        }
 
-            SecBufferDesc outBufferDesc = {};
-            outBufferDesc.cBuffers = 1;
-            outBufferDesc.pBuffers = outBuffers;
-            outBufferDesc.ulVersion = SECBUFFER_VERSION;
-
-            SecBuffer inBuffers[2] = {};
-            SecBufferDesc inBufferDesc = {};
-
-            if (pContext)
-            {
-                inBuffers[0].pvBuffer = recvBuffer.data();
-                inBuffers[0].cbBuffer = static_cast<DWORD>(recvBuffer.size());
-                inBuffers[0].BufferType = SECBUFFER_TOKEN;
-                inBuffers[1].BufferType = SECBUFFER_EMPTY;
-
-                inBufferDesc.cBuffers = 2;
-                inBufferDesc.pBuffers = inBuffers;
-                inBufferDesc.ulVersion = SECBUFFER_VERSION;
-            }
-
-            DWORD contextAttr;
-            status = InitializeSecurityContext(
-                &credHandle,
-                pContext,
-                nullptr,
-                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY,
-                0,
-                SECURITY_NATIVE_DREP,
-                pContext ? &inBufferDesc : nullptr,
-                0,
-                &ctxtHandle,
-                &outBufferDesc,
-                &contextAttr,
-                nullptr
-            );
-
-            if (outBuffers[0].cbBuffer > 0 && outBuffers[0].pvBuffer)
-            {
-                int totalSent = 0;
-                const int sendSize = static_cast<int>(outBuffers[0].cbBuffer);
-                while (totalSent < sendSize)
-                {
-                    const int sent = send(socket
-                        , static_cast<const char*>(outBuffers[0].pvBuffer) + totalSent
-                        , sendSize - totalSent
-                        , 0);
-
-                    if (sent == SOCKET_ERROR)
-                    {
-                        FreeContextBuffer(outBuffers[0].pvBuffer);
-                        return false;
-                    }
-                    totalSent += sent;
-                }
-                FreeContextBuffer(outBuffers[0].pvBuffer);
-            }
-
-            if (status == SEC_E_OK)
-            {
-                break;
-            }
-
-            if (status != SEC_I_CONTINUE_NEEDED && status != SEC_E_INCOMPLETE_MESSAGE)
+        int totalSent = 0;
+        const int sendSize = static_cast<int>(tokenBuffer.cbBuffer);
+        while (totalSent < sendSize)
+        {
+            const int sent = send(
+                socket,
+                static_cast<const char*>(tokenBuffer.pvBuffer) + totalSent,
+                sendSize - totalSent,
+                0);
+            if (sent <= 0)
             {
                 return false;
             }
 
-            if (pContext && (inBuffers[1].BufferType == SECBUFFER_EXTRA && inBuffers[1].cbBuffer > 0))
-            {
-                std::vector extraData(
-                    recvBuffer.end() - inBuffers[1].cbBuffer,
-                    recvBuffer.end()
-                );
-                recvBuffer = std::move(extraData);
-            }
-            else
-            {
-                recvBuffer.clear();
-            }
-
-            if (status == SEC_I_CONTINUE_NEEDED || status == SEC_E_INCOMPLETE_MESSAGE)
-            {
-                char tempBuffer[HANDSHAKE_BUFFER_SIZE];
-                const int received = recv(socket, tempBuffer, sizeof(tempBuffer), 0);
-                if (received <= 0)
-                {
-                    return false;
-                }
-                recvBuffer.insert(recvBuffer.end(), tempBuffer, tempBuffer + received);
-            }
-
-            pContext = &ctxtHandle;
-
-        } while (status == SEC_I_CONTINUE_NEEDED || status == SEC_E_INCOMPLETE_MESSAGE);
-
-        if (status != SEC_E_OK)
-        {
-            return false;
+            totalSent += sent;
         }
-
-        handshakeCompleted = true;
-        QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
 
         return true;
     }
 
-    TLSHelperServer::TLSHelperServer(ServerCertificateConfig inCertificateConfig)
-        : certificateConfig(std::move(inCertificateConfig))
+    bool TLSHelperBase::ReceiveHandshakeData(const SOCKET socket, std::vector<char>& recvBuffer)
     {
+        char tempBuffer[HANDSHAKE_BUFFER_SIZE];
+        const int received = recv(socket, tempBuffer, sizeof(tempBuffer), 0);
+        if (received <= 0)
+        {
+            return false;
+        }
+
+        recvBuffer.insert(recvBuffer.end(), tempBuffer, tempBuffer + received);
+        return true;
     }
 
-    bool TLSHelperServer::Initialize()
+    void TLSHelperBase::PreserveExtraHandshakeData(std::vector<char>& recvBuffer, const SecBuffer& extraBuffer)
     {
-        switch (certificateConfig.source)
+        if (extraBuffer.BufferType != SECBUFFER_EXTRA || extraBuffer.cbBuffer == 0)
         {
-        case ServerCertificateSource::Store:
-            return InitializeFromStore();
-        case ServerCertificateSource::PfxFile:
-            return InitializeFromPfxFile();
-        default:
-            return false;
+            recvBuffer.clear();
+            return;
         }
+
+        const auto* extraDataBegin = static_cast<const char*>(extraBuffer.pvBuffer);
+        std::vector<char> extraData(extraDataBegin, extraDataBegin + extraBuffer.cbBuffer);
+        recvBuffer = std::move(extraData);
     }
 
-    bool TLSHelperServer::InitializeFromStore()
+    bool TLSHelperBase::FinalizeHandshake()
     {
-        const HCERTSTORE hStore = CertOpenStore(
-            CERT_STORE_PROV_SYSTEM,
-            0,
-            0,
-            CERT_SYSTEM_STORE_CURRENT_USER,
-            certificateConfig.storeName.c_str()
-        );
-
-        if (not hStore)
-        {
-            return false;
-        }
-
-        PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
-            hStore,
-            X509_ASN_ENCODING,
-            0,
-            CERT_FIND_SUBJECT_STR,
-            certificateConfig.certSubjectName.c_str(),
-            nullptr
-        );
-
-        if (nullptr == pCertContext)
-        {
-            CertCloseStore(hStore, 0);
-            return false;
-        }
-
-        lastStatus = AcquireServerCredentials(pCertContext, credHandle);
-
-        CertFreeCertificateContext(pCertContext);
-        CertCloseStore(hStore, 0);
-
-        return lastStatus == SEC_E_OK;
-    }
-
-    bool TLSHelperServer::InitializeFromPfxFile()
-    {
-        std::ifstream pfxStream(certificateConfig.pfxFilePath, std::ios::binary | std::ios::ate);
-        if (not pfxStream.is_open())
-        {
-            return false;
-        }
-
-        const std::streamsize pfxSize = pfxStream.tellg();
-        if (pfxSize <= 0)
-        {
-            return false;
-        }
-
-        std::vector<char> pfxBuffer(static_cast<size_t>(pfxSize));
-        pfxStream.seekg(0, std::ios::beg);
-        if (not pfxStream.read(pfxBuffer.data(), pfxSize))
-        {
-            return false;
-        }
-
-        CRYPT_DATA_BLOB pfxBlob{};
-        pfxBlob.cbData = static_cast<DWORD>(pfxBuffer.size());
-        pfxBlob.pbData = reinterpret_cast<BYTE*>(pfxBuffer.data());
-
-        const HCERTSTORE hStore = PFXImportCertStore(
-            &pfxBlob,
-            certificateConfig.pfxPassword.c_str(),
-            CRYPT_EXPORTABLE
-        );
-        if (hStore == nullptr)
-        {
-            return false;
-        }
-
-        PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
-            hStore,
-            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-            0,
-            CERT_FIND_HAS_PRIVATE_KEY,
-            nullptr,
-            nullptr
-        );
-        if (pCertContext == nullptr)
-        {
-            CertCloseStore(hStore, 0);
-            return false;
-        }
-
-        lastStatus = AcquireServerCredentials(pCertContext, credHandle);
-
-        CertFreeCertificateContext(pCertContext);
-        CertCloseStore(hStore, 0);
-
-        return lastStatus == SEC_E_OK;
-    }
-
-    bool TLSHelperServer::Handshake(const SOCKET socket)
-    {
-        if (handshakeCompleted)
+        lastStatus = QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
+        if (lastStatus != SEC_E_OK)
         {
             DeleteSecurityContext(&ctxtHandle);
             ZeroMemory(&ctxtHandle, sizeof(ctxtHandle));
-        }
-
-        handshakeCompleted = false;
-        CtxtHandle* pContext = nullptr;
-        std::vector<char> recvBuffer;
-        recvBuffer.reserve(HANDSHAKE_BUFFER_SIZE);
-
-        SECURITY_STATUS status;
-        do
-        {
-            char tempBuffer[HANDSHAKE_BUFFER_SIZE];
-            const int received = recv(socket, tempBuffer, sizeof(tempBuffer), 0);
-            if (received <= 0)
-            {
-                return false;
-            }
-            recvBuffer.insert(recvBuffer.end(), tempBuffer, tempBuffer + received);
-
-            SecBuffer inBuffers[2] = {};
-            inBuffers[0].pvBuffer = recvBuffer.data();
-            inBuffers[0].cbBuffer = static_cast<DWORD>(recvBuffer.size());
-            inBuffers[0].BufferType = SECBUFFER_TOKEN;
-            inBuffers[1].BufferType = SECBUFFER_EMPTY;
-
-            SecBufferDesc inBufferDesc = {};
-            inBufferDesc.cBuffers = 2;
-            inBufferDesc.pBuffers = inBuffers;
-            inBufferDesc.ulVersion = SECBUFFER_VERSION;
-
-            SecBuffer outBuffers[1] = {};
-            outBuffers[0].BufferType = SECBUFFER_TOKEN;
-            outBuffers[0].pvBuffer = nullptr;
-            outBuffers[0].cbBuffer = 0;
-
-            SecBufferDesc outBufferDesc = {};
-            outBufferDesc.cBuffers = 1;
-            outBufferDesc.pBuffers = outBuffers;
-            outBufferDesc.ulVersion = SECBUFFER_VERSION;
-
-            DWORD contextAttr;
-            status = AcceptSecurityContext(
-                &credHandle,
-                pContext,
-                &inBufferDesc,
-                ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY | ASC_REQ_STREAM | ASC_REQ_ALLOCATE_MEMORY,
-                SECURITY_NATIVE_DREP,
-                &ctxtHandle,
-                &outBufferDesc,
-                &contextAttr,
-                nullptr
-            );
-
-            if (outBuffers[0].cbBuffer > 0 && outBuffers[0].pvBuffer)
-            {
-                int totalSent = 0;
-                const int sendSize = static_cast<int>(outBuffers[0].cbBuffer);
-                while (totalSent < sendSize)
-                {
-                    const int sent = send(socket
-                        , static_cast<const char*>(outBuffers[0].pvBuffer) + totalSent
-                        , sendSize - totalSent
-                        , 0
-                    );
-
-                    if (sent == SOCKET_ERROR)
-                    {
-                        FreeContextBuffer(outBuffers[0].pvBuffer);
-                        return false;
-                    }
-                    totalSent += sent;
-                }
-                FreeContextBuffer(outBuffers[0].pvBuffer);
-            }
-
-            if (status == SEC_E_OK || status == SEC_I_CONTINUE_NEEDED)
-            {
-                if (inBuffers[1].BufferType == SECBUFFER_EXTRA && inBuffers[1].cbBuffer > 0)
-                {
-                    std::vector extraData(recvBuffer.end() - inBuffers[1].cbBuffer, recvBuffer.end());
-                    recvBuffer = std::move(extraData);
-                }
-                else
-                {
-                    recvBuffer.clear();
-                }
-            }
-            else if (status == SEC_E_INCOMPLETE_MESSAGE)
-            {
-                continue;
-            }
-            else
-            {
-                return false;
-            }
-
-            pContext = &ctxtHandle;
-
-        } while (status == SEC_I_CONTINUE_NEEDED);
-
-        if (status != SEC_E_OK)
-        {
             return false;
         }
 
         handshakeCompleted = true;
-        QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_STREAM_SIZES, &streamSizes);
-
         return true;
     }
 }

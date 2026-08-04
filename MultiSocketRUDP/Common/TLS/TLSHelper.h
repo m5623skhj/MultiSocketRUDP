@@ -90,6 +90,15 @@ namespace TLSHelper
 		bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
 
 	protected:
+		[[nodiscard]]
+		static bool SendHandshakeToken(SOCKET socket, SecBuffer& tokenBuffer);
+		[[nodiscard]]
+		static bool ReceiveHandshakeData(SOCKET socket, std::vector<char>& recvBuffer);
+		static void PreserveExtraHandshakeData(std::vector<char>& recvBuffer, const SecBuffer& extraBuffer);
+		[[nodiscard]]
+		bool FinalizeHandshake();
+
+	protected:
 		CredHandle credHandle;
 		CtxtHandle ctxtHandle;
 		SECURITY_STATUS lastStatus = SEC_E_OK;

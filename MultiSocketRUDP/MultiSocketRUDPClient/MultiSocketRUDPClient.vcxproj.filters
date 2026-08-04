@@ -42,6 +42,9 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\TLS\TLSHelperClient.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
     <ClCompile Include="ServerAliveChecker.cpp">
       <Filter>소스 파일\MultiSocketClientCore</Filter>
     </ClCompile>
