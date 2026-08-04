@@ -60,7 +60,8 @@
             "totalRetransmissionSuspectedCount": 3206
           }
         }
-      ]
+      ],
+      "commitSubject": "* Receive context 큐 종료 행잉 수정   * 재사용 노드의 stale link로 소멸자가 무한 순회하던 CListBaseQueue 제거   * worker별 receive context 큐의 producer와 consumer 접근 동기화   * 큐 소멸 순환과 남은 개수 확인 경쟁 조건 제거   * IntegrationTest 종료 단계의 간헐적 타임아웃 방지"
     },
     {
       "commitSha": "03293c8f5918ecf5ff439340d1fb40464d2895f4",
@@ -121,7 +122,8 @@
             "totalRetransmissionSuspectedCount": 179
           }
         }
-      ]
+      ],
+      "commitSubject": "* 주석 수정 및 추가"
     },
     {
       "commitSha": "f75b7248d10a57a3a172a02ddd9b8dcf535effbf",
@@ -180,6 +182,69 @@
             "worstMaxRttMs": 264.875,
             "medianElapsedSeconds": 5.877264,
             "totalRetransmissionSuspectedCount": 165
+          }
+        }
+      ],
+      "commitSubject": "* TLS 파일 분리"
+    },
+    {
+      "commitSha": "34b8102718e718a90ef60cb5e0c45818e626fca2",
+      "commitSubject": "* README RTT 표에서 현재 RTT를 알 수 있도록 추가",
+      "recordedAtUtc": "2026-08-04T11:02:11.1842539+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000000834",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.11745119999999983,
+            "medianMinRttMs": 0.0637,
+            "medianP50RttMs": 0.1198,
+            "medianP95RttMs": 0.1622,
+            "medianP99RttMs": 0.1922,
+            "medianMaxRttMs": 0.5349,
+            "worstMaxRttMs": 5.8757,
+            "medianElapsedSeconds": 0.123041,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.05161230000001,
+            "medianMinRttMs": 0.0163,
+            "medianP50RttMs": 0.0963,
+            "medianP95RttMs": 32.4164,
+            "medianP99RttMs": 62.1351,
+            "medianMaxRttMs": 165.1103,
+            "worstMaxRttMs": 501.6764,
+            "medianElapsedSeconds": 6.0549964,
+            "totalRetransmissionSuspectedCount": 167
           }
         }
       ]

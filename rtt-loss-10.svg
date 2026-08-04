@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="563" viewBox="0 0 960 563">
 <rect width="100%" height="100%" fill="#0d1117" rx="12"/>
-<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}</style>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}.table-header{font-size:12px;font-weight:600}.table-row{font-size:12px}</style>
 <text x="28" y="38" class="title">RTT trend — BotTester TX/RX loss 10%</text>
-<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 -52.00%, P99 -41.30%</text>
+<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 -0.58%, P99 -3.37%</text>
 <line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>
 <line x1="830" y1="36" x2="860" y2="36" stroke="#f85149" stroke-width="3"/><text x="868" y="41" class="legend">P99</text>
 <line x1="78" y1="340.00" x2="930" y2="340.00" stroke="#30363d" stroke-width="1"/>
@@ -20,17 +20,48 @@
 <text x="18" y="226.00" transform="rotate(-90 18 226.00)" text-anchor="middle" class="axis">RTT (ms)</text>
 <text x="78.00" y="367" text-anchor="middle" class="label">cb43718</text>
 <text x="78.00" y="384" text-anchor="middle" class="label">08-03</text>
-<text x="504.00" y="367" text-anchor="middle" class="label">03293c8</text>
-<text x="504.00" y="384" text-anchor="middle" class="label">08-03</text>
-<text x="930.00" y="367" text-anchor="middle" class="label">f75b724</text>
+<text x="362.00" y="367" text-anchor="middle" class="label">03293c8</text>
+<text x="362.00" y="384" text-anchor="middle" class="label">08-03</text>
+<text x="646.00" y="367" text-anchor="middle" class="label">f75b724</text>
+<text x="646.00" y="384" text-anchor="middle" class="label">08-04</text>
+<text x="930.00" y="367" text-anchor="middle" class="label">34b8102</text>
 <text x="930.00" y="384" text-anchor="middle" class="label">08-04</text>
-<polyline points="78.00,213.44 504.00,307.15 930.00,307.43" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="78.00,213.44 362.00,307.15 646.00,307.43 930.00,307.41" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="78.00" cy="213.44" r="4" fill="#58a6ff"><title>102.392 ms</title></circle>
-<circle cx="504.00" cy="307.15" r="4" fill="#58a6ff"><title>32.606 ms</title></circle>
-<circle cx="930.00" cy="307.43" r="4" fill="#58a6ff"><title>32.400 ms</title></circle>
-<polyline points="78.00,144.57 504.00,264.59 930.00,265.02" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="362.00" cy="307.15" r="4" fill="#58a6ff"><title>32.606 ms</title></circle>
+<circle cx="646.00" cy="307.43" r="4" fill="#58a6ff"><title>32.400 ms</title></circle>
+<circle cx="930.00" cy="307.41" r="4" fill="#58a6ff"><title>32.416 ms</title></circle>
+<polyline points="78.00,144.57 362.00,264.59 646.00,265.02 930.00,267.50" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="78.00" cy="144.57" r="4" fill="#f85149"><title>153.679 ms</title></circle>
-<circle cx="504.00" cy="264.59" r="4" fill="#f85149"><title>64.302 ms</title></circle>
-<circle cx="930.00" cy="265.02" r="4" fill="#f85149"><title>63.983 ms</title></circle>
+<circle cx="362.00" cy="264.59" r="4" fill="#f85149"><title>64.302 ms</title></circle>
+<circle cx="646.00" cy="265.02" r="4" fill="#f85149"><title>63.983 ms</title></circle>
+<circle cx="930.00" cy="267.50" r="4" fill="#f85149"><title>62.135 ms</title></circle>
 <text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>
+<line x1="28" y1="426" x2="932" y2="426" stroke="#30363d" stroke-width="1"/>
+<text x="28" y="447" class="table-header">Date (UTC)</text>
+<text x="122" y="447" class="table-header">Commit</text>
+<text x="210" y="447" class="table-header">Commit log</text>
+<text x="815" y="447" text-anchor="end" class="table-header">P95</text>
+<text x="930" y="447" text-anchor="end" class="table-header">P99</text>
+<line x1="28" y1="456" x2="932" y2="456" stroke="#30363d" stroke-width="1"/>
+<text x="28" y="478" class="table-row">2026-08-03</text>
+<text x="122" y="478" class="table-row">cb43718</text>
+<text x="210" y="478" class="table-row">* Receive context 큐 종료 행잉 수정   * 재사용 노드의 stale link로 소멸자가 무한 순회하던…</text>
+<text x="815" y="478" text-anchor="end" class="table-row">102.392 ms</text>
+<text x="930" y="478" text-anchor="end" class="table-row">153.679 ms</text>
+<text x="28" y="499" class="table-row">2026-08-03</text>
+<text x="122" y="499" class="table-row">03293c8</text>
+<text x="210" y="499" class="table-row">* 주석 수정 및 추가</text>
+<text x="815" y="499" text-anchor="end" class="table-row">32.606 ms</text>
+<text x="930" y="499" text-anchor="end" class="table-row">64.302 ms</text>
+<text x="28" y="520" class="table-row">2026-08-04</text>
+<text x="122" y="520" class="table-row">f75b724</text>
+<text x="210" y="520" class="table-row">* TLS 파일 분리</text>
+<text x="815" y="520" text-anchor="end" class="table-row">32.400 ms</text>
+<text x="930" y="520" text-anchor="end" class="table-row">63.983 ms</text>
+<text x="28" y="541" class="table-row">2026-08-04</text>
+<text x="122" y="541" class="table-row">34b8102</text>
+<text x="210" y="541" class="table-row">* README RTT 표에서 현재 RTT를 알 수 있도록 추가</text>
+<text x="815" y="541" text-anchor="end" class="table-row">32.416 ms</text>
+<text x="930" y="541" text-anchor="end" class="table-row">62.135 ms</text>
 </svg>
