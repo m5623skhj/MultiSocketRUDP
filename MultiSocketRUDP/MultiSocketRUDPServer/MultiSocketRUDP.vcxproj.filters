@@ -72,6 +72,9 @@
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\TLS\TLSHelperServer.cpp">
+      <Filter>소스 파일\lib</Filter>
+    </ClCompile>
     <ClCompile Include="..\Common\FlowController\RUDPFlowController.cpp">
       <Filter>소스 파일\lib</Filter>
     </ClCompile>

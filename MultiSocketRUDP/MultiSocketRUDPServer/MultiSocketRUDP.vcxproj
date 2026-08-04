@@ -26,6 +26,7 @@
     <ClCompile Include="..\Common\FlowController\RUDPFlowController.cpp" />
     <ClCompile Include="..\Common\FlowController\RUDPReceiveWindow.cpp" />
     <ClCompile Include="..\Common\TLS\TLSHelper.cpp" />
+    <ClCompile Include="..\Common\TLS\TLSHelperServer.cpp" />
     <ClCompile Include="MemoryTracer.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.cpp" />
     <ClCompile Include="MultiSocketRUDPCore.Workers.cpp" />
