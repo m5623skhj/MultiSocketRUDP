@@ -70,14 +70,19 @@ void OnDisconnected() override;
 void OnReleased() override;
 ```
 
+### `BeginIOShutdown`
+
+```cpp
+void BeginIOShutdown();
+```
+
+해제 세션의 수신 로직을 drain한 후 `OnDisconnected`와 소켓 종료를 수행한다. 수신 로직이 남아 있으면 상태를 변경하지 않고 다음 해제 반복에서 다시 시도한다.
+
 ### 의미
 
 - `OnConnected()`: CONNECT 수락 직후
 - `OnDisconnected()`: 사용자 수신 로직이 끝난 뒤 `BeginIOShutdown()`에서 socket을 닫기 직전
 - `OnReleased()`: 풀 반환 직전, 재사용 전 상태 초기화 지점
-
----
-
 ## 최소 예시
 
 ```cpp
@@ -120,6 +125,14 @@ void Player::OnPing(const Ping&)
 
 `DoDisconnect()`가 `RELEASING` 전이와 release queue 등록을 수행하는 즉시 호출되는 훅은 아니다. release worker는 `pendingRecvLogic`과 처리 중 플래그가 0이 된 뒤 `BeginIOShutdown()`에서 훅을 한 번 호출하며, 이어서 소켓을 닫아 신규 I/O 등록을 차단한다. 이후 기존 send/receive 작업과 `activeIOCompletions`가 drain될 때까지 세션은 `RELEASING` 상태로 유지된다.
 
+#### `BeginIOShutdown`
+
+```cpp
+void BeginIOShutdown();
+```
+
+해제 세션의 수신 로직 drain 후 `OnDisconnected`와 소켓 종료를 한 번만 수행한다.  
+수신 로직이 남아 있으면 상태를 변경하지 않고 다음 해제 반복에서 다시 시도한다.
 ### 2. `OnReleased()`에서는 상태 초기화만 하는 편이 낫다
 
 세션은 이후 풀에서 재사용된다. 멤버 변수 초기화 지점으로 이해하는 것이 맞다.

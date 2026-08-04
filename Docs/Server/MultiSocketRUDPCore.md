@@ -90,6 +90,10 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
         └─ for i in 0..N: RIOCreateCompletionQueue(ceil(numOfSockets/N) * (RECV_OUTSTANDING_COUNT + 1))
 
 8. RunAllThreads()
+```cpp
+[[nodiscard]]
+bool RunAllThreads();
+```
    ├─ recvLogicThreadEventStopHandle = CreateEvent(manual, FALSE)
    ├─ sessionReleaseStopEventHandle  = CreateEvent(manual, FALSE)
    ├─ sessionReleaseEventHandle      = CreateEvent(auto,   FALSE)
@@ -121,6 +125,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
 > SessionBroker가 클라이언트를 수락하면, 세션에 DoRecv()가 등록되기 전에  
 > 패킷이 도착해 유실될 수 있다. 1초 대기로 이를 방지한다.
 
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ### 사용 예시 (전체)
 
 ```cpp
@@ -244,14 +249,26 @@ void StopServer();
 - 서버 전체 종료 진입점이다.
 - 브로커 중단, 세션 소켓 정리, 워커 스레드 정지, 세션 메모리 반환, Logger 종료, `WSACleanup()`를 순서대로 수행한다.
 
-#### `void SetFatalErrorHandler(ServerFatalErrorHandler inHandler)`
-- 공유 worker pipeline을 계속 신뢰할 수 없는 치명 오류를 상위 레이어에 전달할 callback을 등록한다.
-- callback은 오류 발생 worker thread에서 호출되므로 제어 스레드에 재시작 요청을 전달하는 짧은 작업만 수행해야 한다.
+### `SetFatalErrorHandler`
 
-#### `std::optional<ServerFatalError> GetFatalError() const`
-- 코어 instance 수명 동안 저장된 최초 치명 오류를 반환한다.
-- 오류가 없으면 `std::nullopt`를 반환한다.
+```cpp
+void SetFatalErrorHandler(ServerFatalErrorHandler inHandler);
+```
 
+서버가 안전하게 계속 실행될 수 없는 오류를 상위 레이어에 전달할 콜백을 설정한다.
+
+오류 보고 시 콜백은 해당 worker thread에서 호출되므로 `StopServer()`를 동기적으로 호출하지 말고, 상위 레이어의 제어 스레드에 종료 또는 재시작 요청을 전달해야 한다. 오류 발생 후 등록하면 `SetFatalErrorHandler()` 호출 스레드에서 저장된 최초 오류를 즉시 전달한다.
+### `GetFatalError`
+
+```cpp
+[[nodiscard]]
+std::optional<ServerFatalError> GetFatalError() const;
+```
+
+코어 instance 수명 동안 저장된 최초 치명 오류를 반환한다.
+오류가 없으면 `std::nullopt`를 반환한다.
+
+반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 #### `bool IsServerStopped() const`
 - 서버가 완전히 종료되었는지 반환한다.
 

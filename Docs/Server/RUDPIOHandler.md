@@ -43,10 +43,25 @@ RUDPIOHandler
 - RIO 매니저, 세션 delegate, IOContext 풀, 스레드별 재전송 scheduler를 주입받는다.
 - 재전송 기본 주기와 테스트용 datagram 손실 시뮬레이션 설정도 생성 시점에 고정된다.
 
-#### `bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId, LONG status) const`
-- IO Worker에서 호출되는 완료 분기 진입점이다.
-- 요청 당시 generation과 현재 세대를 비교한 뒤 `context->ioType`에 따라 RECV와 SEND 완료 처리를 분기한다. 오류·취소 completion도 이 함수에서 수명 정리를 수행한다.
+### `IOCompleted`
 
+```cpp
+[[nodiscard]]
+bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId, LONG status = 0) const override;
+```
+
+IO Worker에서 호출되는 완료 분기 진입점이다.
+요청 당시 generation과 현재 세대를 비교한 뒤 `context->ioType`에 따라 RECV와 SEND 완료 처리를 분기한다. 오류·취소 completion도 이 함수에서 수명 정리를 수행한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `context` | `IOContext*` | 완료된 IO 컨텍스트 |
+| `transferred` | `ULONG` | 전송된 바이트 수 |
+| `threadId` | `BYTE` | 호출 스레드 ID |
+| `status` | `LONG` | IO 완료 상태 (기본값: 0) |
+
+**반환값**
+작업 성공 여부를 반환한다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ### `DoRecv`
 
 ```cpp
@@ -61,12 +76,40 @@ bool DoRecv(RUDPSession& session) const override;
 
 ### 비공개 함수
 
-#### `bool RecvIOCompleted(IOContext* contextResult, ULONG transferred, BYTE threadId) const`
-- 수신 완료 데이터를 `NetBuffer`로 복사해 RecvLogic Worker로 넘기고, 곧바로 다음 `DoRecv()`를 재등록한다.
+### `IOCompleted`
 
-#### `bool SendIOCompleted(IOContext* context, BYTE threadId) const`
-- 송신 완료 후 `IO_NONE_SENDING`을 복구하고 후속 송신을 이어간다.
+```cpp
+[[nodiscard]]
+bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId, LONG status = 0) const override;
+```
 
+I/O 작업 완료를 처리한다. 완료된 데이터를 처리하고 필요한 경우 다음 I/O 작업을 재등록한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `context` | `IOContext*` | 완료된 I/O 작업의 컨텍스트 |
+| `transferred` | `ULONG` | 전송된 바이트 수 |
+| `threadId` | `BYTE` | 호출 스레드 ID |
+| `status` | `LONG` | [선택] I/O 작업 상태 코드 (기본값: 0) |
+
+**반환값**: 작업 처리 성공 여부를 반환한다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
+### `IOCompleted`
+
+```cpp
+[[nodiscard]]
+bool IOCompleted(IOContext* context, ULONG transferred, BYTE threadId, LONG status = 0) const override;
+```
+
+I/O 완료 이벤트를 처리한다. 송신 완료 후 `IO_NONE_SENDING`을 복구하고 후속 송신을 이어간다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `context` | `IOContext*` | 완료된 I/O 컨텍스트 |
+| `transferred` | `ULONG` | 전송된 바이트 수 |
+| `threadId` | `BYTE` | 처리 스레드 ID |
+| `status` | `LONG` | I/O 작업 결과 상태 코드 (기본값 0) |
+
+**반환값**: 처리 성공 시 `true`, 실패 시 `false`를 반환한다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 #### `bool TryRIOSend(RUDPSession& session, IOContext* context) const`
 - 준비된 send context를 실제 RIO Send 호출로 연결한다.
 
@@ -116,7 +159,7 @@ bool DoRecv(RUDPSession& session) const override;
                 nullptr, nullptr, 0,
                 context)) {               // RequestContext는 이 slot의 IOContext
             recvBuffer.CompleteRecvIo();
-            recvBuffer.ReleaseRecvContext(context);
+            ReleaseRecvContext(context);
             return false;
         }
     }
@@ -137,6 +180,14 @@ bool DoRecv(RUDPSession& session) const override;
 수신 완료 뒤에는 해제된 context를 다시 등록해 동시 수신 대기 수를 유지한다.
 
 > 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
+
+### `ReleaseRecvContext`
+
+```cpp
+void ReleaseRecvContext(IOContext* context) const;
+```
+
+컨텍스트를 원래 `RecvBuffer`의 자유 큐(free queue)에 반환하고 수신 I/O 추적 수를 감소시킨다.
 ## 4. DoSend — 송신 시도 (SpinLock 방식)
 
 ```cpp
@@ -326,6 +377,14 @@ bool RUDPIOHandler::IOCompleted(
 }
 ```
 
+#### `ReleaseRecvContext` (내부 메서드)
+
+```cpp
+void ReleaseRecvContext(IOContext* context) const;
+```
+
+컨텍스트를 원래 `RecvBuffer`의 자유 큐(free queue)에 반환하고 수신 I/O 추적 수를 감소시킨다.
+
 **`IOContext` 구조체:**
 
 ```cpp
@@ -344,9 +403,6 @@ struct IOContext {
 ```
 
 receive용 `IOContext`는 `RecvBufferSlot`이 `shared_ptr`로 소유한다. receive/send 요청은 RIO 등록 직전에 `ownerSessionGeneration`을 기록하며, 완료 처리는 저장된 session 포인터·ID·generation을 함께 검증한다.
-
----
-
 ## 8. RecvIOCompleted — 수신 완료
 
 ```cpp
@@ -385,6 +441,14 @@ bool RUDPIOHandler::RecvIOCompleted(
 }
 ```
 
+#### `ReleaseRecvContext`
+
+```cpp
+void ReleaseRecvContext(IOContext* context) const;
+```
+
+컨텍스트를 원래 `RecvBuffer`의 자유 큐에 반환하고 수신 I/O 추적 수를 감소시킨다.
+
 **왜 복사가 필요한가:**
 
 ```
@@ -395,9 +459,6 @@ NetBuffer: 메모리 풀에서 할당한 독립 버퍼
   → RecvLogic Worker가 자기 속도로 처리
   → 처리 완료 후 NetBuffer::Free()
 ```
-
----
-
 ## 9. SendIOCompleted — 송신 완료
 
 ```cpp
