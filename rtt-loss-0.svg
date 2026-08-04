@@ -2,31 +2,35 @@
 <rect width="100%" height="100%" fill="#0d1117" rx="12"/>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}</style>
 <text x="28" y="38" class="title">RTT trend — packet loss 0%</text>
-<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 -99.67%, P99 -99.61%</text>
+<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 -99.42%, P99 -99.37%</text>
 <line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>
 <line x1="830" y1="36" x2="860" y2="36" stroke="#f85149" stroke-width="3"/><text x="868" y="41" class="legend">P99</text>
 <line x1="78" y1="340.00" x2="930" y2="340.00" stroke="#30363d" stroke-width="1"/>
 <text x="68" y="344.00" text-anchor="end" class="axis">0.00</text>
 <line x1="78" y1="294.40" x2="930" y2="294.40" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="298.40" text-anchor="end" class="axis">15.25</text>
+<text x="68" y="298.40" text-anchor="end" class="axis">15.26</text>
 <line x1="78" y1="248.80" x2="930" y2="248.80" stroke="#30363d" stroke-width="1"/>
 <text x="68" y="252.80" text-anchor="end" class="axis">30.51</text>
 <line x1="78" y1="203.20" x2="930" y2="203.20" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="207.20" text-anchor="end" class="axis">45.76</text>
+<text x="68" y="207.20" text-anchor="end" class="axis">45.77</text>
 <line x1="78" y1="157.60" x2="930" y2="157.60" stroke="#30363d" stroke-width="1"/>
 <text x="68" y="161.60" text-anchor="end" class="axis">61.02</text>
 <line x1="78" y1="112.00" x2="930" y2="112.00" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="116.00" text-anchor="end" class="axis">76.27</text>
+<text x="68" y="116.00" text-anchor="end" class="axis">76.28</text>
 <text x="18" y="226.00" transform="rotate(-90 18 226.00)" text-anchor="middle" class="axis">RTT (ms)</text>
 <text x="78.00" y="367" text-anchor="middle" class="label">cb43718</text>
 <text x="78.00" y="384" text-anchor="middle" class="label">08-03</text>
-<text x="930.00" y="367" text-anchor="middle" class="label">03293c8</text>
-<text x="930.00" y="384" text-anchor="middle" class="label">08-03</text>
-<polyline points="78.00,152.16 930.00,339.39" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="152.16" r="4" fill="#58a6ff"><title>62.839 ms</title></circle>
-<circle cx="930.00" cy="339.39" r="4" fill="#58a6ff"><title>204.600 µs</title></circle>
-<polyline points="78.00,149.90 930.00,339.26" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="149.90" r="4" fill="#f85149"><title>63.596 ms</title></circle>
-<circle cx="930.00" cy="339.26" r="4" fill="#f85149"><title>248.100 µs</title></circle>
+<text x="504.00" y="367" text-anchor="middle" class="label">03293c8</text>
+<text x="504.00" y="384" text-anchor="middle" class="label">08-03</text>
+<text x="930.00" y="367" text-anchor="middle" class="label">f75b724</text>
+<text x="930.00" y="384" text-anchor="middle" class="label">08-04</text>
+<polyline points="78.00,152.17 504.00,339.39 930.00,339.45" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="152.17" r="4" fill="#58a6ff"><title>62.839 ms</title></circle>
+<circle cx="504.00" cy="339.39" r="4" fill="#58a6ff"><title>204.600 µs</title></circle>
+<circle cx="930.00" cy="339.45" r="4" fill="#58a6ff"><title>183.400 µs</title></circle>
+<polyline points="78.00,149.91 504.00,339.26 930.00,339.40" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="149.91" r="4" fill="#f85149"><title>63.596 ms</title></circle>
+<circle cx="504.00" cy="339.26" r="4" fill="#f85149"><title>248.100 µs</title></circle>
+<circle cx="930.00" cy="339.40" r="4" fill="#f85149"><title>200.100 µs</title></circle>
 <text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>
 </svg>
