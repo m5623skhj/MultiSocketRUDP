@@ -20,6 +20,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public RuntimeContext GlobalContext { get; }
 
         private readonly PacketWaiterRegistry packetWaiters = new();
+        private volatile BotRttSampleCollector? botRttSampleCollector;
+        private long botRttSendTimestamp;
         private long rttSendTimestamp;
         private long rttSocketReceiveTimestamp;
         private long rttFastPathTimestamp;
@@ -46,6 +48,21 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public void EnableRttMode()
         {
             isRttModeEnabled = true;
+        }
+
+        internal void EnableBotRttTracking(BotRttSampleCollector inSampleCollector)
+        {
+            botRttSampleCollector = inSampleCollector;
+        }
+
+        public void BeginBotRttSample()
+        {
+            if (botRttSampleCollector == null)
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref botRttSendTimestamp, Stopwatch.GetTimestamp());
         }
 
         public async Task WaitUntilConnectedAsync(int timeoutMs, CancellationToken cancellationToken)
@@ -131,6 +148,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         {
             Log.Debug("Received packet with ID: {PacketId}", packetId);
 
+            RecordBotRttSample(packetId);
+
             if (packetHandlerDictionary.TryGetValue(packetId, out var action))
             {
                 action.Execute(buffer);
@@ -169,6 +188,23 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         private void CompletePacketWaiters(PacketId packetId, NetBuffer buffer)
         {
             packetWaiters.Complete(packetId, buffer);
+        }
+
+        private void RecordBotRttSample(PacketId inPacketId)
+        {
+            if (inPacketId != PacketId.Pong)
+            {
+                return;
+            }
+
+            var sentTimestamp = Interlocked.Exchange(ref botRttSendTimestamp, 0);
+            if (sentTimestamp == 0)
+            {
+                return;
+            }
+
+            botRttSampleCollector?.RecordSample(
+                Stopwatch.GetElapsedTime(sentTimestamp).TotalMilliseconds);
         }
     }
 }

@@ -20,6 +20,9 @@ namespace MultiSocketRUDPBotTester
             Logs = [];
             DataContext = this;
 
+            BotTesterCore.Instance.BotTestCompleted += OnBotTestCompleted;
+            Closed += (_, _) => BotTesterCore.Instance.BotTestCompleted -= OnBotTestCompleted;
+
             var timer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(1)
@@ -27,6 +30,41 @@ namespace MultiSocketRUDPBotTester
             timer.Tick += (_, e) => UpdateUi();
             timer.Start();
         }
+
+        private void OnBotTestCompleted(BotTestResult inResult)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+            {
+                HostIpTextBox.IsEnabled = true;
+                HostPortTextBox.IsEnabled = true;
+                BotCountTextBox.IsEnabled = true;
+
+                MessageBox.Show(
+                    this,
+                    BuildBotTestResultMessage(inResult),
+                    "Bot Test Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            });
+        }
+
+        private static string BuildBotTestResultMessage(BotTestResult inResult)
+        {
+            var summary = inResult.RttSummary;
+            if (summary.SampleCount == 0)
+            {
+                return $"Bot test completed.\nBots: {inResult.BotCount}\nRTT samples: 0\nNo Ping/Pong RTT samples were recorded.";
+            }
+
+            return
+                $"Bot test completed.\nBots: {inResult.BotCount}\nRTT samples: {summary.SampleCount}\n" +
+                $"Avg: {summary.AverageRttMs:F3} ms\nMin: {summary.MinRttMs:F3} ms\n" +
+                $"P50: {summary.P50RttMs:F3} ms\nP95: {summary.P95RttMs:F3} ms\n" +
+                $"P99: {summary.P99RttMs:F3} ms\nMax: {summary.MaxRttMs:F3} ms\n" +
+                $"Retransmission suspected (>=40ms): {summary.RetransmissionSuspectedCount}\n" +
+                $"Elapsed: {summary.ElapsedSeconds:F3} s";
+        }
+
         private void SetBotActionGraph_Click(object sender, RoutedEventArgs e)
         {
             var window = new BotActionGraphWindow
