@@ -23,6 +23,11 @@ namespace MultiSocketRUDPBotTester.Bot
                     return;
                 }
 
+                if (PacketId == PacketId.Ping)
+                {
+                    client.BeginBotRttSample();
+                }
+
                 _ = client.SendPacket(buffer, PacketId)
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),

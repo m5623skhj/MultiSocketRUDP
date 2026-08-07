@@ -11,12 +11,15 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly SessionGetter sessionGetter = new();
         private readonly Dictionary<SessionIdType, Client> sessionDictionary = new();
         private readonly Lock sessionDictionaryLock = new();
+        private BotTestCompletionTracker? activeBotTestCompletion;
 
         private string hostIp = "";
         private ushort hostPort;
 
         private ActionGraph botActionGraph = new();
         private List<NodeVisual>? savedNodeVisuals;
+
+        public event Action<BotTestResult>? BotTestCompleted;
 
         public void SetConnectionInfo(string targetIp, ushort targetPort)
         {
@@ -61,15 +64,27 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 throw new InvalidOperationException("Connection info not set. Call SetConnectionInfo first.");
             }
 
+            var rttSampleCollector = new BotRttSampleCollector();
+            var completionTracker = new BotTestCompletionTracker(
+                numOfBot,
+                completedBotCount => NotifyBotTestCompleted(new BotTestResult
+                {
+                    BotCount = completedBotCount,
+                    RttSummary = rttSampleCollector.CreateSummary()
+                }));
+            Interlocked.Exchange(ref activeBotTestCompletion, completionTracker)?.Cancel();
+
             for (var i = 0; i < numOfBot; ++i)
             {
                 var rudpSession = await GetSessionInfoFromSessionBroker();
                 if (rudpSession == null)
                 {
+                    completionTracker.Cancel();
                     Log.Error("StartBotTest() failed to get session info from session broker");
                     return;
                 }
 
+                rudpSession.EnableBotRttTracking(rttSampleCollector);
                 rudpSession.SetActionGraph(botActionGraph);
                 rudpSession.OnSessionDisconnected = (sessionId) =>
                 {
@@ -78,6 +93,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         sessionDictionary.Remove(sessionId);
                         Log.Information("Session {Id} removed from dictionary after disconnect", sessionId);
                     }
+
+                    completionTracker.MarkDisconnected();
                 };
 
                 lock (sessionDictionaryLock)
@@ -87,6 +104,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                 sessionGetter.Close();
             }
+
+            completionTracker.MarkSetupComplete();
         }
 
         public Task<RttTestSummary> StartRttTest(int inSampleCount, int inTimeoutMs)
@@ -137,6 +156,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         public void StopBotTest()
         {
+            Interlocked.Exchange(ref activeBotTestCompletion, null)?.Cancel();
+
             lock (sessionDictionaryLock)
             {
                 foreach (var session in sessionDictionary.Values)
@@ -144,6 +165,18 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     session.Disconnect();
                 }
                 sessionDictionary.Clear();
+            }
+        }
+
+        private void NotifyBotTestCompleted(BotTestResult inResult)
+        {
+            try
+            {
+                BotTestCompleted?.Invoke(inResult);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Bot test completion notification failed");
             }
         }
 
