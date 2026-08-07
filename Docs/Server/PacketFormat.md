@@ -128,20 +128,20 @@ Byte
 
 ```
 Byte
- 0    ┌──────────────┐
-      │ HeaderCode   │  1 B
- 1    ├──────────────┤
-      │ PayloadLen   │  2 B
- 3    ├──────────────┤
-      │ Reserved     │  2 B
- 5    ├──────────────┤
-      │ PacketType   │  1 B
- 6    ├──────────────┤
-      │ PacketSeq    │  8 B
-14    ├──────────────┤  ← AES-GCM 암호화 시작
-      │ Payload      │  N B  (PacketId 없음)
-14+N  ├──────────────┤
-      │ AuthTag      │  16 B
+ 0      ┌──────────────┐
+        │ HeaderCode   │  1 B
+ 1      ├──────────────┤
+        │ PayloadLen   │  2 B
+ 3      ├──────────────┤
+        │ Reserved     │  2 B
+ 5      ├──────────────┤
+        │ PacketType   │  1 B
+ 6      ├──────────────┤
+        │ PacketSeq    │  8 B
+14      ├──────────────┤  ← AES-GCM 암호화 시작
+        │ Payload      │  N B  (PacketId 없음)
+14+N    ├──────────────┤
+        │ AuthTag      │  16 B
 14+N+16 └──────────────┘
 
 ← AAD: [0 .. 13] →

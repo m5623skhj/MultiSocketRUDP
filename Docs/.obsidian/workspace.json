@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Server/Ticker.md",
+                "file": "Common/TLSHelper.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ticker"
+              "title": "TLSHelper"
             }
           }
         ]
@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 210.5
   },
   "right": {
     "id": "172ae16f802f879b",
@@ -185,22 +185,41 @@
   },
   "active": "d68527863d5119d9",
   "lastOpenFiles": [
+    "ContentServer/PlayerManager.md",
+    "Logger/Logger.md",
     "Server/ThreadModel.md",
     "Server/Ticker.md",
-    "Troubleshooting.md",
-    "Tools/PacketGenerator.md",
-    "00_Overview.md",
-    "BotTester/AI/AiTreeGenerator.md",
+    "Server/SessionLifecycle.md",
+    "Server/SessionComponents.md",
+    "Server/SendPacketInfo.md",
+    "Server/RUDPThreadManager.md",
+    "Server/RUDPSessionManager.md",
+    "Server/RUDPSessionBroker.md",
+    "Server/RUDPSession.md",
+    "Server/RUDPPacketProcessor.md",
+    "Server/RIOManager.md",
+    "Server/PacketProcessing.md",
+    "Server/Threading/ThreadModelReference.md",
+    "Server/RetransmissionTimeoutEstimator.md",
+    "Server/RUDPIOHandler.md",
+    "Server/PacketFormat.md",
+    "Server/MultiSocketRUDPCore.md",
+    "Server/MemoryTracer.md",
+    "Server/FatalErrorHandling.md",
+    "Server/Threading/WorkerThreads.md",
+    "Server/Threading/LifecycleAndSynchronization.md",
+    "Server/Session/StateCryptoAndSocket.md",
+    "Server/Session/SessionComponentsReference.md",
+    "Server/Session/SendAndFlow.md",
+    "Diagrams/AiTreeFlow.svg",
     "Diagrams/BotTester_Architecture.svg",
     "Diagrams/Connection_Sequence.svg",
     "Diagrams/CryptoStructure.svg",
     "Diagrams/GraphEditor_Layout.svg",
     "Diagrams/NodeHierarchy.svg",
     "Diagrams/PacketFlow.svg",
-    "Diagrams/README.md",
     "Diagrams/SessionStateMachine.svg",
     "Diagrams/ThreadModel.svg",
-    "Diagrams/Architecture_Overview.svg",
-    "Diagrams/AiTreeFlow.svg"
+    "Diagrams/Architecture_Overview.svg"
   ]
 }

@@ -31,19 +31,19 @@
 │                                                                              │
 │  RIODequeueCompletion()                                                      │
 │    │                                                                         │
-│    ├─ BytesTransferred=0 → 빈 데이터그램 처리 후 DoRecv() 재등록                     │
-│    ├─ Status=WSAECONNRESET → DoDisconnect(DISCONNECT_REASON::NORMAL)                  │
-│    ├─ 그 외 Status≠0      → RIO 에러 → DoDisconnect(DISCONNECT_REASON::BY_ERROR)       │
+│    ├─ BytesTransferred=0 → 빈 데이터그램 처리 후 DoRecv() 재등록                 │
+│    ├─ Status=WSAECONNRESET → DoDisconnect(DISCONNECT_REASON::NORMAL)         | 
+|    ├─ 그 외 Status≠0    → RIO 에러 → DoDisconnect(DISCONNECT_REASON::BY_ERROR)|  │                                                                              |
 │    └─ 모든 완료          → IOCompleted(context, transferred, threadId, status)│
 │                                   │                                          │
-│                          ┌────────┴────────┐                                │
+│                          ┌────────┴────────┐                                 │
 │                          │ ioType?         │                                 │
 │                    OP_RECV│                 │OP_SEND                         │
 │                          ▼                 ▼                                 │
 │              RecvIOCompleted()     SendIOCompleted()                         │
-│              NetBuffer 복사        IO_NONE_SENDING 복원                      │
-│              AutoResetEvent.Set()  DoSend() 재호출                           │
-│              DoRecv() 재등록                                                 │
+│              NetBuffer 복사        IO_NONE_SENDING 복원                       │
+│              AutoResetEvent.Set()  DoSend() 재호출                            │
+│              DoRecv() 재등록                                                  │
 └──────────────────────────────────────────────────────────────────────────────┘
                           │
                    AutoResetEvent
@@ -55,15 +55,15 @@
 │    │                                                                         │
 │    └─ OnRecvPacket(threadId)                                                 │
 │         │                                                                    │
-│         ├─ 사전 유효성 검사 (헤더 크기, 클라이언트 주소 크기)               │
+│         ├─ 사전 유효성 검사 (헤더 크기, 클라이언트 주소 크기)                      │
 │         │                                                                    │
 │         └─ ProcessByPacketType(session, clientAddr, buffer)                  │
 │              │                                                               │
 │              ├─ CONNECT_TYPE  → TryConnect()                                 │
-│              ├─ SEND_TYPE     → OnRecvPacket() → 순서 보장 → 핸들러        │
-│              ├─ SEND_REPLY_TYPE → OnSendReply() → CWND 증가                 │
-│              ├─ DISCONNECT_TYPE → DoDisconnect(DISCONNECT_REASON::NORMAL)     │
-│              └─ HEARTBEAT_REPLY_TYPE → OnSendReply()                        │
+│              ├─ SEND_TYPE     → OnRecvPacket() → 순서 보장 → 핸들러            │
+│              ├─ SEND_REPLY_TYPE → OnSendReply() → CWND 증가                   │
+│              ├─ DISCONNECT_TYPE → DoDisconnect(DISCONNECT_REASON::NORMAL)    │
+│              └─ HEARTBEAT_REPLY_TYPE → OnSendReply()                         │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
