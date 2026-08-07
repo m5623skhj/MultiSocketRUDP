@@ -42,7 +42,7 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
         Interlocked.Exchange(ref removedTimestampMs, (long)now);
     }
 
-    public bool IsExceedMaxRetransmissionCount()
+    public bool IsExceedMaxRetransmissionCount()    
     {
         return Interlocked.Read(ref retransmissionCount) >= RetransmissionMaxCount;
     }

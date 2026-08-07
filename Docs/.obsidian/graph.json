@@ -9,27 +9,45 @@
   "colorGroups": [
     {
       "query": "path:Server",
-      "color": { "a": 1, "rgb": 5767168 }
+      "color": {
+        "a": 1,
+        "rgb": 5767168
+      }
     },
     {
       "query": "path:Client",
-      "color": { "a": 1, "rgb": 2109609 }
+      "color": {
+        "a": 1,
+        "rgb": 2109609
+      }
     },
     {
       "query": "path:Common",
-      "color": { "a": 1, "rgb": 14899706 }
+      "color": {
+        "a": 1,
+        "rgb": 14899706
+      }
     },
     {
       "query": "path:Logger",
-      "color": { "a": 1, "rgb": 9109504 }
+      "color": {
+        "a": 1,
+        "rgb": 9109504
+      }
     },
     {
       "query": "path:Tools",
-      "color": { "a": 1, "rgb": 6697728 }
+      "color": {
+        "a": 1,
+        "rgb": 6697728
+      }
     },
     {
       "query": "path:Diagrams",
-      "color": { "a": 1, "rgb": 6710886 }
+      "color": {
+        "a": 1,
+        "rgb": 6710886
+      }
     }
   ],
   "collapse-display": false,
@@ -42,6 +60,6 @@
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 1,
+  "scale": 1.0000000000000004,
   "close": false
 }

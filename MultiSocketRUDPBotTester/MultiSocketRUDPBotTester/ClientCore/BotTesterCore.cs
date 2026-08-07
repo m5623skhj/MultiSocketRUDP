@@ -154,6 +154,11 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
         }
 
+        /// <summary>
+        /// Stops the currently active bot test.
+        /// This cancels the associated completion tracker and forces all active bot sessions to disconnect.
+        /// All sessions are removed from the internal dictionary.
+        /// </summary>
         public void StopBotTest()
         {
             Interlocked.Exchange(ref activeBotTestCompletion, null)?.Cancel();
