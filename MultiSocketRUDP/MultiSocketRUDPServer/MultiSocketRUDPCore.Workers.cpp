@@ -1,4 +1,4 @@
-﻿#include "PreCompile.h"
+#include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 #include "LogExtension.h"
 #include "Logger.h"
@@ -83,6 +83,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(const std::stop_token& stopToken, co
 			ReportFatalError({ SERVER_FATAL_ERROR_CODE::RIO_COMPLETION_QUEUE_CORRUPT, threadId, 0 });
 			return;
 		}
+
 		for (ULONG i = 0; i < numOfResults; ++i)
 		{
 			const auto context = reinterpret_cast<IOContext*>(rioResults[i].RequestContext);
@@ -237,11 +238,13 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 			{
 				break;
 			}
+
 			if (waitResult == WAIT_FAILED)
 			{
 				LOG_ERROR(std::format("Empty retransmission wait failed. error is {}", GetLastError()));
 				break;
 			}
+
 			if (waitResult != WAIT_OBJECT_0)
 			{
 				LOG_ERROR(std::format("Empty retransmission wait returned unexpected result {}", waitResult));
@@ -310,7 +313,6 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 	while (not stopToken.stop_requested())
 	{
 		const auto now = GetTickCount64();
-
 		switch (WaitForMultipleObjects(2, eventHandles, FALSE, INFINITE))
 		{
 		case WAIT_OBJECT_0:

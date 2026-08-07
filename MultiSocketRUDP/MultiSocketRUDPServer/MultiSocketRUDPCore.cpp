@@ -190,9 +190,9 @@ void MultiSocketRUDPCore::SetFatalErrorHandler(ServerFatalErrorHandler inHandler
 		}
 	}
 
-	if (handlerToNotify != nullptr)
+	if (handlerToNotify != nullptr && errorToNotify.has_value())
 	{
-		NotifyFatalErrorHandler(handlerToNotify, *errorToNotify);
+		NotifyFatalErrorHandler(handlerToNotify, errorToNotify.value());
 	}
 }
 
@@ -448,7 +448,6 @@ bool MultiSocketRUDPCore::InitNetwork() const
 	}
 
 	RUDPSession::SetMaximumPacketHoldingQueueSize(maxHoldingPacketQueueSize);
-
 	return true;
 }
 
@@ -632,10 +631,12 @@ void MultiSocketRUDPCore::SignalWorkerStopEvents() const
 	{
 		SetEvent(recvLogicThreadEventStopHandle);
 	}
+
 	if (sessionReleaseStopEventHandle != NULL)
 	{
 		SetEvent(sessionReleaseStopEventHandle);
 	}
+
 	if (retransmissionStopEventHandle != NULL)
 	{
 		SetEvent(retransmissionStopEventHandle);
@@ -737,6 +738,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		LOG_ERROR(std::format("DoRecv failed with error {}", WSAGetLastError()));
 		return CONNECT_RESULT_CODE::DO_RECV_FAILED;
 	}
+
 	releaseOnFailure.Dismiss();
 	return CONNECT_RESULT_CODE::SUCCESS;
 }
@@ -760,6 +762,7 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 		{
 			break;
 		}
+
 		if (context == nullptr)
 		{
 			continue;
@@ -781,6 +784,7 @@ bool MultiSocketRUDPCore::TryDispatchRecvPacket(RecvIOCompletedContext* const co
 	{
 		return false;
 	}
+
 	if (context->session->GetSessionGeneration() != context->ownerSessionGeneration || context->session->IsReleasing())
 	{
 		return false;

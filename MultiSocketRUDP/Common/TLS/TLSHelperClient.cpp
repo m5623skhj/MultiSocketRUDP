@@ -9,7 +9,7 @@ namespace TLSHelper
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = 0;
-        cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;
+        cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
 
         lastStatus = AcquireCredentialsHandle(
             nullptr,
@@ -61,7 +61,7 @@ namespace TLSHelper
                 &credHandle,
                 context,
                 nullptr,
-                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY,
+                ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_MUTUAL_AUTH,
                 0,
                 SECURITY_NATIVE_DREP,
                 context ? &inBufferDesc : nullptr,

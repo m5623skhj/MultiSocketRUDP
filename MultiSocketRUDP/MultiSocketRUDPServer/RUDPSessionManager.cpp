@@ -28,6 +28,7 @@ bool RUDPSessionManager::Initialize(const BYTE inNumOfWorkerThreads, SessionFact
 		LOG_ERROR("The number of worker threads must be greater than zero");
 		return false;
     }
+
     if (factory == nullptr)
     {
 		LOG_ERROR("Session factory function is not set");
@@ -89,8 +90,8 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		LOG_ERROR("Session is not in RELEASING state in ReleaseSession");
 		return false;
 	}
-	const auto disconnectedReason = sessionList[sessionId]->GetDisconnectedReason();
 
+	const auto disconnectedReason = sessionList[sessionId]->GetDisconnectedReason();
 	{
 		std::scoped_lock lock(unusedSessionIdListLock);
 		if (unusedSessionIdSet.contains(sessionId))
@@ -248,6 +249,7 @@ void RUDPSessionManager::DecrementConnectedCount(const DISCONNECT_REASON disconn
 			std::memory_order_relaxed))
 	{
 	}
+
 	if (connectedCount == 0)
 	{
 		LOG_ERROR("Connected user count is already zero");
