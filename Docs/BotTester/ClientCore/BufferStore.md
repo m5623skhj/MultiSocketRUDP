@@ -7,7 +7,7 @@
 
 ## 목차
 
-1. [SendPacketInfo](#1-sendpacketinfo)
+1. [`SendPacketInfo`](#1-sendpacketinfo)
 2. [저장소 API](#2-저장소-api)
 3. [재전송 판정](#3-재전송-판정)
 4. [동시성 보호](#4-동시성-보호)
@@ -25,20 +25,15 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
 | `inSentBuffer` | `NetBuffer` | ACK 전까지 보관하고 재전송할 인코딩된 패킷 |
 | `inPacketSequence` | `PacketSequence` | 저장소 키와 ACK 매칭에 사용하는 시퀀스 |
 
-주요 상태는 아래와 같다.
+주요 메서드를 통해 재전송과 관련된 시간 상태를 관리한다. 모든 숫자 상태는 `Interlocked`를 통해 스레드 안전하게 읽고 갱신한다.
 
-| 상태 | 갱신 규칙 |
-|------|-----------|
-| 생성 시각 | `InitializeSendTimestamp()`의 첫 호출만 기록 |
-| 최근 송신 시각 | 초기 송신과 재전송마다 갱신 |
-| ACK 수신 시각 | `MarkAckReceived()`의 첫 호출만 기록 |
-| 제거 시각 | `MarkRemoved()` 호출마다 갱신 |
-| 재전송 횟수 | `RefreshSendPacketInfo()` 호출마다 증가 |
+### 주요 메서드
 
-모든 숫자 상태는 `Interlocked`로 읽고 갱신한다.
+- `InitializeSendTimestamp(ulong now)` — 생성 시각과 첫 송신 시각을 초기화한다.
+- `RefreshSendPacketInfo(ulong now)` — 최근 송신 시각을 갱신하고 재전송 횟수를 증가시킨다.
+- `IsRetransmissionTime(ulong now)` — `RetransmissionTimeoutMs` 경과 여부를 반환한다.
 
 ---
-
 ## 2. 저장소 API
 
 `BufferStore`는 내부 `SendBufferStore`에 작업을 위임한다.

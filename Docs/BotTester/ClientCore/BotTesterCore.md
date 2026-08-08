@@ -24,8 +24,20 @@ MainWindow
             sessionDictionary.Add(sessionId, client)
 ```
 
----
+### `SetConnectionInfo`
 
+```csharp
+public void SetConnectionInfo(string targetIp, ushort targetPort)
+```
+
+연결 대상 서버의 IP와 포트를 설정한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `targetIp` | `string` | 서버 IP 주소 |
+| `targetPort` | `ushort` | 서버 포트 번호 |
+
+**예외:** `targetIp`가 비어있거나 `targetPort`가 0일 경우 `ArgumentException`이 발생한다.
 ## 세션 브로커 패킷 수신
 
 ```
@@ -80,16 +92,35 @@ int GetActiveBotCount()                   // IsConnected() == true 개수
 #### `List<NodeVisual>? GetSavedGraphVisuals()`
 - 마지막으로 저장한 비주얼 상태를 반환한다.
 
-#### `Task StartBotTest(ushort numOfBot)`
-- 지정한 수만큼 SessionBroker에서 세션 정보를 받아 `Client` 인스턴스를 만들고 행동 그래프를 적용한다.
+#### `StartBotTest`
 
+```csharp
+public async Task StartBotTest(ushort numOfBot)
+```
+
+지정한 수만큼 `SessionBroker`에서 세션 정보를 받아 봇 테스트를 시작하고, 각 세션에 행동 그래프와 RTT 추적기를 적용한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `numOfBot` | `ushort` | 테스트할 봇의 수 |
+
+**예외**
+- `InvalidOperationException`: 연결 정보(`hostIp`, `hostPort`)가 설정되지 않은 상태에서 호출된 경우
+
+**주의사항**
+- 호출 전 `SetConnectionInfo`를 통해 연결 정보가 설정되어 있어야 한다.
+- 내부적으로 `activeBotTestCompletion`을 사용하여 기존에 진행 중인 봇 테스트가 있다면 취소 처리한다.
 #### `Task<RttTestSummary> StartRttTest(...)`
 - SessionBroker에서 단일 세션을 받아 RTT 모드로 전환한 뒤, 지정한 표본 수와 timeout으로 RTT 테스트를 실행한다.
 - 두 번째 overload는 양방향 패킷 손실률과 난수 seed를 함께 지정한다.
 
 #### `void StopBotTest()`
-- 현재 관리 중인 모든 클라이언트 봇을 정리하고 연결을 끊는다.
 
+```csharp
+public void StopBotTest()
+```
+
+현재 활성화된 봇 테스트를 중단한다. 관련 컴플리션 트래커(completion tracker)를 취소하고 모든 활성 봇 세션의 연결을 강제로 해제한다. 세션은 내부 딕셔너리에서 즉시 제거된다.
 #### `int GetActiveBotCount()`
 - 현재 연결된 봇 수를 반환한다.
 
