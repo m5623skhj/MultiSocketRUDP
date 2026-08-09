@@ -94,6 +94,7 @@ auto code = InitReserveSession(*session);
 // InitReserveSession 내부:
 {
 	// 초기화 실패도 안전하게 release queue로 전달할 수 있도록 먼저 예약 상태로 전이
+	session->sessionReservedTime = GetTickCount64();
 	session->stateMachine.SetReserved();
 	auto releaseOnFailure = MakeScopeExit([&] { session->AbortReservedSession(); });
 
@@ -114,12 +115,16 @@ auto code = InitReserveSession(*session);
 // 3. 암호화 키 생성
 InitSessionCrypto(*session);
 
-// 4. 세션 정보 전송 (TLS)
+// 4. 성공 응답 버퍼 구성 직후 timeout 기준 시각 재설정
+SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);
+sessionDelegate.SetSessionReservedTime(*session, GetTickCount64());
+
+// 5. 세션 정보 전송 (TLS)
 SendSessionInfoToClient(...);
 ```
 
 **전이 후 상태:**
-- `reservedTimestamp` 갱신 (30초 타임아웃 카운트 시작)
+- `sessionReservedTime`은 `InitReserveSession()` 시작 시 설정되고, 성공 응답 버퍼 구성 직후 다시 설정된다. 마지막 설정 시각부터 30초 타임아웃을 계산한다.
 - UDP 소켓 바인딩 완료, 클라이언트 패킷 수신 대기
 
 ---
@@ -406,8 +411,8 @@ DoDisconnect():
       → ReleaseSession(id)에서 InitializeSession() / SetDisconnected()
 ```
 
-일반 세션의 `OnDisconnected`와 `OnReleased`는 Session Release Thread에서 위 순서로 실행된다. `BY_ABORT_RESERVED` 경로는 아직 연결되지 않은 예약 세션이므로 두 콘텐츠 훅을 모두 생략하지만, 동일한 close/drain/cleanup 경로를 사용한다.
-두 훅이 다른 스레드에서 실행될 수 있으므로 공유 자원 접근 시 주의해야 한다.
+일반 세션의 `OnDisconnected`와 `OnReleased`는 단일 Session Release Thread에서 위 순서로 실행되므로 두 훅 상호 간에는 별도 동기화가 필요하지 않다. `BY_ABORT_RESERVED` 경로는 아직 연결되지 않은 예약 세션이므로 두 콘텐츠 훅을 모두 생략하지만, 동일한 close/drain/cleanup 경로를 사용한다.
+다만 `OnConnected`는 RecvLogic Worker에서 실행되므로, 연결 훅과 해제 훅 또는 다른 worker가 공유하는 상태에는 동기화가 필요하다.
 
 ---
 

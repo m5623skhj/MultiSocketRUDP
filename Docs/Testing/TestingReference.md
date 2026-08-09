@@ -105,7 +105,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj
 ```
 
-현재 10개 테스트 파일에 `[Fact]`/`[Theory]` 선언 100개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
+현재 12개 테스트 파일에 `[Fact]`/`[Theory]` 선언 107개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
 
 ```powershell
 rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests -g "*Tests.cs"
@@ -123,6 +123,8 @@ rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.Un
 | `NetBufferBoundaryTests.cs` | read/write 경계, 문자열 최대 길이, 짧거나 길이가 불일치한 패킷 거부 |
 | `RudpPureComponentsTests.cs` | broker 응답 parsing, datagram framing, 수신 순서·waiter·RTT 통계 |
 | `RttBenchmarkAggregationTests.cs` | 여러 RTT run의 Average/P95/P99/Max 중앙값 집계 |
+| `BotTestCompletionTrackerTests.cs` | setup/disconnect 완료 시점, 완료 알림 1회 보장, 취소와 동시 disconnect 처리 |
+| `BotRttSampleCollectorTests.cs` | RTT 요약, 빈 표본 결과, 동시 표본 수집 |
 
 실행:
 
@@ -430,7 +432,6 @@ IntegrationClientHarness
 
 | 함수 | 역할 |
 |------|------|
-| `TryInitializeClientTls` | 테스트 전에 TLS client credential 초기화가 가능한지 확인한다. |
 | `GetRootRelativePath` | 테스트 실행 파일 기준으로 저장소 상대 경로를 만든다. |
 | `GetTestOptionPath` | `IntegrationTest` 하위 테스트 옵션 파일 경로를 만든다. |
 | `GetTestCertificatePath` | `TestCert.pfx` 경로를 반환한다. |
@@ -439,7 +440,7 @@ IntegrationClientHarness
 | `CreateTestOptionFiles` | 테스트별 임시 SessionBroker/Client 옵션 파일을 생성한다. |
 | `SetUpTestSuite` | Winsock을 초기화한다. |
 | `TearDownTestSuite` | Winsock을 정리한다. |
-| `SetUp` | 인증서, TLS 초기화, 임시 옵션 파일, 테스트 서버를 준비한다. |
+| `SetUp` | 테스트 PFX 존재 확인, 통계 초기화, 임시 옵션 파일과 테스트 서버 준비를 수행한다. |
 | `TearDown` | 테스트 서버와 임시 상태를 정리한다. |
 | `RunClientScenario` | harness 프로세스를 실행하고 timeout까지 완료를 기다린다. |
 | `BuildClientArgs` | harness 실행 인자에 테스트 옵션 파일 경로를 추가한다. |

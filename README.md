@@ -120,7 +120,7 @@
     * `Packet header` 5byte
     * `Packet type` 1byte
     * `Packet sequence` 8byte
-    * `Packet id` 4byte
+    * `Packet id` 4byte (`SEND_TYPE` 일반 데이터 패킷에만 존재하며 코어 패킷에는 없음)
     * `Packet body` nbyte
     * `Auth tag` 16byte
 

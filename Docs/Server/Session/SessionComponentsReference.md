@@ -112,13 +112,14 @@ public:
     // 접근자
     const unsigned char* GetSessionKey()  const { return sessionKey;  }
     const unsigned char* GetSessionSalt() const { return sessionSalt; }
-    BCRYPT_KEY_HANDLE     GetKeyHandle()  const { return sessionKeyHandle; }
+    const BCRYPT_KEY_HANDLE& GetSessionKeyHandle() const;
+    unsigned char* GetKeyObjectBuffer() const;
 
     // 설정자 (RUDPSessionFunctionDelegate를 통해 접근)
     void SetSessionKey(const unsigned char* key);    // copy_n(key, 16, sessionKey)
     void SetSessionSalt(const unsigned char* salt);  // copy_n(salt, 16, sessionSalt)
     void SetKeyObjectBuffer(unsigned char* buf);
-    void SetSessionKeyHandle(BCRYPT_KEY_HANDLE handle);
+    void SetSessionKeyHandle(const BCRYPT_KEY_HANDLE& handle);
 };
 ```
 
@@ -457,7 +458,7 @@ stateMachine
   → 거의 모든 메서드에서 상태 확인 후 처리
 
 cryptoContext
-  → EncodePacket/DecodePacket에서 GetSessionSalt(), GetKeyHandle() 사용
+  → EncodePacket/DecodePacket에서 GetSessionSalt(), GetSessionKeyHandle() 사용
 
 socketContext
   → DoRecv/DoSend: GetSocket() + GetSocketMutex()
