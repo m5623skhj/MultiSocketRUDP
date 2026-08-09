@@ -433,31 +433,34 @@ RESERVED 상태 세션의 타임아웃을 감지한다.
 void MultiSocketRUDPCore::RunHeartbeatThread(const std::stop_token& stopToken) const
 {
     TickSet tickSet;
+    tickSet.nowTick = GetTickCount64();
 
     while (!stopToken.stop_requested()) {
-        uint64_t now = GetTickCount64();
+        sessionManager->HeartbeatCheck(GetTickCount64());
+        SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
+    }
+}
 
-        for (auto* session : sessionManager->GetSessionList()) {
-            if (!session->IsUsingSession()) continue;
+void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
+{
+    for (auto* session : sessionList) {
+        if (session == nullptr || !session->IsUsingSession()) continue;
 
-            if (session->IsConnected()) {
-                // ① CONNECTED 세션: 하트비트 전송
-                sessionDelegate.SendHeartbeatPacket(*session);
-                // → HEARTBEAT_TYPE 패킷 전송 (AES-GCM, 재전송 추적됨)
+        if (session->IsConnected()) {
+            // ① CONNECTED 세션: 하트비트 전송
+            sessionDelegate.SendHeartbeatPacket(*session, now);
+            // → HEARTBEAT_TYPE 패킷 전송 (AES-GCM, 재전송 추적됨)
 
-            } else if (session->IsReserved()) {
-                // ② RESERVED 세션: 30초 타임아웃 체크
-                if (sessionDelegate.CheckReservedSessionTimeout(*session, now)) {
-                    // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
-                    sessionDelegate.AbortReservedSession(*session);
-                    // → TryAbortReserved() CAS: RESERVED → RELEASING
-                    // → 공통 release queue 등록
-                    // → close → drain → cleanup → ReleaseSession
-                }
+        } else if (session->IsReserved()) {
+            // ② RESERVED 세션: 30초 타임아웃 체크
+            if (sessionDelegate.CheckReservedSessionTimeout(*session, now)) {
+                // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
+                sessionDelegate.AbortReservedSession(*session);
+                // → TryAbortReserved() CAS: RESERVED → RELEASING
+                // → 공통 release queue 등록
+                // → close → drain → cleanup → ReleaseSession
             }
         }
-
-        SleepRemainingFrameTime(tickSet, heartbeatThreadSleepMs);
     }
 }
 ```
@@ -541,8 +544,8 @@ SendHeartbeatPacket()
    └─ 이유: Retransmission Thread의 event wait 해제
 
 7. StopAllThreads()
-   └─ RUDPThreadManager::RequestStop(각 그룹)
-   └─ stop_token 신호 → jthread 자동 join
+   └─ RUDPThreadManager::StopAllThreads()가 각 joinable jthread에 request_stop()
+   └─ thread group map을 비울 때 jthread 소멸자가 join
 
 종료 순서가 중요한 이유:
   - IO Worker보다 먼저 Logic Worker를 종료하면: 완료 컨텍스트 큐가 남지만 처리되지 않음
@@ -627,7 +630,9 @@ worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다.
 
 [Heartbeat Thread]
   │
-  └─ session.SendHeartbeatPacket()
+  └─ sessionManager.HeartbeatCheck(now)
+      → sessionList에서 CONNECTED/RESERVED 세션 분기
+      → CONNECTED: sessionDelegate.SendHeartbeatPacket(*session, now)
       → HEARTBEAT_TYPE 패킷 전송
       → retransmissionSchedulers[session.threadId]에 schedule 등록
       → Retransmission Thread가 추적

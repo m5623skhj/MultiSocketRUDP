@@ -23,6 +23,7 @@
 | `.github/workflows/RttBenchmark.yml` | Release RTT 측정, PR 결과 비교, `main` 공식 이력 갱신 |
 | `.github/workflows/docs-bot.yml` | 문서 변경 후보 자동화 |
 | `.github/workflows/GeminiPRCommoentBot.yml` | 보조 AI 리뷰 status |
+| `.github/workflows/StaticAnalysis.yml` | 매일·수동 MSVC 네이티브 및 .NET Roslyn 정적 분석 |
 
 ---
 

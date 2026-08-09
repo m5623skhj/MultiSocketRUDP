@@ -64,27 +64,24 @@ Common/
 // RUDPSessionBroker::InitSessionCrypto
 bool InitSessionCrypto(RUDPSession& session) const
 {
-    // ① sessionKey 생성 (16 bytes, CSPRNG)
-    auto keyBytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_KEY_SIZE);
-    if (!keyBytes) return false;
-    session.SetSessionKey(keyBytes->data());
+    // ① delegate를 통해 sessionKey/sessionSalt 생성 및 저장
+    if (!GenerateSessionKey(session) || !GenerateSaltKey(session)) return false;
 
-    // ② sessionSalt 생성 (16 bytes, CSPRNG)
-    auto saltBytes = CryptoHelper::GenerateSecureRandomBytes(SESSION_SALT_SIZE);
-    if (!saltBytes) return false;
-    session.SetSessionSalt(saltBytes->data());
+    // ② 현재 구현은 기존 키 핸들이 없을 때 키 오브젝트 버퍼를 할당한다.
+    if (sessionDelegate.GetSessionKeyHandle(session) == nullptr) {
+        sessionDelegate.SetSessionKeyObjectBuffer(
+            session,
+            new unsigned char[CryptoHelper::GetTLSInstance().GetKeyObjectSize()]);
+    }
 
-    // ③ BCrypt 키 핸들 생성 (세션 유지 동안 재사용)
-    auto& crypto = CryptoHelper::GetTLSInstance();
-    ULONG keyObjSize = crypto.GetKeyObjectSize();
-    unsigned char* keyObj = new unsigned char[keyObjSize];
+    // ③ BCrypt 키 핸들을 생성해 세션에 저장하고 결과를 확인한다.
+    sessionDelegate.SetSessionKeyHandle(
+        session,
+        CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(
+            sessionDelegate.GetSessionKeyObjectBuffer(session),
+            const_cast<unsigned char*>(sessionDelegate.GetSessionKey(session))));
 
-    BCRYPT_KEY_HANDLE handle = crypto.GetSymmetricKeyHandle(keyObj, keyBytes->data());
-    if (handle == nullptr) { delete[] keyObj; return false; }
-
-    session.SetKeyObjectBuffer(keyObj);      // 소유권 이전
-    session.SetSessionKeyHandle(handle);
-    return true;
+    return sessionDelegate.GetSessionKeyHandle(session) != nullptr;
 }
 ```
 
