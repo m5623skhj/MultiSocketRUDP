@@ -45,5 +45,5 @@ inline void PushRetransmissionSchedule(
 [[nodiscard]]
 inline bool SignalRetransmissionWakeEvent(const RetransmissionScheduler& scheduler)
 {
-	return scheduler.wakeEventHandle == NULL || SetEvent(scheduler.wakeEventHandle) != FALSE;
+	return SetEvent(scheduler.wakeEventHandle);
 }
