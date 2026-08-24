@@ -51,3 +51,4 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/obj/
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/bin/
 Scripts/RTTBenchmark/__pycache__/update_rtt_history.cpython-312.pyc
 Scripts/__pycache__/GeminiComment.cpython-312.pyc
+tmp/
