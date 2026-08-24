@@ -164,14 +164,18 @@ void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::s
 
 	if (not localTlsHelper.Initialize())
 	{
-		LOG_ERROR("HandleClientConnection localTlsHelper.Initialize() failed");
+		LOG_ERROR(std::format(
+			"HandleClientConnection localTlsHelper.Initialize() failed with security status {:#010x}",
+			static_cast<unsigned long>(localTlsHelper.GetLastStatus())));
 		closesocket(clientSocket);
 		return;
 	}
 
 	if (not localTlsHelper.Handshake(clientSocket))
 	{
-		LOG_ERROR("HandleClientConnection localTlsHelper.Handshake failed");
+		LOG_ERROR(std::format(
+			"HandleClientConnection localTlsHelper.Handshake failed with security status {:#010x}",
+			static_cast<unsigned long>(localTlsHelper.GetLastStatus())));
 		closesocket(clientSocket);
 		return;
 	}
