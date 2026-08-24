@@ -247,10 +247,10 @@ GitHub Actions에서는 `GoogleTest.yml`에서 테스트 전에 이 스크립트
 
 ## CI 흐름
 
-PR 필수 CI는 dispatcher와 두 개의 재사용 workflow로 구성한다.
+PR 필수 CI는 dispatcher의 선택적 actionlint job과 두 개의 재사용 workflow로 구성한다.
 
 ```text
-.github/workflows/CI.yml          # 변경 경로 분류 및 최종 상태 집계
+.github/workflows/CI.yml          # 변경 경로 분류, workflow lint 및 최종 상태 집계
 .github/workflows/GoogleTest.yml  # C++ Native 테스트
 .github/workflows/BotTester.yml   # C# BotTester 빌드 및 프로토콜 테스트
 ```
@@ -265,15 +265,17 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 
 `CI.yml`은 모든 PR에서 실행되고 변경 파일을 기준으로 필요한 workflow만 호출한다.
 
-| 변경 경로 | Native GTest | BotTester | RTT Benchmark |
-|---|---:|---:|---:|
-| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 | 실행 |
-| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 실행 |
-| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 실행 |
-| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 실행 |
-| `.github/workflows/CI.yml` | 실행 | 실행 | 미실행 |
-| `.github/workflows/RttBenchmark.yml` | 미실행 | 미실행 | 실행 |
-| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 |
+| 변경 경로 | Native GTest | BotTester | actionlint | RTT Benchmark |
+|---|---:|---:|---:|---:|
+| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 | 미실행 | 실행 |
+| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
+| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 미실행 | 실행 |
+| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
+| `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
+| 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
+| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
+
+같은 PR에 새 commit이 올라오면 PR 번호 기반 concurrency가 이전 실행을 취소한다. workflow 파일이 하나라도 변경되면 actionlint가 전체 `.github/workflows/**`를 검사한다.
 
 ### Native GTest
 
@@ -285,7 +287,7 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 6. `--gtest_list_tests`로 IntegrationTest 목록을 구한 뒤 테스트별 별도 프로세스 실행
 7. 실행별 XML과 exit code 검증
 8. CoreTest 10분, 개별 IntegrationTest 180초 초과 시 프로세스 트리 종료
-9. 실패 테스트만 retry
+9. 실패 테스트만 retry하며 IntegrationTest는 재시도에서도 테스트별 독립 프로세스 유지
 10. PR comment와 OpenCppCoverage 결과 갱신
 
 ### BotTester
@@ -314,7 +316,7 @@ Branch protection의 필수 체크는 최종 집계 job인 `build-and-test` 하�
 
 `build-and-test`는 모든 PR에서 항상 생성되며 다음 규칙으로 결과를 판정한다.
 
-- 변경 경로상 필요한 테스트가 모두 성공하면 성공
+- 변경 경로상 필요한 테스트와 actionlint가 모두 성공하면 성공
 - 관련 없는 테스트가 skip되면 성공
 - 필요한 테스트가 실패, 취소 또는 비정상 skip되면 실패
 - 변경 경로 분류가 실패하면 실패

@@ -41,12 +41,23 @@ jobs:
         shell: cmd
         run: MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
 
+      - name: Resolve GTest revision
+        id: gtest-revision
+        shell: pwsh
+        run: |
+          $revision = git -C external/CommonCode/Common/googletest-main rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($revision)) {
+              Write-Error "Could not resolve the checked-out GTest revision"
+              exit 1
+          }
+          "sha=$revision" | Add-Content -Path $env:GITHUB_OUTPUT
+
       - name: Cache GTest build
         id: cache-gtest
         uses: actions/cache@v4
         with:
           path: external/CommonCode/Common/googletest-main/build
-          key: gtest-${{ runner.os }}-${{ hashFiles('.gitmodules') }}
+          key: gtest-${{ runner.os }}-v143-debug-${{ steps.gtest-revision.outputs.sha }}
 
       - name: Build GTest
         if: steps.cache-gtest.outputs.cache-hit != 'true'
@@ -80,6 +91,7 @@ jobs:
           $ErrorActionPreference = "Continue"
 
           $failedTests = @()
+          $failedTestsByExecutable = @{}
           $finalFailed = @()
           $crashedRuns = @()
 
@@ -213,7 +225,12 @@ jobs:
                     }
 
                     foreach ($t in $temp) {
-                      $failedTests += "$($t.classname).$($t.name)"
+                      $failedTestName = "$($t.classname).$($t.name)"
+                      $failedTests += $failedTestName
+                      if (-not $failedTestsByExecutable.ContainsKey($exePath)) {
+                        $failedTestsByExecutable[$exePath] = @()
+                      }
+                      $failedTestsByExecutable[$exePath] += $failedTestName
                     }
                   }
 
@@ -240,29 +257,73 @@ jobs:
               }
 
               foreach ($t in $temp) {
-                $failedTests += "$($t.classname).$($t.name)"
+                $failedTestName = "$($t.classname).$($t.name)"
+                $failedTests += $failedTestName
+                if (-not $failedTestsByExecutable.ContainsKey($exePath)) {
+                  $failedTestsByExecutable[$exePath] = @()
+                }
+                $failedTestsByExecutable[$exePath] += $failedTestName
               }
           }
 
           if ($failedTests.Count -gt 0) {
-              $filter = $failedTests -join ":"
-
               foreach ($testExecutable in $gtestExecutables) {
                   $exePath = $testExecutable.FullName
+                  if (-not $failedTestsByExecutable.ContainsKey($exePath)) {
+                    continue
+                  }
+                  $executableFailedTests = @($failedTestsByExecutable[$exePath])
+                  if ($executableFailedTests.Count -eq 0) {
+                    continue
+                  }
+
+                  if ($testExecutable.Name -eq "IntegrationTest.exe") {
+                    foreach ($integrationTest in $executableFailedTests) {
+                      $safeTestName = $integrationTest -replace '[^A-Za-z0-9_.-]', '_'
+                      $retryXml = Join-Path $testExecutable.DirectoryName "IntegrationTest_retry_$safeTestName.xml"
+                      Remove-Item $retryXml -Force -ErrorAction SilentlyContinue
+                      Write-Host "Retrying isolated integration test: $integrationTest"
+
+                      $retryRun = Invoke-GTestProcess `
+                        -Executable $exePath `
+                        -Arguments @(
+                          "--gtest_filter=$integrationTest",
+                          "--gtest_output=xml:$retryXml"
+                        ) `
+                        -TimeoutSeconds 180
+
+                      $retryFailures = @()
+                      $retryXmlValid = Parse-XmlFailures $retryXml ([ref]$retryFailures)
+                      if ($retryRun.TimedOut) {
+                        $timeoutMessage = "$integrationTest retry timed out after 180 seconds"
+                        Write-Error $timeoutMessage
+                        $crashedRuns += $timeoutMessage
+                      }
+                      elseif ($retryRun.StartFailed -or -not $retryXmlValid -or $retryRun.ExitCode -notin @(0, 1) -or
+                        ($retryRun.ExitCode -ne 0 -and $retryFailures.Count -eq 0)) {
+                        $crashedRuns += "$integrationTest retry (exit=$($retryRun.ExitCode), valid result XML=$retryXmlValid)"
+                      }
+
+                      $finalFailed += $retryFailures
+                    }
+
+                    continue
+                  }
+
+                  $filter = $executableFailedTests -join ":"
                   $retryXml = Join-Path $testExecutable.DirectoryName "$($testExecutable.BaseName)_retry_result.xml"
                   Remove-Item $retryXml -Force -ErrorAction SilentlyContinue
 
-                  $timeoutSeconds = if ($testExecutable.Name -eq "IntegrationTest.exe") { 180 } else { 600 }
                   $retryRun = Invoke-GTestProcess `
                     -Executable $exePath `
                     -Arguments @("--gtest_filter=$filter", "--gtest_output=xml:$retryXml") `
-                    -TimeoutSeconds $timeoutSeconds
+                    -TimeoutSeconds 600
                   $retryExitCode = $retryRun.ExitCode
 
                   $retryFailures = @()
                   $retryXmlValid = Parse-XmlFailures $retryXml ([ref]$retryFailures)
                   if ($retryRun.TimedOut) {
-                      $timeoutMessage = "$($testExecutable.Name) retry timed out after $timeoutSeconds seconds"
+                      $timeoutMessage = "$($testExecutable.Name) retry timed out after 600 seconds"
                       Write-Error $timeoutMessage
                       $crashedRuns += $timeoutMessage
                   }

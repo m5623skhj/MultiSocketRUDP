@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
@@ -15,6 +19,7 @@ jobs:
     outputs:
       server: ${{ steps.filter.outputs.server }}
       bot_tester: ${{ steps.filter.outputs.bot_tester }}
+      workflows: ${{ steps.filter.outputs.workflows }}
 
     steps:
       - name: Classify changed paths
@@ -34,6 +39,38 @@ jobs:
               - 'MultiSocketRUDPBotTester/**'
               - '.github/workflows/BotTester.yml'
               - '.github/workflows/CI.yml'
+            workflows:
+              - '.github/workflows/**'
+
+  workflow_lint:
+    name: Workflow actionlint
+    needs: classify_changes
+    if: needs.classify_changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install actionlint
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_LINUX_AMD64_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_LINUX_AMD64_SHA256}  ${archive}" | sha256sum --check
+          tar --extract --gzip --file "$archive" actionlint
+
+      - name: Lint GitHub Actions workflows
+        shell: bash
+        run: ./actionlint
 
   native_gtest:
     name: Native GTest
@@ -52,7 +89,7 @@ jobs:
     # Keep this check name stable because branch protection requires it.
     name: build-and-test
     if: always()
-    needs: [classify_changes, native_gtest, bot_tester]
+    needs: [classify_changes, workflow_lint, native_gtest, bot_tester]
     runs-on: ubuntu-latest
 
     steps:
@@ -61,6 +98,8 @@ jobs:
           CLASSIFIER_RESULT: ${{ needs.classify_changes.result }}
           SERVER_CHANGED: ${{ needs.classify_changes.outputs.server }}
           BOT_TESTER_CHANGED: ${{ needs.classify_changes.outputs.bot_tester }}
+          WORKFLOWS_CHANGED: ${{ needs.classify_changes.outputs.workflows }}
+          WORKFLOW_LINT_RESULT: ${{ needs.workflow_lint.result }}
           NATIVE_RESULT: ${{ needs.native_gtest.result }}
           BOT_TESTER_RESULT: ${{ needs.bot_tester.result }}
         run: |
@@ -79,6 +118,11 @@ jobs:
             exit 1
           fi
 
+          if [ "$WORKFLOWS_CHANGED" = "true" ] && [ "$WORKFLOW_LINT_RESULT" != "success" ]; then
+            echo "Workflow actionlint was required but did not succeed: $WORKFLOW_LINT_RESULT"
+            exit 1
+          fi
+
           if [ "$SERVER_CHANGED" != "true" ] && [ "$NATIVE_RESULT" != "skipped" ]; then
             echo "Native GTest was not required but returned: $NATIVE_RESULT"
             exit 1
@@ -86,6 +130,11 @@ jobs:
 
           if [ "$BOT_TESTER_CHANGED" != "true" ] && [ "$BOT_TESTER_RESULT" != "skipped" ]; then
             echo "BotTester test was not required but returned: $BOT_TESTER_RESULT"
+            exit 1
+          fi
+
+          if [ "$WORKFLOWS_CHANGED" != "true" ] && [ "$WORKFLOW_LINT_RESULT" != "skipped" ]; then
+            echo "Workflow actionlint was not required but returned: $WORKFLOW_LINT_RESULT"
             exit 1
           fi
 

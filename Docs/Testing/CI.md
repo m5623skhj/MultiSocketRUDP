@@ -17,7 +17,7 @@
 
 | 파일 | 역할 |
 |---|---|
-| `.github/workflows/CI.yml` | 변경 경로 분류와 최종 상태 집계 |
+| `.github/workflows/CI.yml` | 변경 경로 분류, workflow actionlint와 최종 상태 집계 |
 | `.github/workflows/GoogleTest.yml` | C++ build, CoreTest, IntegrationTest, coverage |
 | `.github/workflows/BotTester.yml` | .NET build, xUnit, C# protocol vector 검증 |
 | `.github/workflows/RttBenchmark.yml` | Release RTT 측정, PR 결과 비교, `main` 공식 이력 갱신 |
@@ -29,17 +29,19 @@
 
 ## 변경 경로별 실행 범위
 
-| 변경 경로 | Native GTest | BotTester | RTT Benchmark |
-|---|---:|---:|---:|
-| `MultiSocketRUDP/**`, C++ 테스트, submodule | 실행 | 미실행 | 실행 |
-| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 실행 |
-| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 실행 |
-| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 실행 |
-| `.github/workflows/CI.yml` | 실행 | 실행 | 미실행 |
-| `.github/workflows/RttBenchmark.yml` | 미실행 | 미실행 | 실행 |
-| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 |
+| 변경 경로 | Native GTest | BotTester | actionlint | RTT Benchmark |
+|---|---:|---:|---:|---:|
+| `MultiSocketRUDP/**`, C++ 테스트, submodule | 실행 | 미실행 | 미실행 | 실행 |
+| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
+| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 미실행 | 실행 |
+| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
+| `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
+| 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
+| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
 
 경로 분류 결과는 테스트 면제를 뜻하지 않는다. 문서만 바뀌었더라도 문서가 설명하는 동작과 현재 코드가 일치하는지는 reviewer가 확인한다.
+
+PR CI는 PR 번호를 concurrency group으로 사용한다. 같은 PR에 새 commit이 올라오면 이전 실행을 취소하고 최신 commit만 계속 검증한다. `.github/workflows/**`가 변경되면 SHA-256을 확인한 고정 버전의 actionlint로 전체 workflow를 검사하며, 결과는 `build-and-test`에 포함된다.
 
 ---
 
@@ -94,7 +96,7 @@ PR 측정 job은 저장소를 읽고 PR 코멘트를 갱신할 권한만 사용�
 
 ## 필수 체크
 
-Branch protection의 필수 체크는 `build-and-test` 하나다. 이 job은 모든 PR에서 생성되며 필요한 workflow가 모두 성공하면 성공하고, 관련 없는 workflow의 정상 skip은 허용한다.
+Branch protection의 필수 체크는 `build-and-test` 하나다. 이 job은 모든 PR에서 생성되며 필요한 테스트와 actionlint가 모두 성공하면 성공하고, 관련 없는 검사의 정상 skip은 허용한다.
 
 `RTT Benchmark`는 초기 운영 단계에서 성능 추세를 수집하는 정보성 검사이므로 `build-and-test`에 포함하지 않는다. 이후 merge gate로 승격하려면 runner 노이즈를 고려한 회귀 임계값을 먼저 합의하고 branch protection required check를 별도로 설정한다.
 
@@ -112,7 +114,7 @@ AI 리뷰 status `ai-review-check`는 외부 API의 rate limit과 일시 장애 
 4. IntegrationTest면 인증서 생성, child process 종료, 포트·timeout 영향을 확인한다.
 5. retry 성공만으로 종료하지 말고 최초 실패가 timing 의존인지 조사한다.
 
-Native GTest 실행은 CoreTest에 10분 상한을 적용하고 전체 job은 45분으로 제한한다. IntegrationTest는 반복 서버 생성·정리 과정의 RIO 종료 상태가 다음 fixture에 영향을 주지 않도록 `--gtest_list_tests` 결과의 각 테스트를 별도 프로세스에서 실행하며 테스트별 180초 상한을 적용한다. 제한 시간을 넘기면 프로세스 트리를 종료하고 해당 테스트 이름과 제한 시간을 crash 항목 및 콘솔에 보고한다. IntegrationTest의 child process 출력은 pipe EOF를 무기한 기다리지 않고 현재 읽을 수 있는 데이터만 회수한다.
+Native GTest 실행은 CoreTest에 10분 상한을 적용하고 전체 job은 45분으로 제한한다. IntegrationTest는 반복 서버 생성·정리 과정의 RIO 종료 상태가 다음 fixture에 영향을 주지 않도록 `--gtest_list_tests` 결과의 각 테스트를 별도 프로세스에서 실행하며, 실패 재시도도 테스트별 독립 프로세스를 유지한다. 테스트별 180초 상한을 넘기면 프로세스 트리를 종료하고 해당 테스트 이름과 제한 시간을 crash 항목 및 콘솔에 보고한다. IntegrationTest의 child process 출력은 pipe EOF를 무기한 기다리지 않고 현재 읽을 수 있는 데이터만 회수한다.
 
 RTT workflow가 실패하면 다음 순서로 확인한다.
 

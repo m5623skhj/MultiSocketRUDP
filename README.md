@@ -178,7 +178,7 @@
 * `IntegrationTest`는 실제 서버/클라이언트, TLS, UDP 흐름을 사용하는 통합 테스트입니다.
 * `MultiSocketRUDPBotTester.UnitTests`는 xUnit 기반 BotTester 유닛 테스트입니다.
 * `ProtocolInteropTest`는 8개의 공용 vector로 C++/C# 패킷 암호화 호환성을 검증합니다.
-* PR CI는 변경 경로에 따라 Native GTest와 BotTester xUnit/프로토콜 테스트를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
+* PR CI는 변경 경로에 따라 Native GTest, BotTester xUnit/프로토콜 테스트와 workflow actionlint를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
 * 자세한 실행 방법과 CI 주의점은 [Testing](./Docs/Testing.md)을 참고합니다.
 
 ---
@@ -189,7 +189,7 @@ GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지�
 
 | 구분 | Action | 실행 조건 | 역할 |
 | :--- | :--- | :--- | :--- |
-| PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류하고 필요한 테스트를 호출한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. |
+| PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류해 필요한 테스트와 workflow actionlint를 실행한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. 같은 PR의 이전 실행은 새 commit이 올라오면 취소합니다. |
 | PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
 | PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C# protocol vector 검증을 수행합니다. 공용 vector 변경 시에는 PR CI가 Native GTest도 함께 호출합니다. |
 | 성능 추세 | [RTT Benchmark](./.github/workflows/RttBenchmark.yml) | 관련 PR, `main` 병합, 수동 실행 | 서버와 BotTester를 Release 최적화로 빌드해 유실률 0%·10% RTT를 측정합니다. `main` 측정만 공식 이력과 그래프에 자동 반영합니다. |
