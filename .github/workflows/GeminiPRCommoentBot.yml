@@ -39,7 +39,7 @@ jobs:
         run: |
           git diff origin/${{ github.base_ref }} -- '*.h' '*.cpp' '*.cs' > diff.txt
           LINE_COUNT=$(wc -l < diff.txt)
-          echo "line_count=$LINE_COUNT" >> $GITHUB_OUTPUT
+          echo "line_count=$LINE_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Report Skipped Large Diff
         if: ${{ steps.diffcheck.outputs.line_count > 1000 }}

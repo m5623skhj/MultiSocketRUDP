@@ -63,7 +63,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           LAST_RUN=$(gh variable get DOCS_BOT_LAST_RUN 2>/dev/null || echo "")
-          echo "last_run=$LAST_RUN" >> $GITHUB_OUTPUT
+          echo "last_run=$LAST_RUN" >> "$GITHUB_OUTPUT"
 
       - name: Run DocsBot
         id: run_bot
