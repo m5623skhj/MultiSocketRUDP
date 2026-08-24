@@ -49,7 +49,9 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 {
 	if (not tlsHelper.Initialize())
 	{
-		LOG_ERROR("RUDPClientCore::tlsHelper.Initialize() failed");
+		LOG_ERROR(std::format(
+			"RUDPClientCore::tlsHelper.Initialize() failed with security status {:#010x}",
+			static_cast<unsigned long>(tlsHelper.GetLastStatus())));
 		return false;
 	}
 
@@ -114,7 +116,9 @@ bool RUDPClientCore::GetSessionFromServer()
 
 	if (not tlsHelper.Handshake(sessionBrokerSocket))
 	{
-		LOG_ERROR("TLS Handshake failed in GetSessionFromServer()");
+		LOG_ERROR(std::format(
+			"TLS Handshake failed in GetSessionFromServer() with security status {:#010x}",
+			static_cast<unsigned long>(tlsHelper.GetLastStatus())));
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
