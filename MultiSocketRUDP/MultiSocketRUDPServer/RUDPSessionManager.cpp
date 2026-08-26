@@ -278,10 +278,9 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
 		}
 		else if (session->IsReserved() == true)
 		{
-			// Waiting 30 seconds
+			// Abort reservations that did not connect before the configured timeout.
 			if (sessionDelegate.CheckReservedSessionTimeout(*session, now) == true)
 			{
-				// if not connected within the time, disconnect the session
 				sessionDelegate.AbortReservedSession(*session);
 			}
 		}

@@ -23,6 +23,7 @@ public:
 	// 최대 세션 수와 RUDP 코어 참조를 받아 초기화합니다.
 	// @param inMaxSessionSize 관리할 최대 세션의 수입니다.
 	// @param inCore RUDP 코어 인스턴스에 대한 참조입니다.
+	// @param inSessionDelegate 세션 내부 동작에 접근할 위임 인터페이스입니다.
 	// ----------------------------------------
 	explicit RUDPSessionManager(const unsigned short inMaxSessionSize, MultiSocketRUDPCore& inCore, ISessionDelegate& inSessionDelegate);
 	// ----------------------------------------
@@ -45,12 +46,17 @@ public:
 	// ----------------------------------------
 	bool Initialize(const BYTE inNumOfWorkerThreads, SessionFactoryFunc&& factory);
 
+	// ----------------------------------------
+	// @brief 재사용 대기 목록에서 세션 하나를 획득합니다.
+	// @return 초기화 전이거나 세션 풀이 소진된 경우 nullptr을 반환합니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	RUDPSession* AcquireSession();
 	// ----------------------------------------
 	// @brief 지정된 세션 ID의 세션을 풀로 반환하여 재사용 가능하게 만듭니다.
-	// 유효하지 않은 세션 ID이거나 이미 해제된 세션인 경우 오류를 기록합니다.
+	// 유효하지 않은 세션 ID, RELEASING이 아닌 상태 또는 이미 해제된 세션이면 오류를 기록합니다.
 	// @param sessionId 해제할 세션의 고유 ID입니다.
+	// @return 세션을 재사용 대기 목록에 반환했으면 true를 반환합니다.
 	// ----------------------------------------
 	bool ReleaseSession(SessionIdType sessionId);
 
@@ -86,14 +92,23 @@ public:
 	[[nodiscard]]
 	unsigned short GetNowSessionCount() const { return connectedUserCount.load(std::memory_order_relaxed); }
 	// ----------------------------------------
-	// @brief 매니저가 관리할 수 있는 최대 세션 수를 반환합니다.
+	// @brief 서버 시작 후 연결 상태로 전환된 누적 세션 수를 반환합니다.
 	// ----------------------------------------
 	[[nodiscard]]
 	unsigned int GetAllConnectedCount() const { return allConnectedCount.load(std::memory_order_relaxed); }
+	// ----------------------------------------
+	// @brief 예약 중단을 제외하고 연결 해제된 누적 세션 수를 반환합니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	unsigned int GetAllDisconnectedCount() const { return allDisconnectedCount.load(std::memory_order_relaxed); }
+	// ----------------------------------------
+	// @brief 재전송 한도 초과로 연결 해제된 누적 세션 수를 반환합니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	unsigned int GetAllDisconnectedByRetransmissionCount() const { return allDisconnectedByRetransmissionCount.load(std::memory_order_relaxed); }
+	// ----------------------------------------
+	// @brief 매니저가 관리할 수 있는 최대 세션 수를 반환합니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	unsigned short GetMaxSessions() const { return maxSessionSize; }
 	// ----------------------------------------
@@ -121,18 +136,19 @@ public:
 
 public:
 	// ----------------------------------------
-	// @brief 연결된 사용자 수를 1 증가시킵니다.
+	// @brief 현재 연결 수와 누적 연결 수를 각각 1 증가시킵니다.
 	// ----------------------------------------
 	void IncrementConnectedCount();
 	// ----------------------------------------
-	// @brief 연결된 사용자 수를 1 감소시킵니다.
+	// @brief 예약 중단을 제외하고 현재 연결 수와 사유별 누적 연결 해제 수를 갱신합니다.
+	// @param disconnectedReason 연결 해제 통계에 반영할 사유입니다.
 	// ----------------------------------------
 	void DecrementConnectedCount(const DISCONNECT_REASON disconnectedReason);
 
 public:
 	// ----------------------------------------
 	// @brief 모든 활성 세션에 대해 하트비트 검사를 수행합니다.
-	// 일정 시간 동안 응답이 없는 세션이 감지되면 해당 세션의 연결 상태를 해제합니다.
+	// 연결된 세션에는 필요한 하트비트 패킷을 보내고 제한 시간을 넘긴 예약 세션은 중단합니다.
 	// ----------------------------------------
 	void HeartbeatCheck(const unsigned long long now) const;
 
@@ -156,7 +172,7 @@ private:
 	unsigned short maxSessionSize;
 	SessionFactoryFunc sessionFactory;
 	std::vector<RUDPSession*> sessionList;
-	// 반드시 sessionListLock 안에서 sessionList와 같이 수정되어야 합니다.
+	// unusedSessionIdList와 함께 unusedSessionIdListLock 아래에서만 수정합니다.
 	std::unordered_set<SessionIdType> unusedSessionIdSet;
 	std::atomic_uint16_t connectedUserCount{};
 	std::atomic_uint32_t allConnectedCount{};

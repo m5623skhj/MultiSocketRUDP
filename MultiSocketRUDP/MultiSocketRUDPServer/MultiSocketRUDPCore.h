@@ -15,6 +15,7 @@
 #include <functional>
 #include <mutex>
 #include <optional>
+#include <atomic>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -91,11 +92,15 @@ public:
 	std::optional<ServerFatalError> GetFatalError() const;
 
 	// ----------------------------------------
-	// @brief 현재 서버에 연결된 사용자 수를 반환합니다.
-	// @return 연결된 사용자 수
+	// @brief 서버가 중지된 상태인지 확인합니다.
+	// @return 서버가 중지되었으면 true를 반환합니다.
 	// ----------------------------------------
 	[[nodiscard]]
 	bool IsServerStopped() const;
+	// ----------------------------------------
+	// @brief 현재 서버에 연결된 사용자 수를 반환합니다.
+	// @return 연결된 사용자 수
+	// ----------------------------------------
 	[[nodiscard]]
 	unsigned short GetNowSessionCount() const;
 	[[nodiscard]]
@@ -232,7 +237,7 @@ private:
 	void ReleaseAllSession() const;
 
 private:
-	bool isServerStopped{};
+	std::atomic_bool isServerStopped{};
 	mutable std::mutex fatalErrorLock;
 	ServerFatalErrorHandler fatalErrorHandler;
 	std::optional<ServerFatalError> fatalError;

@@ -245,7 +245,7 @@ void MultiSocketRUDPCore::NotifyFatalErrorHandler(
 
 bool MultiSocketRUDPCore::IsServerStopped() const
 {
-	return isServerStopped;
+	return isServerStopped.load(std::memory_order_acquire);
 }
 
 unsigned short MultiSocketRUDPCore::GetNowSessionCount() const

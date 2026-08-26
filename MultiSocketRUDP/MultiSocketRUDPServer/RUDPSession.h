@@ -64,12 +64,12 @@ private:
 	[[nodiscard]]
 	bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
 	// ----------------------------------------
-	// @brief 보류 큐를 거치지 않고 패킷을 즉시 전송합니다.직접 RIO Send 작업을 예약합니다.
+	// @brief 흐름 제어 보류 큐를 거치지 않고 송신 정보를 코어의 RIO 송신 경로에 등록합니다.
 	// @param buffer 전송할 NetBuffer.
 	// @param inSendPacketSequence 전송할 패킷의 시퀀스 번호.
 	// @param isReplyType 응답 패킷인지 여부.
 	// @param isCorePacket 코어 기능 관련 패킷인지 여부.
-	// @return RIO Send 작업이 성공적으로 예약되면 true, 아니면 false.
+	// @return 송신 경로 등록과 송신 시작에 성공하면 true, 아니면 false.
 	// ----------------------------------------
 	[[nodiscard]]
 	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
