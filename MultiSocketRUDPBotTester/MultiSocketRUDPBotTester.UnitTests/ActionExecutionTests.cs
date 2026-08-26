@@ -7,6 +7,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class ActionExecutionTests
 {
+    /// <summary>
+    /// 선형 노드 체인을 한 번씩 실행하고 순환 경로에서 재진입을 중단하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ExecuteChainTraversesLinearNodesOnceAndStopsCycles()
     {
@@ -27,6 +30,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(1, context.GetExecutionCount("third"));
     }
 
+    /// <summary>
+    /// 조건 분기 내부와 그 후속 노드의 실행 횟수가 통계에 모두 반영되는지 확인합니다.
+    /// </summary>
     [Fact]
     public void NestedBranchExecutionsAreIncludedInStats()
     {
@@ -61,6 +67,9 @@ public sealed class ActionExecutionTests
         }
     }
 
+    /// <summary>
+    /// 특수 노드가 자신을 직접 가리키는 순환 경로를 한 번만 실행하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SpecialNodeDirectCycleStopsAtActiveExecutionPath()
     {
@@ -77,6 +86,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(1, context.GetExecutionCount("conditional"));
     }
 
+    /// <summary>
+    /// 특수 노드의 간접 순환 경로가 활성 실행 경로에서 중단되는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SpecialNodeIndirectCycleStopsAtActiveExecutionPath()
     {
@@ -98,6 +110,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(1, context.GetExecutionCount("middle"));
     }
 
+    /// <summary>
+    /// 동시 패킷 수신 시 각 완료 경로에 대응하는 버퍼와 실행 컨텍스트가 전달되는지 확인합니다.
+    /// </summary>
     [Fact]
     public async Task WaitForPacketDispatchPassesEachCompletedBufferAcrossConcurrentReceives()
     {
@@ -150,6 +165,9 @@ public sealed class ActionExecutionTests
         Assert.Same(secondBuffer, secondContextObserved);
     }
 
+    /// <summary>
+    /// 조건식이 선택한 분기와 공통 후속 노드를 올바른 순서로 실행하는지 확인합니다.
+    /// </summary>
     [Theory]
     [InlineData(true, "true")]
     [InlineData(false, "false")]
@@ -171,6 +189,9 @@ public sealed class ActionExecutionTests
         Assert.Equal([expectedBranch, $"{expectedBranch}-child", "next"], calls);
     }
 
+    /// <summary>
+    /// Assert 노드가 성공, 계속 진행 실패 및 중단 실패 계약을 각각 준수하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void AssertDispatchesPassFailureAndStopContracts()
     {
@@ -207,6 +228,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(["pass-next", "failure", "continue", "stop-failure"], calls);
     }
 
+    /// <summary>
+    /// 조건 평가 예외를 실패 경로로 보내고 설정에 따라 후속 실행을 계속하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void AssertConditionExceptionUsesFailureAndContinuesWhenConfigured()
     {
@@ -224,6 +248,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(["failure", "next"], calls);
     }
 
+    /// <summary>
+    /// 변수 설정 노드가 지원하는 모든 형식을 문화권에 독립적으로 변환하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SetVariableConvertsEverySupportedTypeUsingInvariantCulture()
     {
@@ -244,6 +271,9 @@ public sealed class ActionExecutionTests
         Assert.Equal("hello", context.Get<string>("s"));
     }
 
+    /// <summary>
+    /// 변수 값 파싱에 실패했을 때 기존 값을 덮어쓰지 않는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SetVariableParseFailureDoesNotOverwriteExistingValue()
     {
@@ -255,6 +285,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(7, context.Get<int>("value"));
     }
 
+    /// <summary>
+    /// 가중치로 선택된 분기와 공통 후속 노드를 정확히 한 번씩 실행하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void RandomChoiceTraversesSelectedBranchAndCommonNextExactlyOnce()
     {
@@ -277,6 +310,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(["selected", "selected-child", "next"], calls);
     }
 
+    /// <summary>
+    /// 0 이하의 선택 가중치를 거부하고 어떤 노드도 실행하지 않는지 확인합니다.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -297,6 +333,9 @@ public sealed class ActionExecutionTests
         Assert.Empty(calls);
     }
 
+    /// <summary>
+    /// 전체 선택 가중치가 int 최댓값을 넘어도 오버플로 없이 분기를 선택하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void RandomChoiceSupportsPositiveWeightTotalsBeyondIntMaximum()
     {
@@ -321,6 +360,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(["second"], calls);
     }
 
+    /// <summary>
+    /// int 최댓값을 포함하는 지연 범위를 오버플로 없이 선택하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void RandomDelaySupportsInclusiveIntMaximumWithoutOverflow()
     {
@@ -340,6 +382,9 @@ public sealed class ActionExecutionTests
         Assert.Equal(int.MaxValue, selected);
     }
 
+    /// <summary>
+    /// 사용자 정의 액션에 인자가 전달되고 액션 예외가 호출자에게 전파되는지 확인합니다.
+    /// </summary>
     [Fact]
     public void CustomActionReceivesArgumentsAndPropagatesExceptions()
     {

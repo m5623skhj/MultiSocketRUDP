@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 
 #include "MultiSocketRUDPCoreTestAccess.h"
@@ -143,6 +143,7 @@ protected:
 	BYTE originalXorCode{};
 };
 
+// 유효한 옵션 파일의 모든 서버 설정이 코어에 반영되는지 확인합니다.
 TEST_F(CoreOptionParserTest, ValidOptionsPopulateEveryServerSetting)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -165,6 +166,7 @@ TEST_F(CoreOptionParserTest, ValidOptionsPopulateEveryServerSetting)
 	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetSessionBrokerPort(core), 12011);
 }
 
+// 선택 RTO 범위와 패킷 손실 옵션이 없을 때 정의된 기본값을 사용하는지 확인합니다.
 TEST_F(CoreOptionParserTest, MissingOptionalRtoBoundsUseInitialRtoAndLossOptionsDefaultToZero)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -181,6 +183,7 @@ TEST_F(CoreOptionParserTest, MissingOptionalRtoBoundsUseInitialRtoAndLossOptions
 	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetSimulatedPacketLossSeed(core), 0);
 }
 
+// 최소·최대 RTO 중 하나만 지정한 불완전한 설정을 거부하는지 확인합니다.
 TEST_F(CoreOptionParserTest, OnlyOneOptionalRtoBoundIsRejected)
 {
 	MultiSocketRUDPCore missingMaximum{ L"", L"" };
@@ -196,6 +199,7 @@ TEST_F(CoreOptionParserTest, OnlyOneOptionalRtoBoundIsRejected)
 		MakeBrokerOptions()));
 }
 
+// 초기 RTO가 최소·최대 범위를 벗어나는 잘못된 설정을 거부하는지 확인합니다.
 TEST_F(CoreOptionParserTest, InvalidRtoOrderingIsRejected)
 {
 	const std::array invalidBounds{
@@ -212,6 +216,7 @@ TEST_F(CoreOptionParserTest, InvalidRtoOrderingIsRejected)
 	}
 }
 
+// 최소·최대 RTO가 초기 RTO와 같은 경계 설정을 허용하는지 확인합니다.
 TEST_F(CoreOptionParserTest, EqualRtoBoundsAtInitialValueAreAccepted)
 {
 	MultiSocketRUDPCore core{ L"", L"" };
@@ -222,6 +227,7 @@ TEST_F(CoreOptionParserTest, EqualRtoBoundsAtInitialValueAreAccepted)
 	EXPECT_EQ(core.GetMaxRetransmissionMs(), 30u);
 }
 
+// 필수 코어 및 세션 브로커 옵션이 하나라도 누락되면 파싱을 거부하는지 확인합니다.
 TEST_F(CoreOptionParserTest, MissingRequiredCoreAndBrokerOptionsAreRejected)
 {
 	const std::array coreKeys{
@@ -254,6 +260,7 @@ TEST_F(CoreOptionParserTest, MissingRequiredCoreAndBrokerOptionsAreRejected)
 	}
 }
 
+// 비어 있거나 허용 길이를 초과한 서버 IP를 거부하는지 확인합니다.
 TEST_F(CoreOptionParserTest, EmptyAndOverlongServerIpAreRejected)
 {
 	MultiSocketRUDPCore emptyIpCore{ L"", L"" };

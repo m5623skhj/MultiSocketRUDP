@@ -4,6 +4,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class BotTestCompletionTrackerTests
 {
+    /// <summary>
+    /// 설정 완료 전에 연결이 끊기면 설정 완료까지 종료 알림을 보류하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void DisconnectBeforeSetupWaitsUntilSetupCompletes()
     {
@@ -19,6 +22,9 @@ public sealed class BotTestCompletionTrackerTests
         Assert.Equal(1, notificationCount);
     }
 
+    /// <summary>
+    /// 마지막 봇의 연결 해제 시 완료 알림을 정확히 한 번 발생시키는지 확인합니다.
+    /// </summary>
     [Fact]
     public void LastDisconnectRaisesCompletionExactlyOnce()
     {
@@ -35,6 +41,9 @@ public sealed class BotTestCompletionTrackerTests
         Assert.Equal(2, notificationCount);
     }
 
+    /// <summary>
+    /// 취소된 추적기가 이후 연결 해제에 대해 완료 알림을 발생시키지 않는지 확인합니다.
+    /// </summary>
     [Fact]
     public void CancelSuppressesCompletionNotification()
     {
@@ -50,6 +59,9 @@ public sealed class BotTestCompletionTrackerTests
         Assert.Equal(0, notificationCount);
     }
 
+    /// <summary>
+    /// 동시 연결 해제에서도 완료 알림이 한 번만 발생하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ConcurrentDisconnectsRaiseSingleCompletionNotification()
     {

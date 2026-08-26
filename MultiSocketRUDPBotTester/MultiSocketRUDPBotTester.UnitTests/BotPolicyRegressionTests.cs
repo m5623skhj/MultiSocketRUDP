@@ -7,6 +7,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class BotPolicyRegressionTests
 {
+    /// <summary>
+    /// 패킷 후보 조회가 와일드카드와 정확히 일치하는 ID만 중복 없이 결합하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void PacketCandidatesCombineWildcardAndExactWithoutIncludingOtherIds()
     {
@@ -27,6 +30,9 @@ public sealed class BotPolicyRegressionTests
         Assert.Equal(candidates.Count, candidates.Distinct().Count());
     }
 
+    /// <summary>
+    /// AI 트리 검증기가 팩터리가 지원하는 모든 자식 경로를 재귀적으로 검사하는지 확인합니다.
+    /// </summary>
     [Theory]
     [InlineData("exit_nodes")]
     [InlineData("retry_body")]
@@ -45,6 +51,9 @@ public sealed class BotPolicyRegressionTests
             error => error.Contains($"root.{childProperty}") && error.Contains("UnknownNode"));
     }
 
+    /// <summary>
+    /// 검증기가 스키마 기반 송신 노드는 허용하고 빌더와 스키마가 없는 패킷은 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ValidatorAcceptsSchemaBackedSendAndRejectsMissingBuilderAndSchema()
     {
@@ -67,6 +76,9 @@ public sealed class BotPolicyRegressionTests
                 && issue.Message.Contains("PacketBuilder or packet schema"));
     }
 
+    /// <summary>
+    /// 제어 노드와 변수 노드의 잘못된 경계 설정을 모두 오류로 보고하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ValidatorReportsControlAndVariableBoundaryConfigurations()
     {
@@ -123,6 +135,9 @@ public sealed class BotPolicyRegressionTests
         }
     }
 
+    /// <summary>
+    /// 패킷 스키마 직렬화가 선언 순서를 유지하며 기본값과 재정의 값을 기록하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SchemaSerializationWritesDefaultsAndOverridesInDeclaredOrder()
     {
@@ -165,6 +180,9 @@ public sealed class BotPolicyRegressionTests
         }
     }
 
+    /// <summary>
+    /// 대기 작업의 원자적 교환이 등록된 작업을 정확히 한 호출에만 반환하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void PendingTaskExchangeReturnsExactlyOneRegisteredTask()
     {

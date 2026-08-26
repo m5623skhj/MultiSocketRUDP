@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 
 #include "MemoryTracer.h"
@@ -22,6 +22,7 @@ protected:
 	}
 };
 
+// 추적 활성화 상태에서만 객체가 기록되는지 확인합니다.
 TEST_F(MemoryTracerTest, EnableAndDisableControlTracking)
 {
 	int object{};
@@ -37,6 +38,7 @@ TEST_F(MemoryTracerTest, EnableAndDisableControlTracking)
 	EXPECT_EQ(MemoryTracer::GetActiveObjectCount(), 1u);
 }
 
+// null 포인터에 대한 추적·해제·메모 호출을 안전하게 무시하는지 확인합니다.
 TEST_F(MemoryTracerTest, NullPointersAreIgnored)
 {
 	MemoryTracer::TrackObject(nullptr, "null", __FILE__, __LINE__);
@@ -46,6 +48,7 @@ TEST_F(MemoryTracerTest, NullPointersAreIgnored)
 	EXPECT_EQ(MemoryTracer::GetActiveObjectCount(), 0u);
 }
 
+// 객체의 추적, 메모 및 해제 이력이 결정적인 형식으로 출력되는지 확인합니다.
 TEST_F(MemoryTracerTest, TrackNoteAndUntrackProduceDeterministicHistory)
 {
 	int object{};
@@ -72,6 +75,7 @@ TEST_F(MemoryTracerTest, TrackNoteAndUntrackProduceDeterministicHistory)
 	EXPECT_NE(freedHistory.find("Lifetime:"), std::string::npos);
 }
 
+// 같은 주소를 다시 추적할 때 이전 이력을 교체하고 활성 객체 수를 중복 증가시키지 않는지 확인합니다.
 TEST_F(MemoryTracerTest, RetrackingSameAddressReplacesHistoryWithoutIncreasingActiveCount)
 {
 	int object{};
@@ -88,6 +92,7 @@ TEST_F(MemoryTracerTest, RetrackingSameAddressReplacesHistoryWithoutIncreasingAc
 	EXPECT_NE(history.find("Status: ACTIVE"), std::string::npos);
 }
 
+// 누수 보고서와 스레드 통계가 현재 활성 객체 수를 포함하는지 확인합니다.
 TEST_F(MemoryTracerTest, LeakReportAndThreadStatisticsContainActiveCounts)
 {
 	int first{};
@@ -107,6 +112,7 @@ TEST_F(MemoryTracerTest, LeakReportAndThreadStatisticsContainActiveCounts)
 	EXPECT_NE(statistics.find(": 2 active objects"), std::string::npos);
 }
 
+// 여러 스레드의 동시 추적과 해제가 끝난 뒤 활성 객체가 남지 않는지 확인합니다.
 TEST_F(MemoryTracerTest, ConcurrentTrackingAndUntrackingLeavesNoActiveObjects)
 {
 	std::array<int, 8> objects{};
@@ -129,6 +135,7 @@ TEST_F(MemoryTracerTest, ConcurrentTrackingAndUntrackingLeavesNoActiveObjects)
 	EXPECT_EQ(MemoryTracer::GetActiveObjectCount(), 0u);
 }
 
+// 전체 정리가 활성 객체와 해제된 객체의 이력을 모두 제거하는지 확인합니다.
 TEST_F(MemoryTracerTest, ClearRemovesActiveAndFreedHistory)
 {
 	int object{};

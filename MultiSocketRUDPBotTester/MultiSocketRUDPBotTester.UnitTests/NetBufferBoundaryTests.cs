@@ -9,6 +9,9 @@ public sealed class NetBufferBoundaryTests
     private static readonly byte[] Key = Enumerable.Range(1, 16).Select(value => (byte)value).ToArray();
     private static readonly byte[] Salt = Enumerable.Range(21, 16).Select(value => (byte)value).ToArray();
 
+    /// <summary>
+    /// 읽기와 건너뛰기가 실제로 기록된 데이터 범위를 넘지 못하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ReadsAndSkipsCannotCrossWrittenData()
     {
@@ -24,6 +27,9 @@ public sealed class NetBufferBoundaryTests
         Assert.Throws<InvalidOperationException>(() => buffer.SkipBytes(1));
     }
 
+    /// <summary>
+    /// 쓰기와 패킷 메타데이터 삽입이 버퍼 용량 및 헤더 선행 조건을 준수하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void WritesAndMetadataInsertionCannotCrossCapacityOrMissingHeader()
     {
@@ -49,6 +55,9 @@ public sealed class NetBufferBoundaryTests
                 isCorePacket: false));
     }
 
+    /// <summary>
+    /// UTF-8 문자열이 ushort 최대 길이는 허용하고 그보다 긴 페이로드는 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void Utf8StringAcceptsUshortMaximumAndRejectsLongerPayload()
     {
@@ -62,6 +71,9 @@ public sealed class NetBufferBoundaryTests
             () => new NetBuffer(sizeof(ushort) + tooLong.Length).WriteString(tooLong));
     }
 
+    /// <summary>
+    /// 완전한 패킷 최소 길이보다 짧은 모든 입력을 잘못된 레이아웃으로 보고하는지 확인합니다.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(5)]
@@ -86,6 +98,9 @@ public sealed class NetBufferBoundaryTests
         Assert.Equal(length, failure.PacketLength);
     }
 
+    /// <summary>
+    /// 헤더의 페이로드 길이가 실제 패킷 길이와 다르면 디코딩을 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void DecodeRejectsHeaderPayloadLengthThatDoesNotMatchPacketLength()
     {

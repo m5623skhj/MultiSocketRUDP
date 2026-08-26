@@ -5,6 +5,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class RttBenchmarkAggregationTests
 {
+    /// <summary>
+    /// 짝수 개 값의 중앙값을 가운데 두 값의 평균으로 계산하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void MedianEvenNumberOfValuesReturnsMiddleAverage()
     {
@@ -13,6 +16,9 @@ public sealed class RttBenchmarkAggregationTests
         Assert.Equal(2.5, median);
     }
 
+    /// <summary>
+    /// 반복 실행 결과의 안정 지표에는 중앙값을, 최악 지표에는 최댓값을 사용하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void CreateUsesMedianForStableMetricsAndWorstValueForMaximum()
     {
@@ -59,6 +65,9 @@ public sealed class RttBenchmarkAggregationTests
 
 public sealed class RttBenchmarkOptionsTests
 {
+    /// <summary>
+    /// 양수인 실행 제한 시간을 명령줄 옵션에서 정상적으로 파싱하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ParseAcceptsPositiveRunTimeout()
     {
@@ -68,6 +77,9 @@ public sealed class RttBenchmarkOptionsTests
         Assert.Equal(1, options.ServerThreadCount);
     }
 
+    /// <summary>
+    /// 0 이하의 실행 제한 시간을 명령줄 옵션에서 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ParseRejectsNonPositiveRunTimeout()
     {

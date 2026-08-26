@@ -4,6 +4,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class BotRttSampleCollectorTests
 {
+    /// <summary>
+    /// 수집된 RTT 표본으로 평균, 분위수, 최댓값 및 재전송 의심 횟수를 계산하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void CreateSummaryMatchesRegularRttStatistics()
     {
@@ -26,6 +29,9 @@ public sealed class BotRttSampleCollectorTests
         Assert.True(summary.ElapsedSeconds >= 0);
     }
 
+    /// <summary>
+    /// 표본이 없을 때 모든 RTT 요약값을 0으로 반환하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void EmptyCollectorReturnsZeroSampleSummary()
     {
@@ -37,6 +43,9 @@ public sealed class BotRttSampleCollectorTests
         Assert.Equal(0, summary.MaxRttMs);
     }
 
+    /// <summary>
+    /// 여러 스레드에서 동시에 기록한 RTT 표본이 누락 없이 요약에 포함되는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ConcurrentSamplesAreAllIncluded()
     {

@@ -7,6 +7,9 @@ namespace MultiSocketRUDPBotTester.UnitTests;
 
 public sealed class SessionBrokerResponseParserTests
 {
+    /// <summary>
+    /// 세션 브로커 성공 응답에서 서버 주소, 세션 ID, 키 및 솔트를 모두 파싱하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ParseReturnsEveryBrokerField()
     {
@@ -23,6 +26,9 @@ public sealed class SessionBrokerResponseParserTests
         Assert.Equal(salt, parsed.SessionSalt);
     }
 
+    /// <summary>
+    /// 브로커 오류 응답과 모든 길이의 잘린 성공 응답을 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ParseRejectsBrokerErrorAndEveryTruncatedSuccessResponse()
     {
@@ -75,6 +81,9 @@ public sealed class SessionBrokerResponseParserTests
 
 public sealed class DatagramFramerTests
 {
+    /// <summary>
+    /// 유효한 시작 위치에서 페이로드 길이를 사용해 전체 데이터그램 크기를 계산하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void PacketSizeUsesPayloadLengthAtAnyValidOffset()
     {
@@ -84,6 +93,9 @@ public sealed class DatagramFramerTests
         Assert.Equal(9, size);
     }
 
+    /// <summary>
+    /// 잘못된 시작 위치 또는 길이가 0인 페이로드를 데이터그램 프레이밍에서 거부하는지 확인합니다.
+    /// </summary>
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]
@@ -100,6 +112,9 @@ public sealed class DatagramFramerTests
 
 public sealed class ReceivePacketOrdererTests
 {
+    /// <summary>
+    /// 시퀀스 갭을 보류했다가 순서대로 해제하고 중복 패킷을 무시하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void GapIsHeldThenReleasedInSequenceAndDuplicatesAreIgnored()
     {
@@ -121,6 +136,9 @@ public sealed class ReceivePacketOrdererTests
         Assert.Empty(orderer.Collect(1, PacketId.TestPacketRes, first, PacketType.SendType));
     }
 
+    /// <summary>
+    /// ulong 시퀀스 랩어라운드에서 보류한 0번 패킷을 올바른 순서로 해제하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void SequenceWrapReleasesHeldZeroAfterUlongMaximum()
     {
@@ -139,6 +157,9 @@ public sealed class ReceivePacketOrdererTests
         Assert.Equal(0UL, orderer.GetExpectedSequence());
     }
 
+    /// <summary>
+    /// 패킷이 동시에 도착해도 결합된 결과의 순서와 유일성을 보존하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ConcurrentArrivalPreservesJoinedOrderAndUniqueness()
     {
@@ -172,6 +193,9 @@ public sealed class ReceivePacketOrdererTests
 
 public sealed class PacketWaiterRegistryTests
 {
+    /// <summary>
+    /// 같은 패킷 ID의 모든 대기자에게 완료를 전파하고 취소된 대기자를 정리하는지 확인합니다.
+    /// </summary>
     [Fact]
     public async Task CompleteFansOutByPacketIdAndCancellationCleansRemainingWaiter()
     {
@@ -193,6 +217,9 @@ public sealed class PacketWaiterRegistryTests
         Assert.Equal(0, registry.GetPendingCount());
     }
 
+    /// <summary>
+    /// 패킷 대기가 시간 초과되면 null을 반환하고 등록을 제거하는지 확인합니다.
+    /// </summary>
     [Fact]
     public async Task TimeoutReturnsNullAndRemovesRegistration()
     {
@@ -204,6 +231,9 @@ public sealed class PacketWaiterRegistryTests
         Assert.Equal(0, registry.GetPendingCount());
     }
 
+    /// <summary>
+    /// 0 이하의 대기 시간을 등록 없이 거부하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void NonPositiveTimeoutIsRejectedWithoutRegistration()
     {
@@ -217,6 +247,9 @@ public sealed class PacketWaiterRegistryTests
 
 public sealed class RttStatisticsTests
 {
+    /// <summary>
+    /// 빈 입력과 분위수 경계값에서 최근접 순위 방식으로 값을 계산하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void PercentileUsesNearestRankAcrossEmptyAndBoundaryInputs()
     {
@@ -231,6 +264,9 @@ public sealed class RttStatisticsTests
             () => RttStatistics.Percentile([1], 100.1));
     }
 
+    /// <summary>
+    /// 진행률 출력 정책이 보고 간격과 마지막 표본 경계를 올바르게 처리하는지 확인합니다.
+    /// </summary>
     [Fact]
     public void ProgressPolicyUsesDetailedPrefixAndReportInterval()
     {
