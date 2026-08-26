@@ -14,6 +14,7 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-08-26 | `611752b` | * 주석 최신화 * 클라이언트 수신 패킷 시퀀스 동기화 수정 | 0.217 ms | 0.238 ms | 32.342 ms | 66.364 ms |
 | 2026-08-26 | `61833d0` | * 주석 없던 테스트들에 테스트 목적 주석 추가 | 0.225 ms | 0.259 ms | 32.228 ms | 64.554 ms |
 | 2026-08-26 | `f72bf31` | * 인코딩 잘못된 주석 수정 | 0.216 ms | 0.242 ms | 32.405 ms | 64.146 ms |
 | 2026-08-24 | `640064d` | * Schannel TLS 핸드셰이크 설정 및 실패 진단 개선 | 0.222 ms | 0.249 ms | 32.340 ms | 64.168 ms |
@@ -23,6 +24,5 @@ The JSON file keeps the complete official history. Charts and the table render t
 | 2026-08-04 | `34b8102` | * README RTT 표에서 현재 RTT를 알 수 있도록 추가 | 0.162 ms | 0.192 ms | 32.416 ms | 62.135 ms |
 | 2026-08-04 | `f75b724` | * TLS 파일 분리 | 0.183 ms | 0.200 ms | 32.400 ms | 63.983 ms |
 | 2026-08-03 | `03293c8` | * 주석 수정 및 추가 | 0.205 ms | 0.248 ms | 32.606 ms | 64.302 ms |
-| 2026-08-03 | `cb43718` | * Receive context 큐 종료 행잉 수정   * 재사용 노드의 stale link로 소멸자가 무한 순회하던 CListBaseQueue 제거   * worker별 receive context 큐의 producer와 consumer 접근 동기화   * 큐 소멸 순환과 남은 개수 확인 경쟁 조건 제거   * IntegrationTest 종료 단계의 간헐적 타임아웃 방지 | 62.839 ms | 63.596 ms | 102.392 ms | 153.679 ms |
 
-Last updated by `61833d0a2d189feae1dbd61ebbb5b7ceaab29e0d` at 2026-08-26T10:53:51.4065138+00:00.
+Last updated by `611752b722902f89706c7e1232d17b7140588f17` at 2026-08-26T11:59:45.8524075+00:00.
