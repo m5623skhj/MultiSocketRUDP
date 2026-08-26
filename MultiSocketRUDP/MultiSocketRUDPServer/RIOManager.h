@@ -8,6 +8,10 @@
 class RUDPSession;
 class ISessionDelegate;
 
+// ----------------------------------------
+// @brief RIO 함수 테이블, 워커별 완료 큐 및 등록 버퍼의 수명을 관리하는 구현체입니다.
+// 등록 버퍼 목록은 registeredBufferMutex로 보호되며 Shutdown은 모든 세션 I/O가 중단된 뒤 호출해야 합니다.
+// ----------------------------------------
 class RIOManager : public IRIOManager
 {
 public:
@@ -15,8 +19,14 @@ public:
 	~RIOManager();
 
 public:
+	// ----------------------------------------
+	// @brief RIO 함수 테이블과 워커별 완료 큐를 생성합니다.
+	// ----------------------------------------
 	[[nodiscard]]
 	bool Initialize(size_t numOfSockets, size_t inNumOfWorkerThreads);
+	// ----------------------------------------
+	// @brief 완료 큐와 추적 중인 등록 버퍼를 모두 정리합니다.
+	// ----------------------------------------
 	void Shutdown();
 
 	[[nodiscard]]

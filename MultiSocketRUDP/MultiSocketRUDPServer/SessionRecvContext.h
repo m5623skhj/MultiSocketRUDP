@@ -20,7 +20,7 @@ public:
 
 public:
     // ----------------------------------------
-    // @brief RIO 수신용 IOContext를 생성하고 데이터 및 주소 버퍼를 RIO에 등록합니다.
+    // @brief RIO 수신용 IOContext들을 생성하고 데이터 및 주소 버퍼를 RIO에 등록합니다.
     // @param rioFunctionTable RIO 확장 함수 테이블
     // @param sessionId 세션 식별자
     // @param ownerSession 해당 컨텍스트를 소유하는 RUDPSession 포인터
@@ -41,13 +41,13 @@ public:
     [[nodiscard]]
 	RecvBuffer& GetRecvBuffer();
     // ----------------------------------------
-    // @brief 현재 수신 IOContext를 가리키는 shared_ptr을 반환합니다.
-    // @return 수신 IOContext를 가리키는 shared_ptr
+    // @brief 첫 번째 수신 슬롯의 IOContext를 가리키는 shared_ptr을 반환합니다.
+    // @return 첫 번째 수신 슬롯의 IOContext shared_ptr
     // ----------------------------------------
     [[nodiscard]]
 	std::shared_ptr<IOContext> GetRecvBufferContext() const;
     // ----------------------------------------
-    // @brief 수신 IOContext의 소유권을 해제합니다.
+    // @brief 모든 수신 슬롯의 내부 IOContext shared_ptr 참조를 해제합니다.
     // ----------------------------------------
     void RecvContextReset();
 

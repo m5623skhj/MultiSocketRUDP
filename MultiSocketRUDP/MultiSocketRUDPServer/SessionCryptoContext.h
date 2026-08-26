@@ -54,11 +54,8 @@ public:
 	void Release();
 
 private:
-	// a connectKey seems to be necessary
-	// generate and store a key on the TCP connection side,
-	// then insert the generated key into the packet and send it
-	// if the connectKey matches, verifying it as a valid key,
-	// insert the client information into clientAddr below
+	// TLS 세션 브로커에서 생성한 대칭키와 nonce 솔트를 세션 수명 동안 보관합니다.
+	// keyObjectBuffer는 BCrypt 키 핸들의 backing storage이며 Release가 핸들과 함께 해제합니다.
 	unsigned char sessionKey[SESSION_KEY_SIZE]{};
 	unsigned char sessionSalt[SESSION_SALT_SIZE]{};
 	unsigned char* keyObjectBuffer{};

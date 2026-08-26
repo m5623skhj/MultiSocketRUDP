@@ -35,6 +35,7 @@ public:
 	// ----------------------------------------
 	// @brief RIO 송신 버퍼를 등록하고 초기화합니다.
 	// @param rioFunctionTable RIO 확장 함수 테이블
+	// @param pendingQueueCapacity 흐름 제어 보류 큐의 최대 항목 수입니다.
 	// @return 초기화 성공 여부 (true: 성공, false: 실패)
 	// ----------------------------------------
 	[[nodiscard]]
@@ -46,7 +47,7 @@ public:
 	void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 
 	// ----------------------------------------
-	// @brief 송신 시퀀스, 예약 패킷 및 큐에 남아있는 모든 SendPacketInfo를 정리합니다.
+	// @brief 송신 상태·시퀀스와 예약·송신·보류 큐를 초기화합니다. ACK 대기 맵은 재사용 전에 별도로 비워야 합니다.
 	// ----------------------------------------
 	void Reset();
 
@@ -74,7 +75,7 @@ public:
 	[[nodiscard]]
 	SendPacketInfo* TryGetFrontAndPop();
 	// ----------------------------------------
-	// @brief 송신 대기 중인 패킷이 전혀 없는지 확인합니다.
+	// @brief 현재 RIO 송신 스트림에 추가할 패킷이 없는지 확인합니다.
 	// @return 송신 큐와 예약 패킷이 모두 비어있으면 true
 	// ----------------------------------------
 	[[nodiscard]]
@@ -120,7 +121,7 @@ public:
 	std::atomic<IO_MODE>& GetIOMode();
 
 	// ----------------------------------------
-	// @brief 시퀀스를 키로 송신 패킷 정보를 맵에 등록합니다.
+	// @brief 시퀀스를 키로 송신 패킷 정보를 맵에 등록하고 성공한 경우 맵 소유 참조를 추가합니다.
 	// @param sequence 패킷 시퀀스
 	// @param info 등록할 SendPacketInfo 포인터
 	// ----------------------------------------
@@ -135,12 +136,12 @@ public:
 	SendPacketInfo* FindSendPacketInfo(PacketSequence sequence);
 
 	// ----------------------------------------
-	// @brief 시퀀스를 기준으로 송신 패킷 정보를 제거합니다.
+	// @brief 시퀀스를 기준으로 송신 패킷 정보를 제거하고 맵 소유 참조를 해제합니다.
 	// @param sequence 패킷 시퀀스
 	// ----------------------------------------
 	void EraseSendPacketInfo(PacketSequence sequence);
 	// ----------------------------------------
-	// @brief 시퀀스를 기준으로 송신 패킷 정보를 찾아 제거 후 반환합니다.
+	// @brief 시퀀스를 기준으로 송신 패킷 정보를 찾아 맵에서 제거하고 맵 소유 참조를 호출자에게 넘깁니다.
 	// @param sequence 패킷 시퀀스
 	// @return 제거된 SendPacketInfo 포인터, 없으면 nullptr
 	// ----------------------------------------
@@ -178,6 +179,9 @@ public:
 	[[nodiscard]]
 	PacketSequence IncrementLastSendPacketSequence();
 
+	// ----------------------------------------
+	// 아래 보류 큐 연산은 내부에서 잠그지 않으므로 동시 접근 시 GetPendingQueueLock()을 보유해야 합니다.
+	// ----------------------------------------
 	void InitializePendingQueue(unsigned short capacity);
 	[[nodiscard]]
 	std::mutex& GetPendingQueueLock();
@@ -213,7 +217,7 @@ public:
 	// ----------------------------------------
 	bool PopFromPendingQueue(OUT std::pair<PacketSequence, NetBuffer*>& item);
 	// ----------------------------------------
-	// @brief 전송을 위해 보류된 패킷들을 저장하는 링 버퍼.플로우 제어에 의해 즉시 전송되지 못하는 패킷들이 여기에 저장됩니다.
+	// @brief 보류 큐를 비우고 큐가 소유하던 모든 NetBuffer 참조를 해제합니다. 호출자는 pending 큐 잠금을 보유해야 합니다.
 	// ----------------------------------------
 	void ClearPendingQueue();
 
