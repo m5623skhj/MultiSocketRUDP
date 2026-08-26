@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 #include "../Common/FlowController/RUDPFlowManager.h"
 
@@ -16,7 +16,7 @@ protected:
 
 
 // ------------------------------------------------------------
-// �ʱ� ���¿��� cwnd(4) ���� �� ������ �����ؾ� �Ѵ�
+// 초기 상태에서 cwnd(4) 범위 내 전송은 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 {
@@ -25,7 +25,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsTrue_WithinInitialCwnd)
 }
 
 // ------------------------------------------------------------
-// cwnd�� �ʰ��ϴ� ������ �Ұ��ؾ� �Ѵ�
+// cwnd를 초과하는 전송은 불가해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 {
@@ -33,7 +33,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_ReturnsFalse_WhenExceedsCwnd)
 }
 
 // ------------------------------------------------------------
-// ACK ���� �� cwnd�� �þ �߰� ������ �����ؾ� �Ѵ�
+// ACK 수신 후 cwnd가 늘어나 추가 전송이 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 {
@@ -44,7 +44,7 @@ TEST_F(RUDPFlowManagerTest, CanSend_AllowsMore_AfterAckReceived)
 }
 
 // ------------------------------------------------------------
-// ������ ���� �� �������� ���� �����ؾ� �Ѵ�
+// 윈도우 범위 내 시퀀스는 수신 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 {
@@ -53,7 +53,7 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsTrue_WhenWithinWindow)
 }
 
 // ------------------------------------------------------------
-// ������ ������ ��� �������� ���� �Ұ��ؾ� �Ѵ�
+// 윈도우 범위를 벗어난 시퀀스는 수신 불가해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 {
@@ -61,7 +61,7 @@ TEST_F(RUDPFlowManagerTest, CanAccept_ReturnsFalse_WhenOutsideWindow)
 }
 
 // ------------------------------------------------------------
-// MarkReceived �� �����찡 �����̵��Ǿ� �� �������� ���� �����ؾ� �Ѵ�
+// MarkReceived 후 윈도우가 슬라이딩되어 새 시퀀스를 수신 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 {
@@ -72,7 +72,7 @@ TEST_F(RUDPFlowManagerTest, MarkReceived_SlidesWindow_AllowsNewSequence)
 }
 
 // ------------------------------------------------------------
-// Ÿ�Ӿƿ� �� cwnd�� 1�� �پ� ���� ���� ������ �������� �Ѵ�
+// 타임아웃 후 cwnd가 1로 줄어 전송 가능 범위가 좁아져야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, OnTimeout_HalvesCwnd)
 {
@@ -86,7 +86,7 @@ TEST_F(RUDPFlowManagerTest, OnTimeout_HalvesCwnd)
 }
 
 // ------------------------------------------------------------
-// Reset �� ������ ���������� ���� �����ؾ� �Ѵ�
+// Reset 후 지정한 시퀀스부터 수신 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 {
@@ -102,7 +102,7 @@ TEST_F(RUDPFlowManagerTest, Reset_SetsReceiveWindowToGivenSequence)
 }
 
 // ------------------------------------------------------------
-// GetReceiveWindowEnd �׽�Ʈ
+// GetReceiveWindowEnd 테스트
 // ------------------------------------------------------------
 TEST_F(RUDPFlowManagerTest, GetReceiveWindowEnd_ReturnsCorrectEnd)
 {

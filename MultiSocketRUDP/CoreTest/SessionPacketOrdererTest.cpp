@@ -3,15 +3,15 @@
 #include "SessionPacketOrderer.h"
 
 // ============================================================
-// SessionPacketOrderer ���� �׽�Ʈ
+// SessionPacketOrderer 단위 테스트
 //
-// �ٽ� ����:
-//  - seq < nextExpected  �� DUPLICATED_RECV
-//  - seq == nextExpected �� ó�� �� ������ ��Ŷ�� ���� ó�� �� PROCESSED / ERROR_OCCURED
-//  - seq >  nextExpected �� maxHoldingQueueSize �̸��̸� Ȧ�� �� PACKET_HELD
-//  - ���� �̷� ������ �ߺ� ���� �� �� ��°�� ���� (recvHoldingPacketSequences.contains)
-//  - Reset(startSeq)	: Ȧ�� ��Ŷ ���� Free, nextExpected �缳��
-//  - Initialize(size)   : Reset(0) + maxSize �缳��
+// 핵심 동작:
+//  - seq < nextExpected  → DUPLICATED_RECV
+//  - seq == nextExpected → 처리 후 보관된 패킷도 연속 처리 → PROCESSED / ERROR_OCCURED
+//  - seq >  nextExpected → maxHoldingQueueSize 미만이면 홀딩 → PACKET_HELD
+//  - 동일 미래 시퀀스 중복 수신 → 두 번째는 무시 (recvHoldingPacketSequences.contains)
+//  - Reset(startSeq)	: 홀딩 패킷 전부 Free, nextExpected 재설정
+//  - Initialize(size)   : Reset(0) + maxSize 재설정
 // ============================================================
 
 static bool successCb(NetBuffer&, PacketSequence) { return true; }
@@ -45,7 +45,7 @@ protected:
 };
 
 // ------------------------------------------------------------
-// 1. �ʱ� ����
+// 1. 초기 상태
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, InitialState_NextExpectedEqualsStart)
 {
@@ -53,7 +53,7 @@ TEST_F(SessionPacketOrdererTest, InitialState_NextExpectedEqualsStart)
 }
 
 // ------------------------------------------------------------
-// 2. ������� �����ϴ� ��Ŷ
+// 2. 순서대로 도착하는 패킷
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, InOrder_ReturnsProcessed)
 {
@@ -83,7 +83,7 @@ TEST_F(SessionPacketOrdererTest, InOrder_SequenceAdvancesPerPacket)
 }
 
 // ------------------------------------------------------------
-// 3. �ߺ� ���� (���� ������)
+// 3. 중복 수신 (과거 시퀀스)
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, PastSeq_ReturnsDuplicatedRecv)
 {
@@ -105,7 +105,7 @@ TEST_F(SessionPacketOrdererTest, FarPastSeq_ReturnsDuplicatedRecv)
 }
 
 // ------------------------------------------------------------
-// 4. �̷� ������ Ȧ��
+// 4. 미래 시퀀스 홀딩
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, FutureSeq_ReturnsPacketHeld)
 {
@@ -152,7 +152,7 @@ TEST_F(SessionPacketOrdererTest, MultipleHeldPackets_ProcessedInOrder)
 }
 
 // ------------------------------------------------------------
-// 5. �ߺ� Ȧ�� ������: �� �� �޾Ƶ� �� ���� ó��
+// 5. 중복 홀딩 시퀀스: 두 번 받아도 한 번만 처리
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, DuplicateFutureSeq_HeldOnlyOnce)
 {
@@ -170,7 +170,7 @@ TEST_F(SessionPacketOrdererTest, DuplicateFutureSeq_HeldOnlyOnce)
 }
 
 // ------------------------------------------------------------
-// 6. ť �뷮 �ʰ�
+// 6. 큐 용량 초과
 // ------------------------------------------------------------
 // ------------------------------------------------------------
 // 보류 큐가 최대 용량인 상태에서 누락 패킷이 도착하면 전체 패킷을 순서대로 처리하는지 확인합니다.
@@ -193,7 +193,7 @@ TEST_F(SessionPacketOrdererTest, QueueAtCapacityProcessesAllPacketsWhenGapCloses
 }
 
 // ------------------------------------------------------------
-// 7. �ݹ� ���� ó��
+// 7. 콜백 실패 처리
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, CallbackFails_ReturnsErrorOccured)
 {
@@ -266,7 +266,7 @@ TEST_F(SessionPacketOrdererTest, Initialize_ResetsToZeroAndChangesMaxSize)
 }
 
 // ------------------------------------------------------------
-// 10. ��(gap) �ó�����
+// 10. 갭(gap) 시나리오
 // ------------------------------------------------------------
 TEST_F(SessionPacketOrdererTest, GapScenario_ProcessesInChunks)
 {

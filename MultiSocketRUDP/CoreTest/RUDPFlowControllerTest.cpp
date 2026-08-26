@@ -33,7 +33,7 @@ TEST_F(RUDPFlowControllerTest, InitialState_LastAckedSequenceIsZero)
 }
 
 // ------------------------------------------------------------
-// outstanding�� cwnd �̸��̸� ���� �����ؾ� �Ѵ�
+// outstanding이 cwnd 미만이면 전송 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenOutstandingBelowCwnd)
 {
@@ -42,7 +42,7 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenOutstandingBelowCwn
 }
 
 // ------------------------------------------------------------
-// outstanding�� cwnd �̻��̸� ���� �Ұ��ؾ� �Ѵ�
+// outstanding이 cwnd 이상이면 전송 불가해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsFalse_WhenOutstandingReachesCwnd)
 {
@@ -69,7 +69,7 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_HandlesSequenceWraparound)
 }
 
 // ------------------------------------------------------------
-// lastAcked�� nextSend�� ������ outstanding=0���� ���� �����ؾ� �Ѵ�
+// lastAcked와 nextSend가 같으면 outstanding=0으로 전송 가능해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenNoOutstanding)
 {
@@ -77,7 +77,7 @@ TEST_F(RUDPFlowControllerTest, CanSendPacket_ReturnsTrue_WhenNoOutstanding)
 }
 
 // ------------------------------------------------------------
-// ���� ACK ���� �� cwnd�� 1 �����ؾ� �Ѵ�
+// 정상 ACK 수신 시 cwnd가 1 증가해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_IncrementsCwnd)
 {
@@ -87,7 +87,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_IncrementsCwnd)
 }
 
 // ------------------------------------------------------------
-// ���� ACK ���� �� lastReplySequence�� ���ŵǾ�� �Ѵ�
+// 정상 ACK 수신 시 lastReplySequence가 갱신되어야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_UpdatesLastAckedSequence)
 {
@@ -105,7 +105,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_DoesNotAliasTwoToTheThirtySecondG
 }
 
 // ------------------------------------------------------------
-// �ߺ� ACK(���� ������) ���� �� cwnd�� ������ �ʾƾ� �Ѵ�
+// 중복 ACK(이전 시퀀스) 수신 시 cwnd가 변하지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_DuplicateAck_DoesNotChangeCwnd)
 {
@@ -118,7 +118,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_DuplicateAck_DoesNotChangeCwnd)
 }
 
 // ------------------------------------------------------------
-// GAP_THRESHOLD(5) �ʰ� �� ȥ�� �̺�Ʈ�� �߻��ؾ� �Ѵ�
+// GAP_THRESHOLD(5) 초과 시 혼잡 이벤트가 발생해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_LargeGap_TriggersCongestion)
 {
@@ -130,7 +130,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_LargeGap_TriggersCongestion)
 }
 
 // ------------------------------------------------------------
-// GAP_THRESHOLD(5) ���� gap�� ȥ�� �̺�Ʈ�� �߻���Ű�� �ʾƾ� �Ѵ�
+// GAP_THRESHOLD(5) 이하 gap은 혼잡 이벤트를 발생시키지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion)
 {
@@ -142,7 +142,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_SmallGap_DoesNotTriggerCongestion
 }
 
 // ------------------------------------------------------------
-// cwnd�� MAX_CWND�� �ʰ����� �ʾƾ� �Ѵ�
+// cwnd는 MAX_CWND를 초과하지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 {
@@ -154,7 +154,7 @@ TEST_F(RUDPFlowControllerTest, OnReplyReceived_CwndDoesNotExceedMaxCwnd)
 }
 
 // ------------------------------------------------------------
-// ȥ�� �̺�Ʈ �߻� �� cwnd�� �������� �پ�� �Ѵ�
+// 혼잡 이벤트 발생 시 cwnd가 절반으로 줄어야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnCongestionEvent_HalvesCwnd)
 {
@@ -166,7 +166,7 @@ TEST_F(RUDPFlowControllerTest, OnCongestionEvent_HalvesCwnd)
 }
 
 // ------------------------------------------------------------
-// cwnd�� 1�� �� ȥ�� �̺�Ʈ �߻� �� �ּڰ� 1�� �����ؾ� �Ѵ�
+// cwnd가 1일 때 혼잡 이벤트 발생 시 최솟값 1을 유지해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnCongestionEvent_CwndMinimumIsOne)
 {
@@ -176,7 +176,7 @@ TEST_F(RUDPFlowControllerTest, OnCongestionEvent_CwndMinimumIsOne)
 }
 
 // ------------------------------------------------------------
-// Ÿ�Ӿƿ� �߻� �� cwnd�� 1�� �ʱ�ȭ�Ǿ�� �Ѵ�
+// 타임아웃 발생 시 cwnd가 1로 초기화되어야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnTimeout_HalvesCwndWithMinimumOne)
 {
@@ -187,7 +187,7 @@ TEST_F(RUDPFlowControllerTest, OnTimeout_HalvesCwndWithMinimumOne)
 }
 
 // ------------------------------------------------------------
-// Ÿ�Ӿƿ� ���� ACK ���� �� recovery ���·� cwnd�� �ٷ� �������� �ʾƾ� �Ѵ�
+// 타임아웃 이후 ACK 수신 시 recovery 상태로 cwnd가 바로 증가하지 않아야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, OnTimeout_EntersRecovery_CwndNotIncreasedOnFirstAck)
 {
@@ -197,12 +197,12 @@ TEST_F(RUDPFlowControllerTest, OnTimeout_EntersRecovery_CwndNotIncreasedOnFirstA
 	const uint16_t cwndAfterTimeout = fc.GetCwnd();
 	fc.OnReplyReceived(fc.GetLastAckedSequence() + 1);
 
-	// recovery ���¿��� ù ACK�� cwnd�� ������Ű�� �ʰ� recovery ������ ��
+	// recovery 상태에서 첫 ACK는 cwnd를 증가시키지 않고 recovery 해제만 함
 	EXPECT_EQ(fc.GetCwnd(), cwndAfterTimeout);
 }
 
 // ------------------------------------------------------------
-// recovery ���� �� ACK ���� �� cwnd�� ���������� �����ؾ� �Ѵ�
+// recovery 해제 후 ACK 수신 시 cwnd가 정상적으로 증가해야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, AfterRecovery_CwndIncreasesNormally)
 {
@@ -218,7 +218,7 @@ TEST_F(RUDPFlowControllerTest, AfterRecovery_CwndIncreasesNormally)
 }
 
 // ------------------------------------------------------------
-// Reset �� �ʱ� ���·� ���ƿ;� �Ѵ�
+// Reset 후 초기 상태로 돌아와야 한다
 // ------------------------------------------------------------
 TEST_F(RUDPFlowControllerTest, Reset_RestoresInitialState)
 {
