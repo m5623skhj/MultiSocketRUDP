@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="668" viewBox="0 0 960 668">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="689" viewBox="0 0 960 689">
 <rect width="100%" height="100%" fill="#0d1117" rx="12"/>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}.table-header{font-size:12px;font-weight:600}.table-row{font-size:12px}</style>
 <text x="28" y="38" class="title">RTT trend — packet loss 0%</text>
-<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 +4.65%, P99 +1.89%</text>
+<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 +4.21%, P99 +7.15%</text>
 <line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>
 <line x1="830" y1="36" x2="860" y2="36" stroke="#f85149" stroke-width="3"/><text x="868" y="41" class="legend">P99</text>
 <line x1="78" y1="340.00" x2="930" y2="340.00" stroke="#30363d" stroke-width="1"/>
@@ -20,42 +20,46 @@
 <text x="18" y="226.00" transform="rotate(-90 18 226.00)" text-anchor="middle" class="axis">RTT (ms)</text>
 <text x="78.00" y="367" text-anchor="middle" class="label">cb43718</text>
 <text x="78.00" y="384" text-anchor="middle" class="label">08-03</text>
-<text x="184.50" y="367" text-anchor="middle" class="label">03293c8</text>
-<text x="184.50" y="384" text-anchor="middle" class="label">08-03</text>
-<text x="291.00" y="367" text-anchor="middle" class="label">f75b724</text>
-<text x="291.00" y="384" text-anchor="middle" class="label">08-04</text>
-<text x="397.50" y="367" text-anchor="middle" class="label">34b8102</text>
-<text x="397.50" y="384" text-anchor="middle" class="label">08-04</text>
-<text x="504.00" y="367" text-anchor="middle" class="label">536de21</text>
-<text x="504.00" y="384" text-anchor="middle" class="label">08-07</text>
-<text x="610.50" y="367" text-anchor="middle" class="label">cb4ed7d</text>
-<text x="610.50" y="384" text-anchor="middle" class="label">08-07</text>
-<text x="717.00" y="367" text-anchor="middle" class="label">cabf791</text>
-<text x="717.00" y="384" text-anchor="middle" class="label">08-09</text>
-<text x="823.50" y="367" text-anchor="middle" class="label">640064d</text>
-<text x="823.50" y="384" text-anchor="middle" class="label">08-24</text>
-<text x="930.00" y="367" text-anchor="middle" class="label">f72bf31</text>
+<text x="172.67" y="367" text-anchor="middle" class="label">03293c8</text>
+<text x="172.67" y="384" text-anchor="middle" class="label">08-03</text>
+<text x="267.33" y="367" text-anchor="middle" class="label">f75b724</text>
+<text x="267.33" y="384" text-anchor="middle" class="label">08-04</text>
+<text x="362.00" y="367" text-anchor="middle" class="label">34b8102</text>
+<text x="362.00" y="384" text-anchor="middle" class="label">08-04</text>
+<text x="456.67" y="367" text-anchor="middle" class="label">536de21</text>
+<text x="456.67" y="384" text-anchor="middle" class="label">08-07</text>
+<text x="551.33" y="367" text-anchor="middle" class="label">cb4ed7d</text>
+<text x="551.33" y="384" text-anchor="middle" class="label">08-07</text>
+<text x="646.00" y="367" text-anchor="middle" class="label">cabf791</text>
+<text x="646.00" y="384" text-anchor="middle" class="label">08-09</text>
+<text x="740.67" y="367" text-anchor="middle" class="label">640064d</text>
+<text x="740.67" y="384" text-anchor="middle" class="label">08-24</text>
+<text x="835.33" y="367" text-anchor="middle" class="label">f72bf31</text>
+<text x="835.33" y="384" text-anchor="middle" class="label">08-26</text>
+<text x="930.00" y="367" text-anchor="middle" class="label">61833d0</text>
 <text x="930.00" y="384" text-anchor="middle" class="label">08-26</text>
-<polyline points="78.00,152.18 184.50,339.39 291.00,339.45 397.50,339.52 504.00,339.46 610.50,339.34 717.00,339.38 823.50,339.34 930.00,339.35" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="78.00,152.18 172.67,339.39 267.33,339.45 362.00,339.52 456.67,339.46 551.33,339.34 646.00,339.38 740.67,339.34 835.33,339.35 930.00,339.33" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="78.00" cy="152.18" r="4" fill="#58a6ff"><title>62.839 ms</title></circle>
-<circle cx="184.50" cy="339.39" r="4" fill="#58a6ff"><title>204.600 µs</title></circle>
-<circle cx="291.00" cy="339.45" r="4" fill="#58a6ff"><title>183.400 µs</title></circle>
-<circle cx="397.50" cy="339.52" r="4" fill="#58a6ff"><title>162.200 µs</title></circle>
-<circle cx="504.00" cy="339.46" r="4" fill="#58a6ff"><title>179.700 µs</title></circle>
-<circle cx="610.50" cy="339.34" r="4" fill="#58a6ff"><title>220.900 µs</title></circle>
-<circle cx="717.00" cy="339.38" r="4" fill="#58a6ff"><title>206.600 µs</title></circle>
-<circle cx="823.50" cy="339.34" r="4" fill="#58a6ff"><title>221.900 µs</title></circle>
-<circle cx="930.00" cy="339.35" r="4" fill="#58a6ff"><title>216.200 µs</title></circle>
-<polyline points="78.00,149.92 184.50,339.26 291.00,339.40 397.50,339.43 504.00,339.39 610.50,339.25 717.00,339.29 823.50,339.26 930.00,339.28" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="172.67" cy="339.39" r="4" fill="#58a6ff"><title>204.600 µs</title></circle>
+<circle cx="267.33" cy="339.45" r="4" fill="#58a6ff"><title>183.400 µs</title></circle>
+<circle cx="362.00" cy="339.52" r="4" fill="#58a6ff"><title>162.200 µs</title></circle>
+<circle cx="456.67" cy="339.46" r="4" fill="#58a6ff"><title>179.700 µs</title></circle>
+<circle cx="551.33" cy="339.34" r="4" fill="#58a6ff"><title>220.900 µs</title></circle>
+<circle cx="646.00" cy="339.38" r="4" fill="#58a6ff"><title>206.600 µs</title></circle>
+<circle cx="740.67" cy="339.34" r="4" fill="#58a6ff"><title>221.900 µs</title></circle>
+<circle cx="835.33" cy="339.35" r="4" fill="#58a6ff"><title>216.200 µs</title></circle>
+<circle cx="930.00" cy="339.33" r="4" fill="#58a6ff"><title>225.300 µs</title></circle>
+<polyline points="78.00,149.92 172.67,339.26 267.33,339.40 362.00,339.43 456.67,339.39 551.33,339.25 646.00,339.29 740.67,339.26 835.33,339.28 930.00,339.22" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="78.00" cy="149.92" r="4" fill="#f85149"><title>63.596 ms</title></circle>
-<circle cx="184.50" cy="339.26" r="4" fill="#f85149"><title>248.100 µs</title></circle>
-<circle cx="291.00" cy="339.40" r="4" fill="#f85149"><title>200.100 µs</title></circle>
-<circle cx="397.50" cy="339.43" r="4" fill="#f85149"><title>192.200 µs</title></circle>
-<circle cx="504.00" cy="339.39" r="4" fill="#f85149"><title>205.400 µs</title></circle>
-<circle cx="610.50" cy="339.25" r="4" fill="#f85149"><title>252.000 µs</title></circle>
-<circle cx="717.00" cy="339.29" r="4" fill="#f85149"><title>237.500 µs</title></circle>
-<circle cx="823.50" cy="339.26" r="4" fill="#f85149"><title>248.700 µs</title></circle>
-<circle cx="930.00" cy="339.28" r="4" fill="#f85149"><title>242.000 µs</title></circle>
+<circle cx="172.67" cy="339.26" r="4" fill="#f85149"><title>248.100 µs</title></circle>
+<circle cx="267.33" cy="339.40" r="4" fill="#f85149"><title>200.100 µs</title></circle>
+<circle cx="362.00" cy="339.43" r="4" fill="#f85149"><title>192.200 µs</title></circle>
+<circle cx="456.67" cy="339.39" r="4" fill="#f85149"><title>205.400 µs</title></circle>
+<circle cx="551.33" cy="339.25" r="4" fill="#f85149"><title>252.000 µs</title></circle>
+<circle cx="646.00" cy="339.29" r="4" fill="#f85149"><title>237.500 µs</title></circle>
+<circle cx="740.67" cy="339.26" r="4" fill="#f85149"><title>248.700 µs</title></circle>
+<circle cx="835.33" cy="339.28" r="4" fill="#f85149"><title>242.000 µs</title></circle>
+<circle cx="930.00" cy="339.22" r="4" fill="#f85149"><title>259.300 µs</title></circle>
 <text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>
 <line x1="28" y1="426" x2="932" y2="426" stroke="#30363d" stroke-width="1"/>
 <text x="28" y="447" class="table-header">Date (UTC)</text>
@@ -109,4 +113,9 @@
 <text x="210" y="646" class="table-row">* 인코딩 잘못된 주석 수정</text>
 <text x="815" y="646" text-anchor="end" class="table-row">0.216 ms</text>
 <text x="930" y="646" text-anchor="end" class="table-row">0.242 ms</text>
+<text x="28" y="667" class="table-row">2026-08-26</text>
+<text x="122" y="667" class="table-row">61833d0</text>
+<text x="210" y="667" class="table-row">* 주석 없던 테스트들에 테스트 목적 주석 추가</text>
+<text x="815" y="667" text-anchor="end" class="table-row">0.225 ms</text>
+<text x="930" y="667" text-anchor="end" class="table-row">0.259 ms</text>
 </svg>
