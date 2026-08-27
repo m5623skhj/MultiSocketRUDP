@@ -8,15 +8,15 @@
 
 ## 목차
 
-1. [설계 목적 — 풀 패턴](#1-설계-목적--풀-패턴)
-2. [초기화 — Initialize](#2-초기화--initialize)
-3. [세션 할당 — AcquireSession](#3-세션-할당--acquiresession)
-4. [세션 반환 — ReleaseSession](#4-세션-반환--releasesession)
+1. [설계 목적 — 풀 패턴](#1-설계-목적-풀-패턴)
+2. [초기화 — `Initialize`](#2-초기화-initialize)
+3. [세션 할당 — `AcquireSession`](#3-세션-할당-acquiresession)
+4. [세션 반환 — `ReleaseSession`](#4-세션-반환-releasesession)
 5. [함수 설명](#5-함수-설명)
 6. [세션 조회](#6-세션-조회)
 7. [연결 수 카운터](#7-연결-수-카운터)
-8. [종료 순서 — 세 단계 안전 정리](#8-종료-순서--세-단계-안전-정리)
-9. [이중 반환 방지 — unusedSessionIdSet](#9-이중-반환-방지--unusedsessionidset)
+8. [종료 순서 — 세 단계 안전 정리](#8-종료-순서-세-단계-안전-정리)
+9. [이중 반환 방지 — `unusedSessionIdSet`](#9-이중-반환-방지-unusedsessionidset)
 
 ---
 
@@ -236,9 +236,13 @@ unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
   `RELEASING` 상태에 전달한다.
 - 실제 소켓 close와 풀 반환은 release worker의 drain 절차가 수행한다.
 
-#### `void ClearAllSessions()`
-- 세션 객체 메모리를 정리한다.
+### `ClearAllSessions`
 
+```cpp
+void ClearAllSessions();
+```
+
+모든 세션 리소스를 해제하고 세션 풀을 비운다. 관리 중인 모든 `RUDPSession` 객체를 삭제하고 초기화 상태를 해제한다.
 #### `void IncrementConnectedCount()`
 - 성공 연결 시 통계를 증가시킨다.
 
