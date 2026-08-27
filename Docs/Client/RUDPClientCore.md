@@ -9,18 +9,18 @@
 ## 목차
 
 1. [전체 연결 흐름](#1-전체-연결-흐름)
-2. [시작 — Start](#2-시작--start)
-3. [종료 — Stop](#3-종료--stop)
+2. [시작 — `Start`](#2-시작-start)
+3. [종료 — `Stop`](#3-종료-stop)
 4. [TLS 세션 정보 수신](#4-tls-세션-정보-수신)
 5. [CONNECT 패킷 전송](#5-connect-패킷-전송)
-6. [데이터 송신 — SendPacket](#6-데이터-송신--sendpacket)
-7. [데이터 수신 — GetReceivedPacket](#7-데이터-수신--getreceivedpacket)
-8. [수신 스레드 — recvThread](#8-수신-스레드--recvthread)
-9. [수신 처리 — ProcessRecvPacket](#9-수신-처리--processrecvpacket)
-10. [ACK 수신 — OnSendReply](#10-ack-수신--onsendreply)
-11. [송신 스레드 — sendThread](#11-송신-스레드--sendthread)
-12. [재전송 스레드 — RunRetransmissionThread](#12-재전송-스레드--runretransmissionthread)
-13. [흐름 제어 — TryFlushPendingQueue](#13-흐름-제어--tryflushpendingqueue)
+6. [데이터 송신 — `SendPacket`](#6-데이터-송신-sendpacket)
+7. [데이터 수신 — `GetReceivedPacket`](#7-데이터-수신-getreceivedpacket)
+8. [수신 스레드 — `recvThread`](#8-수신-스레드-recvthread)
+9. [수신 처리 — `ProcessRecvPacket`](#9-수신-처리-processrecvpacket)
+10. [ACK 수신 — `OnSendReply`](#10-ack-수신-onsendreply)
+11. [송신 스레드 — `sendThread`](#11-송신-스레드-sendthread)
+12. [재전송 스레드 — `RunRetransmissionThread`](#12-재전송-스레드-runretransmissionthread)
+13. [흐름 제어 — `TryFlushPendingQueue`](#13-흐름-제어-tryflushpendingqueue)
 14. [옵션 파일 설정값](#14-옵션-파일-설정값)
 15. [주요 멤버 변수](#15-주요-멤버-변수)
 16. [스레드 구조 요약](#16-스레드-구조-요약)
@@ -631,36 +631,15 @@ void ProcessRecvPacket(NetBuffer& recvBuffer)
 ### `SendReplyToServer` — ACK 전송
 
 ```cpp
-void SendReplyToServer(PacketSequence ackedSeq)
-{
-    NetBuffer* buf = NetBuffer::Alloc();
-    auto type = PACKET_TYPE::SEND_REPLY_TYPE;
-    *buf << type << ackedSeq;
-
-    PacketCryptoHelper::EncodePacket(
-        *buf, ackedSeq,
-        PACKET_DIRECTION::CLIENT_TO_SERVER_REPLY,
-        sessionSalt, SESSION_SALT_SIZE,
-        sessionKeyHandle, true
-    );
-
-    // ACK는 send 큐 우회, 직접 sendto
-    sendto(rudpSocket,
-           buf->m_pSerializeBuffer,
-           buf->m_iWriteLast,
-           0,
-           reinterpret_cast<sockaddr*>(&serverAddr),
-           sizeof(serverAddr));
-
-    NetBuffer::Free(buf);
-}
+void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
 ```
 
-> ACK는 PendingQueue나 SendPacketInfo 등록 없이 직접 전송한다.  
-> 서버와 같은 논리: ACK는 손실 시 원본 패킷 재전송으로 자연스럽게 재요청됨.
+ACK는 PendingQueue나 SendPacketInfo 등록 없이 직접 전송한다. 서버와 같은 논리: ACK는 손실 시 원본 패킷 재전송으로 자연스럽게 재요청된다.
 
----
-
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `inRecvPacketSequence` | `PacketSequence` | 응답할 패킷의 시퀀스 번호 |
+| `packetType` | `PACKET_TYPE` | 전송할 패킷 타입. 기본값은 `PACKET_TYPE::SEND_REPLY_TYPE` |
 ## 10. ACK 수신 — `OnSendReply`
 
 ```cpp
@@ -1004,9 +983,18 @@ void TryFlushPendingQueue()
 #### `void OnRecvStream(NetBuffer& recvBuffer, int recvSize)`
 #### `void ProcessRecvPacket(NetBuffer& receivedBuffer)`
 #### `void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence)`
-#### `void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE)`
-- 수신 패킷 분해, ACK 처리, 서버 reply 전송을 담당한다.
+### `SendReplyToServer`
 
+```cpp
+void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
+```
+
+수신 패킷 분해, ACK 처리, 서버 reply 전송을 담당한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `inRecvPacketSequence` | `PacketSequence` | 수신한 패킷의 시퀀스 |
+| `packetType` | `PACKET_TYPE` | 전송할 패킷의 타입. 기본값은 `PACKET_TYPE::SEND_REPLY_TYPE` |
 #### `void DoSend()`
 #### `void SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket)`
 #### `void SendPacket(const SendPacketInfo& sendPacketInfo)`
