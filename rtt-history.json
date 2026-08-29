@@ -682,6 +682,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "30e9ac6eca8c6f5027405f446074375001bd7b47",
+      "commitSubject": "* 1000클라이언트 폐루프 RTT 스트레스 벤치마크 추가   * 클라이언트별 요청 하나만 유지하는 closed-loop 부하 모델 구현   * 32바이트 echo payload 송수신 및 응답 내용 검증 추가   * 워밍업과 측정 구간을 분리하고 RTT/s 및 P50/P95/P99/P99.9 통계 수집   * 타임아웃, 잘못된 응답, 송신 실패 및 연결 해제 원인 집계   * 프로세스 CPU와 메모리 사용량 및 JSON 결과 출력 지원   * 재전송 간격과 최대 횟수를 세션별로 설정할 수 있도록 개선   * PacketWaiterRegistry가 신규 waiter를 동일 응답으로 완료하는 경쟁 조건 수정   * 서버의 최대 세션 수를 1100개로 확장   * 스트레스 벤치마크 실행 방법과 단위 테스트 추가   * CommonCode 메모리 풀 수정 커밋 반영",
+      "recordedAtUtc": "2026-08-29T06:15:24.2181975+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000000988",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.1836874000000003,
+            "medianMinRttMs": 0.0967,
+            "medianP50RttMs": 0.1912,
+            "medianP95RttMs": 0.2179,
+            "medianP99RttMs": 0.2433,
+            "medianMaxRttMs": 0.4826,
+            "worstMaxRttMs": 1.5171,
+            "medianElapsedSeconds": 0.1904895,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.049177599999996,
+            "medianMinRttMs": 0.0556,
+            "medianP50RttMs": 0.1309,
+            "medianP95RttMs": 32.402,
+            "medianP99RttMs": 69.2608,
+            "medianMaxRttMs": 200.6183,
+            "worstMaxRttMs": 226.2439,
+            "medianElapsedSeconds": 6.0521771,
+            "totalRetransmissionSuspectedCount": 179
+          }
+        }
+      ]
     }
   ]
 }

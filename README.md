@@ -14,6 +14,7 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-08-29 | `30e9ac6` | * 1000클라이언트 폐루프 RTT 스트레스 벤치마크 추가   * 클라이언트별 요청 하나만 유지하는 closed-loop 부하 모델 구현   * 32바이트 echo payload 송수신 및 응답 내용 검증 추가   * 워밍업과 측정 구간을 분리하고 RTT/s 및 P50/P95/P99/P99.9 통계 수집   * 타임아웃, 잘못된 응답, 송신 실패 및 연결 해제 원인 집계   * 프로세스 CPU와 메모리 사용량 및 JSON 결과 출력 지원   * 재전송 간격과 최대 횟수를 세션별로 설정할 수 있도록 개선   * PacketWaiterRegistry가 신규 waiter를 동일 응답으로 완료하는 경쟁 조건 수정   * 서버의 최대 세션 수를 1100개로 확장   * 스트레스 벤치마크 실행 방법과 단위 테스트 추가   * CommonCode 메모리 풀 수정 커밋 반영 | 0.218 ms | 0.243 ms | 32.402 ms | 69.261 ms |
 | 2026-08-26 | `611752b` | * 주석 최신화 * 클라이언트 수신 패킷 시퀀스 동기화 수정 | 0.217 ms | 0.238 ms | 32.342 ms | 66.364 ms |
 | 2026-08-26 | `61833d0` | * 주석 없던 테스트들에 테스트 목적 주석 추가 | 0.225 ms | 0.259 ms | 32.228 ms | 64.554 ms |
 | 2026-08-26 | `f72bf31` | * 인코딩 잘못된 주석 수정 | 0.216 ms | 0.242 ms | 32.405 ms | 64.146 ms |
@@ -23,6 +24,5 @@ The JSON file keeps the complete official history. Charts and the table render t
 | 2026-08-07 | `536de21` | * 코드 정리 * 클라이언트 TLS 보안 강화 | 0.180 ms | 0.205 ms | 32.289 ms | 64.362 ms |
 | 2026-08-04 | `34b8102` | * README RTT 표에서 현재 RTT를 알 수 있도록 추가 | 0.162 ms | 0.192 ms | 32.416 ms | 62.135 ms |
 | 2026-08-04 | `f75b724` | * TLS 파일 분리 | 0.183 ms | 0.200 ms | 32.400 ms | 63.983 ms |
-| 2026-08-03 | `03293c8` | * 주석 수정 및 추가 | 0.205 ms | 0.248 ms | 32.606 ms | 64.302 ms |
 
-Last updated by `611752b722902f89706c7e1232d17b7140588f17` at 2026-08-26T11:59:45.8524075+00:00.
+Last updated by `30e9ac6eca8c6f5027405f446074375001bd7b47` at 2026-08-29T06:15:24.2181975+00:00.
