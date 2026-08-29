@@ -26,6 +26,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
         DoRecvFailed = 5
     }
 
+    public enum SessionDisconnectReason
+    {
+        None = 0,
+        Manual = 1,
+        RetransmissionLimit = 2,
+        ServerUnresponsive = 3
+    }
+
     public class SessionInfo
     {
         public static readonly int SessionKeySize = 16;
@@ -164,11 +172,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
         private readonly BufferStore bufferStore = new();
 
         private volatile PacketLossSimulator? packetLossSimulator;
+        private long retransmissionTimeoutMs = 20;
+        private long retransmissionMaxCount = 16;
 
         public CancellationTokenSource CancellationToken = new();
 
         private volatile bool isConnected;
         private int isDisposed;
+        private int disconnectReason;
 
         public Action<SessionIdType>? OnSessionDisconnected { get; set; }
 
@@ -216,7 +227,12 @@ namespace MultiSocketRUDPBotTester.ClientCore
             _ = Task.Run(SendConnectPacketAsync);
         }
 
-        public void Disconnect() => Cleanup();
+        public void Disconnect() => Cleanup(SessionDisconnectReason.Manual);
+
+        public SessionDisconnectReason GetDisconnectReason()
+        {
+            return (SessionDisconnectReason)Volatile.Read(ref disconnectReason);
+        }
 
         /// <summary>
         /// 소켓 경계에서의 양방향 패킷 손실 시뮬레이션을 설정합니다.
@@ -235,6 +251,27 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var simualator = new PacketLossSimulator(inLossRate, inSeed);
             simualator.SetEnabled(true);
             packetLossSimulator = simualator;
+        }
+
+        /// <summary>
+        /// 이후 생성되는 송신 패킷에 적용할 재전송 간격과 최대 횟수를 설정합니다.
+        /// 이미 송신 대기열에 들어간 패킷의 설정은 변경하지 않습니다.
+        /// </summary>
+        public void ConfigureRetransmission(
+            int inRetransmissionTimeoutMs,
+            int inRetransmissionMaxCount)
+        {
+            if (inRetransmissionTimeoutMs <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inRetransmissionTimeoutMs));
+            }
+            if (inRetransmissionMaxCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inRetransmissionMaxCount));
+            }
+
+            Interlocked.Exchange(ref retransmissionTimeoutMs, inRetransmissionTimeoutMs);
+            Interlocked.Exchange(ref retransmissionMaxCount, inRetransmissionMaxCount);
         }
 
         private async Task SendDatagramAsync(UdpClient client, ReadOnlyMemory<byte> datagram)
@@ -266,7 +303,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     PacketDirection.ClientToServer, SessionInfo.SessionSalt, isCorePacket: false);
             }
 
-            await SendPacketInternal(new SendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
+            await SendPacketInternal(CreateSendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
         }
 
         private async Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)
@@ -293,7 +330,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                         PacketDirection.ClientToServer, SessionInfo.SessionSalt, isCorePacket: true);
                 }
 
-                if (!await SendPacketInternal(new SendPacketInfo(buffer, LoginPacketSequence))
+                if (!await SendPacketInternal(CreateSendPacketInfo(buffer, LoginPacketSequence))
                         .ConfigureAwait(false))
                 {
                     Log.Error("SendConnectPacketAsync() failed. SessionId {Id}", SessionInfo.SessionId);
@@ -310,6 +347,17 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var buffer = new NetBuffer(64);
             buffer.BuildConnectPacket(SessionInfo.SessionId);
             return buffer;
+        }
+
+        private SendPacketInfo CreateSendPacketInfo(
+            NetBuffer inBuffer,
+            PacketSequence inPacketSequence)
+        {
+            return new SendPacketInfo(
+                inBuffer,
+                inPacketSequence,
+                Interlocked.Read(ref retransmissionTimeoutMs),
+                Interlocked.Read(ref retransmissionMaxCount));
         }
 
         private async Task ReceiveAsync()
@@ -650,7 +698,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
                             Log.Warning("Max retransmission exceeded for seq={Seq}, disconnecting...",
                                 info.PacketSequence);
-                            await DisconnectAsync().ConfigureAwait(false);
+                            await DisconnectAsync(SessionDisconnectReason.RetransmissionLimit)
+                                .ConfigureAwait(false);
                             return;
                         }
 
@@ -691,7 +740,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             catch (OperationCanceledException) { Log.Information("RetransmissionAsync: Cancelled"); }
         }
 
-        private async Task DisconnectAsync()
+        private async Task DisconnectAsync(SessionDisconnectReason inReason)
         {
             isConnected = false;
             SessionInfo.SessionState = SessionState.Disconnecting;
@@ -706,7 +755,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 Log.Warning("DisconnectAsync: Failed to send disconnect packet - {Error}", ex.Message);
             }
 
-            Cleanup();
+            Cleanup(inReason);
         }
 
         private NetBuffer BuildDisconnectPacket()
@@ -741,19 +790,21 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     if (prev != curr) { prev = curr; continue; }
 
                     Log.Warning("No response from server, disconnecting...");
-                    await DisconnectAsync().ConfigureAwait(false);
+                    await DisconnectAsync(SessionDisconnectReason.ServerUnresponsive)
+                        .ConfigureAwait(false);
                     break;
                 }
             }
             catch (OperationCanceledException) { Log.Information("StartServerAliveCheck: Cancelled"); }
         }
 
-        private void Cleanup()
+        private void Cleanup(SessionDisconnectReason inReason)
         {
             if (Interlocked.CompareExchange(ref isDisposed, 1, 0) != 0)
                 return;
 
             var capturedSessionId = SessionInfo.SessionId;
+            Volatile.Write(ref disconnectReason, (int)inReason);
 
             isConnected = false;
 

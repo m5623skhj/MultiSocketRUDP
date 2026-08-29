@@ -41,10 +41,13 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
         public void Complete(PacketId packetId, NetBuffer buffer)
         {
-            foreach (var entry in waiters)
+            var matchingKeys = waiters.Keys
+                .Where(key => key.PacketId == packetId)
+                .ToArray();
+
+            foreach (var key in matchingKeys)
             {
-                if (entry.Key.PacketId == packetId
-                    && waiters.TryRemove(entry.Key, out var source))
+                if (waiters.TryRemove(key, out var source))
                 {
                     source.TrySetResult(buffer);
                 }

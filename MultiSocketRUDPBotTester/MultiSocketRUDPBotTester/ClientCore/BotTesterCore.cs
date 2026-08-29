@@ -1,6 +1,7 @@
 using Serilog;
 using MultiSocketRUDPBotTester.Bot;
 using MultiSocketRUDPBotTester.Contents.Client;
+using System.Diagnostics;
 
 namespace MultiSocketRUDPBotTester.ClientCore
 {
@@ -151,6 +152,107 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 sessionGetter.Close();
                 rudpSession?.Disconnect();
+            }
+        }
+
+        /// <summary>
+        /// 모든 봇을 먼저 연결한 뒤 클라이언트별로 하나의 Ping만 outstanding 상태로
+        /// 유지하는 폐루프 RTT 처리량 테스트를 실행합니다.
+        /// </summary>
+        public async Task<RttStressTestSummary> StartRttStressTest(
+            RttStressTestConfiguration inConfiguration,
+            CancellationToken inCancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(inConfiguration);
+            if (string.IsNullOrEmpty(hostIp) || hostPort == 0)
+            {
+                throw new InvalidOperationException(
+                    "Connection info not set. Call SetConnectionInfo first.");
+            }
+            if (inConfiguration.ClientCount <= 0 ||
+                inConfiguration.ClientCount > ushort.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inConfiguration.ClientCount));
+            }
+            if (inConfiguration.WarmupSeconds < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inConfiguration.WarmupSeconds));
+            }
+            if (inConfiguration.MeasureSeconds <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inConfiguration.MeasureSeconds));
+            }
+            if (inConfiguration.TimeoutMs <= 0 || inConfiguration.TimeoutMs > 60000)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inConfiguration.TimeoutMs));
+            }
+
+            const int connectionWaitTimeoutMs = 120000;
+            var clients = new List<Client>(inConfiguration.ClientCount);
+            var connectStartedTimestamp = Stopwatch.GetTimestamp();
+
+            try
+            {
+                for (var index = 0; index < inConfiguration.ClientCount; ++index)
+                {
+                    inCancellationToken.ThrowIfCancellationRequested();
+                    Client? session;
+                    try
+                    {
+                        session = await GetSessionInfoFromSessionBroker().ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        sessionGetter.Close();
+                    }
+
+                    if (session == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to get session info for client {index + 1}.");
+                    }
+
+                    session.EnableRttMode();
+                    session.ConfigureRetransmission(
+                        inConfiguration.RetransmissionTimeoutMs,
+                        inConfiguration.RetransmissionMaxCount);
+                    session.OnSessionDisconnected = sessionId =>
+                    {
+                        lock (sessionDictionaryLock)
+                        {
+                            sessionDictionary.Remove(sessionId);
+                        }
+                    };
+
+                    lock (sessionDictionaryLock)
+                    {
+                        sessionDictionary[session.GetSessionId()] = session;
+                    }
+                    clients.Add(session);
+                }
+
+                var connectionTasks = clients.Select(client =>
+                    client.WaitUntilConnectedAsync(
+                        connectionWaitTimeoutMs,
+                        inCancellationToken));
+                await Task.WhenAll(connectionTasks).ConfigureAwait(false);
+
+                var allConnectedMs = Stopwatch.GetElapsedTime(
+                    connectStartedTimestamp).TotalMilliseconds;
+                var runner = new RttStressTestRunner();
+                return await runner.RunAsync(
+                    clients,
+                    inConfiguration,
+                    allConnectedMs,
+                    inCancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                sessionGetter.Close();
+                foreach (var client in clients)
+                {
+                    client.Disconnect();
+                }
             }
         }
 

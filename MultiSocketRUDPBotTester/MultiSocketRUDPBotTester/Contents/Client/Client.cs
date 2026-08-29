@@ -15,6 +15,8 @@ namespace MultiSocketRUDPBotTester.Contents.Client
     public partial class Client : RudpSession
     {
         private const double TailLatencyLogThresholdMs = 1.0;
+        internal const int RttStressApplicationPayloadBytes = 32;
+        private const string RttStressPayload = "0123456789abcdefghijklmnopqrst";
         private ActionGraph actionGraph = new();
         private volatile bool isRttModeEnabled;
         public RuntimeContext GlobalContext { get; }
@@ -88,6 +90,14 @@ namespace MultiSocketRUDPBotTester.Contents.Client
             return SendPacket(buffer, PacketId.Ping);
         }
 
+        public Task SendRttStressRequestAsync()
+        {
+            var buffer = new NetBuffer(96);
+            buffer.ReserveHeader();
+            buffer.WriteString(RttStressPayload);
+            return SendPacket(buffer, PacketId.TestStringPacketReq);
+        }
+
         public void BeginRttSample(long inSendTimestamp)
         {
             Interlocked.Exchange(ref rttSocketReceiveTimestamp, 0);
@@ -98,6 +108,22 @@ namespace MultiSocketRUDPBotTester.Contents.Client
         public Task<NetBuffer?> WaitForPongAsync(int timeoutMs, CancellationToken cancellationToken)
         {
             return WaitForNextPacketAsync(PacketId.Pong, timeoutMs, cancellationToken);
+        }
+
+        public Task<NetBuffer?> WaitForRttStressResponseAsync(
+            int timeoutMs,
+            CancellationToken cancellationToken)
+        {
+            return WaitForNextPacketAsync(
+                PacketId.TestStringPacketRes,
+                timeoutMs,
+                cancellationToken);
+        }
+
+        public static bool IsValidRttStressResponse(NetBuffer inBuffer)
+        {
+            ArgumentNullException.ThrowIfNull(inBuffer);
+            return inBuffer.ReadString() == RttStressPayload;
         }
 
         public bool TryCreateRttTraceSnapshot(long inResumeTimestamp, out RttTraceSnapshot outSnapshot)
@@ -165,7 +191,7 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
         protected override bool TryHandleRecvFastPath(PacketId packetId, NetBuffer buffer)
         {
-            if (!isRttModeEnabled || packetId != PacketId.Pong)
+            if (!isRttModeEnabled || !IsRttResponsePacket(packetId))
             {
                 return false;
             }
@@ -177,12 +203,17 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
         protected override void OnRttPacketReceived(PacketId packetId, long inReceiveTimestamp)
         {
-            if (!isRttModeEnabled || packetId != PacketId.Pong)
+            if (!isRttModeEnabled || !IsRttResponsePacket(packetId))
             {
                 return;
             }
 
             Interlocked.Exchange(ref rttSocketReceiveTimestamp, inReceiveTimestamp);
+        }
+
+        private static bool IsRttResponsePacket(PacketId inPacketId)
+        {
+            return inPacketId is PacketId.Pong or PacketId.TestStringPacketRes;
         }
 
         private void CompletePacketWaiters(PacketId packetId, NetBuffer buffer)
