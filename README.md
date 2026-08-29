@@ -2,13 +2,13 @@
 
 ## 제작 기간 : 2024.10.20 ~ 진행중
 
-1. 개요
-2. 구성
-3. Tools
-4. 문서
-5. 테스트
-6. GitHub Actions 자동화
-7. 측정
+1. [개요](#1-개요)
+2. [구성](#2-구성)
+3. [Tools](#3-tools)
+4. [문서](#4-문서)
+5. [테스트](#5-테스트)
+6. [GitHub Actions 자동화](#6-github-actions-자동화)
+7. [측정](#7-측정)
 
 ---
 
@@ -205,6 +205,7 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 * [RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
 * [손실률 수반 RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/206#issuecomment-5213531330)
+* [1,000 클라이언트 처리량 및 RTT 비교 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/228#issuecomment-5460688159)
 
 아래 그래프는 `main`에 기록된 최근 10회 공식 측정의 반복 중앙값을 보여주며, 그래프 아래 표에는 측정 날짜(UTC), 커밋 로그, P95/P99 RTT(ms)가 함께 표시됩니다.
 
