@@ -1,6 +1,10 @@
 using MultiSocketRUDPBotTester.Buffer;
 
-public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSequence)
+public class SendPacketInfo(
+    NetBuffer inSentBuffer,
+    PacketSequence inPacketSequence,
+    long inRetransmissionTimeoutMs = 20,
+    long inRetransmissionMaxCount = 16)
 {
     public NetBuffer SentBuffer { get; } = inSentBuffer;
     public PacketSequence PacketSequence { get; } = inPacketSequence;
@@ -11,8 +15,12 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     private long removedTimestampMs;
     private long retransmissionCount;
 
-    private const long RetransmissionTimeoutMs = 20;
-    private const long RetransmissionMaxCount = 16;
+    private readonly long retransmissionTimeoutMs = ValidatePositive(
+        inRetransmissionTimeoutMs,
+        nameof(inRetransmissionTimeoutMs));
+    private readonly long retransmissionMaxCount = ValidatePositive(
+        inRetransmissionMaxCount,
+        nameof(inRetransmissionMaxCount));
 
     public void InitializeSendTimestamp(ulong now)
     {
@@ -29,7 +37,7 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     public bool IsRetransmissionTime(ulong now)
     {
         var stamp = (ulong)Interlocked.Read(ref sendTimeStampMs);
-        return (now - stamp) >= (ulong)RetransmissionTimeoutMs;
+        return (now - stamp) >= (ulong)retransmissionTimeoutMs;
     }
 
     public void MarkAckReceived(ulong now)
@@ -44,7 +52,7 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
 
     public bool IsExceedMaxRetransmissionCount()    
     {
-        return Interlocked.Read(ref retransmissionCount) >= RetransmissionMaxCount;
+        return Interlocked.Read(ref retransmissionCount) >= retransmissionMaxCount;
     }
 
     public long GetRetransmissionCount()
@@ -75,6 +83,13 @@ public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSeque
     public bool HasAckReceived()
     {
         return Interlocked.Read(ref ackReceivedTimestampMs) != 0;
+    }
+
+    private static long ValidatePositive(long inValue, string inParameterName)
+    {
+        return inValue > 0
+            ? inValue
+            : throw new ArgumentOutOfRangeException(inParameterName);
     }
 }
 

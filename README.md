@@ -2,17 +2,20 @@
 
 ## 제작 기간 : 2024.10.20 ~ 진행중
 
-1. 개요
-2. 구성
-3. Tools
-4. 문서
-5. 테스트
-6. GitHub Actions 자동화
-7. 측정
+1. [개요](#1-개요)
+2. [구성](#2-구성)
+   1. [서버](#21-서버)
+   2. [클라이언트](#22-클라이언트)
+   3. [공통](#23-공통)
+3. [Tools](#3-tools)
+4. [문서](#4-문서)
+5. [테스트](#5-테스트)
+6. [GitHub Actions 자동화](#6-github-actions-자동화)
+7. [측정](#7-측정)
 
 ---
 
-1. 개요
+## 1. 개요
 
 [이전에 개발하던 RUDP 프로젝트](https://github.com/m5623skhj/RUDPServer)에서 부족한 점을 보완하기 위해 생성한 프로젝트입니다.
 
@@ -30,7 +33,7 @@
 
 ---
 
-2. 구성
+## 2. 구성
 
 솔루션에 포함된 주요 프로젝트는 아래와 같습니다.
 
@@ -50,7 +53,7 @@
 
 ---
 
-2.1 서버
+### 2.1 서버
 
 * `MultiSocketRUDPCore`
   * UDP와 RIO를 사용하는 서버 코어입니다.
@@ -88,7 +91,7 @@
 
 ---
 
-2.2 클라이언트
+### 2.2 클라이언트
 
 * `RUDPClientCore`
 	* UDP를 이용한 클라이언트 코어입니다.
@@ -107,7 +110,7 @@
 
 ---
 
-2.3 공통
+### 2.3 공통
 
 * `Logger`
 	* 로그 출력을 위한 오브젝트입니다.
@@ -126,7 +129,7 @@
 
 ---
 
-3. Tools
+## 3. Tools
    1. PacketGenerator
       * PacketGenerate.bat 파일을 실행하면 PacketDefine.yml 파일을 참조하여 아래 파일들을 생성 혹은 수정합니다.
         * PlayerPacketHandler.cpp
@@ -166,13 +169,13 @@
 
 ---
 
-4. 문서
+## 4. 문서
 
 처음 보는 경우 [문서 읽기 가이드](./Docs/ReadingGuide.md)에서 역할과 목적에 맞는 순서를 선택합니다. 전체 목록은 [Docs](./Docs/README.md)에서 확인합니다.
 
 ---
 
-5. 테스트
+## 5. 테스트
 
 * `CoreTest`는 GoogleTest 기반 유닛 테스트입니다.
 * `IntegrationTest`는 실제 서버/클라이언트, TLS, UDP 흐름을 사용하는 통합 테스트입니다.
@@ -183,7 +186,7 @@
 
 ---
 
-6. GitHub Actions 자동화
+## 6. GitHub Actions 자동화
 
 GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지보수, 정적 분석을 지원하는 자동화로 구성됩니다.
 
@@ -201,10 +204,11 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 ---
 
-7. 측정
+## 7. 측정
 
 * [RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/185#issuecomment-4670917398)
 * [손실률 수반 RTT 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/206#issuecomment-5213531330)
+* [1,000 클라이언트 처리량 및 RTT 비교 측정](https://github.com/m5623skhj/MultiSocketRUDP/issues/228#issuecomment-5460688159)
 
 아래 그래프는 `main`에 기록된 최근 10회 공식 측정의 반복 중앙값을 보여주며, 그래프 아래 표에는 측정 날짜(UTC), 커밋 로그, P95/P99 RTT(ms)가 함께 표시됩니다.
 

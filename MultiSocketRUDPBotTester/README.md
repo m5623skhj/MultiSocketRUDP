@@ -65,4 +65,24 @@ BotTester xUnit 테스트:
 dotnet test .\MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug
 ```
 
+### 1000 클라이언트 폐루프 RTT 스트레스
+
+`MultiSocketRUDPBotTester.RttBenchmark`의 `stress` 명령은 모든 클라이언트를 먼저 연결한 뒤,
+클라이언트마다 Ping 하나를 전송하고 Pong 또는 타임아웃을 기다린 후 즉시 다음 Ping을 전송합니다.
+
+```powershell
+dotnet .\MultiSocketRUDPBotTester.RttBenchmark\bin\Release\net9.0-windows7.0\MultiSocketRUDPBotTester.RttBenchmark.dll stress `
+    --host 127.0.0.1 `
+    --port 11011 `
+    --clients 1000 `
+    --warmup-seconds 30 `
+    --measure-seconds 300 `
+    --timeout-ms 5000 `
+    --output rtt-stress.json
+```
+
+옵션을 생략하면 위의 값이 기본값으로 사용됩니다. 결과에는 전체 RTT/s, RTT 평균과
+P50/P95/P99/P99.9, 타임아웃, 클라이언트별 처리량, 프로세스 CPU 및 메모리가 포함됩니다.
+현재 Ping/Pong 애플리케이션 payload는 0바이트이며 RUDP 헤더·인증 태그·ACK 트래픽은 별도입니다.
+
 PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출됩니다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 xUnit 테스트와 프로토콜 상호운용 테스트를 실행합니다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행됩니다.
