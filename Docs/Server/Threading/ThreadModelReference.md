@@ -208,14 +208,10 @@ void MultiSocketRUDPCore::OnRecvPacket(ThreadIdType threadId)
 
         NetBuffer* recvBuffer = completedContext->buffer;
         RUDPSession* session = completedContext->session;
-        bool processingStarted = false;
 
         if (recvBuffer != nullptr &&
             completedContext->ownerSessionGeneration == session->GetSessionGeneration() &&
             !session->IsReleasing()) {
-            completedContext->session->nowInProcessingRecvPacket.store(
-                true, std::memory_order_release);
-            processingStarted = true;
             packetProcessor->OnRecvPacket(
                 *session,
                 *recvBuffer,
@@ -226,10 +222,6 @@ void MultiSocketRUDPCore::OnRecvPacket(ThreadIdType threadId)
 
         if (recvBuffer != nullptr) {
             NetBuffer::Free(recvBuffer);
-        }
-        if (processingStarted) {
-            session->nowInProcessingRecvPacket.store(
-                false, std::memory_order_release);
         }
 
         completedContext->ownerRecvBuffer->CompleteRecvLogic();
@@ -242,7 +234,7 @@ void MultiSocketRUDPCore::OnRecvPacket(ThreadIdType threadId)
 
 `pendingRecvLogic`은 완료 컨텍스트가 큐에 들어가기 전에 증가하고, 버퍼 처리와 폐기가
 끝난 뒤 감소한다. Release Thread는 이 카운터를 `acquire`로 확인하므로 처리 시작 전후의
-짧은 구간까지 drain barrier에 포함된다. `nowInProcessingRecvPacket`은 추가 방어 조건이다.
+짧은 구간과 콜백 실행 구간까지 drain barrier에 포함되어 별도의 수신 처리 플래그는 필요하지 않다.
 
 ---
 
@@ -580,7 +572,7 @@ worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다.
   │   → semaphore 신호 → 깨어남
   │
   ├─ recvIOCompletedContexts[0].Dequeue(context)
-  │   → session.nowInProcessingRecvPacket = true
+  │   → pendingRecvLogic 유지
   │   → context generation 재검증 + context.buffer 사용
   │   → packetProcessor.OnRecvPacket(session, buffer, clientAddr)
   │       → [타입 분기] → session.OnRecvPacket(buffer)
@@ -589,7 +581,7 @@ worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다.
   │                   → packetFactoryMap[id](session, buffer)()
   │                       → (콘텐츠 핸들러 호출)
   │               → SendReplyToClient(sequence)         ← ACK 전송
-  │   → session.nowInProcessingRecvPacket = false
+  │   → 버퍼 정리 후 CompleteRecvLogic()으로 카운터 감소
   │
   └─ OnSendReply 수신 시:
       → sendPacketInfoMap.FindAndErase(sequence)
@@ -612,10 +604,10 @@ worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다.
   │   → sessionReleaseEventHandle 신호 (PushToDisconnectTargetSession에서 Set)
   │
   ├─ GetReleasingSession(id)
-  │   → recv logic quiescence 확인
+  │   → 송신 작업과 recv logic quiescence 확인
   │   → BeginIOShutdown(): OnDisconnected + socket close-only
   │   → send I/O / outstandingRecvIo / pendingRecvLogic / activeIOCompletions 체크
-  │   → nowInProcessingRecvPacket 추가 확인
+  │   → activeSendOperations = 0 확인
   │
   └─ 안전 확인 후 session.Disconnect()
       → FinalizeRIOCleanup()

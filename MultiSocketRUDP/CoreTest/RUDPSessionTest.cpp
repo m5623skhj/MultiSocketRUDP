@@ -1,5 +1,7 @@
 #include "PreCompile.h"
 #include <gtest/gtest.h>
+#include <semaphore>
+#include <thread>
 
 #include "../MultiSocketRUDPServer/SessionSocketContext.h"
 #include "../MultiSocketRUDPServer/RUDPSession.h"
@@ -7,6 +9,11 @@
 #include "../MultiSocketRUDPServer/SendPacketInfo.h"
 #include "MultiSocketRUDPCoreTestAccess.h"
 #include "RUDPSessionTestAccess.h"
+#include "../Common/Crypto/CryptoHelper.h"
+#ifndef LOG_ERROR
+#define LOG_ERROR(...) ((void)0)
+#endif
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 namespace
 {
@@ -21,12 +28,21 @@ namespace
 	public:
 		explicit LifecycleHookTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
 
+		void OnConnected() override
+		{
+			if (connectedCallback)
+			{
+				connectedCallback();
+			}
+		}
+
 		void OnDisconnected() override
 		{
 			++disconnectedCount;
 		}
 
 		int disconnectedCount{};
+		std::function<void()> connectedCallback;
 	};
 
 	class NoOpPacket final : public IPacket
@@ -34,6 +50,269 @@ namespace
 	public:
 		PacketId GetPacketId() const override { return 1; }
 	};
+
+	class CallbackPacket final : public IPacket
+	{
+	public:
+		explicit CallbackPacket(std::function<void(NetBuffer&)> inSerialize)
+			: serialize(std::move(inSerialize)) {}
+		PacketId GetPacketId() const override { return 1; }
+		void PacketToBuffer(NetBuffer& buffer) override { serialize(buffer); }
+
+	private:
+		std::function<void(NetBuffer&)> serialize;
+	};
+}
+
+class SessionSendLifecycleTest : public ::testing::Test
+{
+protected:
+	void SetUp() override
+	{
+		releaseInitialized = MultiSocketRUDPCoreTestAccess::InitializeSessionRelease(core);
+		ASSERT_TRUE(releaseInitialized);
+		MultiSocketRUDPCoreTestAccess::SetTimingOptions(core, 100, 250, 100, 1000);
+		RUDPSessionBehaviorAccess::SetMaximumPacketHoldingQueueSize(4);
+		RUDPSessionBehaviorAccess::InitializeSession(session);
+		RUDPSessionBehaviorAccess::GetSendContext(session).InitializePendingQueue(4);
+		RUDPSessionBehaviorAccess::SetConnected(session);
+		auto& crypto = RUDPSessionBehaviorAccess::GetCryptoContext(session);
+		auto& helper = CryptoHelper::GetTLSInstance();
+		auto keyObject = std::make_unique<unsigned char[]>(helper.GetKeyObjectSize());
+		unsigned char key[SESSION_KEY_SIZE]{};
+		const auto keyHandle = helper.GetSymmetricKeyHandle(keyObject.get(), key);
+		ASSERT_NE(keyHandle, nullptr);
+		crypto.SetSessionKeyHandle(keyHandle);
+		crypto.SetKeyObjectBuffer(keyObject.release());
+	}
+
+	void TearDown() override
+	{
+		RUDPSessionBehaviorAccess::GetSendContext(session).Reset();
+		if (releaseInitialized)
+		{
+			MultiSocketRUDPCoreTestAccess::CleanupSessionRelease(core);
+		}
+	}
+
+	MultiSocketRUDPCore core{ L"", L"" };
+	LifecycleHookTestSession session{ core };
+	bool releaseInitialized{};
+};
+
+// Stop a real public send before encryption; release must wait even without posted send I/O.
+TEST_F(SessionSendLifecycleTest, DisconnectWaitsForPausedSerializationAndRemainingIo)
+{
+	auto& crypto = RUDPSessionBehaviorAccess::GetCryptoContext(session);
+	const auto keyHandle = crypto.GetSessionKeyHandle();
+	const auto generation = session.GetSessionGeneration();
+
+	std::binary_semaphore entered{ 0 };
+	std::binary_semaphore resume{ 0 };
+	CallbackPacket packet([&](NetBuffer& buffer)
+		{
+			buffer << BYTE{ 42 };
+			entered.release();
+			resume.acquire();
+		});
+	bool sendResult = true;
+	std::jthread sender([&]() { sendResult = session.SendPacket(packet); });
+	entered.acquire();
+
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 0);
+	EXPECT_EQ(crypto.GetSessionKeyHandle(), keyHandle);
+	EXPECT_EQ(session.GetSessionGeneration(), generation);
+	NoOpPacket rejectedPacket;
+	EXPECT_FALSE(session.SendPacket(rejectedPacket));
+
+	auto& recvBuffer = RUDPSessionBehaviorAccess::GetRecvBuffer(session);
+	recvBuffer.BeginRecvIo();
+	resume.release();
+	sender.join();
+	EXPECT_FALSE(sendResult);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	recvBuffer.CompleteRecvIo();
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	EXPECT_EQ(crypto.GetSessionKeyHandle(), nullptr);
+	EXPECT_EQ(crypto.GetKeyObjectBuffer(), nullptr);
+	EXPECT_EQ(session.GetSessionGeneration(), generation + 1);
+}
+
+// Disconnect called from user serialization must not deadlock or leak the active-send barrier.
+TEST_F(SessionSendLifecycleTest, DisconnectInsideSerializationDrainsAfterSendFailure)
+{
+	CallbackPacket packet([&](NetBuffer& buffer)
+		{
+			buffer << BYTE{ 42 };
+			session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+			EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+			RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+			EXPECT_EQ(session.disconnectedCount, 0);
+		});
+
+	EXPECT_FALSE(session.SendPacket(packet));
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::BY_ERROR);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).FindSendPacketInfo(1), nullptr);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+}
+
+// Pending success and heartbeat early returns must release their guards; shutdown rejects every producer.
+TEST_F(SessionSendLifecycleTest, PendingSendAndHeartbeatReturnWithoutHoldingReleaseBarrier)
+{
+	RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 0);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	auto& sendContext = RUDPSessionBehaviorAccess::GetSendContext(session);
+	for (int i = 0; i < 4; ++i)
+	{
+		std::ignore = sendContext.IncrementLastSendPacketSequence();
+	}
+	NoOpPacket packet;
+	EXPECT_TRUE(session.SendPacket(packet));
+	EXPECT_FALSE(sendContext.IsPendingQueueEmpty());
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 100);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	const auto sequence = sendContext.GetLastSendPacketSequence();
+	EXPECT_FALSE(session.SendPacket(packet));
+	RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 200);
+	RUDPSessionBehaviorAccess::SendReplyToClient(session, 1);
+	RUDPSessionBehaviorAccess::TryFlushPendingQueue(session);
+	EXPECT_EQ(sendContext.GetLastSendPacketSequence(), sequence);
+	EXPECT_EQ(sendContext.GetSendPacketInfoQueueSize(), 0u);
+	EXPECT_FALSE(sendContext.IsPendingQueueEmpty());
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+TEST_F(SessionSendLifecycleTest, AbortedReservationRejectsSendWithoutDisconnectedHook)
+{
+	RUDPSessionBehaviorAccess::SetReserved(session);
+	RUDPSessionBehaviorAccess::AbortReservedSession(session);
+	NoOpPacket packet;
+	EXPECT_FALSE(session.SendPacket(packet));
+	RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 100);
+	RUDPSessionBehaviorAccess::SendReplyToClient(session, 1);
+	RUDPSessionBehaviorAccess::TryFlushPendingQueue(session);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 0);
+}
+
+// The real receive queue must retain its count while a connection callback is running.
+TEST_F(SessionSendLifecycleTest, RecvLogicCountProtectsQueuedAndExecutingCallback)
+{
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::InitializeRecvLogic(core));
+	RUDPSessionBehaviorAccess::SetReserved(session);
+	auto& recvBuffer = RUDPSessionBehaviorAccess::GetRecvBuffer(session);
+	auto& crypto = RUDPSessionBehaviorAccess::GetCryptoContext(session);
+	NetBuffer* packet = NetBuffer::Alloc();
+	ASSERT_NE(packet, nullptr);
+	auto packetType = PACKET_TYPE::CONNECT_TYPE;
+	*packet << packetType << PacketSequence{ LOGIN_PACKET_SEQUENCE } << session.GetSessionId();
+	PacketCryptoHelper::EncodePacket(*packet, LOGIN_PACKET_SEQUENCE, PACKET_DIRECTION::CLIENT_TO_SERVER,
+		crypto.GetSessionSalt(), SESSION_SALT_SIZE, crypto.GetSessionKeyHandle(), true);
+	// Encoding rewinds the cursor; a received buffer starts immediately after the header.
+	char header[df_HEADER_SIZE];
+	packet->ReadBuffer(header, sizeof(header));
+	IOContext context{};
+	context.session = &session;
+	context.ownerRecvBuffer = &recvBuffer;
+	context.ownerSessionGeneration = session.GetSessionGeneration();
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::EnqueueRecv(core, context, packet));
+	EXPECT_EQ(recvBuffer.pendingRecvLogic.load(), 1u);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+
+	std::binary_semaphore entered{ 0 };
+	std::binary_semaphore resume{ 0 };
+	session.connectedCallback = [&]()
+		{
+			entered.release();
+			resume.acquire();
+		};
+	std::jthread receiver([&]() { MultiSocketRUDPCoreTestAccess::ProcessRecvQueue(core); });
+	if (not entered.try_acquire_for(std::chrono::seconds(5)))
+	{
+		resume.release();
+		receiver.join();
+		FAIL() << "The queued CONNECT packet did not reach its callback";
+	}
+
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	EXPECT_EQ(recvBuffer.pendingRecvLogic.load(), 1u);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 0);
+	resume.release();
+	receiver.join();
+
+	EXPECT_EQ(recvBuffer.pendingRecvLogic.load(), 0u);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+}
+
+// Rejected dispatch still owns a queued receive count and must return it on every path.
+TEST_F(SessionSendLifecycleTest, ReleasingSessionDrainsQueuedPacketWithoutDispatch)
+{
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::InitializeRecvLogic(core));
+	auto& recvBuffer = RUDPSessionBehaviorAccess::GetRecvBuffer(session);
+	IOContext context{};
+	context.session = &session;
+	context.ownerRecvBuffer = &recvBuffer;
+	context.ownerSessionGeneration = session.GetSessionGeneration();
+	NetBuffer* packet = NetBuffer::Alloc();
+	ASSERT_NE(packet, nullptr);
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::EnqueueRecv(core, context, packet));
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	MultiSocketRUDPCoreTestAccess::ProcessRecvQueue(core);
+	EXPECT_EQ(recvBuffer.pendingRecvLogic.load(), 0u);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+// Publishing via the release queue preserves the winning reason without a separate release flag.
+TEST_F(SessionSendLifecycleTest, ReleaseQueuePublishesReasonOnceAndStateResetsForReuse)
+{
+	std::vector<SessionIdType> releaseIds;
+	DISCONNECT_REASON observedReason = DISCONNECT_REASON::NOT_DISCONNECTED;
+	std::jthread releaser([&]()
+		{
+			releaseIds = MultiSocketRUDPCoreTestAccess::WaitAndTakeReleaseSessionIds(core);
+			if (not releaseIds.empty())
+			{
+				observedReason = session.GetDisconnectedReason();
+			}
+		});
+	session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	releaser.join();
+	EXPECT_EQ(releaseIds, std::vector<SessionIdType>{ session.GetSessionId() });
+	EXPECT_EQ(observedReason, DISCONNECT_REASON::BY_ERROR);
+	EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).empty());
+	EXPECT_TRUE(session.IsReleasing());
+	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::RELEASING);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	EXPECT_FALSE(session.IsReleasing());
+	RUDPSessionBehaviorAccess::SetConnected(session);
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 2);
 }
 
 class SessionSocketContextTest : public ::testing::Test
@@ -202,7 +481,7 @@ TEST(RUDPSessionBehaviorTest, InitializeSessionResetsReusableStateAndUsesCoreRto
 	RUDPSessionBehaviorAccess::SetMaximumPacketHoldingQueueSize(4);
 	SessionBehaviorTestSession session{ core };
 	RUDPSessionBehaviorAccess::SetConnected(session);
-	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	RUDPSessionBehaviorAccess::SetReleasing(session);
 	RUDPSessionBehaviorAccess::SetDisconnectedReason(session, DISCONNECT_REASON::BY_ERROR);
 	RUDPSessionBehaviorAccess::RefreshLastReceivedPacketTime(session, 500);
 	std::ignore = RUDPSessionBehaviorAccess::GetSendContext(session).IncrementLastSendPacketSequence();
@@ -238,7 +517,7 @@ TEST(RUDPSessionBehaviorTest, HeartbeatGuardHonorsStateReleaseAndThreshold)
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1099));
 	EXPECT_TRUE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1100));
 
-	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	RUDPSessionBehaviorAccess::SetReleasing(session);
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::NeedToSendHeartbeat(session, 1200));
 }
 
@@ -277,7 +556,7 @@ TEST(RUDPSessionBehaviorTest, CanProcessPacketRequiresMatchingAddressAndNonRelea
 	wrongAddress.sin_addr.S_un.S_addr = htonl(0x7F000002);
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanProcessPacket(session, wrongAddress));
 
-	RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+	RUDPSessionBehaviorAccess::SetReleasing(session);
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanProcessPacket(session, clientAddress));
 }
 

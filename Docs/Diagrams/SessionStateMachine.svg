@@ -75,7 +75,7 @@
   <rect x="30" y="390" width="230" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
   <text x="145" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">RELEASING → DISCONNECTED 조건</text>
   <text x="45" y="424" font-size="9" fill="#64748b">✓ IO_SENDING 상태가 아닐 것</text>
-  <text x="45" y="438" font-size="9" fill="#64748b">✓ nowInProcessingRecvPacket = false</text>
+  <text x="45" y="438" font-size="9" fill="#64748b">✓ activeSendOperations = 0</text>
   <text x="45" y="452" font-size="9" fill="#64748b">✓ SessionReleaseThread가 처리</text>
 
   <!-- Connected state description -->

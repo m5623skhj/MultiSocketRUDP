@@ -46,7 +46,7 @@ DISCONNECTED ──────────────────► RESERVED
     │         IO_SENDING 아님 AND
     │ outstandingRecvIo/pendingRecvLogic=0 AND
     │ activeIOCompletions=0 AND
-    │ nowInProcessingRecvPacket=false
+    │ activeSendOperations=0
     │                              │
     │                      Disconnect() 호출
     │                    (Release Thread)
@@ -197,12 +197,12 @@ bool CheckReservedSessionTimeout(unsigned long long now) const {
 
 // RUDPSession::AbortReservedSession (세션 멤버 함수)
 void AbortReservedSession() {
-    // CAS: RESERVED → RELEASING
-    if (!stateMachine.TryAbortReserved()) return;
-    // → 이미 CONNECTED이면 실패 → 정상 연결 흐름으로
-
-    nowInReleaseThread.store(true, std::memory_order_seq_cst);
-    disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
+    {
+        std::scoped_lock lock(sendLifecycleMutex);
+        // CAS: RESERVED → RELEASING (이미 CONNECTED이면 실패)
+        if (!stateMachine.TryAbortReserved()) return;
+        disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
+    }
 
     // 예약 세션도 공통 Release Thread에서 close → drain → cleanup 순서를 따른다.
     MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
@@ -230,17 +230,14 @@ void AbortReservedSession() {
 ```cpp
 void RUDPSession::DoDisconnect(const DISCONNECT_REASON reason)
 {
-    // ① CAS: RESERVED 또는 CONNECTED → RELEASING
-    if (!stateMachine.TryTransitionToReleasing()) return;
-    // → RESERVED(1) → RELEASING(3) 먼저 시도
-    // → 실패하면 CONNECTED(2) → RELEASING(3) 시도
-    // → 둘 다 실패 (이미 RELEASING/DISCONNECTED) → return
+    {
+        std::scoped_lock lock(sendLifecycleMutex);
+        // CAS: RESERVED 또는 CONNECTED → RELEASING
+        if (!stateMachine.TryTransitionToReleasing()) return;
+        disconnectedReason = reason;
+    }
 
-    // ② 해제 진행 플래그 설정
-    nowInReleaseThread.store(true, std::memory_order_seq_cst);
-
-    // ③ 콘텐츠 훅
-    // ④ Session Release Thread에 알림
+    // 큐 mutex를 통해 종료 사유를 Release Thread에 전달한다.
     MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
     // → releaseSessionIdList.push_back(sessionId)
     // → SetEvent(sessionReleaseEventHandle)
@@ -333,15 +330,12 @@ send/receive/logic drain 완료:
   → completion의 session/context 접근 중 use-after-free 방지
 ```
 
-**`nowInProcessingRecvPacket` 대기 이유:**
+**`pendingRecvLogic` 대기 이유:**
 
-```
-RecvLogic Worker가 session->OnRecvPacket() 처리 중에 세션이 해제되면:
-  → 처리 완료 후 session 멤버 접근 → use-after-free → crash
-
-nowInProcessingRecvPacket=false를 확인 후 해제:
-  → RecvLogic Worker가 완전히 빠져나온 상태
-```
+큐에 등록하기 전에 증가하고, 수신 콜백과 버퍼 정리가 끝난 뒤 감소한다.
+따라서 대기 중인 작업과 실행 중인 작업을 모두 보호하며, 별도의 수신 처리 플래그는
+필요하지 않다. 최종 해제에는 이 카운터뿐 아니라 송신 작업과 I/O 완료 처리의
+drain 조건도 함께 만족해야 한다.
 
 ---
 
@@ -457,12 +451,12 @@ RecvLogic Worker:
 
 RecvLogic Worker:
   OnConnected() 완료 후 SendReplyToClient
-    IsConnected() → false (이미 RELEASING)
-    → ACK 전송 시도, nowInReleaseThread 확인
+    TryBeginSendOperation() → false (이미 RELEASING)
+    → ACK 송신 진입 거절
 ```
 
 **결과:** OnConnected → OnDisconnected 순서 보장됨.  
-ACK는 nowInReleaseThread 체크로 전송 시도하지만 효과 없음.
+ACK 송신은 `TryBeginSendOperation()`에서 거절된다.
 
 ---
 

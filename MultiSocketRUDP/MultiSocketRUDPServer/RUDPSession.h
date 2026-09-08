@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <functional>
+#include <mutex>
 #include "../Common/etc/CoreType.h"
 #include <shared_mutex>
 #include "PacketManager.h"
@@ -57,6 +58,12 @@ public:
 	ThreadIdType GetThreadId() const;
 
 private:
+	/** @brief 종료 상태 전환과 직렬화하여 송신 작업의 진입을 등록합니다. */
+	[[nodiscard]]
+	bool TryBeginSendOperation();
+	/** @brief 송신 실패 정리까지 끝난 뒤 RAII guard에서 진입 등록을 해제합니다. */
+	void CompleteSendOperation();
+
 	void OnConnected(SessionIdType inSessionId);
 	virtual void OnConnected() {}
 	virtual void OnDisconnected() {}
@@ -70,6 +77,7 @@ private:
 	// @param isReplyType 응답 패킷인지 여부.
 	// @param isCorePacket 코어 기능 관련 패킷인지 여부.
 	// @return 송신 경로 등록과 송신 시작에 성공하면 true, 아니면 false.
+	// @details 호출자는 TryBeginSendOperation으로 등록한 송신 작업을 유지해야 합니다.
 	// ----------------------------------------
 	[[nodiscard]]
 	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
@@ -97,8 +105,8 @@ private:
 	void AbortReservedSession();
 	void CloseSocket();
 	// ----------------------------------------
-	// @brief 해제 세션의 수신 로직 drain 후 OnDisconnected와 소켓 종료를 한 번만 수행합니다.
-	// @details 수신 로직이 남아 있으면 상태를 변경하지 않고 다음 해제 반복에서 다시 시도합니다.
+	// @brief 해제 세션의 송신 준비와 수신 로직 drain 후 OnDisconnected와 소켓 종료를 한 번만 수행합니다.
+	// @details 송신 작업 또는 수신 로직이 남아 있으면 다음 해제 반복에서 다시 시도합니다.
 	// ----------------------------------------
 	void BeginIOShutdown();
 	// ----------------------------------------
@@ -114,7 +122,7 @@ private:
 	// ----------------------------------------
 	void FinalizeRIOCleanup();
 	// ----------------------------------------
-	// @brief 수신 I/O, 수신 로직, 송신, 완료 처리가 모두 끝났는지 확인합니다.
+	// @brief 송신 준비, 수신 I/O, 수신 로직, 송신 I/O, 완료 처리가 모두 끝났는지 확인합니다.
 	// @return 세션을 안전하게 최종 해제할 수 있으면 true입니다.
 	// ----------------------------------------
 	[[nodiscard]]
@@ -246,10 +254,11 @@ private:
 	SessionIdType sessionId = INVALID_SESSION_ID;
 	sockaddr_in clientAddr{};
 	SOCKADDR_INET clientSockAddrInet{};
-	std::atomic_bool nowInReleaseThread{};
-	std::atomic_bool nowInProcessingRecvPacket{};
-	std::atomic_bool ioShutdownStarted{};
+	bool ioShutdownStarted{}; // sendLifecycleMutex로 보호합니다.
 	std::atomic_uint32_t activeIOCompletions{};
+	// 송신 본문이나 콜백에서는 잡지 않는 수명 관리용 잠금입니다.
+	std::mutex sendLifecycleMutex;
+	uint32_t activeSendOperations{}; // sendLifecycleMutex로 보호합니다.
 	ThreadIdType threadId{};
 	std::atomic_uint32_t sessionGeneration{};
 

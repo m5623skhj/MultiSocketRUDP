@@ -34,9 +34,11 @@ class RUDPSession {
     RUDPFlowManager       flowManager;      // CWND + 수신 윈도우
     SessionPacketOrderer  sessionPacketOrderer;  // 순서 보장 홀딩 큐
 
-    // ─── 스레드 안전 플래그 ──────────────────────────────────────────
-    std::atomic_bool nowInReleaseThread{ false };
-    std::atomic_bool nowInProcessingRecvPacket{ false };
+    // ─── 송신 및 해제 수명 보호 ──────────────────────────────────────
+    std::mutex sendLifecycleMutex;
+    uint32_t activeSendOperations{};  // sendLifecycleMutex 보호
+    bool ioShutdownStarted{};        // sendLifecycleMutex 보호
+    std::atomic_uint32_t activeIOCompletions{};
 
     // ─── 패킷 핸들러 맵 ──────────────────────────────────────────────
     std::unordered_map<PacketId, PacketFactory> packetFactoryMap;
@@ -130,10 +132,12 @@ public:
 ```cpp
 // RUDPSessionManager::ReleaseSession() → InitializeSession()
 void RUDPSession::InitializeSession() {
+    std::scoped_lock lock(sendLifecycleMutex);
+    assert(activeSendOperations == 0);
     cryptoContext.Initialize();                              // ← 키 핸들 파괴 + 버퍼 해제
     clientAddr = {};
     clientSockAddrInet = {};
-    nowInReleaseThread.store(false, std::memory_order_release);
+    ioShutdownStarted = false;
     sessionReservedTime = {};
 
     flowManager.Initialize(maximumHoldingPacketQueueSize);  // CWND/윈도우 재초기화
@@ -327,7 +331,6 @@ class SessionSendContext {
 
     // ─── 시퀀스 캐시 (중복 전송 방지) ────────────────────────────────
     std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
-    std::mutex cachedSequenceSetLock;
 
     // ─── 보류 큐 (흐름 제어) ─────────────────────────────────────────
     RingBuffer<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue;
@@ -510,7 +513,7 @@ sessionPacketOrderer
    ├─ InitializeSession()
    ├─ cryptoContext.Initialize()        ← 키 핸들 파괴
    ├─ clientAddr/clientSockAddrInet/sessionReservedTime 초기화
-   ├─ nowInReleaseThread = false
+   ├─ ioShutdownStarted = false (sendLifecycleMutex 보호)
    ├─ flowManager.Initialize(maxHoldingQueueSize)
    ├─ rioContext.GetSendContext().Reset()
    └─ sessionPacketOrderer.Initialize(maxHoldingQueueSize)
@@ -521,9 +524,9 @@ sessionPacketOrderer
 **해제 순서 (AbortReservedSession — 공통 release queue 사용):**
 
 ```
-1. nowInReleaseThread = true
+1. sendLifecycleMutex 안에서 RESERVED → RELEASING 전이 및 종료 사유 설정
 2. release target queue에 session id 등록
-3. Session Release Thread가 recv logic quiescence 확인 후 socket close-only와 RIO drain 수행
+3. Session Release Thread가 송신 작업과 recv logic quiescence 확인 후 socket close-only와 RIO drain 수행
 4. FinalizeRIOCleanup() 뒤 DisconnectSession(id)
 5. RUDPSessionManager::ReleaseSession(id)에서 InitializeSession() / stateMachine.SetDisconnected()
 ```

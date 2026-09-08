@@ -480,7 +480,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 [어디서든] session->DoDisconnect()
     ↓ TryTransitionToReleasing() CAS
     ↓ PushToDisconnectTargetSession(session)
-         ↓ nowInReleaseThread = true
+         ↓ releaseSessionIdListLock으로 종료 사유와 큐 등록 동기화
          ↓ releaseSessionIdList.push_back(sessionId)
          ↓ SetEvent(sessionReleaseEventHandle)
 

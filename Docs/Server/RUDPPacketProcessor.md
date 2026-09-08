@@ -25,7 +25,7 @@
   MultiSocketRUDPCore::OnRecvPacket(threadId)
     │
     ├─ recvIOCompletedContexts[threadId].Dequeue(&context)
-    ├─ session->nowInProcessingRecvPacket = true
+    ├─ pendingRecvLogic 유지 (큐 등록부터 처리 및 버퍼 정리 완료까지)
     ├─ context의 session generation 재검증
     ├─ context->buffer 사용
     │

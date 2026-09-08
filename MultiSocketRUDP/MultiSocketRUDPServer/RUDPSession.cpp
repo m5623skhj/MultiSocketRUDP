@@ -9,6 +9,7 @@
 #include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
+#include "../Common/etc/UtilFunc.h"
 
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 unsigned long long RUDPSession::reservedSessionTimeoutMs = 30000;
@@ -35,14 +36,14 @@ bool RUDPSession::InitializeRIO(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionT
 
 void RUDPSession::InitializeSession()
 {
+	std::scoped_lock lock(sendLifecycleMutex);
+	assert(activeSendOperations == 0);
 	sessionGeneration.fetch_add(1, std::memory_order_release);
 
 	cryptoContext.Initialize();
 	clientAddr = {};
 	clientSockAddrInet = {};
-	nowInReleaseThread.store(false, std::memory_order_release);
-	nowInProcessingRecvPacket.store(false, std::memory_order_release);
-	ioShutdownStarted.store(false, std::memory_order_release);
+	ioShutdownStarted = false;
 	assert(activeIOCompletions.load(std::memory_order_acquire) == 0);
 	activeIOCompletions.store(0, std::memory_order_release);
 	sessionReservedTime = {};
@@ -73,13 +74,16 @@ void RUDPSession::SetThreadId(const ThreadIdType inThreadId)
 
 void RUDPSession::DoDisconnect(const DISCONNECT_REASON inDisconnectSession)
 {
-	if (not stateMachine.TryTransitionToReleasing())
 	{
-		return;
+		std::scoped_lock lock(sendLifecycleMutex);
+		if (not stateMachine.TryTransitionToReleasing())
+		{
+			return;
+		}
+
+		disconnectedReason = inDisconnectSession;
 	}
 
-	disconnectedReason = inDisconnectSession;
-	nowInReleaseThread.store(true, std::memory_order_seq_cst);
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
@@ -115,10 +119,11 @@ void RUDPSession::Disconnect()
 
 bool RUDPSession::SendPacket(IPacket& packet)
 {
-	if (not IsConnected())
+	if (not TryBeginSendOperation())
 	{
 		return false;
 	}
+	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
@@ -141,6 +146,25 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	return true;
+}
+
+bool RUDPSession::TryBeginSendOperation()
+{
+	std::scoped_lock lock(sendLifecycleMutex);
+	if (not stateMachine.IsConnected())
+	{
+		return false;
+	}
+
+	++activeSendOperations;
+	return true;
+}
+
+void RUDPSession::CompleteSendOperation()
+{
+	std::scoped_lock lock(sendLifecycleMutex);
+	assert(activeSendOperations > 0);
+	--activeSendOperations;
 }
 
 ThreadIdType RUDPSession::GetThreadId() const
@@ -234,6 +258,12 @@ bool RUDPSession::SendPacketImmediate(
 
 void RUDPSession::TryFlushPendingQueue()
 {
+	if (not TryBeginSendOperation())
+	{
+		return;
+	}
+	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
+
 	std::vector<std::pair<PacketSequence, NetBuffer*>> sendBuffers;
 	{
 		std::scoped_lock lock(rioContext.GetSendContext().GetPendingQueueLock());
@@ -271,6 +301,12 @@ void RUDPSession::TryFlushPendingQueue()
 
 void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 {
+	if (not TryBeginSendOperation())
+	{
+		return;
+	}
+	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
+
 	if (not NeedToSendHeartbeat(now))
 	{
 		return;
@@ -306,7 +342,7 @@ void RUDPSession::RefreshLastReceivedPacketTime(unsigned long long now)
 
 bool RUDPSession::NeedToSendHeartbeat(unsigned long long now) const
 {
-	if (nowInReleaseThread.load(std::memory_order_acquire) || not IsConnected())
+	if (not IsConnected())
 	{
 		return false;
 	}
@@ -321,13 +357,16 @@ bool RUDPSession::CheckReservedSessionTimeout(const unsigned long long now) cons
 
 void RUDPSession::AbortReservedSession()
 {
-	if (not stateMachine.TryAbortReserved())
 	{
-		return;
+		std::scoped_lock lock(sendLifecycleMutex);
+		if (not stateMachine.TryAbortReserved())
+		{
+			return;
+		}
+
+		disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
 	}
 
-	nowInReleaseThread.store(true, std::memory_order_seq_cst);
-	disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
 	MultiSocketRUDPCoreFunctionDelegate::PushToDisconnectTargetSession(*this);
 }
 
@@ -339,22 +378,20 @@ void RUDPSession::CloseSocket()
 
 void RUDPSession::BeginIOShutdown()
 {
-	if (ioShutdownStarted.load(std::memory_order_acquire))
 	{
-		return;
-	}
+		std::scoped_lock lock(sendLifecycleMutex);
+		if (ioShutdownStarted || activeSendOperations != 0)
+		{
+			return;
+		}
 
-	const auto& recvBuffer = rioContext.GetRecvBuffer();
-	if (recvBuffer.pendingRecvLogic.load(std::memory_order_acquire) != 0 ||
-		nowInProcessingRecvPacket.load(std::memory_order_acquire))
-	{
-		return;
-	}
+		const auto& recvBuffer = rioContext.GetRecvBuffer();
+		if (recvBuffer.pendingRecvLogic.load(std::memory_order_acquire) != 0)
+		{
+			return;
+		}
 
-	bool expected = false;
-	if (not ioShutdownStarted.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
-	{
-		return;
+		ioShutdownStarted = true;
 	}
 
 	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
@@ -383,9 +420,9 @@ void RUDPSession::FinalizeRIOCleanup()
 
 bool RUDPSession::CanFinalizeIO()
 {
-	return rioContext.IsDrained() &&
-		activeIOCompletions.load(std::memory_order_acquire) == 0 &&
-		not nowInProcessingRecvPacket.load(std::memory_order_acquire);
+	std::scoped_lock lock(sendLifecycleMutex);
+	return activeSendOperations == 0 && rioContext.IsDrained() &&
+		activeIOCompletions.load(std::memory_order_acquire) == 0;
 }
 
 void RUDPSession::SetMaximumPacketHoldingQueueSize(const BYTE size)
@@ -533,6 +570,12 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 
 void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 {
+	if (not TryBeginSendOperation())
+	{
+		return;
+	}
+	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
+
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -648,7 +691,7 @@ SESSION_STATE RUDPSession::GetSessionState() const
 
 bool RUDPSession::IsReleasing() const
 {
-	return nowInReleaseThread.load(std::memory_order_seq_cst);
+	return stateMachine.IsReleasing();
 }
 
 uint32_t RUDPSession::GetSessionGeneration() const

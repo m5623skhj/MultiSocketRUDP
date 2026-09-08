@@ -287,7 +287,7 @@ bool MultiSocketRUDPCore::SendPacket(SendPacketInfo* sendPacketInfo) const
 		return false;
 	}
 
-	if (sendPacketInfo->owner->nowInReleaseThread.load(std::memory_order_acquire))
+	if (sendPacketInfo->owner->IsReleasing())
 	{
 		return false;
 	}
@@ -384,7 +384,7 @@ void MultiSocketRUDPCore::DisconnectSession(const SessionIdType disconnectTarget
 void MultiSocketRUDPCore::PushToDisconnectTargetSession(RUDPSession& session)
 {
 	std::scoped_lock lock(releaseSessionIdListLock);
-	session.nowInReleaseThread.store(true, std::memory_order_seq_cst);
+	// The queue mutex publishes session changes, including the reason, to the release thread.
 	session.onSessionReleaseTime = GetTickCount64();
 	releaseSessionIdList.emplace_back(session.GetSessionId());
 	SetEvent(sessionReleaseEventHandle);
@@ -774,42 +774,33 @@ void MultiSocketRUDPCore::OnRecvPacket(const BYTE threadId)
 
 void MultiSocketRUDPCore::ProcessRecvIOCompletedContext(RecvIOCompletedContext* const context)
 {
-	const bool processingStarted = TryDispatchRecvPacket(context);
-	CompleteRecvIOCompletedContext(context, processingStarted);
+	DispatchRecvPacket(context);
+	CompleteRecvIOCompletedContext(context);
 }
 
-bool MultiSocketRUDPCore::TryDispatchRecvPacket(RecvIOCompletedContext* const context)
+void MultiSocketRUDPCore::DispatchRecvPacket(RecvIOCompletedContext* const context)
 {
 	if (context->session == nullptr || context->buffer == nullptr || context->ownerRecvBuffer == nullptr)
 	{
-		return false;
+		return;
 	}
 
 	if (context->session->GetSessionGeneration() != context->ownerSessionGeneration || context->session->IsReleasing())
 	{
-		return false;
+		return;
 	}
 
-	context->session->nowInProcessingRecvPacket.store(true, std::memory_order_release);
 	packetProcessor->OnRecvPacket(*context->session
 		, *context->buffer
 		, std::span(reinterpret_cast<const unsigned char*>(context->clientAddrBuffer)
 		, sizeof(context->clientAddrBuffer)));
-	return true;
 }
 
-void MultiSocketRUDPCore::CompleteRecvIOCompletedContext(
-	RecvIOCompletedContext* const context,
-	const bool processingStarted)
+void MultiSocketRUDPCore::CompleteRecvIOCompletedContext(RecvIOCompletedContext* const context)
 {
 	if (context->buffer != nullptr)
 	{
 		NetBuffer::Free(context->buffer);
-	}
-
-	if (processingStarted)
-	{
-		context->session->nowInProcessingRecvPacket.store(false, std::memory_order_release);
 	}
 
 	if (context->ownerRecvBuffer != nullptr)

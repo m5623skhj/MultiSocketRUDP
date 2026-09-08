@@ -84,19 +84,40 @@
     <ClCompile Include="SessionRIOContextTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
-	<ClCompile Include="ServerUtilityTypesTest.cpp">
-	  <Filter>소스 파일\GoogleTestForServerCore</Filter>
-	</ClCompile>
+    <ClCompile Include="ServerUtilityTypesTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
+    <ClCompile Include="CryptoHelperTest.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionTest.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="RUDPSessionManagerTest.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionCryptoContextTest.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SessionSendContextTest.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\external\CommonCode\Common\googletest-main\googletest\src\gtest-all.cc">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h">
       <Filter>소스 파일\GoogleTestMain</Filter>
     </ClInclude>
-	<ClInclude Include="MultiSocketRUDPCoreTestAccess.h">
-	  <Filter>헤더 파일</Filter>
-	</ClInclude>
-	<ClInclude Include="RUDPSessionTestAccess.h">
-	  <Filter>헤더 파일</Filter>
-	</ClInclude>
+    <ClInclude Include="MultiSocketRUDPCoreTestAccess.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="RUDPSessionTestAccess.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json" />
   </ItemGroup>
 </Project>

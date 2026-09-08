@@ -1,10 +1,74 @@
 #pragma once
 
 #include "MultiSocketRUDPCore.h"
+#include "MultiSocketRUDPCoreFunctionDelegate.h"
+#include "RUDPPacketProcessor.h"
+#include "RUDPSessionManager.h"
 
 class MultiSocketRUDPCoreTestAccess
 {
 public:
+	static bool InitializeSessionRelease(MultiSocketRUDPCore& core)
+	{
+		core.sessionReleaseEventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (core.sessionReleaseEventHandle == nullptr)
+		{
+			return false;
+		}
+		MultiSocketRUDPCoreFunctionDelegate::Instance().Init(core);
+		return true;
+	}
+
+	static void CleanupSessionRelease(MultiSocketRUDPCore& core)
+	{
+		MultiSocketRUDPCoreFunctionDelegate::Instance().Clear(core);
+		CloseHandle(core.sessionReleaseEventHandle);
+		core.sessionReleaseEventHandle = nullptr;
+		for (const auto handle : core.recvLogicThreadEventHandles)
+		{
+			CloseHandle(handle);
+		}
+		core.recvLogicThreadEventHandles.clear();
+	}
+
+	static bool InitializeRecvLogic(MultiSocketRUDPCore& core)
+	{
+		const HANDLE eventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		if (eventHandle == nullptr)
+		{
+			return false;
+		}
+		core.recvLogicThreadEventHandles.push_back(eventHandle);
+		core.recvIOCompletedContexts.push_back(std::make_unique<MultiSocketRUDPCore::RecvIOCompletedQueue>());
+		core.sessionManager = std::make_unique<RUDPSessionManager>(1, core, core.sessionDelegate);
+		core.packetProcessor = std::make_unique<RUDPPacketProcessor>(*core.sessionManager, core.sessionDelegate);
+		return true;
+	}
+
+	static bool EnqueueRecv(MultiSocketRUDPCore& core, const IOContext& context, NetBuffer* buffer)
+	{
+		return core.EnqueueContextResult(&context, buffer, 0);
+	}
+
+	static void ProcessRecvQueue(MultiSocketRUDPCore& core)
+	{
+		core.OnRecvPacket(0);
+	}
+
+	static std::vector<SessionIdType> WaitAndTakeReleaseSessionIds(MultiSocketRUDPCore& core)
+	{
+		if (WaitForSingleObject(core.sessionReleaseEventHandle, 5000) != WAIT_OBJECT_0)
+		{
+			return {};
+		}
+		return core.TakeReleaseSessionIds();
+	}
+
+	static std::vector<SessionIdType> TakeReleaseSessionIds(MultiSocketRUDPCore& core)
+	{
+		return core.TakeReleaseSessionIds();
+	}
+
 	static bool ReadOptionFile(
 		MultiSocketRUDPCore& core,
 		const std::wstring& coreOptionFilePath,
