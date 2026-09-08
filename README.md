@@ -14,6 +14,7 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-09-08 | `cccba6b` | * 송신 준비가 끝나기 전에 세션의 암호화 자원을 해제 문제 수정 | 0.151 ms | 0.173 ms | 32.280 ms | 63.482 ms |
 | 2026-09-08 | `6a8a448` | * 빌드 툴 버전 업 | 0.219 ms | 0.251 ms | 31.927 ms | 64.570 ms |
 | 2026-08-29 | `30e9ac6` | * 1000클라이언트 폐루프 RTT 스트레스 벤치마크 추가   * 클라이언트별 요청 하나만 유지하는 closed-loop 부하 모델 구현   * 32바이트 echo payload 송수신 및 응답 내용 검증 추가   * 워밍업과 측정 구간을 분리하고 RTT/s 및 P50/P95/P99/P99.9 통계 수집   * 타임아웃, 잘못된 응답, 송신 실패 및 연결 해제 원인 집계   * 프로세스 CPU와 메모리 사용량 및 JSON 결과 출력 지원   * 재전송 간격과 최대 횟수를 세션별로 설정할 수 있도록 개선   * PacketWaiterRegistry가 신규 waiter를 동일 응답으로 완료하는 경쟁 조건 수정   * 서버의 최대 세션 수를 1100개로 확장   * 스트레스 벤치마크 실행 방법과 단위 테스트 추가   * CommonCode 메모리 풀 수정 커밋 반영 | 0.218 ms | 0.243 ms | 32.402 ms | 69.261 ms |
 | 2026-08-26 | `611752b` | * 주석 최신화 * 클라이언트 수신 패킷 시퀀스 동기화 수정 | 0.217 ms | 0.238 ms | 32.342 ms | 66.364 ms |
@@ -23,6 +24,5 @@ The JSON file keeps the complete official history. Charts and the table render t
 | 2026-08-09 | `cabf791` | * 재전송 Wake 이벤트 신호 실패 처리를 수정   * NULL 핸들을 성공으로 처리하던 예외 제거   * SetEvent 결과를 직접 반환해 오류 코드 보존 | 0.207 ms | 0.237 ms | 32.469 ms | 63.264 ms |
 | 2026-08-07 | `cb4ed7d` | * 주석 수정 | 0.221 ms | 0.252 ms | 32.396 ms | 63.201 ms |
 | 2026-08-07 | `536de21` | * 코드 정리 * 클라이언트 TLS 보안 강화 | 0.180 ms | 0.205 ms | 32.289 ms | 64.362 ms |
-| 2026-08-04 | `34b8102` | * README RTT 표에서 현재 RTT를 알 수 있도록 추가 | 0.162 ms | 0.192 ms | 32.416 ms | 62.135 ms |
 
-Last updated by `6a8a448713f62926d9c11c59842d4a2aaf738a23` at 2026-09-08T07:09:09.3461463+00:00.
+Last updated by `cccba6b679b1fe7a1e66e8c01a60208738875e09` at 2026-09-08T12:50:36.2189927+00:00.

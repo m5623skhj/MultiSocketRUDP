@@ -806,6 +806,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "cccba6b679b1fe7a1e66e8c01a60208738875e09",
+      "commitSubject": "* 송신 준비가 끝나기 전에 세션의 암호화 자원을 해제 문제 수정",
+      "recordedAtUtc": "2026-09-08T12:50:36.2189927+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "Intel64 Family 6 Model 207 Stepping 2, GenuineIntel",
+        "runnerName": "GitHub Actions 1000001043",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.11333530000000007,
+            "medianMinRttMs": 0.0641,
+            "medianP50RttMs": 0.1155,
+            "medianP95RttMs": 0.1509,
+            "medianP99RttMs": 0.1731,
+            "medianMaxRttMs": 0.3109,
+            "worstMaxRttMs": 0.4343,
+            "medianElapsedSeconds": 0.1182616,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.380732599999992,
+            "medianMinRttMs": 0.0395,
+            "medianP50RttMs": 0.1018,
+            "medianP95RttMs": 32.2796,
+            "medianP99RttMs": 63.4821,
+            "medianMaxRttMs": 197.2975,
+            "worstMaxRttMs": 200.934,
+            "medianElapsedSeconds": 5.3836303,
+            "totalRetransmissionSuspectedCount": 183
+          }
+        }
+      ]
     }
   ]
 }
