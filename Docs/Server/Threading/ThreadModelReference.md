@@ -308,6 +308,18 @@ void MultiSocketRUDPCore::RunRetransmissionThread(
 }
 ```
 
+### 재전송 작업의 세션 수명 보호
+
+`ProcessRetransmission()`은 `scheduler.lock`을 해제한 뒤
+`TryBeginSendOperation(ownerGeneration)`으로 세션 작업을 등록한다.
+`sendLifecycleMutex` 안에서 generation 일치와 CONNECTED 상태를 확인하고
+`activeSendOperations`를 증가시키므로, 검사와 등록 사이에 세션이 재사용될 수 없다.
+이미 반환되어 재사용된 세션의 작업이나 종료 중인 세션의 작업은 패킷 참조만 반환한다.
+
+등록에 성공하면 RAII guard를 유지한 상태로 한도 초과 종료, 타임아웃 반영,
+재송신 및 실패에 따른 종료를 처리한다. 패킷 참조를 반환한 뒤 guard가 카운터를
+감소시키기 전까지는 세션을 최종 해제할 수 없다. 송신 본문에서는 mutex를 유지하지 않는다.
+
 ### `AddRefCount` / `Free` 설계
 
 ```cpp
@@ -595,8 +607,10 @@ worker stop은 모든 세션이 unused pool로 반환된 뒤에만 요청한다.
       → waitable timer로 가장 빠른 deadline까지 대기
       → isErasedPacketInfo 또는 scheduleVersion mismatch 확인
       → stale entry면 Free 후 skip
-      → core.SendPacket(info)                           ← 재전송
-      → retransmissionCount >= max → session.DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION)
+      → scheduler.lock 해제 후 generation 검사 + 송신 작업 등록
+      → 등록 실패면 Free 후 skip
+      → 한도 도달 시 DoDisconnect(BY_RETRANSMISSION), 그 외 타임아웃 반영 및 재송신
+      → Free 후 RAII guard에서 activeSendOperations 감소
 
 [Session Release Thread]
   │

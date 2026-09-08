@@ -69,6 +69,22 @@ public:
 		return core.TakeReleaseSessionIds();
 	}
 
+	static void InitializeRetransmission(MultiSocketRUDPCore& core, const PacketRetransmissionCount limit)
+	{
+		core.retransmissionSchedulers.push_back(std::make_unique<RetransmissionScheduler>());
+		core.maxPacketRetransmissionCount = limit;
+	}
+
+	static void SetRetransmissionLimit(MultiSocketRUDPCore& core, const PacketRetransmissionCount limit)
+	{
+		core.maxPacketRetransmissionCount = limit;
+	}
+
+	static void ProcessRetransmission(MultiSocketRUDPCore& core, SendPacketInfo* info)
+	{
+		core.ProcessRetransmission(info, 0);
+	}
+
 	static bool ReadOptionFile(
 		MultiSocketRUDPCore& core,
 		const std::wstring& coreOptionFilePath,

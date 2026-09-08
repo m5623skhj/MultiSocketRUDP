@@ -7,6 +7,7 @@
 #include "RUDPSession.h"
 #include "RUDPSessionManager.h"
 #include "SendPacketInfo.h"
+#include "../Common/etc/UtilFunc.h"
 #include <chrono>
 #include "BuildConfig.h"
 
@@ -283,25 +284,26 @@ void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, 
 		}
 	}
 
+	// Register after releasing the scheduler lock; retain the session through failure cleanup.
+	RUDPSession* owner = sendPacketInfo->owner;
+	if (owner == nullptr || not owner->TryBeginSendOperation(sendPacketInfo->ownerGeneration))
+	{
+		SendPacketInfo::Free(sendPacketInfo);
+		return;
+	}
+	auto sendGuard = Util::MakeScopeExit([owner]() { owner->CompleteSendOperation(); });
+
 	if (shouldDisconnect)
 	{
-		if (sendPacketInfo->IsOwnerValid())
-		{
-			sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
-		}
-
+		owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
 		SendPacketInfo::Free(sendPacketInfo);
 		return;
 	}
 
-	if (sendPacketInfo->IsOwnerValid())
+	owner->OnRetransmissionTimeout();
+	if (not SendPacket(sendPacketInfo))
 	{
-		sendPacketInfo->owner->OnRetransmissionTimeout();
-	}
-
-	if (not SendPacket(sendPacketInfo) && sendPacketInfo->IsOwnerValid())
-	{
-		sendPacketInfo->owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+		owner->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}
 
 	SendPacketInfo::Free(sendPacketInfo);

@@ -160,6 +160,19 @@ bool RUDPSession::TryBeginSendOperation()
 	return true;
 }
 
+bool RUDPSession::TryBeginSendOperation(const uint32_t expectedGeneration)
+{
+	std::scoped_lock lock(sendLifecycleMutex);
+	if (sessionGeneration.load(std::memory_order_acquire) != expectedGeneration ||
+		not stateMachine.IsConnected())
+	{
+		return false;
+	}
+
+	++activeSendOperations;
+	return true;
+}
+
 void RUDPSession::CompleteSendOperation()
 {
 	std::scoped_lock lock(sendLifecycleMutex);
