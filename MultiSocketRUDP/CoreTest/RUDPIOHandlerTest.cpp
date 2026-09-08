@@ -483,7 +483,7 @@ TEST_F(RUDPIOHandlerTest, DoRecv_ReleasingSessionDoesNotPostReceive)
 {
     SetupValidRecvContext();
     RUDPSessionBehaviorAccess::SetReleasing(session);
-    RUDPSessionBehaviorAccess::SetNowInReleaseThread(session, true);
+    RUDPSessionBehaviorAccess::SetReleasing(session);
 
     EXPECT_TRUE(handler->DoRecv(session));
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 0);

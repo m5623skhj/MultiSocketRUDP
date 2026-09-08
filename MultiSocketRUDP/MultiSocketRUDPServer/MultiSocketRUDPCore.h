@@ -331,14 +331,12 @@ private:
 	void ProcessRecvIOCompletedContext(RecvIOCompletedContext* context);
 	// ----------------------------------------
 	// @brief 세션 generation과 해제 상태를 검증한 후 패킷 로직 실행을 시작합니다.
-	// @return 패킷 처리 카운터를 획득하고 로직을 실행했으면 true입니다.
 	// ----------------------------------------
-	[[nodiscard]]
-	bool TryDispatchRecvPacket(RecvIOCompletedContext* context);
+	void DispatchRecvPacket(RecvIOCompletedContext* context);
 	// ----------------------------------------
 	// @brief 패킷 버퍼를 해제하고 수신 로직 카운터와 완료 컨텍스트를 정리합니다.
 	// ----------------------------------------
-	void CompleteRecvIOCompletedContext(RecvIOCompletedContext* context, bool processingStarted);
+	void CompleteRecvIOCompletedContext(RecvIOCompletedContext* context);
 	// ----------------------------------------
 	// @brief 지정한 logic worker의 event를 신호하고 실패 시 치명 오류로 보고합니다.
 	// ----------------------------------------

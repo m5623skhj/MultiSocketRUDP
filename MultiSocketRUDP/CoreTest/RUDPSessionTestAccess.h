@@ -5,6 +5,31 @@
 class RUDPSessionBehaviorAccess
 {
 public:
+	static SessionCryptoContext& GetCryptoContext(RUDPSession& session)
+	{
+		return session.cryptoContext;
+	}
+
+	static void SendHeartbeatPacket(RUDPSession& session, const unsigned long long now)
+	{
+		session.SendHeartbeatPacket(now);
+	}
+
+	static void SendReplyToClient(RUDPSession& session, const PacketSequence sequence)
+	{
+		session.SendReplyToClient(sequence);
+	}
+
+	static void TryFlushPendingQueue(RUDPSession& session)
+	{
+		session.TryFlushPendingQueue();
+	}
+
+	static void AbortReservedSession(RUDPSession& session)
+	{
+		session.AbortReservedSession();
+	}
+
 	static bool OnRecvPacket(RUDPSession& session, NetBuffer& recvPacket)
 	{
 		return session.OnRecvPacket(recvPacket);
@@ -96,11 +121,6 @@ public:
 		session.clientAddr = clientAddress;
 		session.clientSockAddrInet = {};
 		session.clientSockAddrInet.Ipv4 = clientAddress;
-	}
-
-	static void SetNowInReleaseThread(RUDPSession& session, const bool isReleasing)
-	{
-		session.nowInReleaseThread.store(isReleasing, std::memory_order_release);
 	}
 
 	static void SetDisconnectedReason(RUDPSession& session, const DISCONNECT_REASON reason)

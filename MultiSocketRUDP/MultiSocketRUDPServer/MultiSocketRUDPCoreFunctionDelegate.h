@@ -22,6 +22,7 @@ class MultiSocketRUDPCoreFunctionDelegate
     friend MultiSocketRUDPCore;
     friend RUDPIOHandler;
     friend RUDPSessionBroker;
+    friend class MultiSocketRUDPCoreTestAccess;
 
 public:
     ~MultiSocketRUDPCoreFunctionDelegate() = default;

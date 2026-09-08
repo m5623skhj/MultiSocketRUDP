@@ -116,14 +116,14 @@
   <text x="507" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">releaseSessionIdList</text>
   <text x="507" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">vector + mutex</text>
   <text x="507" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">IoHandler → Release</text>
-  <text x="507" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">nowInReleaseThread(atomic)</text>
+  <text x="507" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">stateMachine.IsReleasing()</text>
   <text x="507" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">sessionReleaseEvent(auto)</text>
 
   <rect x="610" y="430" width="210" height="96" rx="6" fill="#1a2744"/>
   <text x="715" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#93c5fd">SessionStateMachine</text>
   <text x="715" y="464" text-anchor="middle" font-size="9" fill="#60a5fa">atomic SESSION_STATE</text>
   <text x="715" y="478" text-anchor="middle" font-size="9" fill="#3b82f6">compare_exchange_strong</text>
-  <text x="715" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">nowInProcessingRecvPacket</text>
+  <text x="715" y="492" text-anchor="middle" font-size="9" fill="#1d4ed8">pendingRecvLogic (atomic)</text>
   <text x="715" y="506" text-anchor="middle" font-size="9" fill="#1d4ed8">(atomic_bool)</text>
 
   <!-- Arrows: IO Worker → recvIOCompletedContexts -->

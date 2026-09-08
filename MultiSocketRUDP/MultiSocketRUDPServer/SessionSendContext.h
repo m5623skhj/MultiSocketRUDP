@@ -159,12 +159,6 @@ public:
 	// ----------------------------------------
 	[[nodiscard]]
 	std::set<MultiSocketRUDP::PacketSequenceSetKey>& GetCachedSequenceSet();
-	// ----------------------------------------
-	// @brief 캐시된 시퀀스 집합 보호용 mutex를 반환합니다.
-	// @return mutex 참조
-	// ----------------------------------------
-	[[nodiscard]]
-	std::mutex& GetCachedSequenceSetLock();
 
 	// ----------------------------------------
 	// @brief 마지막으로 사용된 송신 패킷 시퀀스를 반환합니다.
@@ -235,7 +229,6 @@ private:
 	std::shared_mutex sendPacketInfoMapLock;
 
 	std::set<MultiSocketRUDP::PacketSequenceSetKey> cachedSequenceSet;
-	std::mutex cachedSequenceSetLock;
 
 	RingBuffer<std::pair<PacketSequence, NetBuffer*>> pendingPacketQueue{ 0 };
 	std::mutex pendingPacketQueueLock;

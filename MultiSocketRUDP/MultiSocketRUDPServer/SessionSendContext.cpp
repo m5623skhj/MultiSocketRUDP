@@ -195,11 +195,6 @@ std::set<MultiSocketRUDP::PacketSequenceSetKey>& SessionSendContext::GetCachedSe
 	return cachedSequenceSet;
 }
 
-std::mutex& SessionSendContext::GetCachedSequenceSetLock()
-{
-	return cachedSequenceSetLock;
-}
-
 PacketSequence SessionSendContext::GetLastSendPacketSequence() const
 {
 	return lastSendPacketSequence.load();
