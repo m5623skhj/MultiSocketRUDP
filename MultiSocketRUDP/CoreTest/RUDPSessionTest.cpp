@@ -315,6 +315,203 @@ TEST_F(SessionSendLifecycleTest, ReleaseQueuePublishesReasonOnceAndStateResetsFo
 	EXPECT_EQ(session.disconnectedCount, 2);
 }
 
+namespace
+{
+	// Keep real retransmission decisions while controlling only the final send result.
+	class RetransmissionTestCore final : public MultiSocketRUDPCore
+	{
+	public:
+		RetransmissionTestCore() : MultiSocketRUDPCore(L"", L"") {}
+
+		bool SendPacket(SendPacketInfo*) const override
+		{
+			++sendCalls;
+			return sendCallback ? sendCallback() : true;
+		}
+
+		mutable int sendCalls{};
+		std::function<bool()> sendCallback;
+	};
+}
+
+class RetransmissionLifecycleTest : public ::testing::Test
+{
+protected:
+	using PacketPtr = std::unique_ptr<SendPacketInfo, decltype(&SendPacketInfo::Free)>;
+
+	void SetUp() override
+	{
+		releaseInitialized = MultiSocketRUDPCoreTestAccess::InitializeSessionRelease(core);
+		ASSERT_TRUE(releaseInitialized);
+		MultiSocketRUDPCoreTestAccess::InitializeRetransmission(core, 2);
+		MultiSocketRUDPCoreTestAccess::SetTimingOptions(core, 100, 250, 100, 1000);
+		RUDPSessionBehaviorAccess::SetSessionId(session, 0);
+		RUDPSessionBehaviorAccess::InitializeSession(session);
+		RUDPSessionBehaviorAccess::SetConnected(session);
+	}
+
+	void TearDown() override
+	{
+		if (releaseInitialized)
+		{
+			MultiSocketRUDPCoreTestAccess::CleanupSessionRelease(core);
+		}
+	}
+
+	PacketPtr MakePacket(const uint32_t generation)
+	{
+		NetBuffer* buffer = NetBuffer::Alloc();
+		if (buffer == nullptr)
+		{
+			return PacketPtr(nullptr, &SendPacketInfo::Free);
+		}
+		SendPacketInfo* info = sendPacketInfoPool->Alloc();
+		if (info == nullptr)
+		{
+			NetBuffer::Free(buffer);
+			return PacketPtr(nullptr, &SendPacketInfo::Free);
+		}
+		info->Initialize(&session, generation, buffer, 1, false);
+		return PacketPtr(info, &SendPacketInfo::Free);
+	}
+
+	void Process(SendPacketInfo* info)
+	{
+		// The worker consumes its own reference; the test retains one for assertions.
+		info->AddRefCount();
+		MultiSocketRUDPCoreTestAccess::ProcessRetransmission(core, info);
+	}
+
+	RetransmissionTestCore core;
+	LifecycleHookTestSession session{ core };
+	bool releaseInitialized{};
+};
+
+TEST_F(RetransmissionLifecycleTest, PreviousGenerationCannotDisconnectOrSendOnReusedSession)
+{
+	const auto oldGeneration = session.GetSessionGeneration();
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	std::ignore = MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core);
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	RUDPSessionBehaviorAccess::SetConnected(session);
+	const auto newRto = session.GetRetransmissionTimeoutMs();
+
+	for (const PacketRetransmissionCount limit : { 1, 2 })
+	{
+		MultiSocketRUDPCoreTestAccess::SetRetransmissionLimit(core, limit);
+		auto packet = MakePacket(oldGeneration);
+		ASSERT_NE(packet, nullptr);
+		Process(packet.get());
+		EXPECT_EQ(packet->refCount.load(), 1);
+		EXPECT_TRUE(session.IsConnected());
+		EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NOT_DISCONNECTED);
+		EXPECT_EQ(session.GetRetransmissionTimeoutMs(), newRto);
+		EXPECT_EQ(core.sendCalls, 0);
+		EXPECT_TRUE(RUDPSessionBehaviorAccess::GetSendContext(session).IsSendPacketInfoQueueEmpty());
+		EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).empty());
+		EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	}
+}
+
+TEST_F(RetransmissionLifecycleTest, CurrentGenerationAtLimitDisconnectsOnceAndReturnsCount)
+{
+	MultiSocketRUDPCoreTestAccess::SetRetransmissionLimit(core, 1);
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	Process(packet.get());
+	EXPECT_TRUE(session.IsReleasing());
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::BY_RETRANSMISSION);
+	EXPECT_EQ(core.sendCalls, 0);
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core),
+		std::vector<SessionIdType>{ session.GetSessionId() });
+
+	Process(packet.get());
+	EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).empty());
+	EXPECT_EQ(packet->refCount.load(), 1);
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+}
+
+TEST_F(RetransmissionLifecycleTest, ReleasingSessionRejectsTimeoutAndResend)
+{
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	const auto rto = session.GetRetransmissionTimeoutMs();
+	std::ignore = MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core);
+	Process(packet.get());
+	EXPECT_EQ(core.sendCalls, 0);
+	EXPECT_EQ(session.GetRetransmissionTimeoutMs(), rto);
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NORMAL);
+	EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).empty());
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	EXPECT_EQ(packet->refCount.load(), 1);
+}
+
+TEST_F(RetransmissionLifecycleTest, ActiveResendBlocksReleaseThroughFailureCleanup)
+{
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	const auto generation = session.GetSessionGeneration();
+	std::binary_semaphore entered{ 0 };
+	std::binary_semaphore resume{ 0 };
+	core.sendCallback = [&]()
+		{
+			entered.release();
+			resume.acquire();
+			return false;
+		};
+	std::jthread retransmitter([&]() { Process(packet.get()); });
+	if (not entered.try_acquire_for(std::chrono::seconds(5)))
+	{
+		resume.release();
+		retransmitter.join();
+		FAIL() << "Retransmission did not reach the send callback";
+	}
+
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 0);
+	EXPECT_EQ(session.GetSessionGeneration(), generation);
+	resume.release();
+	retransmitter.join();
+
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NORMAL);
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	EXPECT_EQ(session.disconnectedCount, 1);
+}
+
+TEST_F(RetransmissionLifecycleTest, SuccessfulResendReturnsCount)
+{
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	Process(packet.get());
+	EXPECT_EQ(core.sendCalls, 1);
+	EXPECT_TRUE(session.IsConnected());
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+TEST_F(RetransmissionLifecycleTest, FailedResendDisconnectsAndReturnsCount)
+{
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	core.sendCallback = []() { return false; };
+	Process(packet.get());
+	EXPECT_EQ(core.sendCalls, 1);
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::BY_ERROR);
+	EXPECT_TRUE(session.IsReleasing());
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
 class SessionSocketContextTest : public ::testing::Test
 {
 protected:

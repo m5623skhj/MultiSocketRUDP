@@ -61,6 +61,9 @@ private:
 	/** @brief 종료 상태 전환과 직렬화하여 송신 작업의 진입을 등록합니다. */
 	[[nodiscard]]
 	bool TryBeginSendOperation();
+	/** @brief 지정한 generation의 연결에만 송신 작업을 등록하여 이전 재전송 작업을 거절합니다. */
+	[[nodiscard]]
+	bool TryBeginSendOperation(uint32_t expectedGeneration);
 	/** @brief 송신 실패 정리까지 끝난 뒤 RAII guard에서 진입 등록을 해제합니다. */
 	void CompleteSendOperation();
 
