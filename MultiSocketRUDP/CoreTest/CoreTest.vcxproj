@@ -40,15 +40,15 @@
     <ClCompile Include="SessionPacketOrdererTest.cpp" />
     <ClCompile Include="SessionRIOContextTest.cpp" />
     <ClCompile Include="SendPacketInfoTest.cpp" />
-	<ClCompile Include="ServerUtilityTypesTest.cpp" />
+    <ClCompile Include="ServerUtilityTypesTest.cpp" />
     <ClCompile Include="SessionStateMachineTest.cpp" />
     <ClCompile Include="SessionSendContextTest.cpp" />
     <ClCompile Include="TimerEventTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GoogleTest.h" />
-	<ClInclude Include="MultiSocketRUDPCoreTestAccess.h" />
-	<ClInclude Include="RUDPSessionTestAccess.h" />
+    <ClInclude Include="MultiSocketRUDPCoreTestAccess.h" />
+    <ClInclude Include="RUDPSessionTestAccess.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json">
@@ -69,26 +69,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
