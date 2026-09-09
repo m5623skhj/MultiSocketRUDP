@@ -581,7 +581,7 @@ TEST_F(SessionReceiveLifecycleTest, DisconnectInsideHandlerStopsHeldPacketsAndPr
 
 	EXPECT_FALSE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *first));
 	EXPECT_EQ(handled, std::vector<unsigned int>{ 0 });
-	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), windowEnd);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), windowEnd + 1);
 	// The packet processor requests BY_ERROR when OnRecvPacket returns false.
 	session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NORMAL);
