@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <stop_token>
 
 #pragma comment(lib, "Secur32.lib")
 #pragma comment(lib, "Crypt32.lib")
@@ -133,6 +134,9 @@ namespace TLSHelper
 		bool Initialize() override;
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
+		[[nodiscard]]
+		// Receive waits share a five-second deadline and observe cancellation.
+		bool Handshake(SOCKET socket, const std::stop_token& stopToken);
 
 	private:
 		[[nodiscard]]

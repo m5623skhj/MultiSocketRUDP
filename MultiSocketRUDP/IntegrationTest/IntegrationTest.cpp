@@ -10,6 +10,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -620,6 +621,100 @@ namespace
 		std::optional<TestOptionFiles> optionFiles;
 		bool serverStarted{ false };
 	};
+
+	class IdleBrokerConnection
+	{
+	public:
+		~IdleBrokerConnection() { Close(); }
+		IdleBrokerConnection() = default;
+		IdleBrokerConnection(const IdleBrokerConnection&) = delete;
+		IdleBrokerConnection& operator=(const IdleBrokerConnection&) = delete;
+
+		bool Connect(const unsigned short port)
+		{
+			clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+			if (clientSocket == INVALID_SOCKET)
+			{
+				return false;
+			}
+			sockaddr_in address{};
+			address.sin_family = AF_INET;
+			address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+			address.sin_port = htons(port);
+			return connect(clientSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
+		}
+
+		bool SendIncompleteTlsRecord() const
+		{
+			// TLS 1.2 handshake record header advertising a body that never arrives.
+			constexpr char HEADER[] = { 0x16, 0x03, 0x03, 0x10, 0x00 };
+			return send(clientSocket, HEADER, sizeof(HEADER), 0) == sizeof(HEADER);
+		}
+
+		bool WaitForClose(const long timeoutSeconds) const
+		{
+			fd_set readable{};
+			FD_SET(clientSocket, &readable);
+			timeval timeout{ timeoutSeconds, 0 };
+			if (select(0, &readable, nullptr, nullptr, &timeout) != 1)
+			{
+				return false;
+			}
+			char byte{};
+			const int received = recv(clientSocket, &byte, 1, 0);
+			return received == 0 || (received == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET);
+		}
+
+		void Close()
+		{
+			if (clientSocket != INVALID_SOCKET)
+			{
+				closesocket(clientSocket);
+				clientSocket = INVALID_SOCKET;
+			}
+		}
+
+	private:
+		SOCKET clientSocket = INVALID_SOCKET;
+	};
+
+	TEST_F(IntegrationFixture, IdleAndIncompleteTlsConnectionsTimeOutAndWorkersAcceptNewClients)
+	{
+		std::array<IdleBrokerConnection, 4> idleClients;
+		for (auto& client : idleClients)
+		{
+			ASSERT_TRUE(client.Connect(optionFiles->brokerPort));
+		}
+		Sleep(3000);
+		ASSERT_TRUE(idleClients.front().SendIncompleteTlsRecord());
+		for (const auto& client : idleClients)
+		{
+			EXPECT_TRUE(client.WaitForClose(3));
+		}
+		const auto result = RunClientScenario({ L"--scenario", L"connect" }, 45s);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, StopServerCancelsIdleTlsConnectionsAndClosesQueuedSockets)
+	{
+		std::array<IdleBrokerConnection, 8> idleClients;
+		for (auto& client : idleClients)
+		{
+			ASSERT_TRUE(client.Connect(optionFiles->brokerPort));
+		}
+		// Allow workers to enter TLS receive; the remaining sockets stay queued.
+		Sleep(200);
+		auto stopResult = std::async(std::launch::async, [this]() { server->Stop(); });
+		for (auto& client : idleClients)
+		{
+			EXPECT_TRUE(client.WaitForClose(1));
+			// Close locally even on failure so a regression cannot strand teardown.
+			client.Close();
+		}
+		stopResult.get();
+		serverStarted = false;
+	}
 
 	TEST_F(IntegrationFixture, ConnectHandshakeCompletesAndSessionCountsUpdate)
 	{

@@ -41,7 +41,8 @@ namespace TLSHelper
 
     TLSHelperBase::~TLSHelperBase()
     {
-        if (handshakeCompleted)
+        // A timed-out or cancelled handshake may already own a partial context.
+        if (ctxtHandle.dwLower || ctxtHandle.dwUpper)
         {
             DeleteSecurityContext(&ctxtHandle);
         }

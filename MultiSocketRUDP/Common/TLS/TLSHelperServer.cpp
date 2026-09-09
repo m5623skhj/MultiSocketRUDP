@@ -3,6 +3,7 @@
 #include <fstream>
 #include <utility>
 #include <vector>
+#include <chrono>
 
 namespace TLSHelper
 {
@@ -147,7 +148,12 @@ namespace TLSHelper
 
     bool TLSHelperServer::Handshake(const SOCKET socket)
     {
-        if (handshakeCompleted)
+        return Handshake(socket, std::stop_token{});
+    }
+
+    bool TLSHelperServer::Handshake(const SOCKET socket, const std::stop_token& stopToken)
+    {
+        if (ctxtHandle.dwLower || ctxtHandle.dwUpper)
         {
             DeleteSecurityContext(&ctxtHandle);
             ZeroMemory(&ctxtHandle, sizeof(ctxtHandle));
@@ -156,9 +162,31 @@ namespace TLSHelper
         handshakeCompleted = false;
         CtxtHandle* context = nullptr;
         std::vector<char> recvBuffer;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 
         while (true)
         {
+            // Poll readiness so stopping does not depend on shutdown interrupting recv.
+            // A single deadline also bounds peers that trickle incomplete TLS records.
+            while (true)
+            {
+                if (stopToken.stop_requested() || std::chrono::steady_clock::now() >= deadline)
+                {
+                    return false;
+                }
+                fd_set readable{};
+                FD_SET(socket, &readable);
+                timeval timeout{ 0, 100000 };
+                const int ready = select(0, &readable, nullptr, nullptr, &timeout);
+                if (ready == SOCKET_ERROR)
+                {
+                    return false;
+                }
+                if (ready > 0)
+                {
+                    break;
+                }
+            }
             if (not ReceiveHandshakeData(socket, recvBuffer))
             {
                 return false;
