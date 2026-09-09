@@ -108,7 +108,7 @@ void RUDPSession::Disconnect()
 			SendPacketInfo::Free(info);
 		});
 	}
-	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	if (stateMachine.GetSessionState() == SESSION_STATE::RELEASING)
 	{
 		OnReleased();
 	}
@@ -407,7 +407,7 @@ void RUDPSession::BeginIOShutdown()
 		ioShutdownStarted = true;
 	}
 
-	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	if (stateMachine.GetSessionState() == SESSION_STATE::RELEASING)
 	{
 		OnDisconnected();
 	}
