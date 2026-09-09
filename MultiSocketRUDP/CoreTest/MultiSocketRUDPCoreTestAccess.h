@@ -4,6 +4,7 @@
 #include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "RUDPPacketProcessor.h"
 #include "RUDPSessionManager.h"
+#include "RIOManager.h"
 
 class MultiSocketRUDPCoreTestAccess
 {
@@ -29,6 +30,24 @@ public:
 			CloseHandle(handle);
 		}
 		core.recvLogicThreadEventHandles.clear();
+	}
+
+	// Use the real release pipeline with unregistered RIO buffers and no network threads.
+	static bool InitializeReleasePool(MultiSocketRUDPCore& core, SessionFactoryFunc factory)
+	{
+		core.rioManager = std::make_unique<RIOManager>(core.sessionDelegate);
+		core.sessionManager = std::make_unique<RUDPSessionManager>(2, core, core.sessionDelegate);
+		return core.sessionManager->Initialize(1, std::move(factory));
+	}
+
+	static RUDPSessionManager& GetSessionManager(MultiSocketRUDPCore& core)
+	{
+		return *core.sessionManager;
+	}
+
+	static bool FinalizeSessionRelease(MultiSocketRUDPCore& core, const SessionIdType sessionId)
+	{
+		return core.TryFinalizeSessionRelease(sessionId, GetTickCount64());
 	}
 
 	static bool InitializeRecvLogic(MultiSocketRUDPCore& core)

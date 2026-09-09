@@ -62,6 +62,11 @@ public:
 		return session.GetRecvBuffer();
 	}
 
+	static PacketSequence GetReceiveWindowEnd(const RUDPSession& session)
+	{
+		return session.flowManager.GetReceiveWindowEnd();
+	}
+
 	static bool CanFinalizeIO(RUDPSession& session)
 	{
 		return session.CanFinalizeIO();
@@ -102,7 +107,7 @@ public:
 
 	static void SetReleasing(RUDPSession& session)
 	{
-		session.stateMachine.SetReserved();
+		SetConnected(session);
 		std::ignore = session.stateMachine.TryTransitionToReleasing();
 	}
 

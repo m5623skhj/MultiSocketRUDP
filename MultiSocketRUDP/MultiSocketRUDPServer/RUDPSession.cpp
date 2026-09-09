@@ -1,4 +1,4 @@
-﻿#include "PreCompile.h"
+#include "PreCompile.h"
 #include "RUDPSession.h"
 #include "NetServerSerializeBuffer.h"
 #include "MultiSocketRUDPCore.h"
@@ -108,7 +108,7 @@ void RUDPSession::Disconnect()
 			SendPacketInfo::Free(info);
 		});
 	}
-	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	if (stateMachine.GetSessionState() == SESSION_STATE::RELEASING)
 	{
 		OnReleased();
 	}
@@ -407,7 +407,7 @@ void RUDPSession::BeginIOShutdown()
 		ioShutdownStarted = true;
 	}
 
-	if (disconnectedReason != DISCONNECT_REASON::BY_ABORT_RESERVED)
+	if (stateMachine.GetSessionState() == SESSION_STATE::RELEASING)
 	{
 		OnDisconnected();
 	}
@@ -559,6 +559,11 @@ bool RUDPSession::IsOlderRecvSequence(
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
+	if (not IsConnected())
+	{
+		return false;
+	}
+
 	PacketId packetId;
 	recvPacket >> packetId;
 

@@ -6,6 +6,7 @@
 #include "RUDPSessionManager.h"
 #include "MockSessionDelegate.h"
 #include "RUDPSessionTestAccess.h"
+#include "MultiSocketRUDPCoreTestAccess.h"
 #include <array>
 #include <barrier>
 #include <stdexcept>
@@ -17,9 +18,100 @@ namespace
 	public:
 		explicit ManagerTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
 		~ManagerTestSession() override { ++destroyedCount; }
+		void OnDisconnected() override { ++disconnectedCalls; }
+		void OnReleased() override { ++releasedCalls; }
+		int disconnectedCalls{};
+		int releasedCalls{};
 		static inline std::atomic_int destroyedCount{};
 	};
 }
+
+class ReservedSessionReleaseTest : public ::testing::TestWithParam<DISCONNECT_REASON>
+{
+protected:
+	void SetUp() override
+	{
+		releaseInitialized = MultiSocketRUDPCoreTestAccess::InitializeSessionRelease(core);
+		ASSERT_TRUE(releaseInitialized);
+		ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::InitializeReleasePool(core,
+			[](MultiSocketRUDPCore& owner) { return new ManagerTestSession(owner); }));
+	}
+
+	void TearDown() override
+	{
+		if (releaseInitialized)
+		{
+			MultiSocketRUDPCoreTestAccess::CleanupSessionRelease(core);
+		}
+	}
+
+	MultiSocketRUDPCore core{ L"", L"" };
+	bool releaseInitialized{};
+};
+
+TEST_P(ReservedSessionReleaseTest, ReservationReleasePreservesConnectedUserAndSkipsCallbacks)
+{
+	auto& manager = MultiSocketRUDPCoreTestAccess::GetSessionManager(core);
+	auto* connected = static_cast<ManagerTestSession*>(manager.AcquireSession());
+	auto* reserved = static_cast<ManagerTestSession*>(manager.AcquireSession());
+	ASSERT_NE(connected, nullptr);
+	ASSERT_NE(reserved, nullptr);
+	RUDPSessionBehaviorAccess::SetConnected(*connected);
+	manager.IncrementConnectedCount();
+	RUDPSessionBehaviorAccess::SetReserved(*reserved);
+	const auto sessionId = reserved->GetSessionId();
+	const auto generation = reserved->GetSessionGeneration();
+	const auto reason = GetParam();
+	if (reason == DISCONNECT_REASON::BY_ABORT_RESERVED)
+	{
+		RUDPSessionBehaviorAccess::AbortReservedSession(*reserved);
+	}
+	else
+	{
+		reserved->DoDisconnect(reason);
+	}
+	ASSERT_EQ(reserved->GetSessionState(), SESSION_STATE::RELEASING_BY_ABORT_RESERVED);
+	EXPECT_EQ(reserved->GetDisconnectedReason(), reason);
+	EXPECT_EQ(manager.GetReleasingSession(sessionId), reserved);
+	EXPECT_EQ(manager.GetUsingSession(sessionId), nullptr);
+	reserved->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
+	EXPECT_EQ(reserved->GetDisconnectedReason(), reason);
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core), std::vector<SessionIdType>{ sessionId });
+
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::FinalizeSessionRelease(core, sessionId));
+	EXPECT_EQ(reserved->disconnectedCalls, 0);
+	EXPECT_EQ(reserved->releasedCalls, 0);
+	EXPECT_TRUE(connected->IsConnected());
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
+	EXPECT_EQ(manager.GetAllConnectedCount(), 1u);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 0u);
+	EXPECT_EQ(manager.GetAllDisconnectedByRetransmissionCount(), 0u);
+	EXPECT_EQ(manager.GetUnusedSessionCount(), 1);
+	EXPECT_EQ(reserved->GetSessionState(), SESSION_STATE::DISCONNECTED);
+	EXPECT_GT(reserved->GetSessionGeneration(), generation);
+	EXPECT_EQ(manager.AcquireSession(), reserved);
+
+	// The same object must use normal release behavior after an actual connection.
+	RUDPSessionBehaviorAccess::SetConnected(*reserved);
+	manager.IncrementConnectedCount();
+	reserved->DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+	ASSERT_EQ(reserved->GetSessionState(), SESSION_STATE::RELEASING);
+	std::ignore = MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core);
+	ASSERT_TRUE(MultiSocketRUDPCoreTestAccess::FinalizeSessionRelease(core, sessionId));
+	EXPECT_EQ(reserved->disconnectedCalls, 1);
+	EXPECT_EQ(reserved->releasedCalls, 1);
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 1u);
+	EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::FinalizeSessionRelease(core, sessionId));
+	EXPECT_EQ(reserved->disconnectedCalls, 1);
+	EXPECT_EQ(reserved->releasedCalls, 1);
+	EXPECT_EQ(manager.GetNowSessionCount(), 1);
+	EXPECT_EQ(manager.GetAllDisconnectedCount(), 1u);
+}
+
+INSTANTIATE_TEST_SUITE_P(ReservationReasons, ReservedSessionReleaseTest,
+	::testing::Values(DISCONNECT_REASON::BY_ERROR, DISCONNECT_REASON::NORMAL,
+		DISCONNECT_REASON::BY_ABORT_RESERVED));
 
 class RUDPSessionManagerTest : public ::testing::Test
 {
