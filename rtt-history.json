@@ -1116,6 +1116,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "6de51f6ed5dee82884093af792e4ca49684fa318",
+      "commitSubject": "* TLS 교환 진행할 때 TCP를 연결하고 아무 행동도 하지 않을 시 접속 마비가 가능한 현상 수정",
+      "recordedAtUtc": "2026-09-09T15:50:18.563934+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "Intel64 Family 6 Model 207 Stepping 2, GenuineIntel",
+        "runnerName": "GitHub Actions 1000001090",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.11599290000000013,
+            "medianMinRttMs": 0.0711,
+            "medianP50RttMs": 0.1124,
+            "medianP95RttMs": 0.1491,
+            "medianP99RttMs": 0.1774,
+            "medianMaxRttMs": 0.2669,
+            "worstMaxRttMs": 1.5502,
+            "medianElapsedSeconds": 0.122191,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.833359799999997,
+            "medianMinRttMs": 0.0462,
+            "medianP50RttMs": 0.1144,
+            "medianP95RttMs": 32.2397,
+            "medianP99RttMs": 64.4458,
+            "medianMaxRttMs": 196.8813,
+            "worstMaxRttMs": 201.1158,
+            "medianElapsedSeconds": 5.8363599,
+            "totalRetransmissionSuspectedCount": 176
+          }
+        }
+      ]
     }
   ]
 }
