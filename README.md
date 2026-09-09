@@ -14,6 +14,7 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-09-09 | `dd9dfaf` | * 실패한 테스트 수정 | 0.215 ms | 0.240 ms | 32.459 ms | 64.027 ms |
 | 2026-09-08 | `546fc8d` | * 이전 세션의 재전송 작업이 재사용된 세션에 영향을 주는 경쟁 조건 수정   * generation 검사와 송신 작업 등록을 동일한 mutex로 보호   * 재전송 처리와 실패 정리가 완료될 때까지 세션 해제 지연   * 이전 generation 및 종료 중인 세션의 재전송 작업 거절   * 세션 재사용과 재전송 처리 중 해제 경쟁 회귀 테스트 추가   * 재전송 작업의 세션 수명 보호 문서 갱신 | 0.180 ms | 0.197 ms | 32.433 ms | 64.645 ms |
 | 2026-09-08 | `cccba6b` | * 송신 준비가 끝나기 전에 세션의 암호화 자원을 해제 문제 수정 | 0.151 ms | 0.173 ms | 32.280 ms | 63.482 ms |
 | 2026-09-08 | `6a8a448` | * 빌드 툴 버전 업 | 0.219 ms | 0.251 ms | 31.927 ms | 64.570 ms |
@@ -23,6 +24,5 @@ The JSON file keeps the complete official history. Charts and the table render t
 | 2026-08-26 | `f72bf31` | * 인코딩 잘못된 주석 수정 | 0.216 ms | 0.242 ms | 32.405 ms | 64.146 ms |
 | 2026-08-24 | `640064d` | * Schannel TLS 핸드셰이크 설정 및 실패 진단 개선 | 0.222 ms | 0.249 ms | 32.340 ms | 64.168 ms |
 | 2026-08-09 | `cabf791` | * 재전송 Wake 이벤트 신호 실패 처리를 수정   * NULL 핸들을 성공으로 처리하던 예외 제거   * SetEvent 결과를 직접 반환해 오류 코드 보존 | 0.207 ms | 0.237 ms | 32.469 ms | 63.264 ms |
-| 2026-08-07 | `cb4ed7d` | * 주석 수정 | 0.221 ms | 0.252 ms | 32.396 ms | 63.201 ms |
 
-Last updated by `546fc8dc936e72e920a82cf96ab16efa27a1dd7d` at 2026-09-08T15:46:49.1420719+00:00.
+Last updated by `dd9dfaf3428e9d65703fb5beeb78b9763153db56` at 2026-09-09T03:59:06.6276371+00:00.
