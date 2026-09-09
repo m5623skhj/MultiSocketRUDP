@@ -14,6 +14,7 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-09-09 | `b8ed6ca` | * 예약 세션 종료 상태를 분리하여 접속자 수와 종료 콜백 처리 수정   * RESERVED에서 종료 시 RELEASING_BY_ABORT_RESERVED 상태로 전환   * 두 종료 상태를 공통 해제 경로에서 처리   * 실제 연결됐던 세션만 접속자 수 감소 및 종료 콜백 수행   * 예약 종료·세션 재사용·중복 해제·연결과 종료 경합 테스트 추가   * 기존 상태 전이 테스트와 해제 상태 설정 헬퍼 갱신 | 0.209 ms | 0.238 ms | 32.671 ms | 64.351 ms |
 | 2026-09-09 | `dd9dfaf` | * 실패한 테스트 수정 | 0.215 ms | 0.240 ms | 32.459 ms | 64.027 ms |
 | 2026-09-08 | `546fc8d` | * 이전 세션의 재전송 작업이 재사용된 세션에 영향을 주는 경쟁 조건 수정   * generation 검사와 송신 작업 등록을 동일한 mutex로 보호   * 재전송 처리와 실패 정리가 완료될 때까지 세션 해제 지연   * 이전 generation 및 종료 중인 세션의 재전송 작업 거절   * 세션 재사용과 재전송 처리 중 해제 경쟁 회귀 테스트 추가   * 재전송 작업의 세션 수명 보호 문서 갱신 | 0.180 ms | 0.197 ms | 32.433 ms | 64.645 ms |
 | 2026-09-08 | `cccba6b` | * 송신 준비가 끝나기 전에 세션의 암호화 자원을 해제 문제 수정 | 0.151 ms | 0.173 ms | 32.280 ms | 63.482 ms |
@@ -23,6 +24,5 @@ The JSON file keeps the complete official history. Charts and the table render t
 | 2026-08-26 | `61833d0` | * 주석 없던 테스트들에 테스트 목적 주석 추가 | 0.225 ms | 0.259 ms | 32.228 ms | 64.554 ms |
 | 2026-08-26 | `f72bf31` | * 인코딩 잘못된 주석 수정 | 0.216 ms | 0.242 ms | 32.405 ms | 64.146 ms |
 | 2026-08-24 | `640064d` | * Schannel TLS 핸드셰이크 설정 및 실패 진단 개선 | 0.222 ms | 0.249 ms | 32.340 ms | 64.168 ms |
-| 2026-08-09 | `cabf791` | * 재전송 Wake 이벤트 신호 실패 처리를 수정   * NULL 핸들을 성공으로 처리하던 예외 제거   * SetEvent 결과를 직접 반환해 오류 코드 보존 | 0.207 ms | 0.237 ms | 32.469 ms | 63.264 ms |
 
-Last updated by `dd9dfaf3428e9d65703fb5beeb78b9763153db56` at 2026-09-09T03:59:06.6276371+00:00.
+Last updated by `b8ed6ca62eb23c61d9c9b1aaae2af706a25d87d5` at 2026-09-09T04:13:42.9215035+00:00.

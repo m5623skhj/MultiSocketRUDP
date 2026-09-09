@@ -992,6 +992,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "b8ed6ca62eb23c61d9c9b1aaae2af706a25d87d5",
+      "commitSubject": "* 예약 세션 종료 상태를 분리하여 접속자 수와 종료 콜백 처리 수정   * RESERVED에서 종료 시 RELEASING_BY_ABORT_RESERVED 상태로 전환   * 두 종료 상태를 공통 해제 경로에서 처리   * 실제 연결됐던 세션만 접속자 수 감소 및 종료 콜백 수행   * 예약 종료·세션 재사용·중복 해제·연결과 종료 경합 테스트 추가   * 기존 상태 전이 테스트와 해제 상태 설정 헬퍼 갱신",
+      "recordedAtUtc": "2026-09-09T04:13:42.9215035+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001070",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.16669479999999992,
+            "medianMinRttMs": 0.095,
+            "medianP50RttMs": 0.1601,
+            "medianP95RttMs": 0.2094,
+            "medianP99RttMs": 0.2376,
+            "medianMaxRttMs": 0.4121,
+            "worstMaxRttMs": 1.9396,
+            "medianElapsedSeconds": 0.1712457,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.315692200000002,
+            "medianMinRttMs": 0.062,
+            "medianP50RttMs": 0.1505,
+            "medianP95RttMs": 32.6711,
+            "medianP99RttMs": 64.3513,
+            "medianMaxRttMs": 197.1864,
+            "worstMaxRttMs": 365.413,
+            "medianElapsedSeconds": 6.3196667,
+            "totalRetransmissionSuspectedCount": 182
+          }
+        }
+      ]
     }
   ]
 }
