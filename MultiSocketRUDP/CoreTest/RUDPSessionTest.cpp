@@ -23,10 +23,34 @@ namespace
 		explicit SessionBehaviorTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
 	};
 
+	class LifecycleContentPacket final : public IPacket
+	{
+	public:
+		static constexpr PacketId PACKET_ID = 9010;
+		PacketId GetPacketId() const override { return PACKET_ID; }
+		void BufferToPacket(NetBuffer& buffer) override { buffer >> value; }
+		unsigned int value{};
+	};
+
 	class LifecycleHookTestSession final : public RUDPSession
 	{
 	public:
 		explicit LifecycleHookTestSession(MultiSocketRUDPCore& inCore) : RUDPSession(inCore) {}
+
+		void RegisterContentHandler()
+		{
+			PacketManager::RegisterPacket<LifecycleContentPacket>();
+			RegisterPacketHandler<LifecycleHookTestSession, LifecycleContentPacket>(
+				LifecycleContentPacket::PACKET_ID, &LifecycleHookTestSession::HandleContent);
+		}
+
+		void HandleContent(const LifecycleContentPacket& packet)
+		{
+			if (contentCallback)
+			{
+				contentCallback(packet.value);
+			}
+		}
 
 		void OnConnected() override
 		{
@@ -43,6 +67,7 @@ namespace
 
 		int disconnectedCount{};
 		std::function<void()> connectedCallback;
+		std::function<void(unsigned int)> contentCallback;
 	};
 
 	class NoOpPacket final : public IPacket
@@ -510,6 +535,112 @@ TEST_F(RetransmissionLifecycleTest, FailedResendDisconnectsAndReturnsCount)
 	EXPECT_TRUE(session.IsReleasing());
 	EXPECT_EQ(packet->refCount.load(), 1);
 	EXPECT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+}
+
+class SessionReceiveLifecycleTest : public SessionSendLifecycleTest
+{
+protected:
+	using BufferPtr = std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)>;
+
+	void SetUp() override
+	{
+		SessionSendLifecycleTest::SetUp();
+		session.RegisterContentHandler();
+	}
+
+	BufferPtr MakeContent(const PacketSequence sequence)
+	{
+		BufferPtr buffer(NetBuffer::Alloc(), &NetBuffer::Free);
+		if (buffer)
+		{
+			*buffer << sequence << LifecycleContentPacket::PACKET_ID << static_cast<unsigned int>(sequence);
+		}
+		return buffer;
+	}
+};
+
+TEST_F(SessionReceiveLifecycleTest, DisconnectInsideHandlerStopsHeldPacketsAndPreservesReason)
+{
+	const auto buffersBefore = NetBuffer::GetUsingSerializeBufNodeCount();
+	auto first = MakeContent(0);
+	auto second = MakeContent(1);
+	auto third = MakeContent(2);
+	ASSERT_TRUE(first && second && third);
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *second));
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *third));
+	std::vector<unsigned int> handled;
+	session.contentCallback = [&](const unsigned int value)
+		{
+			handled.push_back(value);
+			if (value == 0)
+			{
+				session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+			}
+		};
+	const auto windowEnd = RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session);
+
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *first));
+	EXPECT_EQ(handled, std::vector<unsigned int>{ 0 });
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), windowEnd);
+	// The packet processor requests BY_ERROR when OnRecvPacket returns false.
+	session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NORMAL);
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).size(), 1u);
+
+	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::CanFinalizeIO(session));
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	first.reset();
+	second.reset();
+	third.reset();
+	EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), buffersBefore);
+}
+
+TEST_F(SessionReceiveLifecycleTest, ReleasingSessionDoesNotEnterContentHandler)
+{
+	auto packet = MakeContent(0);
+	ASSERT_NE(packet, nullptr);
+	int handled = 0;
+	session.contentCallback = [&](unsigned int) { ++handled; };
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	const auto windowEnd = RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session);
+	EXPECT_FALSE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *packet));
+	EXPECT_EQ(handled, 0);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), windowEnd);
+}
+
+TEST_F(SessionReceiveLifecycleTest, ConcurrentDisconnectStopsHeldPacketsAfterRunningHandlerReturns)
+{
+	auto first = MakeContent(0);
+	auto second = MakeContent(1);
+	ASSERT_TRUE(first && second);
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::OnRecvPacket(session, *second));
+	std::binary_semaphore entered{ 0 };
+	std::binary_semaphore resume{ 0 };
+	std::vector<unsigned int> handled;
+	session.contentCallback = [&](const unsigned int value)
+		{
+			handled.push_back(value);
+			if (value == 0)
+			{
+				entered.release();
+				resume.acquire();
+			}
+		};
+	bool processed = true;
+	std::jthread receiver([&]() { processed = RUDPSessionBehaviorAccess::OnRecvPacket(session, *first); });
+	if (not entered.try_acquire_for(std::chrono::seconds(5)))
+	{
+		resume.release();
+		receiver.join();
+		FAIL() << "Content packet did not reach its handler";
+	}
+	session.DoDisconnect(DISCONNECT_REASON::NORMAL);
+	resume.release();
+	receiver.join();
+	EXPECT_FALSE(processed);
+	EXPECT_EQ(handled, std::vector<unsigned int>{ 0 });
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::NORMAL);
 }
 
 class SessionSocketContextTest : public ::testing::Test

@@ -1,4 +1,4 @@
-﻿#include "PreCompile.h"
+#include "PreCompile.h"
 #include "RUDPSession.h"
 #include "NetServerSerializeBuffer.h"
 #include "MultiSocketRUDPCore.h"
@@ -559,6 +559,11 @@ bool RUDPSession::IsOlderRecvSequence(
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
+	if (not IsConnected())
+	{
+		return false;
+	}
+
 	PacketId packetId;
 	recvPacket >> packetId;
 
