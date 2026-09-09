@@ -41,7 +41,7 @@ public:
 	// ----------------------------------------
 	bool Start(PortType listenPort, const std::string& rudpSessionIP);
 	// ----------------------------------------
-	// @brief listen 소켓을 닫아 accept를 해제하고 모든 브로커 스레드를 join합니다.
+	// @brief accept와 진행 중인 협상을 중단하고 워커 종료 후 대기 소켓을 닫습니다.
 	// ----------------------------------------
 	void Stop();
 
@@ -51,7 +51,7 @@ private:
 	// ----------------------------------------
 	void RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP);
 	void RunBrokerWorkerThread(const std::stop_token& stopToken);
-	void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP);
+	void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP, const std::stop_token& stopToken);
 
 	[[nodiscard]]
 	bool OpenSessionBrokerSocket(PortType listenPort);
