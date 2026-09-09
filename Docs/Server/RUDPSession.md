@@ -17,14 +17,26 @@
 
 ## 콘텐츠 코드에서 직접 쓰는 API
 
-### 패킷 핸들러 등록
+### `RegisterPacketHandler`
+
+```cpp
+void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(const PacketType&))
+```
+
+특정 `PacketId`에 대한 처리 함수를 등록한다. 패킷 수신 시 등록된 `func`가 호출된다.
+
+| 파라미터 | 설명 |
+|----------|------|
+| `packetId` | 핸들러를 등록할 패킷의 ID |
+| `func` | 패킷 수신 시 실행될 `DerivedType`의 멤버 함수 포인터 |
+
+#### 사용 예시
 
 ```cpp
 RegisterPacketHandler<Player, Ping>(
     static_cast<PacketId>(PACKET_ID::PING),
     &Player::OnPing);
 ```
-
 ### 패킷 송신
 
 ```cpp
@@ -78,6 +90,21 @@ void OnReleased() override;
 
 ---
 
+## RegisterPacketHandler
+
+```cpp
+void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(const PacketType&))
+```
+
+특정 패킷 ID에 대응하는 핸들러 함수를 등록한다. 패킷 수신 시 지정된 멤버 함수가 호출된다.
+
+| 파라미터 | 설명 |
+|----------|------|
+| `packetId` | 등록할 패킷의 식별자 |
+| `func` | 패킷 처리 멤버 함수 포인터 |
+
+> **주의:** `PacketType`은 반드시 `IPacket`을 상속받아야 한다.
+
 ## 최소 예시
 
 ```cpp
@@ -108,9 +135,6 @@ void Player::OnPing(const Ping&)
     SendPacket(pong);
 }
 ```
-
----
-
 ## 주의할 점
 
 ### 1. `OnDisconnected()`는 정리 훅이다
