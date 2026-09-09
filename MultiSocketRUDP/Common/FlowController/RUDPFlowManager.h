@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "RUDPFlowController.h"
 #include "RUDPReceiveWindow.h"
+#include <mutex>
 
 class RUDPFlowManager
 {
@@ -24,16 +25,19 @@ public:
 	[[nodiscard]]
 	bool CanSend(PacketSequence nextSend) noexcept
 	{
+		std::scoped_lock lock(sendFlowMutex);
 		return flowController.CanSendPacket(nextSend, flowController.GetLastAckedSequence());
 	}
 
 	void OnAckReceived(PacketSequence replySeq) noexcept
 	{
+		std::scoped_lock lock(sendFlowMutex);
 		flowController.OnReplyReceived(replySeq);
 	}
 
 	void OnTimeout() noexcept
 	{
+		std::scoped_lock lock(sendFlowMutex);
 		flowController.OnTimeout();
 	}
 
@@ -57,6 +61,7 @@ public:
 	[[nodiscard]]
 	uint16_t GetCwnd() const noexcept
 	{
+		std::scoped_lock lock(sendFlowMutex);
 		return flowController.GetCwnd();
 	}
 
@@ -68,7 +73,10 @@ public:
 
 	void Reset(const PacketSequence recvStartSequence) noexcept
 	{
-		flowController.Reset();
+		{
+			std::scoped_lock lock(sendFlowMutex);
+			flowController.Reset();
+		}
 		receiveWindow.Reset(recvStartSequence);
 	}
 
@@ -79,6 +87,9 @@ public:
 	}
 
 private:
+	// Protect the entire send-flow operation; CanSend does not reserve send capacity.
+	mutable std::mutex sendFlowMutex;
 	RUDPFlowController flowController;
+	// Receive-window access and reset require receive-worker ownership or a drained session.
 	RUDPReceiveWindow receiveWindow;
 };

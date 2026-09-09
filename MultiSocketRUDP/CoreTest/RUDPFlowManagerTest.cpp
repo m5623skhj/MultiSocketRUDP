@@ -1,6 +1,9 @@
 ﻿#include "PreCompile.h"
 #include <gtest/gtest.h>
 #include "../Common/FlowController/RUDPFlowManager.h"
+#include <barrier>
+#include <thread>
+#include <array>
 
 class RUDPFlowManagerTest : public ::testing::Test
 {
@@ -13,6 +16,85 @@ protected:
 	static constexpr BYTE WINDOW_SIZE = 16;
 	RUDPFlowManager fm{ WINDOW_SIZE };
 };
+
+// Probe the next ACK as well as cwnd: recovery state must match the same serial ordering.
+TEST(RUDPFlowManagerConcurrencyTest, AckAndTimeoutMatchOneCompleteSerialOrdering)
+{
+	for (const PacketSequence priorAcks : { 0, 1, 4 })
+	{
+		RUDPFlowManager ackFirst{ 16 };
+		RUDPFlowManager timeoutFirst{ 16 };
+		for (PacketSequence sequence = 1; sequence <= priorAcks; ++sequence)
+		{
+			ackFirst.OnAckReceived(sequence);
+			timeoutFirst.OnAckReceived(sequence);
+		}
+		const auto nextAck = priorAcks + 1;
+		ackFirst.OnAckReceived(nextAck);
+		ackFirst.OnTimeout();
+		timeoutFirst.OnTimeout();
+		timeoutFirst.OnAckReceived(nextAck);
+		const auto probe = [nextAck](RUDPFlowManager& manager)
+		{
+			const auto before = manager.GetCwnd();
+			manager.OnAckReceived(nextAck + 1);
+			return std::array<uint16_t, 3>{ before, manager.GetCwnd(),
+				static_cast<uint16_t>(manager.CanSend(nextAck + 4)) };
+		};
+		const auto expectedAckFirst = probe(ackFirst);
+		const auto expectedTimeoutFirst = probe(timeoutFirst);
+		for (int iteration = 0; iteration < 100; ++iteration)
+		{
+			RUDPFlowManager manager{ 16 };
+			for (PacketSequence sequence = 1; sequence <= priorAcks; ++sequence)
+			{
+				manager.OnAckReceived(sequence);
+			}
+			std::barrier start(3);
+			std::jthread ack([&]() { start.arrive_and_wait(); manager.OnAckReceived(nextAck); });
+			std::jthread timeout([&]() { start.arrive_and_wait(); manager.OnTimeout(); });
+			start.arrive_and_wait();
+			ack.join();
+			timeout.join();
+			const auto actual = probe(manager);
+			EXPECT_TRUE(actual == expectedAckFirst || actual == expectedTimeoutFirst)
+				<< "priorAcks=" << priorAcks << ", iteration=" << iteration;
+		}
+	}
+}
+
+// Both complete states allow sequence 4. Old ACK + reduced cwnd would incorrectly reject it.
+TEST(RUDPFlowManagerConcurrencyTest, SendDecisionDoesNotObservePartialAckOrReset)
+{
+	RUDPFlowManager manager{ 16 };
+	std::barrier start(3);
+	bool allAllowed = true;
+	bool validWindows = true;
+	std::jthread writer([&]()
+		{
+			start.arrive_and_wait();
+			for (int iteration = 0; iteration < 10000; ++iteration)
+			{
+				manager.OnAckReceived(10);
+				manager.Reset(0);
+			}
+		});
+	std::jthread reader([&]()
+		{
+			start.arrive_and_wait();
+			for (int iteration = 0; iteration < 10000; ++iteration)
+			{
+				allAllowed &= manager.CanSend(4);
+				const auto window = manager.GetCwnd();
+				validWindows &= window == 2 || window == 4;
+			}
+		});
+	start.arrive_and_wait();
+	writer.join();
+	reader.join();
+	EXPECT_TRUE(allAllowed);
+	EXPECT_TRUE(validWindows);
+}
 
 
 // ------------------------------------------------------------
