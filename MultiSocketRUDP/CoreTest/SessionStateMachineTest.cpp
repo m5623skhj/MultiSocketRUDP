@@ -1,28 +1,14 @@
-﻿#include "gtest/gtest.h"
+#include "gtest/gtest.h"
 #include "SessionStateMachine.h"
 #include <barrier>
 
 // ============================================================
 // SessionStateMachine 단위 테스트
 //
-// 상태 전이도:
-//
-//   [DISCONNECTED]
-//	   │
-//	   │ SetReserved()
-//	   ▼
-//   [RESERVED] ──TryAbortReserved() ──────────────
-//	   │										 │
-//	   │ TryTransitionToConnected()			 │
-//	   ▼										 ▼
-//   [CONNECTED] ──TryTransitionToReleasing()──▶[RELEASING]
-//	   │										 │
-//	   └──TryTransitionToReleasing()─────────────
-//												 │
-//										  SetDisconnected()
-//												 │
-//												 ▼
-//										   [DISCONNECTED]
+// State transitions:
+// RESERVED -> RELEASING_BY_ABORT_RESERVED (abort or disconnect)
+// RESERVED -> CONNECTED -> RELEASING
+// Both release states -> DISCONNECTED
 // ============================================================
 
 class SessionStateMachineTest : public ::testing::Test
@@ -101,7 +87,7 @@ TEST_F(SessionStateMachineTest, TryTransitionToReleasing_FromReserved_Succeeds)
 	const bool result = sm.TryTransitionToReleasing();
 
 	EXPECT_TRUE(result);
-	EXPECT_EQ(sm.GetSessionState(), SESSION_STATE::RELEASING);
+	EXPECT_EQ(sm.GetSessionState(), SESSION_STATE::RELEASING_BY_ABORT_RESERVED);
 	EXPECT_TRUE(sm.IsReleasing());
 	EXPECT_FALSE(sm.IsUsingSession());
 }
@@ -129,6 +115,7 @@ TEST_F(SessionStateMachineTest, TryTransitionToReleasing_FromDisconnected_Fails)
 TEST_F(SessionStateMachineTest, TryTransitionToReleasing_AlreadyReleasing_Fails)
 {
 	sm.SetReserved();
+	ASSERT_TRUE(sm.TryTransitionToConnected());
 	std::ignore = sm.TryTransitionToReleasing();
 
 	const bool result = sm.TryTransitionToReleasing();
@@ -147,7 +134,41 @@ TEST_F(SessionStateMachineTest, TryAbortReserved_FromReserved_Succeeds)
 	const bool result = sm.TryAbortReserved();
 
 	EXPECT_TRUE(result);
-	EXPECT_EQ(sm.GetSessionState(), SESSION_STATE::RELEASING);
+	EXPECT_EQ(sm.GetSessionState(), SESSION_STATE::RELEASING_BY_ABORT_RESERVED);
+}
+
+TEST_F(SessionStateMachineTest, ReservedReleaseRejectsConnectionAndRepeatedRelease)
+{
+	sm.SetReserved();
+	ASSERT_TRUE(sm.TryTransitionToReleasing());
+	EXPECT_TRUE(sm.IsReleasing());
+	EXPECT_FALSE(sm.IsUsingSession());
+	EXPECT_FALSE(sm.IsReserved());
+	EXPECT_FALSE(sm.IsConnected());
+	EXPECT_FALSE(sm.TryTransitionToConnected());
+	EXPECT_FALSE(sm.TryTransitionToReleasing());
+	EXPECT_FALSE(sm.TryAbortReserved());
+	EXPECT_EQ(sm.GetSessionState(), SESSION_STATE::RELEASING_BY_ABORT_RESERVED);
+}
+
+TEST(SessionStateMachineConcurrencyTest, ReleaseStateReflectsWinningConnectionTransition)
+{
+	for (int iteration = 0; iteration < 100; ++iteration)
+	{
+		SessionStateMachine stateMachine;
+		stateMachine.SetReserved();
+		std::barrier start(3);
+		bool connected = false;
+		bool released = false;
+		std::jthread connector([&]() { start.arrive_and_wait(); connected = stateMachine.TryTransitionToConnected(); });
+		std::jthread releaser([&]() { start.arrive_and_wait(); released = stateMachine.TryTransitionToReleasing(); });
+		start.arrive_and_wait();
+		connector.join();
+		releaser.join();
+		ASSERT_TRUE(released);
+		EXPECT_EQ(stateMachine.GetSessionState(), connected ? SESSION_STATE::RELEASING :
+			SESSION_STATE::RELEASING_BY_ABORT_RESERVED);
+	}
 }
 
 TEST_F(SessionStateMachineTest, TryAbortReserved_FromConnected_Fails)

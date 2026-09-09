@@ -85,7 +85,9 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		return false;
 	}
 
-	if (sessionList[sessionId]->GetSessionState() != SESSION_STATE::RELEASING)
+	const auto sessionState = sessionList[sessionId]->GetSessionState();
+	if (sessionState != SESSION_STATE::RELEASING &&
+		sessionState != SESSION_STATE::RELEASING_BY_ABORT_RESERVED)
 	{
 		LOG_ERROR("Session is not in RELEASING state in ReleaseSession");
 		return false;
@@ -105,7 +107,11 @@ bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
 		unusedSessionIdSet.emplace(sessionId);
 	}
 
-	DecrementConnectedCount(disconnectedReason);
+	if (sessionState == SESSION_STATE::RELEASING)
+	{
+		DecrementConnectedCount(disconnectedReason);
+	}
+
 	return true;
 }
 

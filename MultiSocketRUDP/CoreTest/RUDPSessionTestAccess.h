@@ -107,7 +107,7 @@ public:
 
 	static void SetReleasing(RUDPSession& session)
 	{
-		session.stateMachine.SetReserved();
+		SetConnected(session);
 		std::ignore = session.stateMachine.TryTransitionToReleasing();
 	}
 

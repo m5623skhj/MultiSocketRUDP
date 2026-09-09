@@ -18,7 +18,8 @@ bool SessionStateMachine::IsReserved() const noexcept
 
 bool SessionStateMachine::IsReleasing() const noexcept
 {
-	return state.load(std::memory_order_acquire) == SESSION_STATE::RELEASING;
+	const auto currentState = state.load(std::memory_order_acquire);
+	return currentState == SESSION_STATE::RELEASING || currentState == SESSION_STATE::RELEASING_BY_ABORT_RESERVED;
 }
 
 bool SessionStateMachine::IsUsingSession() const noexcept
@@ -44,7 +45,7 @@ bool SessionStateMachine::TryTransitionToConnected() noexcept
 bool SessionStateMachine::TryTransitionToReleasing() noexcept
 {
 	if (auto expectReserved = SESSION_STATE::RESERVED; state.compare_exchange_strong(expectReserved
-	                                                                                 , SESSION_STATE::RELEASING
+	                                                                                 , SESSION_STATE::RELEASING_BY_ABORT_RESERVED
 	                                                                                 , std::memory_order_acq_rel
 	                                                                                 , std::memory_order_acquire))
 	{
@@ -62,7 +63,7 @@ bool SessionStateMachine::TryAbortReserved() noexcept
 {
 	auto expected = SESSION_STATE::RESERVED;
 	return state.compare_exchange_strong(expected
-		, SESSION_STATE::RELEASING
+		, SESSION_STATE::RELEASING_BY_ABORT_RESERVED
 		, std::memory_order_acq_rel 
 		, std::memory_order_acquire);
 }
