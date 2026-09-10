@@ -26,10 +26,19 @@ TLS 설정은 `ServerCertificateConfig`로 전달된다.
 2. 워커 thread pool 4개 시작
 3. `sessionBrokerThread` 시작
 4. `accept()`로 들어온 클라이언트를 큐에 적재
-5. 워커가 `HandleClientConnection(...)` 처리
+5. 워커가 `HandleClientConnection(clientSocket, rudpSessionIP, stopToken)` 처리
 
----
+#### `HandleClientConnection`
 
+```cpp
+void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP, const std::stop_token& stopToken);
+```
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `clientSocket` | `SOCKET` | 연결된 클라이언트 소켓 |
+| `rudpSessionIP` | `const std::string&` | 세션의 IP 주소 |
+| `stopToken` | `const std::stop_token&` | 스레드 중단 제어를 위한 토큰 |
 ## 클라이언트 처리
 
 각 연결은 worker thread에서 아래 흐름으로 처리한다.
