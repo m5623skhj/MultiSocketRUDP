@@ -10,13 +10,13 @@
 ## 목차
 
 1. [클래스 계층 구조](#1-클래스-계층-구조)
-2. [서버 초기화 — TLSHelperServer::Initialize](#2-서버-초기화--tlshelperserverinitialize)
-3. [클라이언트 초기화 — TLSHelperClient::Initialize](#3-클라이언트-초기화--tlshelperclientinitialize)
-4. [서버 핸드셰이크 — AcceptSecurityContext](#4-서버-핸드셰이크--acceptsecuritycontext)
-5. [클라이언트 핸드셰이크 — InitializeSecurityContext](#5-클라이언트-핸드셰이크--initializesecuritycontext)
-6. [데이터 암호화 — EncryptData](#6-데이터-암호화--encryptdata)
-7. [데이터 복호화 — DecryptDataStream](#7-데이터-복호화--decryptdatastream)
-8. [close_notify 전송 — EncryptCloseNotify](#8-close_notify-전송--encryptclosenotify)
+2. [서버 초기화 — `TLSHelperServer::Initialize`](#2-서버-초기화-tlshelperserverinitialize)
+3. [클라이언트 초기화 — `TLSHelperClient::Initialize`](#3-클라이언트-초기화-tlshelperclientinitialize)
+4. [서버 핸드셰이크 — `AcceptSecurityContext` 루프](#4-서버-핸드셰이크-acceptsecuritycontext-루프)
+5. [클라이언트 핸드셰이크 — `InitializeSecurityContext` 루프](#5-클라이언트-핸드셰이크-initializesecuritycontext-루프)
+6. [데이터 암호화 — `EncryptData`](#6-데이터-암호화-encryptdata)
+7. [데이터 복호화 — `DecryptDataStream`](#7-데이터-복호화-decryptdatastream)
+8. [close_notify 전송 — `EncryptCloseNotify`](#8-close_notify-전송-encryptclosenotify)
 9. [TlsDecryptResult 열거형](#9-tlsdecryptresult-열거형)
 10. [인증서 관리](#10-인증서-관리)
 11. [개발 환경 자체 서명 인증서 설정](#11-개발-환경-자체-서명-인증서-설정)
@@ -587,9 +587,22 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 #### `bool Initialize()`
 - 클라이언트용 Schannel 자격 증명을 초기화한다.
 
-#### `bool Handshake(SOCKET socket)`
-- `InitializeSecurityContext` 기반 TLS 핸드셰이크를 수행한다.
+### `Handshake`
 
+```cpp
+virtual bool Handshake(SOCKET socket) = 0;
+```
+
+`InitializeSecurityContext` 기반 TLS 핸드셰이크를 수행한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `socket` | `SOCKET` | 핸드셰이크를 수행할 소켓 핸들 |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 핸드셰이크 성공 |
+| `false` | 핸드셰이크 실패 |
 ### `TLSHelperServer`
 
 #### `TLSHelperServer(ServerCertificateConfig inCertificateConfig)`
@@ -598,9 +611,13 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 #### `bool Initialize()`
 - 생성자에서 받은 인증서 정보를 사용해 서버용 Schannel 자격 증명을 초기화한다.
 
-#### `bool Handshake(SOCKET socket)`
-- `AcceptSecurityContext` 기반 서버 TLS 핸드셰이크를 수행한다.
+### `Handshake`
 
+```cpp
+virtual bool Handshake(SOCKET socket) = 0;
+```
+
+`AcceptSecurityContext` 기반 서버 TLS 핸드셰이크를 수행한다.
 ### 정정 메모
 
 - 현재 `TlsDecryptResult` 값은 `None`, `PlainData`, `CloseNotify`, `Error`다.
