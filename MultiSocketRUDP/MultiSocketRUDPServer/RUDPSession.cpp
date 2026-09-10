@@ -133,13 +133,13 @@ bool RUDPSession::SendPacket(IPacket& packet)
 		return false;
 	}
 
-	PACKET_TYPE packetType = PACKET_TYPE::SEND_TYPE;
-	const PacketSequence packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
+	// Reserve the protocol fields without assigning a sequence before user serialization.
+	constexpr int SEND_HEADER_SIZE = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
+	buffer->MoveWritePos(SEND_HEADER_SIZE);
 	const PacketId packetId = packet.GetPacketId();
-	*buffer << packetType << packetSequence << packetId;
 	packet.PacketToBuffer(*buffer);
 
-	if (not SendPacket(*buffer, packetSequence, false, false))
+	if (not SendPacket(*buffer, packetId))
 	{
 		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return false;
@@ -192,15 +192,22 @@ void RUDPSession::OnConnected(const SessionIdType inSessionId)
 	OnConnected();
 }
 
-bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacketSequence, const bool isReplyType, const bool isCorePacket)
+bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketId packetId)
 {
-	if (not isReplyType)
+	PacketSequence packetSequence;
 	{
 		std::scoped_lock lock(rioContext.GetSendContext().GetPendingQueueLock());
+		// Sequence allocation and FIFO admission must have the same order.
+		packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
+		// Fill the reserved fields, then restore the end of the serialized body.
+		buffer.MoveWritePosThisPos(0);
+		auto packetType = PACKET_TYPE::SEND_TYPE;
+		buffer << packetType << packetSequence << packetId;
+		buffer.MoveWritePosBeforeCallThisPos();
 
-		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(inSendPacketSequence))
+		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(packetSequence))
 		{
-			if (not rioContext.GetSendContext().PushToPendingQueue(inSendPacketSequence, &buffer))
+			if (not rioContext.GetSendContext().PushToPendingQueue(packetSequence, &buffer))
 			{
 				LOG_ERROR("Pending queue is full in RUDPSession::SendPacket()");
 				NetBuffer::Free(&buffer);
@@ -211,7 +218,7 @@ bool RUDPSession::SendPacket(NetBuffer& buffer, const PacketSequence inSendPacke
 		}
 	}
 
-	return SendPacketImmediate(buffer, inSendPacketSequence, isReplyType, isCorePacket);
+	return SendPacketImmediate(buffer, packetSequence, false, false);
 }
 
 bool RUDPSession::SendPacketImmediate(
@@ -325,11 +332,6 @@ void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 		return;
 	}
 
-	if (const PacketSequence nextSequence = rioContext.GetSendContext().GetLastSendPacketSequence() + 1; not flowManager.CanSend(nextSequence))
-	{
-		return;
-	}
-
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -338,11 +340,21 @@ void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 		return;
 	}
 
-	auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
-	const PacketSequence packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
-	*buffer << packetType << packetSequence;
+	PacketSequence packetSequence;
+	{
+		std::scoped_lock lock(rioContext.GetSendContext().GetPendingQueueLock());
+		const auto nextSequence = rioContext.GetSendContext().GetLastSendPacketSequence() + 1;
+		if (not rioContext.GetSendContext().IsPendingQueueEmpty() || not flowManager.CanSend(nextSequence))
+		{
+			NetBuffer::Free(buffer);
+			return;
+		}
+		packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
+		auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
+		*buffer << packetType << packetSequence;
+	}
 
-	if (not SendPacket(*buffer, packetSequence, false, true))
+	if (not SendPacketImmediate(*buffer, packetSequence, false, true))
 	{
 		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}
@@ -606,7 +618,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	const BYTE advertiseWindow = flowManager.GetAdvertisableWindow();
 	*buffer << packetType << recvPacketSequence << advertiseWindow;
 
-	if (not SendPacket(*buffer, recvPacketSequence, true, true))
+	if (not SendPacketImmediate(*buffer, recvPacketSequence, true, true))
 	{
 		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 	}

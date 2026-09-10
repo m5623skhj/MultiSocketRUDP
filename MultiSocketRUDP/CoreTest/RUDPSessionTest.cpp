@@ -89,7 +89,29 @@ namespace
 	};
 }
 
-class SessionSendLifecycleTest : public ::testing::Test
+namespace
+{
+	class SendOrderTestCore final : public MultiSocketRUDPCore
+	{
+	public:
+		SendOrderTestCore() : MultiSocketRUDPCore(L"", L"") {}
+		bool SendPacket(SendPacketInfo* info) const override
+		{
+			PacketSequence wireSequence{};
+			// Encoding positions the read cursor at the wire header.
+			memcpy(&wireSequence, info->buffer->GetReadBufferPtr() + df_HEADER_SIZE + sizeof(PACKET_TYPE), sizeof(wireSequence));
+			EXPECT_EQ(wireSequence, info->sendPacketSequence);
+			std::scoped_lock lock(sentLock);
+			sentSequences.push_back(wireSequence);
+			return true;
+		}
+		mutable std::mutex sentLock;
+		mutable std::vector<PacketSequence> sentSequences;
+	};
+}
+
+template<typename Core>
+class SessionSendTestBase : public ::testing::Test
 {
 protected:
 	void SetUp() override
@@ -120,10 +142,128 @@ protected:
 		}
 	}
 
-	MultiSocketRUDPCore core{ L"", L"" };
+	Core core;
 	LifecycleHookTestSession session{ core };
 	bool releaseInitialized{};
 };
+
+// Preserve the lifecycle tests' real failing I/O path; order tests capture successful sends.
+class LifecycleTestCore : public MultiSocketRUDPCore
+{
+public:
+	LifecycleTestCore() : MultiSocketRUDPCore(L"", L"") {}
+};
+using SessionSendLifecycleTest = SessionSendTestBase<LifecycleTestCore>;
+using SessionSendOrderTest = SessionSendTestBase<SendOrderTestCore>;
+
+TEST_F(SessionSendOrderTest, PausedSerializersCannotTrapSendablePacketsBehindWindow)
+{
+	RUDPSessionBehaviorAccess::GetSendContext(session).InitializePendingQueue(8);
+	std::counting_semaphore<4> entered{ 0 };
+	std::counting_semaphore<4> resume{ 0 };
+	std::vector<std::jthread> senders;
+	for (int i = 0; i < 4; ++i)
+	{
+		senders.emplace_back([&]()
+			{
+				CallbackPacket packet([&](NetBuffer& buffer)
+					{
+						buffer << BYTE{ 42 };
+						entered.release();
+						resume.acquire();
+					});
+				EXPECT_TRUE(session.SendPacket(packet));
+			});
+	}
+	for (int i = 0; i < 4; ++i)
+	{
+		entered.acquire();
+	}
+	NoOpPacket fastPacket;
+	EXPECT_TRUE(session.SendPacket(fastPacket));
+	resume.release(4);
+	senders.clear();
+	EXPECT_EQ(core.sentSequences.size(), 4u);
+	auto& sendContext = RUDPSessionBehaviorAccess::GetSendContext(session);
+	ASSERT_FALSE(sendContext.IsPendingQueueEmpty());
+	EXPECT_EQ(sendContext.PendingQueueFront().first, 5u);
+
+	// ACK of a genuinely transmitted packet must release the remaining queued packet.
+	MultiSocketRUDPCoreTestAccess::InitializeRetransmission(core, 2);
+	NetBuffer ack;
+	ack << PacketSequence{ 1 };
+	RUDPSessionBehaviorAccess::OnSendReply(session, ack);
+	EXPECT_TRUE(sendContext.IsPendingQueueEmpty());
+	EXPECT_EQ(core.sentSequences.size(), 5u);
+}
+
+TEST_F(SessionSendOrderTest, HeartbeatSharesSequenceAdmissionWithContent)
+{
+	CallbackPacket packet([&](NetBuffer& buffer)
+		{
+			buffer << BYTE{ 42 };
+			RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 10000);
+		});
+	EXPECT_TRUE(session.SendPacket(packet));
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ 1, 2 }));
+}
+
+TEST_F(SessionSendOrderTest, SerializationCanReenterSendWithoutHoldingAdmissionLock)
+{
+	CallbackPacket packet([&](NetBuffer& buffer)
+		{
+			buffer << BYTE{ 42 };
+			NoOpPacket nested;
+			EXPECT_TRUE(session.SendPacket(nested));
+		});
+	EXPECT_TRUE(session.SendPacket(packet));
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ 1, 2 }));
+}
+
+TEST_F(SessionSendOrderTest, ContentHeaderPreservesSerializedBodyAndWritePosition)
+{
+	auto& sendContext = RUDPSessionBehaviorAccess::GetSendContext(session);
+	for (int i = 0; i < 4; ++i)
+	{
+		std::ignore = sendContext.IncrementLastSendPacketSequence();
+	}
+	CallbackPacket packet([](NetBuffer& buffer) { buffer << BYTE{ 42 } << UINT{ 123456 }; });
+	ASSERT_TRUE(session.SendPacket(packet));
+	ASSERT_FALSE(sendContext.IsPendingQueueEmpty());
+	const auto& [queuedSequence, buffer] = sendContext.PendingQueueFront();
+	EXPECT_EQ(queuedSequence, 5u);
+	EXPECT_EQ(buffer->GetUseSize(), sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId) + sizeof(BYTE) + sizeof(UINT));
+	PACKET_TYPE type{};
+	PacketSequence sequence{};
+	PacketId packetId{};
+	BYTE byteValue{};
+	UINT intValue{};
+	*buffer >> type >> sequence >> packetId >> byteValue >> intValue;
+	EXPECT_EQ(type, PACKET_TYPE::SEND_TYPE);
+	EXPECT_EQ(sequence, queuedSequence);
+	EXPECT_EQ(packetId, packet.GetPacketId());
+	EXPECT_EQ(byteValue, 42);
+	EXPECT_EQ(intValue, 123456u);
+	EXPECT_EQ(buffer->GetUseSize(), 0);
+}
+
+TEST_F(SessionSendOrderTest, ReplyUsesReceivedSequenceWithoutAllocatingOrFlushingContent)
+{
+	auto& sendContext = RUDPSessionBehaviorAccess::GetSendContext(session);
+	for (int i = 0; i < 4; ++i)
+	{
+		std::ignore = sendContext.IncrementLastSendPacketSequence();
+	}
+	NoOpPacket packet;
+	ASSERT_TRUE(session.SendPacket(packet));
+	RUDPSessionBehaviorAccess::SendHeartbeatPacket(session, 10000);
+	EXPECT_TRUE(core.sentSequences.empty());
+	RUDPSessionBehaviorAccess::SendReplyToClient(session, 123);
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ 123 }));
+	EXPECT_EQ(sendContext.GetLastSendPacketSequence(), 5u);
+	ASSERT_FALSE(sendContext.IsPendingQueueEmpty());
+	EXPECT_EQ(sendContext.PendingQueueFront().first, 5u);
+}
 
 // Stop a real public send before encryption; release must wait even without posted send I/O.
 TEST_F(SessionSendLifecycleTest, DisconnectWaitsForPausedSerializationAndRemainingIo)
