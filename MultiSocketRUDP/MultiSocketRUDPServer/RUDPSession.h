@@ -72,7 +72,8 @@ private:
 	virtual void OnDisconnected() {}
 	virtual void OnReleased() {}
 	[[nodiscard]]
-	bool SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	// The body is serialized after reserved protocol fields; fill them during FIFO admission.
+	bool SendPacket(NetBuffer& buffer, PacketId packetId);
 	// ----------------------------------------
 	// @brief 흐름 제어 보류 큐를 거치지 않고 송신 정보를 코어의 RIO 송신 경로에 등록합니다.
 	// @param buffer 전송할 NetBuffer.
