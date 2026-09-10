@@ -1178,6 +1178,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "d5186d0cd98035b5751f9b62aabd54472bcf0c86",
+      "commitSubject": "* 동시 송신 시 시퀀스 발급 순서를 보장하고 패킷 헤더 구성 경로 분리   * 사용자 직렬화 이후 대기열 락 안에서 시퀀스 발급과 FIFO 등록 여부 결정   * 일반 패킷의 헤더 공간을 확보하고 packetId를 받는 송신 함수에서 헤더 완성   * 하트비트와 ACK 송신 경로를 분리하고 임시 시퀀스 및 덮어쓰기 제거   * 동시 송신 정체, 재진입, 하트비트, 본문 보존 및 ACK 회귀 테스트 추가",
+      "recordedAtUtc": "2026-09-10T15:51:13.951849+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "Intel64 Family 6 Model 207 Stepping 2, GenuineIntel",
+        "runnerName": "GitHub Actions 1000001104",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.12575619999999998,
+            "medianMinRttMs": 0.0839,
+            "medianP50RttMs": 0.1208,
+            "medianP95RttMs": 0.167,
+            "medianP99RttMs": 0.2087,
+            "medianMaxRttMs": 1.7196,
+            "worstMaxRttMs": 7.4716,
+            "medianElapsedSeconds": 0.1332101,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.9278644,
+            "medianMinRttMs": 0.0459,
+            "medianP50RttMs": 0.1201,
+            "medianP95RttMs": 32.4347,
+            "medianP99RttMs": 64.2527,
+            "medianMaxRttMs": 200.887,
+            "worstMaxRttMs": 225.2753,
+            "medianElapsedSeconds": 5.9319825,
+            "totalRetransmissionSuspectedCount": 174
+          }
+        }
+      ]
     }
   ]
 }
