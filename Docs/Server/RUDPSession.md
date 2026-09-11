@@ -43,6 +43,16 @@ RegisterPacketHandler<Player, Ping>(
 bool SendPacket(IPacket& packet);
 ```
 
+패킷을 송신 큐에 추가하여 전송을 요청한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `packet` | `IPacket&` | 송신할 패킷 객체 |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 송신 작업 성공 |
+| `false` | 세션이 연결되지 않았거나 큐가 가득 참 |
 ### 연결 종료 요청
 
 ```cpp
@@ -104,6 +114,23 @@ void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(c
 | `func` | 패킷 처리 멤버 함수 포인터 |
 
 > **주의:** `PacketType`은 반드시 `IPacket`을 상속받아야 한다.
+
+## SendPacket
+
+```cpp
+bool SendPacket(IPacket& packet);
+```
+
+세션을 통해 패킷을 전송한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `packet` | `IPacket&` | 전송할 패킷 객체 |
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 패킷 전송 성공 |
+| `false` | 세션이 연결되지 않았거나 전송 실패 |
 
 ## 최소 예시
 
