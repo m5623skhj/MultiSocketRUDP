@@ -772,6 +772,70 @@ TEST_F(RUDPIOHandlerTest, DoSend_DataPacketBuildsStreamSchedulesRetransmissionAn
 	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
 }
 
+TEST_F(RUDPIOHandlerTest, DoSend_ErasedPacketDoesNotPostStaleBufferContents)
+{
+	SetupValidSendPath();
+	memset(mockDelegate.dummySendBuffer, 0x5A, sizeof(mockDelegate.dummySendBuffer));
+	SendPacketInfo* erased = AllocSerializedSendPacketInfo(9);
+	ASSERT_NE(erased, nullptr);
+	erased->AddRefCount();
+	std::unique_ptr<SendPacketInfo, decltype(&SendPacketInfo::Free)> retained(erased, &SendPacketInfo::Free);
+	mockDelegate.queuedSendPacketInfos.push_back(erased);
+	// Model an ACK arriving after retransmission was queued, before stream assembly.
+	erased->isErasedPacketInfo.store(true, std::memory_order_release);
+
+	EXPECT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	EXPECT_EQ(mockRIO.lastSendLength, 0u);
+	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
+	EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
+	EXPECT_TRUE(retransmissionSchedulers[THREAD_ID]->heap.empty());
+	EXPECT_EQ(erased->refCount.load(), 1);
+	EXPECT_EQ(mockDelegate.dummySendBuffer[0], 0x5A);
+	if (mockRIO.lastSendRequestContext != nullptr)
+	{
+		CompleteOutstandingSend();
+	}
+}
+
+TEST_F(RUDPIOHandlerTest, DoSend_ErasedPacketLeavesNoGapOrTrailingBytesInPostedStream)
+{
+	// Exercise cancellation at the beginning, middle, and end of a batch.
+	for (int erasedIndex = 0; erasedIndex < 3; ++erasedIndex)
+	{
+		SCOPED_TRACE(erasedIndex);
+		SetupValidSendPath();
+		mockRIO.ResetCounts();
+		memset(mockDelegate.dummySendBuffer, 0x5A, sizeof(mockDelegate.dummySendBuffer));
+		std::vector<char> expected;
+		for (int index = 0; index < 3; ++index)
+		{
+			SendPacketInfo* info = AllocSerializedSendPacketInfo(20 + erasedIndex * 3 + index);
+			ASSERT_NE(info, nullptr);
+			mockDelegate.queuedSendPacketInfos.push_back(info);
+			if (index == erasedIndex)
+			{
+				info->isErasedPacketInfo.store(true, std::memory_order_release);
+			}
+			else
+			{
+				const char* data = info->buffer->GetReadBufferPtr();
+				expected.insert(expected.end(), data, data + df_HEADER_SIZE + 1);
+			}
+		}
+
+		const auto scheduledBefore = retransmissionSchedulers[THREAD_ID]->heap.size();
+		ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+		EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
+		EXPECT_EQ(mockRIO.lastSendLength, expected.size());
+		EXPECT_EQ(memcmp(mockDelegate.dummySendBuffer, expected.data(), expected.size()), 0);
+		EXPECT_EQ(mockDelegate.dummySendBuffer[expected.size()], 0x5A);
+		EXPECT_EQ(retransmissionSchedulers[THREAD_ID]->heap.size(), scheduledBefore + 2);
+		EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
+		CompleteOutstandingSend();
+	}
+}
+
 // ------------------------------------------------------------
 // 응답 패킷이 재전송 스케줄에는 등록되지 않고 RIO 송신만 수행하는지 확인합니다.
 // ------------------------------------------------------------
