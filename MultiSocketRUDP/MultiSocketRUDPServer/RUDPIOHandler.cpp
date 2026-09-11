@@ -1,4 +1,4 @@
-﻿#include "PreCompile.h"
+#include "PreCompile.h"
 #include "RUDPIOHandler.h"
 #include "RIOManager.h"
 #include "RUDPSession.h"
@@ -512,12 +512,12 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL;
 	}
 
-	totalSendSize += useSize;
 	if (not RefreshRetransmissionSendPacketInfo(sendPacketInfo, threadId))
 	{
 		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_ERASED_PACKET;
 	}
+	totalSendSize += useSize;
 
 	packetSequenceSet.insert(key);
 	memcpy_s(&sessionDelegate.GetRIOSendBuffer(session)[beforeSendSize]
