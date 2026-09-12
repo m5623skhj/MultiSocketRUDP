@@ -66,6 +66,11 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 		simulatedPacketLossSeed = 0;
 	}
 	
+	int queueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
+	g_Paser.GetValue_Int(buffer, L"CORE", L"UNRELIABLE_QUEUE_CAPACITY", &queueCapacity);
+	if (queueCapacity < 1 || queueCapacity > 65535) return false;
+	unreliableQueueCapacity = static_cast<unsigned int>(queueCapacity);
+
 	// buffer
 	if (g_Paser.GetValue_Byte(buffer, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode) == false)
 	{

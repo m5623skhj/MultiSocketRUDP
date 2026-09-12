@@ -157,6 +157,7 @@ TEST_F(CoreOptionParserTest, ValidOptionsPopulateEveryServerSetting)
 	EXPECT_EQ(core.GetInitialRetransmissionMs(), 30u);
 	EXPECT_EQ(core.GetMinRetransmissionMs(), 16u);
 	EXPECT_EQ(core.GetMaxRetransmissionMs(), 100u);
+	EXPECT_EQ(core.GetUnreliableQueueCapacity(), DEFAULT_UNRELIABLE_QUEUE_CAPACITY);
 	EXPECT_EQ(core.GetHeartbeatThreadSleepMs(), 100u);
 	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetTimerTickMs(core), 20u);
 	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetMaximumHoldingQueueSize(core), 16);
@@ -184,6 +185,20 @@ TEST_F(CoreOptionParserTest, MissingOptionalRtoBoundsUseInitialRtoAndLossOptions
 }
 
 // 최소·최대 RTO 중 하나만 지정한 불완전한 설정을 거부하는지 확인합니다.
+TEST_F(CoreOptionParserTest, UnreliableQueueCapacityAcceptsPositivePacketCountsOnly)
+{
+	for (const int capacity : { -1, 0, 1, 3, 65535, 65536 })
+	{
+		SCOPED_TRACE(capacity);
+		MultiSocketRUDPCore core{ L"", L"" };
+		auto options = MakeCoreOptions();
+		options.insert(options.find(L'{') + 1, L"\n\tUNRELIABLE_QUEUE_CAPACITY = " + std::to_wstring(capacity) + L"\n");
+		const bool valid = capacity >= 1 && capacity <= 65535;
+		EXPECT_EQ(Parse(core, options, MakeBrokerOptions()), valid);
+		if (valid) EXPECT_EQ(core.GetUnreliableQueueCapacity(), capacity);
+	}
+}
+
 TEST_F(CoreOptionParserTest, OnlyOneOptionalRtoBoundIsRejected)
 {
 	MultiSocketRUDPCore missingMaximum{ L"", L"" };

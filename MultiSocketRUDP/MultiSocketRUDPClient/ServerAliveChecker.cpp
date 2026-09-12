@@ -4,15 +4,16 @@
 #include "Logger.h"
 #include "RUDPClientCore.h"
 
-ServerAliveChecker::ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<PacketSequence()>& inGetNextRecvSequenceFunction)
+ServerAliveChecker::ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<uint64_t()>& inGetReceiveCountFunction)
 	: coreStopFunction(inCoreStopFunction)
-	, getNextRecvSequenceFunction(inGetNextRecvSequenceFunction)
+	, getReceiveCountFunction(inGetReceiveCountFunction)
 {
 }
 
 void ServerAliveChecker::StartServerAliveCheck(const unsigned int inCheckIntervalMs)
 {
 	checkIntervalMs = inCheckIntervalMs;
+	beforeCheckReceiveCount = getReceiveCountFunction();
 	isStopped.store(false, std::memory_order_release);
 	serverAliveCheckThread = std::jthread(&ServerAliveChecker::RunServerAliveCheckerThread, this);
 }
@@ -39,14 +40,14 @@ void ServerAliveChecker::StopServerAliveCheck()
 	}
 }
 
-bool ServerAliveChecker::IsServerAlive(const PacketSequence nowPacketSequence)
+bool ServerAliveChecker::IsServerAlive(const uint64_t receiveCount)
 {
-	if (nowPacketSequence == beforeCheckSequence)
+	if (receiveCount == beforeCheckReceiveCount)
 	{
 		return false;
 	}
 
-	beforeCheckSequence = nowPacketSequence;
+	beforeCheckReceiveCount = receiveCount;
 	return true;
 }
 
@@ -60,7 +61,7 @@ void ServerAliveChecker::RunServerAliveCheckerThread()
 			break;
 		}
 
-		if (not IsServerAlive(getNextRecvSequenceFunction()))
+		if (not IsServerAlive(getReceiveCountFunction()))
 		{
 			const auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = "Server is not alive";

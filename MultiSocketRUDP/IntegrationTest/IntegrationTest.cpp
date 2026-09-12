@@ -273,7 +273,14 @@ namespace
 
 			TestStringPacketRes response;
 			response.echoString = packet.testString;
-			EXPECT_TRUE(SendPacket(response));
+			if (packet.testString.starts_with("unreliable:"))
+			{
+				EXPECT_TRUE(SendUnreliablePacket(response));
+			}
+			else
+			{
+				EXPECT_TRUE(SendPacket(response));
+			}
 		}
 
 		void OnTestPacketReq(const TestPacketReq& packet)
@@ -651,6 +658,15 @@ namespace
 			return send(clientSocket, HEADER, sizeof(HEADER), 0) == sizeof(HEADER);
 		}
 
+		bool CompleteTlsAndSendVersion(const std::optional<uint32_t> version) const
+		{
+			TLSHelper::TLSHelperClient tls;
+			const DWORD timeoutMs = 6000;
+			setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeoutMs), sizeof(timeoutMs));
+			return tls.Initialize() && tls.Handshake(clientSocket) &&
+				(not version.has_value() || tls.SendProtocolVersion(clientSocket, *version));
+		}
+
 		bool WaitForClose(const long timeoutSeconds) const
 		{
 			fd_set readable{};
@@ -677,6 +693,23 @@ namespace
 	private:
 		SOCKET clientSocket = INVALID_SOCKET;
 	};
+
+	TEST_F(IntegrationFixture, UnsupportedProtocolVersionDoesNotReserveSession)
+	{
+		const auto unusedBefore = server->GetUnusedSessionCount();
+		IdleBrokerConnection client;
+		ASSERT_TRUE(client.Connect(optionFiles->brokerPort));
+		ASSERT_TRUE(client.CompleteTlsAndSendVersion(RUDP_PROTOCOL_VERSION - 1));
+		EXPECT_TRUE(client.WaitForClose(3));
+		EXPECT_EQ(server->GetUnusedSessionCount(), unusedBefore);
+		EXPECT_EQ(server->GetAllConnectedCount(), 0);
+		EXPECT_EQ(GetSessionStats().connectedCount.load(), 0);
+		IdleBrokerConnection legacyClient;
+		ASSERT_TRUE(legacyClient.Connect(optionFiles->brokerPort));
+		ASSERT_TRUE(legacyClient.CompleteTlsAndSendVersion(std::nullopt));
+		EXPECT_TRUE(legacyClient.WaitForClose(7));
+		EXPECT_EQ(server->GetUnusedSessionCount(), unusedBefore);
+	}
 
 	TEST_F(IntegrationFixture, IdleAndIncompleteTlsConnectionsTimeOutAndWorkersAcceptNewClients)
 	{
@@ -877,6 +910,28 @@ namespace
 
 		EXPECT_TRUE(result.completed);
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, UnreliableOnlyTrafficKeepsClientAliveWithoutReliableConsumption)
+	{
+		const auto coreOptions = optionFiles->clientSessionGetterOptionPath.wstring() + L".core.txt";
+		ASSERT_TRUE(WriteUtf16TextFile(coreOptions,
+			L":CORE\n{\nMAX_PACKET_RETRANSMISSION_COUNT = 3\nRETRANSMISSION_MS = 50\n"
+			L"SERVER_ALIVE_CHECK_MS = 500\nUNRELIABLE_QUEUE_CAPACITY = 64\n}\n"));
+		const auto result = RunClientScenario({ L"--scenario", L"unreliable-only",
+			L"--client-core-option", coreOptions }, 45s);
+		std::error_code error;
+		std::filesystem::remove(coreOptions, error);
+		EXPECT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, ReliableAndUnreliableChannelsRoundTripAndStop)
+	{
+		const auto result = RunClientScenario({ L"--scenario", L"mixed-channels" }, 45s);
+		ASSERT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u);
+		EXPECT_EQ(GetSessionStats().echoRequestCount.load(), 4);
 	}
 
 	TEST_F(IntegrationFixture, MultipleClientsConnectAndEchoConcurrently)

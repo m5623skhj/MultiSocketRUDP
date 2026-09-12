@@ -4,13 +4,13 @@
 namespace MultiSocketRUDP
 {
 	// ----------------------------------------
-	// @brief 송신 캐시에서 일반 패킷과 응답 패킷의 시퀀스를 함께 정렬하기 위한 키입니다.
-	// 일반 패킷(false)이 응답 패킷(true)보다 먼저 오고 같은 종류에서는 시퀀스 오름차순을 사용합니다.
+	// @brief 송신 캐시에서 채널·응답 여부·시퀀스를 구분합니다.
+	// 서로 다른 채널의 같은 시퀀스가 중복 패킷으로 제거되지 않도록 합니다.
 	// ----------------------------------------
 	struct PacketSequenceSetKey
 	{
-		PacketSequenceSetKey(const bool inIsReplyType, const PacketSequence inPacketSequence)
-			: isReplyType(inIsReplyType), packetSequence(inPacketSequence)
+		PacketSequenceSetKey(const bool inIsReplyType, const PacketSequence inPacketSequence, const bool inIsUnreliable = false)
+			: isReplyType(inIsReplyType), isUnreliable(inIsUnreliable), packetSequence(inPacketSequence)
 		{
 		}
 
@@ -19,6 +19,7 @@ namespace MultiSocketRUDP
 		// ----------------------------------------
 		bool operator<(const PacketSequenceSetKey& other) const
 		{
+			if (isUnreliable != other.isUnreliable) return isUnreliable < other.isUnreliable;
 			if (isReplyType != other.isReplyType)
 			{
 				return isReplyType < other.isReplyType;
@@ -28,6 +29,7 @@ namespace MultiSocketRUDP
 		}
 
 		bool isReplyType{};
+		bool isUnreliable{};
 		PacketSequence packetSequence{};
 	};
 }

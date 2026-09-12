@@ -232,8 +232,12 @@ bool CryptoHelper::FillNonce(
 		return false;
 	}
 
-	const unsigned char directionBits = static_cast<unsigned char>(direction) << 6;
-	outNonce[0] = directionBits | (sessionSalt[0] & 0x3F);
+	if (static_cast<unsigned char>(direction) > static_cast<unsigned char>(PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL))
+	{
+		return false;
+	}
+	const unsigned char directionBits = static_cast<unsigned char>(direction) << 5;
+	outNonce[0] = directionBits | (sessionSalt[0] & 0x1F);
 	outNonce[1] = sessionSalt[1];
 	outNonce[2] = sessionSalt[2];
 	outNonce[3] = sessionSalt[3];

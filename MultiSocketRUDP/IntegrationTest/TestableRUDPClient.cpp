@@ -53,6 +53,29 @@ public:
 		SendPacket(request);
 	}
 
+	bool SendUnreliableEchoRequestPacket(const std::string& text)
+	{
+		TestStringPacketReq request;
+		request.testString = text;
+		return SendUnreliablePacket(request);
+	}
+
+	bool WaitForUnreliableEcho(const std::string_view expectedText, const std::chrono::milliseconds timeout)
+	{
+		return WaitUntil(timeout, [&]()
+		{
+			auto* buffer = GetReceivedUnreliablePacket();
+			if (buffer == nullptr) return false;
+			PacketId packetId{};
+			*buffer >> packetId;
+			TestStringPacketRes response;
+			const bool isEcho = packetId == static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_RES);
+			if (isEcho) response.BufferToPacket(*buffer);
+			NetBuffer::Free(buffer);
+			return isEcho && response.echoString == expectedText;
+		});
+	}
+
 	void DisconnectClient()
 	{
 		Disconnect();
@@ -201,6 +224,11 @@ void TestableRUDPClient::StopClient()
 	impl->StopClient();
 }
 
+unsigned int TestableRUDPClient::GetPendingReliablePacketCount()
+{
+	return impl->GetRemainPacketSize();
+}
+
 void TestableRUDPClient::SetAutoReplyDataPackets(const bool shouldAutoReply)
 {
 	impl->SetAutoReplyDataPackets(shouldAutoReply);
@@ -214,6 +242,16 @@ void TestableRUDPClient::SendPingPacket()
 void TestableRUDPClient::SendEchoRequestPacket(const std::string& text)
 {
 	impl->SendEchoRequestPacket(text);
+}
+
+bool TestableRUDPClient::SendUnreliableEchoRequestPacket(const std::string& text)
+{
+	return impl->SendUnreliableEchoRequestPacket(text);
+}
+
+bool TestableRUDPClient::WaitForUnreliableEcho(const std::string_view expectedText, const std::chrono::milliseconds timeout)
+{
+	return impl->WaitForUnreliableEcho(expectedText, timeout);
 }
 
 void TestableRUDPClient::SendOrderedPacket(const int order)

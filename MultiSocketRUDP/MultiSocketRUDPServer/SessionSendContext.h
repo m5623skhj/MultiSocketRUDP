@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <queue>
+#include <deque>
 #include <map>
 #include <set>
 #include <mutex>
@@ -50,6 +51,8 @@ public:
 	// @brief 송신 상태·시퀀스와 예약·송신·보류 큐를 초기화합니다. ACK 대기 맵은 재사용 전에 별도로 비워야 합니다.
 	// ----------------------------------------
 	void Reset();
+	// Configure while drained, before any producers start.
+	void SetUnreliableQueueCapacity(size_t capacity) { unreliableQueueCapacity = capacity; }
 
 	// ----------------------------------------
 	// @brief 송신 패킷 큐가 비어있는지 확인합니다.
@@ -223,6 +226,9 @@ private:
 
 	std::mutex sendPacketInfoQueueLock;
 	std::queue<SendPacketInfo*> sendPacketInfoQueue;
+	std::deque<SendPacketInfo*> unreliableQueue;
+	size_t unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
+	bool preferUnreliable{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};
 	std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;

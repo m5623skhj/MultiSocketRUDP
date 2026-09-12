@@ -1,5 +1,7 @@
 # CryptoHelper
 
+> 아래 nonce 구성 예시는 v1 기준입니다. 현재 v2에서는 방향 3비트와 salt 5비트를 사용합니다. [현재 nonce 규칙](../UnreliableChannel.md)을 참고하세요.
+
 > **Windows BCrypt API를 래핑한 AES-GCM 저수준 암호화 헬퍼.**  
 > 스레드마다 algorithm provider를 가진 `CryptoHelper` 인스턴스를 유지한다.
 > 실제 암복호화는 호출자가 전달한 세션 `BCRYPT_KEY_HANDLE`을 사용한다.

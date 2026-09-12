@@ -209,6 +209,11 @@ void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::s
 			static_cast<unsigned long>(localTlsHelper.GetLastStatus())));
 		return;
 	}
+	if (not localTlsHelper.ReceiveProtocolVersion(clientSocket, RUDP_PROTOCOL_VERSION, stopToken))
+	{
+		LOG_ERROR("Unsupported or missing RUDP protocol version");
+		return;
+	}
 	NetBuffer sendBuffer;
 	sendBuffer.Init();
 
@@ -288,7 +293,7 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	}
 
 	sendBuffer.Init();
-	sendBuffer << connectResultCode;
+	sendBuffer << RUDP_PROTOCOL_VERSION << connectResultCode;
 	if (connectResultCode == CONNECT_RESULT_CODE::SUCCESS && session != nullptr)
 	{
 		SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);

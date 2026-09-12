@@ -11,6 +11,7 @@
 #include "SessionRIOContext.h"
 #include "SessionStateMachine.h"
 #include "RetransmissionTimeoutEstimator.h"
+#include "../Common/etc/LatestPacketSequence.h"
 
 namespace MultiSocketRUDP
 {
@@ -54,6 +55,9 @@ public:
 	// ----------------------------------------
 	void DoDisconnect(const DISCONNECT_REASON disconnectSession);
 	bool SendPacket(IPacket& packet);
+	// True means accepted locally, including replacement of the oldest unsent packet.
+	bool SendUnreliablePacket(IPacket& packet);
+	bool OnUnreliablePacket(NetBuffer& packet);
 
 	ThreadIdType GetThreadId() const;
 
@@ -84,7 +88,8 @@ private:
 	// @details 호출자는 TryBeginSendOperation으로 등록한 송신 작업을 유지해야 합니다.
 	// ----------------------------------------
 	[[nodiscard]]
-	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket);
+	bool SendPacketImmediate(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isReplyType, bool isCorePacket, bool isUnreliable = false);
+	bool DispatchContentPacket(NetBuffer& packet);
 	// ----------------------------------------
 	// @brief 플로우 제어에 의해 보류된 패킷들을 전송 가능한지 확인하고 전송을 시도합니다.
 	// ----------------------------------------
@@ -294,6 +299,9 @@ private:
 
 private:
 	RUDPFlowManager flowManager;
+	std::mutex unreliableSendMutex;
+	PacketSequence lastUnreliableSendSequence{};
+	LatestPacketSequence unreliableReceiveState;
 	RetransmissionTimeoutEstimator retransmissionTimeoutEstimator;
 	SessionCryptoContext cryptoContext;
 	SessionPacketOrderer sessionPacketOrderer;

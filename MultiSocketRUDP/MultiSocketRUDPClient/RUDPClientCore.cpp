@@ -22,7 +22,7 @@ void SendPacketInfo::Free(SendPacketInfo* target)
 
 RUDPClientCore::RUDPClientCore()
 	: serverAliveChecker([this] { Stop(); }
-	                     , [this] { return GetNextRecvPacketSequence(); })
+	                     , [this] { return authenticatedReceiveCount.load(std::memory_order_relaxed); })
 {
 }
 
@@ -30,6 +30,7 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 {
 	threadStopFlag = false;
 	isConnected = false;
+	authenticatedReceiveCount.store(0, std::memory_order_relaxed);
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
 
 	if (not ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath))
@@ -96,6 +97,7 @@ void RUDPClientCore::Stop()
 		{
 			return;
 		}
+		++unreliableSendGeneration;
 
 		if (sessionBrokerSocket != INVALID_SOCKET)
 		{
@@ -117,6 +119,25 @@ void RUDPClientCore::Stop()
 	}
 
 	JoinThreads();
+	{
+		std::scoped_lock lock(sendBufferQueueLock);
+		for (auto* buffer : unreliableSendQueue) NetBuffer::Free(buffer);
+		unreliableSendQueue.clear();
+		lastUnreliableSendSequence = 0;
+		preferUnreliableSend = false;
+	}
+	{
+		std::scoped_lock lock(recvPacketHoldingQueueLock);
+		for (auto* buffer : unreliableReceivedPackets) NetBuffer::Free(buffer);
+		unreliableReceivedPackets.clear();
+		unreliableReceiveState.Reset();
+		while (not recvPacketHoldingQueue.empty())
+		{
+			NetBuffer::Free(recvPacketHoldingQueue.top().buffer);
+			recvPacketHoldingQueue.pop();
+		}
+		nextRecvPacketSequence = 1;
+	}
 
 	{
 		std::scoped_lock lock(lifecycleLock);
@@ -463,6 +484,24 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 
 	switch (packetType)
 	{
+	case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
+	{
+		if (not isConnected || threadStopFlag) return;
+		if (not PacketCryptoHelper::DecodePacket(receivedBuffer, sessionSalt, SESSION_SALT_SIZE,
+			sessionKeyHandle, false, PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL)) return;
+		authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
+		receivedBuffer >> packetSequence;
+		std::scoped_lock lock(recvPacketHoldingQueueLock);
+		if (not unreliableReceiveState.Accept(packetSequence)) return;
+		if (unreliableReceivedPackets.size() >= unreliableQueueCapacity)
+		{
+			NetBuffer::Free(unreliableReceivedPackets.front());
+			unreliableReceivedPackets.pop_front();
+		}
+		NetBuffer::AddRefCount(&receivedBuffer);
+		unreliableReceivedPackets.push_back(&receivedBuffer);
+		return;
+	}
 	case PACKET_TYPE::SEND_TYPE:
 	{
 		isCorePacket = false;
@@ -482,6 +521,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 			return;
 		}
 
+		authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
 		receivedBuffer >> packetSequence;
 		unsigned int packetId = 0;
 		if (packetType == PACKET_TYPE::SEND_TYPE)
@@ -494,6 +534,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 		{
 			std::scoped_lock lock(recvPacketHoldingQueueLock);
 			recvPacketHoldingQueue.emplace(&receivedBuffer, packetSequence, packetType);
+			DrainReceivedControlPackets();
 		}
 
 		if (ShouldSendReplyToServer(packetSequence, packetId))
@@ -525,6 +566,7 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 			return;
 		}
 
+		authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
 		receivedBuffer >> packetSequence;
 		OnSendReply(receivedBuffer, packetSequence);
 		break;
@@ -594,13 +636,19 @@ void RUDPClientCore::SendReplyToServer(const PacketSequence inRecvPacketSequence
 
 void RUDPClientCore::DoSend()
 {
-	while (sendBufferQueue.GetRestSize() > 0)
+	while (true)
 	{
 		NetBuffer* packet = nullptr;
-		if (not sendBufferQueue.Dequeue(&packet))
 		{
-			LOG_ERROR("sendBufferQueue.Dequeue() failed");
-			continue;
+			std::scoped_lock lock(sendBufferQueueLock);
+			if (not unreliableSendQueue.empty() && (preferUnreliableSend || sendBufferQueue.GetRestSize() == 0))
+			{
+				packet = unreliableSendQueue.front();
+				unreliableSendQueue.pop_front();
+				preferUnreliableSend = false;
+			}
+			else if (sendBufferQueue.Dequeue(&packet)) preferUnreliableSend = true;
+			else break;
 		}
 
 		if (rudpSocket == INVALID_SOCKET)
@@ -636,9 +684,8 @@ unsigned int RUDPClientCore::GetRemainPacketSize()
 	return static_cast<unsigned int>(recvPacketHoldingQueue.size());
 }
 
-NetBuffer* RUDPClientCore::GetReceivedPacket()
+void RUDPClientCore::DrainReceivedControlPackets()
 {
-	std::scoped_lock lock(recvPacketHoldingQueueLock);
 	while (not recvPacketHoldingQueue.empty())
 	{
 		const auto holdingPacketInfo = recvPacketHoldingQueue.top();
@@ -650,23 +697,32 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 			continue;
 		}
 
-		if (holdingPacketInfo.packetSequence != nextRecvPacketSequence)
+		if (holdingPacketInfo.packetSequence != nextRecvPacketSequence ||
+			holdingPacketInfo.packetType != PACKET_TYPE::HEARTBEAT_TYPE)
 		{
-			return nullptr;
+			return;
 		}
 
 		++nextRecvPacketSequence;
 		recvPacketHoldingQueue.pop();
-		if (holdingPacketInfo.packetType == PACKET_TYPE::HEARTBEAT_TYPE)
-		{
-			NetBuffer::Free(holdingPacketInfo.buffer);
-			continue;
-		}
-
-		return holdingPacketInfo.buffer;
+		NetBuffer::Free(holdingPacketInfo.buffer);
 	}
+}
 
-	return nullptr;
+NetBuffer* RUDPClientCore::GetReceivedPacket()
+{
+	std::scoped_lock lock(recvPacketHoldingQueueLock);
+	DrainReceivedControlPackets();
+	if (recvPacketHoldingQueue.empty() || recvPacketHoldingQueue.top().packetSequence != nextRecvPacketSequence)
+	{
+		return nullptr;
+	}
+	auto* buffer = recvPacketHoldingQueue.top().buffer;
+	recvPacketHoldingQueue.pop();
+	++nextRecvPacketSequence;
+	// Consume following heartbeats even if the application makes no further receive calls.
+	DrainReceivedControlPackets();
+	return buffer;
 }
 
 void RUDPClientCore::SendPacket(OUT IPacket& packet)
@@ -684,6 +740,60 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	packet.PacketToBuffer(*buffer);
 
 	return SendPacket(*buffer, packetSequence, false);
+}
+
+bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
+{
+	uint64_t expectedGeneration;
+	{
+		std::scoped_lock lock(lifecycleLock);
+		if (isStopped || not isConnected || threadStopFlag) return false;
+		expectedGeneration = unreliableSendGeneration;
+	}
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr) return false;
+	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
+	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
+	const PacketId packetId = packet.GetPacketId();
+	packet.PacketToBuffer(*buffer);
+	// Stop waits for an admitted producer before destroying the key or wake handle.
+	std::scoped_lock lifecycleGuard(lifecycleLock);
+	if (isStopped || not isConnected || threadStopFlag || sendEventHandles[0] == nullptr ||
+		unreliableSendGeneration != expectedGeneration)
+	{
+		return false;
+	}
+	const auto sequence = ++lastUnreliableSendSequence;
+	buffer->MoveWritePosThisPos(0);
+	auto type = PACKET_TYPE::UNRELIABLE_SEND_TYPE;
+	*buffer << type << sequence << packetId;
+	buffer->MoveWritePosBeforeCallThisPos();
+	PacketCryptoHelper::EncodePacket(*buffer, sequence, PACKET_DIRECTION::CLIENT_TO_SERVER_UNREL,
+		sessionSalt, SESSION_SALT_SIZE, sessionKeyHandle, false);
+	if (not buffer->m_bIsEncoded)
+	{
+		return false;
+	}
+	std::scoped_lock queueGuard(sendBufferQueueLock);
+	const bool needsWake = unreliableSendQueue.empty();
+	if (unreliableSendQueue.size() >= unreliableQueueCapacity)
+	{
+		NetBuffer::Free(unreliableSendQueue.front());
+		unreliableSendQueue.pop_front();
+	}
+	unreliableSendQueue.push_back(buffer);
+	bufferGuard.release();
+	if (needsWake) ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+	return true;
+}
+
+NetBuffer* RUDPClientCore::GetReceivedUnreliablePacket()
+{
+	std::scoped_lock lock(recvPacketHoldingQueueLock);
+	if (unreliableReceivedPackets.empty()) return nullptr;
+	auto* buffer = unreliableReceivedPackets.front();
+	unreliableReceivedPackets.pop_front();
+	return buffer;
 }
 
 void RUDPClientCore::Disconnect()
@@ -910,5 +1020,9 @@ bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath
 		return false;
 	}
 
+	int queueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
+	parser.GetValue_Int(pBuff, L"CORE", L"UNRELIABLE_QUEUE_CAPACITY", &queueCapacity);
+	if (queueCapacity < 1 || queueCapacity > 65535) return false;
+	unreliableQueueCapacity = static_cast<unsigned int>(queueCapacity);
 	return true;
 }

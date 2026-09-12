@@ -144,6 +144,7 @@ public:
 	// @brief Returns upper bound for dynamic retransmission timeout and backoff.
 	// ----------------------------------------
 	unsigned int GetMaxRetransmissionMs() const;
+	unsigned int GetUnreliableQueueCapacity() const { return unreliableQueueCapacity; }
 
 private:
 	void DisconnectSession(SessionIdType disconnectTargetSessionId) const override;
@@ -302,6 +303,7 @@ private:
 	unsigned int heartbeatThreadSleepMs{};
 	unsigned int timerTickMs{};
 	BYTE maxHoldingPacketQueueSize{};
+	unsigned int unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
 	unsigned int simulatedPacketLossPercent{};
 	int simulatedPacketLossSeed{};
 

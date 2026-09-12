@@ -22,16 +22,19 @@ public:
 
 	bool StartClient(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath, bool shouldAutoConnect);
 	void StopClient();
+	unsigned int GetPendingReliablePacketCount();
 
 	void SetAutoReplyDataPackets(bool shouldAutoReply);
 	void SendPingPacket();
 	void SendEchoRequestPacket(const std::string& text);
+	bool SendUnreliableEchoRequestPacket(const std::string& text);
 	void SendOrderedPacket(int order);
 	void DisconnectClient();
 
 	bool WaitForConnected(std::chrono::milliseconds timeout);
 	bool WaitForPong(std::chrono::milliseconds timeout);
 	bool WaitForEcho(std::string_view expectedText, std::chrono::milliseconds timeout);
+	bool WaitForUnreliableEcho(std::string_view expectedText, std::chrono::milliseconds timeout);
 	bool WaitForOrderedResponse(int expectedOrder, std::chrono::milliseconds timeout);
 
 private:

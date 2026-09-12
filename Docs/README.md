@@ -1,5 +1,7 @@
 # MultiSocketRUDP 문서
 
+[프로토콜 v2 · 비신뢰성 채널 사용법과 호환 범위](UnreliableChannel.md)
+
 > GitHub와 Obsidian에서 함께 사용할 수 있는 문서 진입점이다.
 
 처음 방문했다면 [문서 읽기 가이드](ReadingGuide.md)에서 역할·목적·시간에 맞는 경로를 선택한다. 전체 문서 목록은 [문서 카탈로그](00_Overview.md)에서 확인한다.

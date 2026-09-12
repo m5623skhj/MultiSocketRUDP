@@ -2,9 +2,63 @@
 #include "TLSHelper.h"
 #include <utility>
 #include <vector>
+#include <chrono>
 
 namespace TLSHelper
 {
+	bool TLSHelperBase::SendProtocolVersion(const SOCKET socket, const uint32_t version)
+	{
+		const char plain[4] = { static_cast<char>(version >> 24), static_cast<char>(version >> 16),
+			static_cast<char>(version >> 8), static_cast<char>(version) };
+		std::vector<char> encrypted(streamSizes.cbHeader + sizeof(plain) + streamSizes.cbTrailer);
+		size_t size{};
+		if (not EncryptData(plain, sizeof(plain), encrypted.data(), size)) return false;
+		for (size_t sent = 0; sent < size;)
+		{
+			const int result = send(socket, encrypted.data() + sent, static_cast<int>(size - sent), 0);
+			if (result <= 0) return false;
+			sent += result;
+		}
+		return true;
+	}
+
+	bool TLSHelperBase::ReceiveProtocolVersion(const SOCKET socket, const uint32_t expectedVersion, const std::stop_token& stopToken)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		std::vector<char> encrypted;
+		std::vector<char> plain;
+		constexpr size_t MAX_VERSION_STREAM = 65536;
+		std::vector<char> decoded(MAX_VERSION_STREAM);
+		size_t totalEncrypted{};
+		while (not stopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
+		{
+			fd_set readable{};
+			FD_SET(socket, &readable);
+			timeval timeout{ 0, 100000 };
+			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
+			if (ready == SOCKET_ERROR) return false;
+			if (ready == 0) continue;
+			char bytes[4096];
+			const int received = recv(socket, bytes, sizeof(bytes), 0);
+			if (received <= 0) return false;
+			totalEncrypted += received;
+			if (totalEncrypted > MAX_VERSION_STREAM) return false;
+			encrypted.insert(encrypted.end(), bytes, bytes + received);
+			size_t size{};
+			const auto result = DecryptDataStream(encrypted, decoded.data(), size);
+			if (result == TlsDecryptResult::Error || result == TlsDecryptResult::CloseNotify) return false;
+			if (plain.size() + size > 4) return false;
+			plain.insert(plain.end(), decoded.begin(), decoded.begin() + size);
+			if (plain.size() == 4)
+			{
+				uint32_t version{};
+				for (const unsigned char value : plain) version = (version << 8) | value;
+				return version == expectedVersion && encrypted.empty();
+			}
+		}
+		return false;
+	}
+
     namespace
     {
         constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;

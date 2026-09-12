@@ -56,6 +56,9 @@ void RUDPSession::InitializeSession()
 		core.GetMaxRetransmissionMs());
 	flowManager.Initialize(maximumHoldingPacketQueueSize);
 	rioContext.GetSendContext().Reset();
+	rioContext.GetSendContext().SetUnreliableQueueCapacity(core.GetUnreliableQueueCapacity());
+	lastUnreliableSendSequence = 0;
+	unreliableReceiveState.Reset();
 	sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
 	disconnectedReason = DISCONNECT_REASON::NOT_DISCONNECTED;
 
@@ -160,6 +163,26 @@ bool RUDPSession::TryBeginSendOperation()
 	return true;
 }
 
+bool RUDPSession::SendUnreliablePacket(IPacket& packet)
+{
+	if (not TryBeginSendOperation()) return false;
+	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
+	NetBuffer* buffer = NetBuffer::Alloc();
+	if (buffer == nullptr) return false;
+	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
+	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
+	const PacketId packetId = packet.GetPacketId();
+	packet.PacketToBuffer(*buffer);
+	// Keep numbering and queue admission ordered, but never lock around user code.
+	std::scoped_lock lock(unreliableSendMutex);
+	const auto sequence = ++lastUnreliableSendSequence;
+	buffer->MoveWritePosThisPos(0);
+	auto type = PACKET_TYPE::UNRELIABLE_SEND_TYPE;
+	*buffer << type << sequence << packetId;
+	buffer->MoveWritePosBeforeCallThisPos();
+	return SendPacketImmediate(*bufferGuard.release(), sequence, false, false, true);
+}
+
 bool RUDPSession::TryBeginSendOperation(const uint32_t expectedGeneration)
 {
 	std::scoped_lock lock(sendLifecycleMutex);
@@ -225,7 +248,8 @@ bool RUDPSession::SendPacketImmediate(
 	NetBuffer& buffer, 
 	const PacketSequence inSendPacketSequence,
 	const bool isReplyType, 
-	const bool isCorePacket)
+	const bool isCorePacket,
+	const bool isUnreliable)
 {
 	const auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
@@ -236,14 +260,16 @@ bool RUDPSession::SendPacketImmediate(
 	}
 
 	sendPacketInfo->Initialize(this, sessionGeneration.load(std::memory_order_acquire), &buffer, inSendPacketSequence, isReplyType);
-	if (not isReplyType)
+	sendPacketInfo->isUnreliable = isUnreliable;
+	if (sendPacketInfo->RequiresRetransmission())
 	{
 		rioContext.GetSendContext().InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
 	}
 
 	if (buffer.m_bIsEncoded == false)
 	{
-		const PACKET_DIRECTION direction = isReplyType ? PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY : PACKET_DIRECTION::SERVER_TO_CLIENT;
+		const PACKET_DIRECTION direction = isUnreliable ? PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL :
+			(isReplyType ? PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY : PACKET_DIRECTION::SERVER_TO_CLIENT);
 		PacketCryptoHelper::EncodePacket(
 			buffer,
 			inSendPacketSequence,
@@ -255,9 +281,15 @@ bool RUDPSession::SendPacketImmediate(
 		);
 	}
 
+	if (isUnreliable && not buffer.m_bIsEncoded)
+	{
+		SendPacketInfo::Free(sendPacketInfo);
+		return false;
+	}
+
 	if (not core.SendPacket(sendPacketInfo))
 	{
-		if (not isReplyType)
+		if (sendPacketInfo->RequiresRetransmission())
 		{
 			core.MarkSendPacketInfoErased(sendPacketInfo, threadId);
 			rioContext.GetSendContext().EraseSendPacketInfo(inSendPacketSequence);
@@ -571,6 +603,23 @@ bool RUDPSession::IsOlderRecvSequence(
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
+	if (not DispatchContentPacket(recvPacket)) return false;
+	flowManager.MarkReceived(recvPacketSequence);
+	SendReplyToClient(recvPacketSequence);
+	return true;
+}
+
+bool RUDPSession::OnUnreliablePacket(NetBuffer& packet)
+{
+	if (not IsConnected()) return false;
+	PacketSequence sequence;
+	packet >> sequence;
+	if (not unreliableReceiveState.Accept(sequence)) return true;
+	return DispatchContentPacket(packet);
+}
+
+bool RUDPSession::DispatchContentPacket(NetBuffer& recvPacket)
+{
 	if (not IsConnected())
 	{
 		return false;
@@ -591,9 +640,6 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 		LOG_ERROR(std::format("Failed to process received packet. packetId: {}", packetId));
 		return false;
 	}
-
-	flowManager.MarkReceived(recvPacketSequence);
-	SendReplyToClient(recvPacketSequence);
 
 	return true;
 }

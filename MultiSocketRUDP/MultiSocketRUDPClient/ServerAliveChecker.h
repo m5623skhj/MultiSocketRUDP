@@ -4,15 +4,15 @@
 #include <functional>
 
 // ----------------------------------------
-// @brief 일정 주기마다 수신 시퀀스 진행 여부를 확인하여 서버 생존 상태를 감시합니다.
-// 두 검사 사이에 시퀀스가 진행하지 않으면 등록된 코어 종료 함수를 감시 스레드에서 호출합니다.
+// @brief 일정 주기마다 인증된 수신 횟수를 확인하여 서버 생존 상태를 감시합니다.
+// 두 검사 사이에 인증된 수신이 없으면 등록된 코어 종료 함수를 감시 스레드에서 호출합니다.
 // Stop은 감시 스레드 자신에게서 호출될 수 있으므로 self-join을 피하도록 구현되어 있습니다.
 // ----------------------------------------
 class ServerAliveChecker
 {
 public:
 	ServerAliveChecker() = delete;
-	explicit ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<PacketSequence()>& inGetNextRecvSequenceFunction);
+	explicit ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<uint64_t()>& inGetReceiveCountFunction);
 	~ServerAliveChecker() = default;
 	ServerAliveChecker(const ServerAliveChecker&) = delete;
 	ServerAliveChecker& operator=(const ServerAliveChecker&) = delete;
@@ -29,10 +29,10 @@ public:
 	// ----------------------------------------
 	void StopServerAliveCheck();
 	// ----------------------------------------
-	// @brief 직전 검사 이후 수신 시퀀스가 진행했는지 확인하고 기준값을 갱신합니다.
+	// @brief 직전 검사 이후 인증된 수신 횟수가 증가했는지 확인하고 기준값을 갱신합니다.
 	// ----------------------------------------
 	[[nodiscard]]
-	bool IsServerAlive(PacketSequence nowPacketSequence);
+	bool IsServerAlive(uint64_t receiveCount);
 
 private:
 	void RunServerAliveCheckerThread();
@@ -42,9 +42,9 @@ private:
 
 private:
 	unsigned int checkIntervalMs{ 0 };
-	PacketSequence beforeCheckSequence{ 0 };
+	uint64_t beforeCheckReceiveCount{};
 	std::jthread serverAliveCheckThread;
 
 	std::function<void()> coreStopFunction{};
-	std::function<PacketSequence()> getNextRecvSequenceFunction{};
+	std::function<uint64_t()> getReceiveCountFunction{};
 };

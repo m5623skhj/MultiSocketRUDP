@@ -52,6 +52,9 @@ void SessionSendContext::Reset()
 			SendPacketInfo::Free(sendPacketInfoQueue.front());
 			sendPacketInfoQueue.pop();
 		}
+		for (auto* info : unreliableQueue) SendPacketInfo::Free(info);
+		unreliableQueue.clear();
+		preferUnreliable = false;
 	}
 
 	{
@@ -63,24 +66,51 @@ void SessionSendContext::Reset()
 bool SessionSendContext::IsSendPacketInfoQueueEmpty()
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
-	return sendPacketInfoQueue.empty();
+	return sendPacketInfoQueue.empty() && unreliableQueue.empty();
 }
 
 size_t SessionSendContext::GetSendPacketInfoQueueSize()
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
-	return sendPacketInfoQueue.size();
+	return sendPacketInfoQueue.size() + unreliableQueue.size();
 }
 
 void SessionSendContext::PushSendPacketInfo(SendPacketInfo* info)
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
+	if (info->isUnreliable)
+	{
+		// The reserved packet is older than every queued packet and has not been copied yet.
+		const bool hasReserved = reservedSendPacketInfo != nullptr && reservedSendPacketInfo->isUnreliable;
+		if (unreliableQueue.size() + (hasReserved ? 1 : 0) >= unreliableQueueCapacity)
+		{
+			if (hasReserved)
+			{
+				SendPacketInfo::Free(reservedSendPacketInfo);
+				reservedSendPacketInfo = nullptr;
+			}
+			else if (not unreliableQueue.empty())
+			{
+				SendPacketInfo::Free(unreliableQueue.front());
+				unreliableQueue.pop_front();
+			}
+		}
+		unreliableQueue.push_back(info);
+		return;
+	}
 	sendPacketInfoQueue.push(info);
 }
 
 SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
+	if (not unreliableQueue.empty() && (preferUnreliable || sendPacketInfoQueue.empty()))
+	{
+		auto* info = unreliableQueue.front();
+		unreliableQueue.pop_front();
+		preferUnreliable = false;
+		return info;
+	}
 	if (sendPacketInfoQueue.empty())
 	{
 		return nullptr;
@@ -88,6 +118,7 @@ SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 
 	auto* front = sendPacketInfoQueue.front();
 	sendPacketInfoQueue.pop();
+	preferUnreliable = true;
 
 	return front;
 }
@@ -95,7 +126,7 @@ SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 bool SessionSendContext::IsNothingToSend()
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
-	return sendPacketInfoQueue.empty() && reservedSendPacketInfo == nullptr;
+	return sendPacketInfoQueue.empty() && unreliableQueue.empty() && reservedSendPacketInfo == nullptr;
 }
 
 SendPacketInfo* SessionSendContext::GetReservedSendPacketInfo()
@@ -113,6 +144,12 @@ SendPacketInfo* SessionSendContext::TakeReservedSendPacketInfo()
 void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
+	// Producers may have filled the queue while this packet was being assembled.
+	if (info->isUnreliable && unreliableQueue.size() >= unreliableQueueCapacity)
+	{
+		SendPacketInfo::Free(info);
+		return;
+	}
 	reservedSendPacketInfo = info;
 }
 

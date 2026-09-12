@@ -51,7 +51,7 @@
     <ClInclude Include="RUDPSessionTestAccess.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json">
+    <None Include="ProtocolInteropV2Vector.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

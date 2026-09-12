@@ -1,6 +1,9 @@
 #pragma once
 #include <cstdint>
 
+constexpr uint32_t RUDP_PROTOCOL_VERSION = 2;
+constexpr unsigned int DEFAULT_UNRELIABLE_QUEUE_CAPACITY = 64;
+
 constexpr unsigned short MAX_RIO_RESULT = 1024;
 constexpr unsigned int   MAX_SEND_BUFFER_SIZE = 32768;
 constexpr int            RECV_BUFFER_SIZE = 16384;
