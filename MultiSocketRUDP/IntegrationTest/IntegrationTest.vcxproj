@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="..\ContentsServer\Protocol.cpp" />
     <ClCompile Include="IntegrationTest.cpp" />
+    <ClCompile Include="..\Common\TLS\TLSHelperClient.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

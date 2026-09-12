@@ -68,7 +68,7 @@ namespace
 			throw std::runtime_error("Failed to locate CoreTest executable");
 		}
 
-		const auto vectorPath = std::filesystem::path(executablePath.data()).parent_path() / "ProtocolInteropVector.json";
+		const auto vectorPath = std::filesystem::path(executablePath.data()).parent_path() / "ProtocolInteropV2Vector.json";
 		std::ifstream vectorFile(vectorPath);
 		if (not vectorFile)
 		{
@@ -265,15 +265,28 @@ TEST(CryptoHelperTest, FillNonceRejectsInvalidArguments)
 	EXPECT_FALSE(CryptoHelper::FillNonce(salt.data(), salt.size() - 1, 0, PACKET_DIRECTION::CLIENT_TO_SERVER, nonce.data(), nonce.size()));
 	EXPECT_FALSE(CryptoHelper::FillNonce(salt.data(), salt.size(), 0, PACKET_DIRECTION::CLIENT_TO_SERVER, nullptr, nonce.size()));
 	EXPECT_FALSE(CryptoHelper::FillNonce(salt.data(), salt.size(), 0, PACKET_DIRECTION::CLIENT_TO_SERVER, nonce.data(), nonce.size() - 1));
+	EXPECT_FALSE(CryptoHelper::FillNonce(salt.data(), salt.size(), 0, PACKET_DIRECTION::INVALID, nonce.data(), nonce.size()));
+}
+
+TEST(CryptoHelperTest, SameSequenceHasDistinctNonceForAllSixDirections)
+{
+	const auto salt = MakeSalt();
+	std::array<std::array<unsigned char, NONCE_SIZE>, 6> nonces{};
+	for (size_t index = 0; index < nonces.size(); ++index)
+	{
+		ASSERT_TRUE(CryptoHelper::FillNonce(salt.data(), salt.size(), 1,
+			static_cast<PACKET_DIRECTION>(index), nonces[index].data(), NONCE_SIZE));
+		for (size_t previous = 0; previous < index; ++previous) EXPECT_NE(nonces[index], nonces[previous]);
+	}
 }
 
 // ------------------------------------------------------------
-// C++과 C#이 공유하는 8개 골든 벡터의 암호화 와이어 형식과 복호화 결과가 일치하는지 확인합니다.
+// 독립적인 AES-GCM 구현으로 생성한 v2 골든 벡터와 와이어 형식을 비교합니다.
 // ------------------------------------------------------------
-TEST_F(PacketCryptoTest, AesGcmMatchesCppCSharpGoldenVectors)
+TEST_F(PacketCryptoTest, AesGcmMatchesProtocolV2GoldenVectors)
 {
 	const auto testVectors = LoadProtocolInteropVectors();
-	ASSERT_EQ(testVectors.size(), 8u);
+	ASSERT_EQ(testVectors.size(), 10u);
 
 	for (const auto& testVector : testVectors)
 	{

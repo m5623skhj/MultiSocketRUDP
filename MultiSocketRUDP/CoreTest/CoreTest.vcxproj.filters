@@ -118,6 +118,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropVector.json" />
+    <None Include="ProtocolInteropV2Vector.json" />
   </ItemGroup>
 </Project>

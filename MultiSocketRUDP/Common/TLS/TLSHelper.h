@@ -89,6 +89,8 @@ namespace TLSHelper
 		TlsDecryptResult DecryptDataStream(std::vector<char>& encryptedStream, char* plainBuffer, size_t& plainSize);
 		[[nodiscard]]
 		bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
+		bool SendProtocolVersion(SOCKET socket, uint32_t version);
+		bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion, const std::stop_token& stopToken);
 
 	protected:
 		[[nodiscard]]

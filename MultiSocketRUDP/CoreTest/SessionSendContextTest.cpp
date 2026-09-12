@@ -3,6 +3,7 @@
 
 #include "SessionSendContext.h"
 #include "SendPacketInfo.h"
+#include "../Common/etc/LatestPacketSequence.h"
 
 namespace
 {
@@ -103,8 +104,8 @@ TEST(SessionSendContextTest, InitializeFailureLeavesInvalidBufferId)
 TEST(SessionSendContextTest, QueueAndReservedPacketOwnershipTransitionsAreConsistent)
 {
 	SessionSendContext context;
-	auto* first = reinterpret_cast<SendPacketInfo*>(1);
-	auto* second = reinterpret_cast<SendPacketInfo*>(2);
+	auto* first = MakeSendPacketInfo(1);
+	auto* second = MakeSendPacketInfo(2);
 
 	EXPECT_TRUE(context.IsNothingToSend());
 	context.PushSendPacketInfo(first);
@@ -113,6 +114,78 @@ TEST(SessionSendContextTest, QueueAndReservedPacketOwnershipTransitionsAreConsis
 	EXPECT_EQ(context.TryGetFrontAndPop(), first);
 	EXPECT_EQ(context.TakeReservedSendPacketInfo(), second);
 	EXPECT_TRUE(context.IsNothingToSend());
+	SendPacketInfo::Free(first);
+	SendPacketInfo::Free(second);
+}
+
+TEST(SessionSendContextTest, UnreliableOverflowDropsOldestAndKeepsReliableQueue)
+{
+	SessionSendContext context;
+	context.SetUnreliableQueueCapacity(3);
+	context.PushSendPacketInfo(MakeSendPacketInfo(100));
+	for (PacketSequence sequence = 1; sequence <= 4; ++sequence)
+	{
+		auto* info = MakeSendPacketInfo(sequence);
+		info->isUnreliable = true;
+		context.PushSendPacketInfo(info);
+	}
+	for (const PacketSequence expected : { 100, 2, 3, 4 })
+	{
+		auto* info = context.TryGetFrontAndPop();
+		ASSERT_NE(info, nullptr);
+		EXPECT_EQ(info->sendPacketSequence, expected);
+		SendPacketInfo::Free(info);
+	}
+	EXPECT_TRUE(context.IsNothingToSend());
+}
+
+TEST(SessionSendContextTest, UnreliableOverflowIncludesReservedUnsentPacket)
+{
+	SessionSendContext context;
+	context.SetUnreliableQueueCapacity(1);
+	auto* reserved = MakeSendPacketInfo(1);
+	reserved->isUnreliable = true;
+	reserved->AddRefCount();
+	context.SetReservedSendPacketInfo(reserved);
+	auto* incoming = MakeSendPacketInfo(2);
+	incoming->isUnreliable = true;
+	context.PushSendPacketInfo(incoming);
+	EXPECT_EQ(context.TakeReservedSendPacketInfo(), nullptr);
+	EXPECT_EQ(reserved->refCount.load(), 1);
+	EXPECT_EQ(context.TryGetFrontAndPop(), incoming);
+	SendPacketInfo::Free(reserved);
+	SendPacketInfo::Free(incoming);
+}
+
+TEST(SessionSendContextTest, FullQueueDropsDetachedPacketWhenReturningItToReserved)
+{
+	SessionSendContext context;
+	context.SetUnreliableQueueCapacity(1);
+	auto* detached = MakeSendPacketInfo(1);
+	detached->isUnreliable = true;
+	detached->AddRefCount();
+	auto* newer = MakeSendPacketInfo(2);
+	newer->isUnreliable = true;
+	context.PushSendPacketInfo(newer);
+	context.SetReservedSendPacketInfo(detached);
+	EXPECT_EQ(context.TakeReservedSendPacketInfo(), nullptr);
+	EXPECT_EQ(detached->refCount.load(), 1);
+	context.Reset();
+	EXPECT_TRUE(context.IsNothingToSend());
+	SendPacketInfo::Free(detached);
+}
+
+TEST(LatestPacketSequenceTest, FirstPacketLossReorderingDuplicatesAndReset)
+{
+	LatestPacketSequence latest;
+	EXPECT_TRUE(latest.Accept(0));
+	EXPECT_FALSE(latest.Accept(0));
+	EXPECT_TRUE(latest.Accept(5));
+	EXPECT_FALSE(latest.Accept(4));
+	EXPECT_FALSE(latest.Accept(5));
+	EXPECT_TRUE(latest.Accept(100));
+	latest.Reset();
+	EXPECT_TRUE(latest.Accept(1));
 }
 
 TEST(SessionSendContextTest, SendPacketMapFindAndErasePreservesCallerReference)

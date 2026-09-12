@@ -238,6 +238,11 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, const ThreadIdType threadId) co
 		if (sendContext == nullptr)
 		{
 			releaseIOSending();
+			// A producer may have replaced the reserved packet while the empty stream was built.
+			if (succeeded && not sessionDelegate.IsNothingToSend(session))
+			{
+				continue;
+			}
 			return succeeded;
 		}
 
@@ -472,7 +477,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 
 	char* bufferPositionPointer = sessionDelegate.GetRIOSendBuffer(session);
 	memcpy_s(bufferPositionPointer, MAX_SEND_BUFFER_SIZE, sendPacketInfo->buffer->GetBufferPtr(), useSize);
-	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence });
+	packetSequenceSet.insert(MultiSocketRUDP::PacketSequenceSetKey{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence, sendPacketInfo->isUnreliable });
 
 	totalSendSize += static_cast<int>(useSize);
 
@@ -489,7 +494,7 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::SUCCESS;
 	}
 
-	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence };
+	const MultiSocketRUDP::PacketSequenceSetKey key{ sendPacketInfo->isReplyType, sendPacketInfo->sendPacketSequence, sendPacketInfo->isUnreliable };
 	if (packetSequenceSet.contains(key) == true)
 	{
 		SendPacketInfo::Free(sendPacketInfo);
@@ -537,7 +542,7 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPack
 		return false;
 	}
 
-	if (sendPacketInfo->isReplyType == true)
+	if (not sendPacketInfo->RequiresRetransmission())
 	{
 		return true;
 	}

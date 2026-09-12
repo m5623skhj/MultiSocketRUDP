@@ -22,6 +22,8 @@ struct SendPacketInfo
 	uint64_t scheduleVersion{};
 	std::atomic_bool isErasedPacketInfo{};
 	bool isReplyType{};
+	bool isUnreliable{};
+	bool RequiresRetransmission() const noexcept { return not isReplyType && not isUnreliable; }
 	std::atomic_int32_t refCount{};
 	mutable std::mutex rttSampleLock;
 	std::chrono::steady_clock::time_point lastSendTime{};

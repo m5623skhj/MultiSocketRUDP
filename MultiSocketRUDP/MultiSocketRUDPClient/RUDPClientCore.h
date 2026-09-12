@@ -11,6 +11,8 @@
 
 #include "Queue.h"
 #include <queue>
+#include <deque>
+#include "../Common/etc/LatestPacketSequence.h"
 #include "../Common/TLS/TLSHelper.h"
 
 #pragma comment(lib, "ws2_32.lib")
@@ -79,6 +81,7 @@ struct RecvPacketInfo
 // ----------------------------------------
 class RUDPClientCore
 {
+	friend class RUDPClientCoreTestAccess;
 public:
 	RUDPClientCore();
 	virtual ~RUDPClientCore() = default;
@@ -123,6 +126,7 @@ private:
 	std::atomic_bool threadStopFlag{};
 	std::atomic_bool isConnected{};
 	std::atomic_bool hasClientProcessReference{};
+	std::atomic<uint64_t> authenticatedReceiveCount{};
 	std::mutex lifecycleLock;
 
 #pragma region SessionGetter
@@ -201,16 +205,12 @@ private:
 	// ----------------------------------------
 	void OnRecvStream(NetBuffer& recvBuffer, int recvSize);
 	void ProcessRecvPacket(OUT NetBuffer& receivedBuffer);
+	// Caller holds recvPacketHoldingQueueLock. Never skip a sequence gap or consume application data.
+	void DrainReceivedControlPackets();
 	void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence);
 	void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
 	void DoSend();
 	static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
-
-	PacketSequence GetNextRecvPacketSequence() const
-	{
-		std::scoped_lock lock(recvPacketHoldingQueueLock);
-		return nextRecvPacketSequence;
-	}
 
 private:
 	SOCKET rudpSocket{ INVALID_SOCKET };
@@ -263,6 +263,9 @@ public:
 	// @brief 콘텐츠 패킷을 직렬화하고 흐름 제어 윈도우에 따라 즉시 송신하거나 대기시킵니다.
 	// ----------------------------------------
 	void SendPacket(OUT IPacket& packet);
+	bool SendUnreliablePacket(IPacket& packet);
+	// Returns an authenticated packet positioned at packetId; caller frees the buffer.
+	NetBuffer* GetReceivedUnreliablePacket();
 	// ----------------------------------------
 	// @brief 연결 상태를 해제로 표시하고 서버에 연결 해제 코어 패킷을 보냅니다.
 	// ----------------------------------------
@@ -305,6 +308,13 @@ private:
 	// ----------------------------------------
 	CListBaseQueue<NetBuffer*> sendBufferQueue;
 	std::mutex sendBufferQueueLock;
+	std::deque<NetBuffer*> unreliableSendQueue;
+	bool preferUnreliableSend{};
+	PacketSequence lastUnreliableSendSequence{};
+	uint64_t unreliableSendGeneration{}; // Protected by lifecycleLock; invalidates paused serializers on Stop.
+	std::deque<NetBuffer*> unreliableReceivedPackets;
+	LatestPacketSequence unreliableReceiveState;
+	unsigned int unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
 
 	struct PendingPacketInfo
 	{

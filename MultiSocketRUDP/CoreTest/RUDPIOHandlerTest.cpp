@@ -839,6 +839,64 @@ TEST_F(RUDPIOHandlerTest, DoSend_ErasedPacketLeavesNoGapOrTrailingBytesInPostedS
 // ------------------------------------------------------------
 // 응답 패킷이 재전송 스케줄에는 등록되지 않고 RIO 송신만 수행하는지 확인합니다.
 // ------------------------------------------------------------
+TEST_F(RUDPIOHandlerTest, DoSend_UnreliablePacketPostsWithoutRetransmissionSchedule)
+{
+	SetupValidSendPath();
+	auto* info = AllocSerializedSendPacketInfo(1);
+	info->isUnreliable = true;
+	mockDelegate.queuedSendPacketInfos.push_back(info);
+	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.lastSendLength, df_HEADER_SIZE + 1);
+	EXPECT_TRUE(retransmissionSchedulers[THREAD_ID]->heap.empty());
+	CompleteOutstandingSend();
+}
+
+TEST_F(RUDPIOHandlerTest, DoSend_RechecksQueueWhenReservedReplacementProducesEmptyStream)
+{
+	SetupValidSendPath();
+	auto* reserved = AllocSerializedSendPacketInfo(1);
+	reserved->isUnreliable = true;
+	mockDelegate.reservedSendReturn = reserved;
+	bool replaced = false;
+	mockDelegate.afterQueueSizeRead = [&]()
+	{
+		if (replaced) return;
+		replaced = true;
+		// Capacity one: replace the reserved packet after count=0 was captured.
+		SendPacketInfo::Free(mockDelegate.reservedSendReturn);
+		mockDelegate.reservedSendReturn = nullptr;
+		auto* incoming = AllocSerializedSendPacketInfo(2);
+		incoming->isUnreliable = true;
+		mockDelegate.queuedSendPacketInfos.push_back(incoming);
+		EXPECT_TRUE(handler->DoSend(session, THREAD_ID));
+		EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
+	};
+	EXPECT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
+	EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
+	EXPECT_TRUE(retransmissionSchedulers[THREAD_ID]->heap.empty());
+	if (mockRIO.lastSendRequestContext != nullptr) CompleteOutstandingSend();
+	while (not mockDelegate.queuedSendPacketInfos.empty())
+	{
+		SendPacketInfo::Free(mockDelegate.queuedSendPacketInfos.front());
+		mockDelegate.queuedSendPacketInfos.pop_front();
+	}
+}
+
+TEST_F(RUDPIOHandlerTest, DoSend_SameSequenceInDifferentChannelsIsNotDeduplicated)
+{
+	SetupValidSendPath();
+	auto* reliable = AllocSerializedSendPacketInfo(1);
+	auto* unreliable = AllocSerializedSendPacketInfo(1);
+	unreliable->isUnreliable = true;
+	mockDelegate.queuedSendPacketInfos.push_back(reliable);
+	mockDelegate.queuedSendPacketInfos.push_back(unreliable);
+	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.lastSendLength, 2 * (df_HEADER_SIZE + 1));
+	EXPECT_EQ(retransmissionSchedulers[THREAD_ID]->heap.size(), 1u);
+	CompleteOutstandingSend();
+}
+
 TEST_F(RUDPIOHandlerTest, DoSend_ReplyPacketPostsWithoutRetransmissionSchedule)
 {
 	SetupValidSendPath();

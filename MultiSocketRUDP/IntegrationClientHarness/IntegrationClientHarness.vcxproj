@@ -22,6 +22,7 @@
     <ClCompile Include="..\ContentsServer\Protocol.cpp" />
     <ClCompile Include="..\IntegrationTest\TestableRUDPClient.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="UnreliableClientChecks.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\IntegrationTest\TestableRUDPClient.h" />

@@ -14,6 +14,8 @@
 #include "../Logger/Logger.h"
 #include "../IntegrationTest/TestableRUDPClient.h"
 
+bool RunUnreliableClientChecks();
+
 namespace
 {
 	using namespace std::chrono_literals;
@@ -103,6 +105,46 @@ namespace
 		}
 
 		client->StopClient();
+		return true;
+	}
+
+	bool RunUnreliableOnlyScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
+	{
+		TestableRUDPClient client;
+		if (not client.StartClient(clientCoreOptionPath, sessionGetterOptionPath, true) ||
+			not client.WaitForConnected(8s)) return false;
+		// The test config uses a 500 ms alive check. Never consume the reliable queue.
+		// Stay idle across several heartbeat periods before starting unreliable traffic.
+		Sleep(2000);
+		if (client.GetPendingReliablePacketCount() != 0) return false;
+		const auto deadline = std::chrono::steady_clock::now() + 3s;
+		int index = 0;
+		while (std::chrono::steady_clock::now() < deadline)
+		{
+			const auto message = "unreliable:alive:" + std::to_string(index++);
+			if (not client.SendUnreliableEchoRequestPacket(message) ||
+				not client.WaitForUnreliableEcho(message, 1s)) return false;
+			Sleep(10);
+		}
+		client.StopClient();
+		return true;
+	}
+
+	bool RunMixedChannelsScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
+	{
+		TestableRUDPClient client;
+		if (not client.StartClient(clientCoreOptionPath, sessionGetterOptionPath, true) ||
+			not client.WaitForConnected(8s)) return false;
+		for (int index = 0; index < 2; ++index)
+		{
+			const auto reliable = "reliable:" + std::to_string(index);
+			const auto unreliable = "unreliable:" + std::to_string(index);
+			client.SendEchoRequestPacket(reliable);
+			if (not client.SendUnreliableEchoRequestPacket(unreliable)) return false;
+			if (not client.WaitForEcho(reliable, 3s) ||
+				not client.WaitForUnreliableEcho(unreliable, 3s)) return false;
+		}
+		client.StopClient();
 		return true;
 	}
 
@@ -310,6 +352,19 @@ int wmain(const int argc, wchar_t* argv[])
 	{
 		const std::string message = argc >= 4 ? std::filesystem::path(argv[3]).string() : "integration-echo";
 		exitCode = RunEchoScenario(clientCoreOptionPath, sessionGetterOptionPath, message) ? 0 : 1;
+	}
+	else if (scenario == L"unreliable-only")
+	{
+		exitCode = RunUnreliableOnlyScenario(clientCoreOptionPath, sessionGetterOptionPath) ? 0 : 1;
+	}
+	else if (scenario == L"mixed-channels")
+	{
+		exitCode = RunUnreliableClientChecks() &&
+			RunMixedChannelsScenario(clientCoreOptionPath, sessionGetterOptionPath) ? 0 : 1;
+	}
+	else if (scenario == L"unreliable-checks")
+	{
+		exitCode = RunUnreliableClientChecks() ? 0 : 1;
 	}
 	else if (scenario == L"ping")
 	{

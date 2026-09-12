@@ -31,6 +31,7 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	buffer = inBuffer;
 	sendPacketSequence = inSendPacketSequence;
 	isReplyType = inIsReplyType;
+	isUnreliable = false;
 
 	retransmissionCount = {};
 	scheduleVersion = {};

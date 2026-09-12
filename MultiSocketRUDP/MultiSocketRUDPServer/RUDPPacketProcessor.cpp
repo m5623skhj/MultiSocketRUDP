@@ -64,6 +64,16 @@ void RUDPPacketProcessor::ProcessByPacketType(RUDPSession& session, const sockad
    		sessionDelegate.Disconnect(session, recvPacket);
         break;
     }
+    case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
+    {
+        if (not sessionDelegate.CanProcessPacket(session, clientAddr)) break;
+        isCorePacket = false;
+        direction = PACKET_DIRECTION::CLIENT_TO_SERVER_UNREL;
+        DECODE_PACKET()
+        if (not session.OnUnreliablePacket(recvPacket)) session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+        else tps.fetch_add(1, std::memory_order_relaxed);
+        break;
+    }
     case PACKET_TYPE::SEND_TYPE:
     {
         if (not sessionDelegate.CanProcessPacket(session, clientAddr))

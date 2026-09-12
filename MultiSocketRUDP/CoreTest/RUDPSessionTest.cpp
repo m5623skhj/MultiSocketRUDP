@@ -156,6 +156,44 @@ public:
 using SessionSendLifecycleTest = SessionSendTestBase<LifecycleTestCore>;
 using SessionSendOrderTest = SessionSendTestBase<SendOrderTestCore>;
 
+TEST_F(SessionSendOrderTest, UnreliableSendUsesIndependentSequenceWithoutAckTracking)
+{
+	NoOpPacket packet;
+	ASSERT_TRUE(session.SendUnreliablePacket(packet));
+	ASSERT_TRUE(session.SendUnreliablePacket(packet));
+	auto& context = RUDPSessionBehaviorAccess::GetSendContext(session);
+	EXPECT_EQ(context.GetLastSendPacketSequence(), 0);
+	EXPECT_EQ(context.FindSendPacketInfo(1), nullptr);
+	EXPECT_EQ(context.FindSendPacketInfo(2), nullptr);
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ 1, 2 }));
+	EXPECT_TRUE(context.IsPendingQueueEmpty());
+}
+
+TEST_F(SessionSendOrderTest, UnreliableReceiveSkipsGapsAndDropsOldOrDuplicateWithoutAck)
+{
+	session.RegisterContentHandler();
+	std::vector<unsigned int> received;
+	session.contentCallback = [&](unsigned int value) { received.push_back(value); };
+	const auto originalWindow = RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session);
+	for (const PacketSequence sequence : { 5, 8, 6, 8, 9 })
+	{
+		NetBuffer buffer;
+		buffer.Init();
+		buffer << sequence << LifecycleContentPacket::PACKET_ID << static_cast<unsigned int>(sequence);
+		ASSERT_TRUE(session.OnUnreliablePacket(buffer));
+	}
+	EXPECT_EQ(received, (std::vector<unsigned int>{ 5, 8, 9 }));
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), originalWindow);
+	EXPECT_TRUE(core.sentSequences.empty());
+	RUDPSessionBehaviorAccess::InitializeSession(session);
+	RUDPSessionBehaviorAccess::SetConnected(session);
+	NetBuffer buffer;
+	buffer.Init();
+	buffer << PacketSequence{ 1 } << LifecycleContentPacket::PACKET_ID << 1u;
+	ASSERT_TRUE(session.OnUnreliablePacket(buffer));
+	EXPECT_EQ(received.back(), 1u);
+}
+
 TEST_F(SessionSendOrderTest, PausedSerializersCannotTrapSendablePacketsBehindWindow)
 {
 	RUDPSessionBehaviorAccess::GetSendContext(session).InitializePendingQueue(8);

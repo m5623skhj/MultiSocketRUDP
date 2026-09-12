@@ -124,6 +124,17 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
+	constexpr DWORD VERSION_TIMEOUT_MS = 6000;
+	if (setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
+		reinterpret_cast<const char*>(&VERSION_TIMEOUT_MS), sizeof(VERSION_TIMEOUT_MS)) == SOCKET_ERROR ||
+		setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
+			reinterpret_cast<const char*>(&VERSION_TIMEOUT_MS), sizeof(VERSION_TIMEOUT_MS)) == SOCKET_ERROR ||
+		not tlsHelper.SendProtocolVersion(sessionBrokerSocket, RUDP_PROTOCOL_VERSION))
+	{
+		closesocket(sessionBrokerSocket);
+		sessionBrokerSocket = INVALID_SOCKET;
+		return false;
+	}
 	return TrySetTargetSessionInfo();
 }
 
@@ -248,6 +259,14 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
+	if (receivedBuffer.GetUseSize() < sizeof(uint32_t) + sizeof(char)) return false;
+	uint32_t version{};
+	receivedBuffer >> version;
+	if (version != RUDP_PROTOCOL_VERSION)
+	{
+		LOG_ERROR("Unsupported RUDP server protocol version");
+		return false;
+	}
 	char connectResultCode;
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)

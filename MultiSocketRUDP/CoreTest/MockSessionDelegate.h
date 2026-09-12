@@ -6,6 +6,7 @@
 class MockSessionDelegate final : public ISessionDelegate
 {
 public:
+    std::function<void()> afterQueueSizeRead;
     [[nodiscard]]
     bool InitializeSessionRIO(RUDPSession&, const RIO_EXTENSION_FUNCTION_TABLE&,
         const RIO_CQ&, const RIO_CQ&) override
@@ -43,6 +44,7 @@ public:
         {
             SendPacketInfo* front = queuedSendPacketInfos.front();
             queuedSendPacketInfos.pop_front();
+            isNothingToSendReturn = queuedSendPacketInfos.empty() && reservedSendReturn == nullptr;
             return front;
         }
 
@@ -55,13 +57,16 @@ public:
     {
         SendPacketInfo* info = reservedSendReturn;
         reservedSendReturn = nullptr;
+        isNothingToSendReturn = queuedSendPacketInfos.empty() && tryGetFrontReturn == nullptr;
         return info;
     }
     void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override { reservedSendReturn = info; }
     [[nodiscard]]
     size_t GetSendPacketInfoQueueSize(RUDPSession&) override
     {
-        return queuedSendPacketInfos.empty() ? sendPacketInfoQueueSizeRet : queuedSendPacketInfos.size();
+        const size_t count = queuedSendPacketInfos.empty() ? sendPacketInfoQueueSizeRet : queuedSendPacketInfos.size();
+        if (afterQueueSizeRead) afterQueueSizeRead();
+        return count;
     }
     [[nodiscard]]
     char* GetRIOSendBuffer(RUDPSession&) override { return dummySendBuffer; }
