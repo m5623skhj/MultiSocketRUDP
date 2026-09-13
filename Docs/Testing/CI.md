@@ -25,6 +25,11 @@
 | `.github/workflows/GeminiPRCommoentBot.yml` | 보조 AI 리뷰 status |
 | `.github/workflows/StaticAnalysis.yml` | 매일·수동 MSVC 네이티브 및 .NET Roslyn 정적 분석 |
 | `.github/workflows/Stability.yml` | 매일 03:30 KST·수동 멀티스레드 통합 테스트 반복, 최초 실패 보존 |
+| `.github/workflows/AddressSanitizer.yml` | 매일 04:30 KST·수동 ASan 계측 CoreTest 및 검출 확인 |
+
+ASan 검사는 PR 필수 체크와 별도로 실행한다. 일반 빌드와 분리된 Debug x64 산출물에서
+메모리 오류 검출을 확인한 뒤 CoreTest를 실행하며 오류를 재시도로 숨기지 않는다.
+실행 방법과 검출 범위는 [ASan 검사 가이드](../../Scripts/ASan/README.md)를 참고한다.
 
 멀티스레드 반복 검사는 PR 필수 체크와 별도로 실행한다. 동시 송수신·연결 해제·세션 재사용과
 종료 시나리오를 케이스별 독립 프로세스로 5회 반복하며, 최초 실패에서 중단한다.
