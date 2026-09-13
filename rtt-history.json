@@ -1364,6 +1364,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "0816aa0654e97f7925adcb1497c329f8a75cbbdf",
+      "commitSubject": "* 비신뢰성·혼합 채널 RTT 성능 측정 CI 추가   * 요청 ID 기반 에코 패킷으로 신뢰성·비신뢰성 왕복 측정   * 비신뢰성 단독, 신뢰성 기준 및 혼합 전송 시나리오 추가   * 채널별 RTT p50·p95·p99, 응답률 및 처리량 기록     * 미수신·지연 응답을 RTT 표본과 구분하여 집계   * 이전 커밋 대비 성능 비교와 결과 이력 저장     * PR 요약, Job Summary 및 artifact에 결과 출력     * 지연 변화는 보고하고 응답 불능·연결 종료 등은 실패 처리   * 집계·이력 비교 테스트와 측정 문서 추가",
+      "recordedAtUtc": "2026-09-13T13:36:47.2979577+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001165",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.16822009999999996,
+            "medianMinRttMs": 0.0953,
+            "medianP50RttMs": 0.1566,
+            "medianP95RttMs": 0.2088,
+            "medianP99RttMs": 0.2288,
+            "medianMaxRttMs": 0.4597,
+            "worstMaxRttMs": 1.4568,
+            "medianElapsedSeconds": 0.1727408,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.197592299999992,
+            "medianMinRttMs": 0.0589,
+            "medianP50RttMs": 0.1343,
+            "medianP95RttMs": 33.3967,
+            "medianP99RttMs": 65.6433,
+            "medianMaxRttMs": 128.2261,
+            "worstMaxRttMs": 201.1471,
+            "medianElapsedSeconds": 6.2005615,
+            "totalRetransmissionSuspectedCount": 187
+          }
+        }
+      ]
     }
   ]
 }
