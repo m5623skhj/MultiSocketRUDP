@@ -34,7 +34,7 @@ public sealed class SessionBrokerResponseParserTests
     {
         Assert.Throws<InvalidOperationException>(
             () => SessionBrokerResponseParser.Parse(
-                new byte[] { (byte)ConnectResultCode.ServerFull }));
+                new byte[] { 2, 0, 0, 0, (byte)ConnectResultCode.ServerFull }));
 
         var complete = BuildResponse(
             "127.0.0.1",
@@ -60,6 +60,7 @@ public sealed class SessionBrokerResponseParserTests
         var ipBytes = Encoding.UTF8.GetBytes(ip);
         var result = new List<byte>
         {
+            2, 0, 0, 0,
             (byte)ConnectResultCode.Success,
             (byte)(ipBytes.Length & 0xFF),
             (byte)(ipBytes.Length >> 8)

@@ -7,6 +7,7 @@ namespace MultiSocketRUDPBotTester.Bot
     public class SendPacketNode : ActionNodeBase
     {
         public PacketId PacketId { get; set; }
+        public bool Unreliable { get; set; }
         public Func<Client, NetBuffer>? PacketBuilder { get; set; }
         public Dictionary<string, object> FieldValues { get; set; } = new();
 
@@ -28,7 +29,8 @@ namespace MultiSocketRUDPBotTester.Bot
                     client.BeginBotRttSample();
                 }
 
-                _ = client.SendPacket(buffer, PacketId)
+                _ = client.SendPacket(buffer, PacketId,
+                    Unreliable ? PacketType.UnreliableSendType : PacketType.SendType)
                     .ContinueWith(t => Log.Error(t.Exception!,
                         "SendPacketNode failed: {PacketId}", PacketId),
                         TaskContinuationOptions.OnlyOnFaulted);

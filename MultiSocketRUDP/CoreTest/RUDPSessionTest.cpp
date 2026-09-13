@@ -156,6 +156,49 @@ public:
 using SessionSendLifecycleTest = SessionSendTestBase<LifecycleTestCore>;
 using SessionSendOrderTest = SessionSendTestBase<SendOrderTestCore>;
 
+TEST_F(SessionSendOrderTest, RepeatedConnectResendsAckOnlyToOriginalPeerWithoutResettingSession)
+{
+	RUDPSessionBehaviorAccess::SetReserved(session);
+	RUDPSessionBehaviorAccess::SetSessionId(session, 7);
+	sockaddr_in address{};
+	address.sin_family = AF_INET;
+	address.sin_port = htons(12000);
+	address.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+	int connectedCount = 0;
+	session.connectedCallback = [&]() { ++connectedCount; };
+	auto connect = [&](const sockaddr_in& peer)
+	{
+		NetBuffer packet;
+		packet << PacketSequence{ LOGIN_PACKET_SEQUENCE } << SessionIdType{ 7 };
+		return RUDPSessionBehaviorAccess::TryConnect(session, packet, peer);
+	};
+	ASSERT_TRUE(connect(address));
+	ASSERT_EQ(core.sentSequences.size(), 1u);
+	// Treat the first ACK as lost, then advance content state before the retried request.
+	session.RegisterContentHandler();
+	NetBuffer content;
+	content << PacketSequence{ 1 } << LifecycleContentPacket::PACKET_ID << 42u;
+	ASSERT_TRUE(RUDPSessionBehaviorAccess::OnRecvPacket(session, content));
+	const auto receiveWindow = RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session);
+	core.sentSequences.clear();
+	EXPECT_FALSE(connect(address));
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ LOGIN_PACKET_SEQUENCE }));
+	EXPECT_EQ(connectedCount, 1);
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetReceiveWindowEnd(session), receiveWindow);
+	EXPECT_EQ(session.GetSessionState(), SESSION_STATE::CONNECTED);
+	core.sentSequences.clear();
+	auto other = address;
+	other.sin_port = htons(12001);
+	EXPECT_FALSE(connect(other));
+	other = address;
+	other.sin_addr.S_un.S_addr = htonl(0x7F000002);
+	EXPECT_FALSE(connect(other));
+	RUDPSessionBehaviorAccess::SetReleasing(session);
+	EXPECT_FALSE(connect(address));
+	EXPECT_TRUE(core.sentSequences.empty());
+	EXPECT_EQ(connectedCount, 1);
+}
+
 TEST_F(SessionSendOrderTest, UnreliableSendUsesIndependentSequenceWithoutAckTracking)
 {
 	NoOpPacket packet;

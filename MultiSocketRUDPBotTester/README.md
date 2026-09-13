@@ -85,4 +85,12 @@ dotnet .\MultiSocketRUDPBotTester.RttBenchmark\bin\Release\net9.0-windows7.0\Mul
 P50/P95/P99/P99.9, 타임아웃, 클라이언트별 처리량, 프로세스 CPU 및 메모리가 포함됩니다.
 현재 Ping/Pong 애플리케이션 payload는 0바이트이며 RUDP 헤더·인증 태그·ACK 트래픽은 별도입니다.
 
-PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출됩니다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 xUnit 테스트와 프로토콜 상호운용 테스트를 실행합니다. 공용 `ProtocolInteropVector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행됩니다.
+PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTester.yml`이 호출됩니다. BotTester workflow는 `MultiSocketRUDPBotTester.sln` 전체를 빌드한 후 xUnit 테스트와 프로토콜 상호운용 테스트를 실행합니다. 공용 `MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json`이 변경되면 Native GTest와 BotTester 테스트가 모두 실행됩니다.
+
+## 프로토콜 v2 / 비신뢰성 전송
+
+봇 테스터는 프로토콜 v2 서버에 접속합니다. 구버전 서버와는 호환되지 않습니다.
+
+송신 노드 설정에서 **비신뢰성 전송 (ACK·재전송 없음)**을 선택하면 독립된 번호와 nonce 방향을 사용하는 비신뢰성 채널로 전송합니다. 기존 그래프는 신뢰성 전송을 유지합니다. 송신·수신 대기열은 각각 64개이며, 가득 차면 가장 오래된 대기 패킷을 버립니다. 송신 성공은 큐 수용을 의미하며 전달을 보장하지 않습니다.
+
+수신 시 최초 인증 성공 번호를 수용하고 이후 중복·오래된 번호를 버립니다. 누락 번호를 기다리지 않으며, 신뢰성 패킷과 같은 콘텐츠 핸들러로 전달합니다. 응답의 채널은 서버 핸들러가 결정합니다. 상세 규칙은 [비신뢰성 채널 문서](../Docs/UnreliableChannel.md)를 참고하세요.

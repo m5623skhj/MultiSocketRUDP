@@ -12,6 +12,6 @@
     <Compile Include="..\MultiSocketRUDPBotTester\Buffer\NetBuffer.cs" Link="Buffer\NetBuffer.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ProtocolInteropVector.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\MultiSocketRUDP\CoreTest\ProtocolInteropV2Vector.json" Link="ProtocolInteropVector.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

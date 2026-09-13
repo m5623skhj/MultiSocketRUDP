@@ -202,7 +202,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 공용 vector:
 
 ```text
-MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json
+MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json
 ```
 
 C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문 및 예상 패킷을 읽는다. 현재 vector는 네 방향과 core/full 조합을 모두 포함한다.
@@ -211,7 +211,7 @@ C++과 C# vector consumer를 각각 실행한다.
 
 ```powershell
 msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x64
-.\MultiSocketRUDP\x64\Debug\CoreTest.exe --gtest_filter=PacketCryptoTest.AesGcmMatchesCppCSharpGoldenVectors
+.\MultiSocketRUDP\x64\Debug\CoreTest.exe --gtest_filter=PacketCryptoTest.AesGcmMatchesProtocolV2GoldenVectors
 
 dotnet build .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.sln --configuration Debug
 dotnet run --project .\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug
@@ -269,7 +269,7 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 |---|---:|---:|---:|---:|
 | `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 | 미실행 | 실행 |
 | `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
-| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 미실행 | 실행 |
+| 공용 `ProtocolInteropV2Vector.json` | 실행 | 실행 | 미실행 | 실행 |
 | `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
 | `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
 | 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
@@ -296,9 +296,9 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 2. `MultiSocketRUDPBotTester.sln` 전체 빌드
 3. `MultiSocketRUDPBotTester.UnitTests.csproj` xUnit 테스트 실행
 4. `ProtocolInteropTest.csproj` 빌드 및 실행
-5. C# 결과가 공용 `ProtocolInteropVector.json`의 예상 패킷과 일치하는지 검증
+5. C# 결과가 공용 `ProtocolInteropV2Vector.json`의 예상 패킷과 일치하는지 검증
 
-C++ consumer는 Native GTest의 `PacketCryptoTest.AesGcmMatchesCppCSharpGoldenVectors`가 검증한다.
+C++ consumer는 Native GTest의 `PacketCryptoTest.AesGcmMatchesProtocolV2GoldenVectors`가 검증한다.
 
 ### RTT Benchmark
 

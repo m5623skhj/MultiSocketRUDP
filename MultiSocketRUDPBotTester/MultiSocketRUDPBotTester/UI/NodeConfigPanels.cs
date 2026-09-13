@@ -20,6 +20,15 @@ namespace MultiSocketRUDPBotTester.UI
             };
             stack.Children.Add(combo);
 
+            var unreliable = new CheckBox
+            {
+                Content = "비신뢰성 전송 (ACK·재전송 없음)",
+                Margin = new Thickness(0, 8, 0, 0),
+                IsChecked = bool.TryParse(node.Configuration?.Properties.GetValueOrDefault("Unreliable")?.ToString(),
+                    out var savedUnreliable) && savedUnreliable
+            };
+            stack.Children.Add(unreliable);
+
             var fieldsPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             stack.Children.Add(fieldsPanel);
 
@@ -60,6 +69,7 @@ namespace MultiSocketRUDPBotTester.UI
             {
                 node.Configuration ??= new NodeConfiguration();
                 node.Configuration.PacketId = (PacketId)combo.SelectedItem;
+                node.Configuration.Properties["Unreliable"] = unreliable.IsChecked == true;
 
                 foreach (var (name, box) in fieldInputs)
                 {

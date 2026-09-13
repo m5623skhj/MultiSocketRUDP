@@ -156,6 +156,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
     {
         private const ulong LoginPacketSequence = 0;
         private const int HeaderSize = 5;
+        private const int MaxIpv4DatagramPayloadSize = 65507;
+        private const int ContentPacketAdditionalSize = sizeof(byte) + sizeof(ulong) + sizeof(uint) + CryptoHelper.AuthTagSize;
         private const int RetransmissionWakeUpMs = 16;
         private const long AckDelayRetransmissionThreshold = 1;
         private const long AckRemovalDelayLogThresholdMs = 5;
@@ -165,6 +167,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private UdpClient udpClient = null!;
         private PacketSequence lastSendSequence = 0;
+        private PacketSequence lastUnreliableSendSequence;
+        private readonly UnreliablePacketQueue unreliableSendQueue = new();
+        private readonly LatestPacketSequence unreliableReceiveSequence = new();
+        private long authenticatedReceiveCount;
 
         private readonly Lock aesGcmLock = new();
 
@@ -190,6 +196,15 @@ namespace MultiSocketRUDPBotTester.ClientCore
                     SingleReader = true,
                     SingleWriter = true
                 });
+
+        private readonly Channel<Action> unreliableProcessingChannel = Channel.CreateBounded<Action>(
+            new BoundedChannelOptions(ProtocolConstants.UnreliableQueueCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = true
+            });
+        private readonly Channel<bool> receiveWakeUp = Channel.CreateBounded<bool>(1);
 
         protected abstract void OnRecvPacket(PacketId packetId, NetBuffer buffer);
         protected virtual bool TryHandleRecvFastPath(PacketId packetId, NetBuffer buffer) => false;
@@ -224,6 +239,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
             _ = Task.Run(ReceiveAsync);
             _ = Task.Run(PacketProcessorAsync);
             _ = Task.Run(RetransmissionAsync);
+            _ = Task.Run(SendUnreliablePacketsAsync);
             _ = Task.Run(SendConnectPacketAsync);
         }
 
@@ -289,6 +305,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
             PacketId packetId,
             PacketType packetType = PacketType.SendType)
         {
+            if (packetType == PacketType.UnreliableSendType)
+            {
+                if (!SendUnreliablePacket(packetBuffer, packetId))
+                    throw new InvalidOperationException("The session is not connected or the packet exceeds the UDP size limit.");
+                return;
+            }
+
             var sequence = Interlocked.Increment(ref lastSendSequence);
 
             packetBuffer.InsertPacketType(packetType);
@@ -304,6 +327,67 @@ namespace MultiSocketRUDPBotTester.ClientCore
             }
 
             await SendPacketInternal(CreateSendPacketInfo(packetBuffer, sequence)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 비신뢰성 패킷을 큐에 수용하면 true입니다. 실제 전달이나 ACK를 보장하지 않습니다.
+        /// 연결이 종료되었거나 최종 크기가 IPv4 UDP 한도를 넘으면 버퍼를 변경하지 않고 false를 반환합니다.
+        /// 번호 발급부터 큐 삽입까지 보호하여 동시 송신 순서와 종료 시 암호화 자원 수명을 보장합니다.
+        /// </summary>
+        public bool SendUnreliablePacket(NetBuffer packetBuffer, PacketId packetId)
+        {
+            lock (aesGcmLock)
+            {
+                if (!isConnected || Volatile.Read(ref isDisposed) != 0 || SessionInfo.AesGcm == null)
+                    return false;
+
+                // 입력 버퍼에는 헤더가 이미 있습니다. 타입·번호·ID·태그를 추가한 최종 크기를 검사합니다.
+                if (packetBuffer.GetLength() > MaxIpv4DatagramPayloadSize - ContentPacketAdditionalSize)
+                    return false;
+
+                var sequence = ++lastUnreliableSendSequence;
+                packetBuffer.InsertPacketType(PacketType.UnreliableSendType);
+                packetBuffer.InsertPacketSequence(sequence);
+                packetBuffer.InsertPacketId(packetId);
+                NetBuffer.EncodePacket(SessionInfo.AesGcm, packetBuffer, sequence,
+                    PacketDirection.ClientToServerUnreliable, SessionInfo.SessionSalt, isCorePacket: false);
+
+                // 큐가 원본 버퍼와 독립된 데이터를 소유합니다.
+                return unreliableSendQueue.Enqueue(packetBuffer.GetPacketBuffer());
+            }
+        }
+
+        private async Task SendUnreliablePacketsAsync()
+        {
+            try
+            {
+                await foreach (var packet in unreliableSendQueue.ReadAllAsync(CancellationToken.Token)
+                    .ConfigureAwait(false))
+                {
+                    if (!isConnected || Volatile.Read(ref isDisposed) != 0)
+                        break;
+                    try
+                    {
+                        await SendDatagramAsync(udpClient, packet).ConfigureAwait(false);
+                    }
+                    catch (SocketException ex) when (ex.SocketErrorCode == SocketError.MessageSize)
+                    {
+                        // 소켓이 더 작은 한도를 적용하더라도 해당 패킷만 버리고 송신 작업을 계속합니다.
+                        Log.Warning("Unreliable packet exceeds socket size limit: {Length}", packet.Length);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch (Exception ex)
+            {
+                Log.Warning("SendUnreliablePacketsAsync failed: {Error}", ex.Message);
+                Cleanup(SessionDisconnectReason.Manual);
+            }
+            finally
+            {
+                unreliableSendQueue.Clear();
+            }
         }
 
         private async Task<bool> SendPacketInternal(SendPacketInfo sendPacketInfo)
@@ -398,18 +482,19 @@ namespace MultiSocketRUDPBotTester.ClientCore
         {
             try
             {
-                await foreach (var action in
-                    recvProcessingChannel.Reader
-                        .ReadAllAsync(CancellationToken.Token)
-                        .ConfigureAwait(false))
+                await foreach (var signal in receiveWakeUp.Reader.ReadAllAsync(CancellationToken.Token)
+                    .ConfigureAwait(false))
                 {
-                    try
+                    // 채널마다 하나씩 처리하여 비신뢰성 트래픽이 연결 콜백과 신뢰성 처리를 막지 않게 합니다.
+                    while (!CancellationToken.IsCancellationRequested)
                     {
-                        action();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error("PacketProcessorAsync: action failed: {Error}", ex.Message);
+                        var hasReliable = recvProcessingChannel.Reader.TryRead(out var reliable);
+                        var hasUnreliable = unreliableProcessingChannel.Reader.TryRead(out var unreliable);
+                        if (!hasReliable && !hasUnreliable)
+                            break;
+                        ExecuteReceivedAction(reliable);
+                        if (!CancellationToken.IsCancellationRequested)
+                            ExecuteReceivedAction(unreliable);
                     }
                 }
             }
@@ -417,6 +502,27 @@ namespace MultiSocketRUDPBotTester.ClientCore
             {
                 Log.Information("PacketProcessorAsync: Cancelled");
             }
+            finally
+            {
+                while (recvProcessingChannel.Reader.TryRead(out _)) { }
+                while (unreliableProcessingChannel.Reader.TryRead(out _)) { }
+            }
+        }
+
+        private static void ExecuteReceivedAction(Action? action)
+        {
+            try { action?.Invoke(); }
+            catch (Exception ex)
+            {
+                Log.Error("PacketProcessorAsync: action failed: {Error}", ex.Message);
+            }
+        }
+
+        private void QueueReceivedAction(Action action, bool unreliable = false)
+        {
+            var writer = unreliable ? unreliableProcessingChannel.Writer : recvProcessingChannel.Writer;
+            if (writer.TryWrite(action))
+                receiveWakeUp.Writer.TryWrite(true);
         }
 
         /// <summary>
@@ -467,11 +573,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             buffer.SkipBytes(HeaderSize);
             var packetType = (PacketType)buffer.ReadByte();
-            var isCorePacket = packetType != PacketType.SendType;
+            var isCorePacket = packetType != PacketType.SendType && packetType != PacketType.UnreliableSendType;
 
             PacketDirection direction;
             switch (packetType)
             {
+                case PacketType.UnreliableSendType:
+                    direction = PacketDirection.ServerToClientUnreliable;
+                    break;
                 case PacketType.HeartbeatType:
                 case PacketType.SendType:
                     direction = PacketDirection.ServerToClient;
@@ -510,6 +619,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 return;
             }
 
+            Interlocked.Increment(ref authenticatedReceiveCount);
             var packetSequence = buffer.ReadULong();
             var packetId = PacketId.InvalidPacketId;
             if (!isCorePacket)
@@ -517,10 +627,18 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 packetId = (PacketId)buffer.ReadUInt();
             }
 
+            if (packetType == PacketType.UnreliableSendType &&
+                (!isConnected || !unreliableReceiveSequence.TryAccept(packetSequence)))
+                return;
+
             OnRttPacketReceived(packetId, Stopwatch.GetTimestamp());
 
             switch (packetType)
             {
+                case PacketType.UnreliableSendType:
+                    if (!TryHandleRecvFastPath(packetId, buffer))
+                        QueueReceivedAction(() => OnRecvPacket(packetId, buffer), unreliable: true);
+                    break;
                 case PacketType.HeartbeatType:
                 case PacketType.SendType:
                     await SendReplyToServerAsync(packetSequence).ConfigureAwait(false);
@@ -541,7 +659,7 @@ namespace MultiSocketRUDPBotTester.ClientCore
                             continue;
                         }
 
-                        recvProcessingChannel.Writer.TryWrite(() =>
+                        QueueReceivedAction(() =>
                         {
                             OnRecvPacket(capturedPid, capturedBuf);
                         });
@@ -608,15 +726,23 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             if (packetSequence == LoginPacketSequence)
             {
-                isConnected = true;
-                SessionInfo.SessionState = SessionState.Connected;
-                _ = Task.Run(StartServerAliveCheck);
-
-                recvProcessingChannel.Writer.TryWrite(() =>
+                lock (aesGcmLock)
                 {
-                    try { OnConnected(); }
-                    catch (Exception ex) { Log.Error("OnConnected failed: {Error}", ex.Message); }
-                });
+                    if (Volatile.Read(ref isDisposed) != 0 ||
+                        SessionInfo.SessionState != SessionState.Connecting)
+                        return;
+
+                    isConnected = true;
+                    SessionInfo.SessionState = SessionState.Connected;
+                    var token = CancellationToken.Token;
+                    _ = Task.Run(() => StartServerAliveCheck(token));
+                    QueueReceivedAction(() =>
+                    {
+                        if (Volatile.Read(ref isDisposed) != 0) return;
+                        try { OnConnected(); }
+                        catch (Exception ex) { Log.Error("OnConnected failed: {Error}", ex.Message); }
+                    });
+                }
 
                 Log.Information("Connected to server. SessionId={Id}", SessionInfo.SessionId);
             }
@@ -742,8 +868,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
         private async Task DisconnectAsync(SessionDisconnectReason inReason)
         {
-            isConnected = false;
-            SessionInfo.SessionState = SessionState.Disconnecting;
+            lock (aesGcmLock)
+            {
+                if (Volatile.Read(ref isDisposed) != 0 || SessionInfo.SessionState == SessionState.Disconnecting)
+                    return;
+                isConnected = false;
+                SessionInfo.SessionState = SessionState.Disconnecting;
+            }
 
             try
             {
@@ -775,17 +906,17 @@ namespace MultiSocketRUDPBotTester.ClientCore
             return buffer;
         }
 
-        private async Task StartServerAliveCheck()
+        private async Task StartServerAliveCheck(System.Threading.CancellationToken token)
         {
-            PacketSequence prev = 0;
+            var prev = Interlocked.Read(ref authenticatedReceiveCount);
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
             try
             {
-                while (await timer.WaitForNextTickAsync(CancellationToken.Token).ConfigureAwait(false))
+                while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
                 {
                     if (!isConnected) break;
 
-                    var curr = receivePacketOrderer.GetExpectedSequence();
+                    var curr = Interlocked.Read(ref authenticatedReceiveCount);
 
                     if (prev != curr) { prev = curr; continue; }
 
@@ -806,9 +937,14 @@ namespace MultiSocketRUDPBotTester.ClientCore
             var capturedSessionId = SessionInfo.SessionId;
             Volatile.Write(ref disconnectReason, (int)inReason);
 
-            isConnected = false;
-
+            lock (aesGcmLock)
+            {
+                isConnected = false;
+                unreliableSendQueue.Complete();
+            }
             recvProcessingChannel.Writer.TryComplete();
+            unreliableProcessingChannel.Writer.TryComplete();
+            receiveWakeUp.Writer.TryComplete();
             CancellationToken.Cancel();
 
             OnDisconnected();
@@ -820,11 +956,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
 
             SessionInfo.SessionState = SessionState.Disconnected;
             SessionInfo.SessionId = 0;
-            SessionInfo.SessionKey = [];
-            SessionInfo.SessionSalt = [];
-
             lock (aesGcmLock)
             {
+                SessionInfo.SessionKey = [];
+                SessionInfo.SessionSalt = [];
                 if (SessionInfo.AesGcm != null)
                 {
                     SessionInfo.AesGcm.Dispose();
