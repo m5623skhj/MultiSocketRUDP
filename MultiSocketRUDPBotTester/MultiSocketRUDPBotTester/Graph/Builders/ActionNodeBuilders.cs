@@ -44,6 +44,9 @@ namespace MultiSocketRUDPBotTester.Graph.Builders
             {
                 Name = visual.NodeType!.Name,
                 PacketId = packetId,
+                Unreliable = bool.TryParse(
+                    visual.Configuration?.Properties.GetValueOrDefault("Unreliable")?.ToString(),
+                    out var unreliable) && unreliable,
                 FieldValues = fieldValues
             };
         }

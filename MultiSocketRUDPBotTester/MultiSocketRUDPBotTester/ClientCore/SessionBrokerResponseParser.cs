@@ -16,6 +16,13 @@ namespace MultiSocketRUDPBotTester.ClientCore
         public static ParsedSessionBrokerResponse Parse(ReadOnlySpan<byte> data)
         {
             var offset = 0;
+            EnsureAvailable(data, offset, sizeof(uint));
+            var version = BinaryPrimitives.ReadUInt32LittleEndian(data);
+            if (version != ProtocolConstants.Version)
+            {
+                throw new InvalidDataException($"Unsupported protocol version: {version}.");
+            }
+            offset += sizeof(uint);
             var resultCode = (ConnectResultCode)ReadByte(data, ref offset);
             if (resultCode != ConnectResultCode.Success)
             {

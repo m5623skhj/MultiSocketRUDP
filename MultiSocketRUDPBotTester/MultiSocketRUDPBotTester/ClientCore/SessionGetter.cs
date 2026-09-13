@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -37,6 +38,10 @@ namespace MultiSocketRUDPBotTester.ClientCore
                 clientCertificates: null,
                 enabledSslProtocols: SslProtocols.Tls12,
                 checkCertificateRevocation: true);
+
+            var version = new byte[sizeof(uint)];
+            BinaryPrimitives.WriteUInt32BigEndian(version, ProtocolConstants.Version);
+            await sslStream.WriteAsync(version);
         }
 
         public async Task<int> ReceiveAsync(byte[] buffer, int offset)

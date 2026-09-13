@@ -33,7 +33,7 @@
 |---|---:|---:|---:|---:|
 | `MultiSocketRUDP/**`, C++ 테스트, submodule | 실행 | 미실행 | 미실행 | 실행 |
 | `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
-| 공용 `ProtocolInteropVector.json` | 실행 | 실행 | 미실행 | 실행 |
+| 공용 `ProtocolInteropV2Vector.json` | 실행 | 실행 | 미실행 | 실행 |
 | `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
 | `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
 | 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |

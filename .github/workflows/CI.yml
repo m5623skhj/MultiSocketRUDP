@@ -34,9 +34,9 @@ jobs:
               - '.gitmodules'
               - '.github/workflows/GoogleTest.yml'
               - '.github/workflows/CI.yml'
-              - 'MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json'
             bot_tester:
               - 'MultiSocketRUDPBotTester/**'
+              - 'MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json'
               - '.github/workflows/BotTester.yml'
               - '.github/workflows/CI.yml'
             workflows:

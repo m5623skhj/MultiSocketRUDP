@@ -525,6 +525,12 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 
 	if (not stateMachine.TryTransitionToConnected())
 	{
+		// A lost connection ACK must be recoverable without repeating connection setup.
+		if (IsConnected() && CheckMyClient(inClientAddr))
+		{
+			SendReplyToClient(packetSequence);
+		}
+		// true is reserved for the first transition: the caller increments the user count.
 		return false;
 	}
 

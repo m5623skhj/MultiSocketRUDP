@@ -19,7 +19,7 @@ new NodeConfigPanelRegistry(createDynamicPorts)
 
 | 패널 클래스 | 대상 노드 | 설정 항목 |
 |------------|-----------|-----------|
-| `SendPacketConfigPanel` | SendPacketNode | PacketId ComboBox |
+| `SendPacketConfigPanel` | SendPacketNode | PacketId ComboBox, 본문 필드, 비신뢰성 전송 CheckBox |
 | `DelayConfigPanel` | DelayNode | Delay (ms) TextBox |
 | `RandomDelayConfigPanel` | RandomDelayNode | Min / Max Delay TextBox |
 | `LogConfigPanel` | LogNode | 메시지 TextBox (멀티라인) + 플레이스홀더 힌트 |
@@ -36,6 +36,8 @@ new NodeConfigPanelRegistry(createDynamicPorts)
 | `ConditionalConfigPanel` | ConditionalNode | Left Type/Value + Operator + Right Type/Value |
 
 ---
+
+송신 노드의 비신뢰성 선택은 `NodeConfiguration.Properties["Unreliable"]`에 저장한다. 속성이 없는 기존 그래프는 신뢰성 전송을 사용한다. 비신뢰성을 선택하면 ACK·재전송 없이 보내며, 응답 송신 방식은 서버 핸들러가 결정한다.
 
 ## ConditionalConfigPanel 상세
 

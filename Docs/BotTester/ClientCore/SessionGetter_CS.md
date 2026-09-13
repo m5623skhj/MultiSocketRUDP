@@ -31,6 +31,7 @@ ConnectAsync(host, port, certFingerprint?)
        enabledSslProtocols: TLS 1.2,
        checkCertificateRevocation: true
      )
+  4. TLS 스트림에 프로토콜 버전 2를 4바이트 big endian으로 송신
 
 ReceiveAsync(buffer, offset)
   → sslStream.ReadAsync(buffer, offset, buffer.Length - offset)
@@ -64,7 +65,7 @@ new Client(buffer[PacketHeaderSize..totalBytes])
 public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
 ```
 
-지정된 호스트와 포트로 TCP 연결을 맺고 TLS 인증을 수행한다.
+지정된 호스트와 포트로 TCP 연결을 맺고 TLS 인증 후 프로토콜 버전 2를 보낸다. 브로커 응답 본문은 4바이트 little-endian 버전 필드로 시작하며 `SessionBrokerResponseParser`가 구버전·알 수 없는 버전·잘린 응답을 거부한다.
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|

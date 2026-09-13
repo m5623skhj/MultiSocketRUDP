@@ -54,11 +54,11 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 
 ## C++/C# 프로토콜 상호운용
 
-`MultiSocketRUDPBotTester/ProtocolInteropTest/ProtocolInteropVector.json`을 C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 함께 사용한다. 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문과 예상 패킷이 양쪽에서 일치해야 한다.
+`MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json`을 C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 함께 사용한다. 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문과 예상 패킷이 양쪽에서 일치해야 한다.
 
 ```powershell
 msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x64
-.\MultiSocketRUDP\x64\Debug\CoreTest.exe --gtest_filter=PacketCryptoTest.AesGcmMatchesCppCSharpGoldenVectors
+.\MultiSocketRUDP\x64\Debug\CoreTest.exe --gtest_filter=PacketCryptoTest.AesGcmMatchesProtocolV2GoldenVectors
 
 dotnet build .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.sln --configuration Debug
 dotnet run --project .\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInteropTest.csproj --configuration Debug

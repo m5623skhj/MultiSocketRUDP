@@ -14,6 +14,7 @@
 - `HoldingPacketStore`
 - `BufferStore`
 - `Channel<Action>` 기반 수신 후속 처리 큐
+- 비신뢰성 송신·수신 대기열 (각 64개, 가득 차면 가장 오래된 대기 패킷 제거)
 
 이 구현은 C++ `RUDPClientCore`와 프로토콜은 같지만 내부 구조는 다르다.
 
@@ -30,6 +31,7 @@
 5. `Task.Run(PacketProcessorAsync)`
 6. `Task.Run(RetransmissionAsync)`
 7. `Task.Run(SendConnectPacketAsync)`
+8. `Task.Run(SendUnreliablePacketsAsync)`
 
 즉 `PacketProcessorAsync()`는 현재 시작 흐름에 포함된다.
 
@@ -40,6 +42,7 @@
 현재 C#도 아래 순서로 읽는다.
 
 ```text
+protocolVersion 4B (little endian, 값 2)
 CONNECT_RESULT_CODE 1B
 serverIp string
 serverPort 2B
@@ -64,6 +67,8 @@ sessionSalt 16B
 6. `BufferStore`에 추적 등록
 7. `UdpClient.SendAsync(...)`
 
+`SendUnreliablePacket(NetBuffer, PacketId)`은 별도 64비트 번호(최초 1)와 `ClientToServerUnreliable` 방향으로 암호화하여 비신뢰성 큐에 넣는다. `BufferStore`에 등록하지 않아 ACK·재전송을 사용하지 않는다. 가득 찬 큐의 가장 오래된 미송신 패킷을 버리고 새 패킷을 수용해도 반환값은 `true`이며, 연결 종료 시에는 `false`다. 번호 발급·암호화·삽입은 동일한 잠금으로 보호한다.
+
 ---
 
 ## 수신
@@ -79,6 +84,10 @@ sessionSalt 16B
 - `PacketProcessorAsync()`로 사용자 처리 전달
 
 를 수행한다.
+
+`UnreliableSendType`(7)은 `ServerToClientUnreliable` 방향으로 인증한 뒤 최초 번호를 수용하고, 이후 마지막 수용 번호 이하를 버린다. ACK와 신뢰성 순서 대기를 거치지 않는다. 비신뢰성 콜백 대기열이 가득 차면 가장 오래된 대기 콜백을 제거한다. 두 채널의 콜백은 같은 처리 작업에서 번갈아 실행한다.
+
+서버 생존 검사는 인증에 성공한 수신 횟수를 기준으로 한다. 비신뢰성 패킷만 도착해도 연결을 유지하며 인증 실패 패킷은 반영하지 않는다. 64비트 번호 소진·순환 방어는 이번 범위에 포함하지 않는다.
 
 ---
 

@@ -216,7 +216,7 @@ public sealed class NetBufferCryptoTests
 
         CryptoHelper.WriteNonce(nonce, Salt, 0x0102030405060708UL, PacketDirection.ServerToClientReply);
 
-        Assert.Equal((byte)(0xC0 | (Salt[0] & 0x3F)), nonce[0]);
+        Assert.Equal((byte)(0x60 | (Salt[0] & 0x1F)), nonce[0]);
         Assert.Equal(Salt.AsSpan(1, 3).ToArray(), nonce[1..4].ToArray());
         Assert.Equal(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, nonce[4..].ToArray());
     }

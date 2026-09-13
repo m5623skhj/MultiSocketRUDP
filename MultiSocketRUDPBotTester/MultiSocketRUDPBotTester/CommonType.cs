@@ -10,6 +10,7 @@ public enum PacketType : byte
     SendReplyType = 4,
     HeartbeatType = 5,
     HeartbeatReplyType = 6,
+    UnreliableSendType = 7,
 }
 
 public static class CommonFunc
@@ -37,5 +38,13 @@ public enum PacketDirection : byte
     ClientToServerReply = 1,
     ServerToClient = 2,
     ServerToClientReply = 3,
+    ClientToServerUnreliable = 4,
+    ServerToClientUnreliable = 5,
     Invalid = 255
+}
+
+public static class ProtocolConstants
+{
+    public const uint Version = 2;
+    public const int UnreliableQueueCapacity = 64;
 }

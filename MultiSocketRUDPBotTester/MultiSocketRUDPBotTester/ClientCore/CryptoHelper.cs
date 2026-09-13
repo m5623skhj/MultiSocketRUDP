@@ -58,8 +58,8 @@ namespace MultiSocketRUDPBotTester.ClientCore
             ulong packetSequence,
             PacketDirection direction)
         {
-            var directionBits = (byte)((byte)direction << 6);
-            nonce[0] = (byte)(directionBits | (sessionSalt[0] & 0x3F));
+            var directionBits = (byte)((byte)direction << 5);
+            nonce[0] = (byte)(directionBits | (sessionSalt[0] & 0x1F));
             nonce[1] = sessionSalt[1];
             nonce[2] = sessionSalt[2];
             nonce[3] = sessionSalt[3];

@@ -331,6 +331,12 @@ public sealed class NodeBuilderTests
         var node = Assert.IsType<SendPacketNode>(builder.Build(visual));
         Assert.Equal(PacketId.TestPacketReq, node.PacketId);
         Assert.Equal(123, node.FieldValues["order"]);
+        Assert.False(node.Unreliable);
+
+        // 저장 파일에서 object 속성이 JsonElement로 복원되는 경우도 지원합니다.
+        visual.Configuration!.Properties["Unreliable"] = JsonSerializer.SerializeToElement(true);
+        var unreliable = Assert.IsType<SendPacketNode>(builder.Build(visual));
+        Assert.True(unreliable.Unreliable);
     }
 
     /// <summary>
