@@ -1302,6 +1302,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "5201fe3b01767aa743e6041a676ad1bfe1e12c5d",
+      "commitSubject": "* 연결 ACK 유실 복구 및 중복 연결 처리 방지   * 서버가 동일 클라이언트의 연결 재요청에 ACK만 재전송하도록 수정     * 접속자 수, 연결 콜백 및 수신 상태 유지     * 다른 주소·포트와 종료 중인 세션의 요청 제외   * 봇 테스터의 최초 연결 전환에서만 연결 콜백과 생존 검사 실행     * 종료 경합 중 연결 상태 복원 방지     * 생존 검사 작업에 취소 토큰을 미리 전달   * 연결 재요청, 중복 ACK 및 종료 경합 회귀 테스트 추가",
+      "recordedAtUtc": "2026-09-13T12:45:10.5018743+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001142",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.17395109999999997,
+            "medianMinRttMs": 0.1056,
+            "medianP50RttMs": 0.193,
+            "medianP95RttMs": 0.2239,
+            "medianP99RttMs": 0.2434,
+            "medianMaxRttMs": 0.3386,
+            "worstMaxRttMs": 1.8743,
+            "medianElapsedSeconds": 0.1807377,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.567241400000006,
+            "medianMinRttMs": 0.058,
+            "medianP50RttMs": 0.1475,
+            "medianP95RttMs": 32.1938,
+            "medianP99RttMs": 64.3166,
+            "medianMaxRttMs": 164.8461,
+            "worstMaxRttMs": 197.2465,
+            "medianElapsedSeconds": 5.5704667,
+            "totalRetransmissionSuspectedCount": 173
+          }
+        }
+      ]
     }
   ]
 }
