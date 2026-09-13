@@ -1426,6 +1426,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "7287ccd1f6cf7e35ee240950758b5d39f5c742a7",
+      "commitSubject": "* 멀티스레드 안정성 검증을 위한 야간·수동 CI 추가   * 동시 송수신·연결 해제·세션 풀 회수 및 재사용 통합 테스트 추가   * 케이스별 독립 프로세스 반복 실행과 최초 실패 로그·재현 명령 보존   * 실행 시간 제한 및 timeout 발생 시 자식 프로세스 종료 처리   * 실행기 실패 판정 검증과 안정성 검사 가이드 추가",
+      "recordedAtUtc": "2026-09-13T15:30:58.4797465+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001173",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.1768595999999998,
+            "medianMinRttMs": 0.106,
+            "medianP50RttMs": 0.1789,
+            "medianP95RttMs": 0.2313,
+            "medianP99RttMs": 0.275,
+            "medianMaxRttMs": 0.7727,
+            "worstMaxRttMs": 8.543,
+            "medianElapsedSeconds": 0.1822299,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.043309100000004,
+            "medianMinRttMs": 0.0615,
+            "medianP50RttMs": 0.1547,
+            "medianP95RttMs": 32.907,
+            "medianP99RttMs": 64.873,
+            "medianMaxRttMs": 197.3249,
+            "worstMaxRttMs": 297.3184,
+            "medianElapsedSeconds": 6.0488539,
+            "totalRetransmissionSuspectedCount": 201
+          }
+        }
+      ]
     }
   ]
 }
