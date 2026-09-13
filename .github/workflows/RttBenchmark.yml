@@ -74,7 +74,7 @@ jobs:
           -p:Optimize=true
 
       - name: Run history generator unit tests
-        run: python Scripts/RTTBenchmark/test_update_rtt_history.py
+        run: python -m unittest discover -s Scripts/RTTBenchmark -p "test_*.py"
 
       - name: Run RTT scenarios
         shell: pwsh
@@ -130,6 +130,24 @@ jobs:
 
           Get-Content -LiteralPath "rtt-results/rtt-summary.md" -Raw |
             Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Compare channel RTT and delivery
+        shell: pwsh
+        run: |
+          $historyArguments = @()
+          git cat-file -e FETCH_HEAD:channel-history.json 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            git show FETCH_HEAD:channel-history.json | Set-Content previous-channel-history.json -Encoding utf8
+            if ($LASTEXITCODE -ne 0) { throw "Failed to read channel history." }
+            $historyArguments = @('--history', 'previous-channel-history.json')
+          }
+          $global:LASTEXITCODE = 0
+          python Scripts/RTTBenchmark/channel_history.py @historyArguments `
+            --results rtt-results/channel-unreliable-only.json rtt-results/channel-reliable-baseline.json rtt-results/channel-mixed.json `
+            --output-history rtt-results/channel-history.json --markdown rtt-results/channel-summary.md
+          if ($LASTEXITCODE -ne 0) { throw "Channel summary generation failed." }
+          Get-Content rtt-results/channel-summary.md -Raw | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          Get-Content rtt-results/channel-summary.md -Raw | Add-Content rtt-results/rtt-summary.md -Encoding utf8
 
       - name: Upsert PR benchmark comment
         if: >-
@@ -230,9 +248,21 @@ jobs:
             --repository source \
             --max-points 10
 
+          channel_history_arguments=()
+          if [[ -f "$history_root/channel-history.json" ]]; then
+            channel_history_arguments=(--history "$history_root/channel-history.json")
+          fi
+          python source/Scripts/RTTBenchmark/channel_history.py \
+            "${channel_history_arguments[@]}" \
+            --results results/channel-unreliable-only.json results/channel-reliable-baseline.json results/channel-mixed.json \
+            --output-history "$history_root/channel-history.json" \
+            --markdown "$history_root/channel-summary.md"
+
           git -C "$history_root" config user.name "github-actions[bot]"
           git -C "$history_root" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$history_root" add \
+            channel-history.json \
+            channel-summary.md \
             rtt-history.json \
             rtt-loss-0.svg \
             rtt-loss-10.svg \

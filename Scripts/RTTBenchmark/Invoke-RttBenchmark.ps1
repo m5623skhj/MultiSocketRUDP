@@ -26,7 +26,12 @@ param(
     [int]$ServerThreadCount = 1,
     [int]$SeedBase = 20260803,
     [string]$BenchmarkHost = "127.0.0.1",
-    [int]$SessionBrokerPort = 11011
+    [int]$SessionBrokerPort = 11011,
+    [switch]$ChannelsOnly,
+    [ValidateRange(1, 100000)]
+    [int]$ChannelSamples = 1000,
+    [ValidateRange(1, 20)]
+    [int]$ChannelRuns = 3
 )
 
 $ErrorActionPreference = "Stop"
@@ -154,6 +159,7 @@ try {
 
     Wait-ForTcpPort -TargetHost $BenchmarkHost -TargetPort $SessionBrokerPort -Process $serverProcess -TimeoutSeconds 30
 
+    if (-not $ChannelsOnly) {
     Invoke-Scenario `
         -Name "Loss 0%" `
         -LossRate 0.0 `
@@ -169,6 +175,17 @@ try {
         -WarmupSamples $LossWarmupSamples `
         -ScenarioSeed ($SeedBase + 1000) `
         -OutputPath (Join-Path $outputDirectoryPath "rtt-loss-10.json")
+    }
+
+    foreach ($scenario in @('unreliable-only', 'reliable-baseline', 'mixed')) {
+        & dotnet $script:benchmarkDllPath channel `
+            --host $BenchmarkHost --port $SessionBrokerPort `
+            --scenario $scenario --samples $ChannelSamples --runs $ChannelRuns `
+            --warmup-samples 100 --timeout-ms 1000 --run-timeout-seconds 60 `
+            --server-thread-count $ServerThreadCount --loss-rate 0 --seed-base $SeedBase `
+            --commit $CommitSha --output (Join-Path $outputDirectoryPath "channel-$scenario.json")
+        if ($LASTEXITCODE -ne 0) { throw "Channel benchmark '$scenario' failed: $LASTEXITCODE" }
+    }
 }
 finally {
     if ($null -ne $serverProcess -and -not $serverProcess.HasExited) {

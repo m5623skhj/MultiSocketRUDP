@@ -30,6 +30,7 @@ private:
 #pragma region Packet Handler
 public:
 	void OnPing(const Ping& packet);
+	void OnChannelEcho(const ChannelEchoReq& packet);
 	void OnTestStringPacketReq(const TestStringPacketReq& packet);
 	void OnTestPacketReq(const TestPacketReq& packet);
 #pragma endregion Packet Handler
