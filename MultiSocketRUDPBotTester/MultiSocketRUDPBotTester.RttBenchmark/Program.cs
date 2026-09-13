@@ -3,6 +3,13 @@ using MultiSocketRUDPBotTester.RttBenchmark;
 
 try
 {
+    if (args.Length > 0 && args[0] == "channel")
+    {
+        var channelOptions = RttBenchmarkOptions.Parse(args[1..]);
+        var channelResult = await ChannelRttBenchmark.RunAsync(channelOptions);
+        await WriteResultAsync(channelOptions.OutputPath, channelResult);
+        return channelResult.Healthy ? 0 : 2;
+    }
     if (args.Length > 0 && string.Equals(args[0], "stress", StringComparison.OrdinalIgnoreCase))
     {
         var stressOptions = RttStressBenchmarkOptions.Parse(args);

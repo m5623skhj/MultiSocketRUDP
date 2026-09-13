@@ -139,6 +139,24 @@ public:
 	int order;
 };
 
+// Benchmark IDs are echoed unchanged; the request selects the response channel.
+class ChannelEchoReq final : public IPacket
+{
+public:
+	GET_PACKET_ID(7)
+	SET_PARAMETERS(requestId, unreliable)
+	uint64_t requestId{};
+	BYTE unreliable{};
+};
+
+class ChannelEchoRes final : public IPacket
+{
+public:
+	GET_PACKET_ID(8)
+	SET_PARAMETERS(requestId, unreliable)
+	uint64_t requestId{};
+	BYTE unreliable{};
+};
 #pragma pack(pop)
 
 ////////////////////////////////////////////////////////////////////////////////////
