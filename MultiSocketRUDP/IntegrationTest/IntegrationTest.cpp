@@ -950,6 +950,39 @@ namespace
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}
 
+	TEST_F(IntegrationFixture, ConcurrentTrafficDisconnectAndSessionReuseAcrossWaves)
+	{
+		constexpr int CLIENT_COUNT = 4;
+		constexpr int MESSAGE_COUNT = 8;
+		const auto unusedBefore = server->GetUnusedSessionCount();
+		ASSERT_GE(unusedBefore, CLIENT_COUNT);
+		// Exceed the pool size while keeping the same server alive to force ID reuse.
+		const int waveCount = unusedBefore / CLIENT_COUNT + 1;
+		for (int wave = 0; wave < waveCount; ++wave)
+		{
+			SCOPED_TRACE(wave);
+			std::cout << "[IntegrationTest] concurrent wave " << wave + 1 << '/' << waveCount << std::endl;
+			const auto result = RunClientScenario({ L"--scenario", L"concurrent-echo-disconnect" }, 70s);
+			ASSERT_TRUE(result.completed) << result.output;
+			ASSERT_EQ(result.exitCode, 0u) << result.output;
+			const int expectedClients = (wave + 1) * CLIENT_COUNT;
+			ASSERT_TRUE(WaitUntil(25s, [this, unusedBefore, expectedClients]()
+			{
+				return server->GetConnectedSessionCount() == 0 &&
+					server->GetUnusedSessionCount() == unusedBefore &&
+					GetSessionStats().releasedCount.load(std::memory_order_relaxed) == expectedClients;
+			}));
+			EXPECT_EQ(server->GetAllConnectedCount(), expectedClients);
+			EXPECT_EQ(server->GetAllDisconnectedCount(), expectedClients);
+			EXPECT_EQ(GetSessionStats().echoRequestCount.load(std::memory_order_relaxed), expectedClients * MESSAGE_COUNT);
+		}
+		std::scoped_lock lock(GetSessionStats().connectedSessionIdsMutex);
+		auto sessionIds = GetSessionStats().connectedSessionIds;
+		ASSERT_EQ(sessionIds.size(), static_cast<size_t>(waveCount * CLIENT_COUNT));
+		std::sort(sessionIds.begin(), sessionIds.end());
+		EXPECT_NE(std::adjacent_find(sessionIds.begin(), sessionIds.end()), sessionIds.end());
+	}
+
 	TEST_F(IntegrationFixture, OrderedBurstRoundTripPreservesApplicationOrder)
 	{
 		ClientHarnessProcess process;

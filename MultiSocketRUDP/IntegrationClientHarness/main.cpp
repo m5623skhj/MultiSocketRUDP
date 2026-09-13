@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -288,6 +289,54 @@ namespace
 		return true;
 	}
 
+	// Each worker owns one client; traffic and disconnects overlap across clients.
+	bool RunConcurrentEchoDisconnectScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
+	{
+		constexpr int CLIENT_COUNT = 4;
+		constexpr int MESSAGE_COUNT = 8;
+		std::vector<std::unique_ptr<TestableRUDPClient>> clients;
+		for (int index = 0; index < CLIENT_COUNT; ++index)
+		{
+			auto client = std::make_unique<TestableRUDPClient>();
+			if (not client->StartClient(clientCoreOptionPath, sessionGetterOptionPath, true) ||
+				not client->WaitForConnected(8s))
+			{
+				return false;
+			}
+			clients.emplace_back(std::move(client));
+		}
+
+		std::vector<std::future<bool>> workers;
+		for (int index = 0; index < CLIENT_COUNT; ++index)
+		{
+			workers.emplace_back(std::async(std::launch::async, [client = clients[index].get(), index]()
+			{
+				bool succeeded = true;
+				for (int messageIndex = 0; messageIndex < MESSAGE_COUNT; ++messageIndex)
+				{
+					const auto message = "concurrent-" + std::to_string(index) + "-" + std::to_string(messageIndex);
+					client->SendEchoRequestPacket(message);
+					if (not client->WaitForEcho(message, 3s))
+					{
+						succeeded = false;
+						break;
+					}
+				}
+				client->DisconnectClient();
+				Sleep(1000);
+				client->StopClient();
+				return succeeded;
+			}));
+		}
+		bool succeeded = true;
+		for (auto& worker : workers)
+		{
+			// Always join every worker before destroying its client, even after a failure.
+			succeeded = worker.get() && succeeded;
+		}
+		return succeeded;
+	}
+
 	bool RunOrderedBurstScenario(const std::wstring& clientCoreOptionPath, const std::wstring& sessionGetterOptionPath)
 	{
 		auto client = std::make_unique<TestableRUDPClient>();
@@ -386,6 +435,10 @@ int wmain(const int argc, wchar_t* argv[])
 	{
 		const int clientCount = argc >= 4 ? (std::max)(1, _wtoi(argv[3])) : 3;
 		exitCode = RunMultiEchoScenario(clientCoreOptionPath, sessionGetterOptionPath, clientCount) ? 0 : 1;
+	}
+	else if (scenario == L"concurrent-echo-disconnect")
+	{
+		exitCode = RunConcurrentEchoDisconnectScenario(clientCoreOptionPath, sessionGetterOptionPath) ? 0 : 1;
 	}
 	else if (scenario == L"ordered-burst")
 	{

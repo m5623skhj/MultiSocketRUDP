@@ -1,0 +1,104 @@
+name: Native Stability
+
+on:
+  schedule:
+    # 03:30 Asia/Seoul, on the default branch.
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Repeat each isolated case (1-100; total test budget is 40 minutes)'
+        type: number
+        default: 5
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-stability-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stability:
+    name: Multithreaded lifecycle stability
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Verify stability runner failure handling
+        shell: pwsh
+        run: ./Scripts/Stability/Test-StabilityRunner.ps1
+
+      - name: Restore NuGet
+        run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
+
+      - name: Generate IntegrationTest certificate
+        shell: cmd
+        run: MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
+
+      - name: Build GTest
+        shell: pwsh
+        run: |
+          $gtestRoot = 'external/CommonCode/Common/googletest-main'
+          cmake -S $gtestRoot -B "$gtestRoot/build" -A x64 -T v143
+          if ($LASTEXITCODE -ne 0) { throw 'GTest configure failed.' }
+          cmake --build "$gtestRoot/build" --config Debug --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'GTest build failed.' }
+
+      - name: Build integration tests (x64 Debug)
+        run: >-
+          msbuild MultiSocketRUDP/MultiSocketRUDP.sln /m /t:IntegrationTest
+          /p:Configuration=Debug /p:Platform=x64
+          /fl "/flp:logfile=stability-build.log;verbosity=normal"
+
+      - name: Preserve test configuration and build identity
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path stability-results -Force | Out-Null
+          Copy-Item MultiSocketRUDP/IntegrationTest/TestOptions stability-results/TestOptions -Recurse
+          $coreOptions = Get-Content MultiSocketRUDP/IntegrationTest/TestOptions/CoreOption.txt -Raw
+          if ($coreOptions -notmatch '(?m)^\s*THREAD_COUNT\s*=\s*(\d+)' -or [int]$Matches[1] -lt 2) {
+            throw 'Stability tests require at least two server worker threads.'
+          }
+          Get-FileHash MultiSocketRUDP/x64/Debug/IntegrationTest.exe,
+            MultiSocketRUDP/x64/Debug/IntegrationClientHarness.exe -Algorithm SHA256 |
+            ConvertTo-Json | Set-Content stability-results/binaries.json
+          git submodule status --recursive | Set-Content stability-results/submodules.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to record submodule revisions.' }
+
+      - name: Repeat isolated stability cases
+        shell: pwsh
+        env:
+          STABILITY_ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          $iterations = 5
+          if (-not [string]::IsNullOrWhiteSpace($env:STABILITY_ITERATIONS)) {
+            if (-not [int]::TryParse($env:STABILITY_ITERATIONS, [ref]$iterations)) {
+              throw 'Iterations must be an integer from 1 to 100.'
+            }
+          }
+          ./Scripts/Stability/Invoke-StabilityTests.ps1 `
+            -Iterations $iterations `
+            -CaseTimeoutSeconds 180 -BudgetMinutes 40 `
+            -OutputDirectory stability-results
+
+      - name: Upload first failure and completed case results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-stability-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            stability-results/
+            stability-build.log
+          if-no-files-found: warn
+          retention-days: 14
