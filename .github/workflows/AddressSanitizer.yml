@@ -1,0 +1,47 @@
+name: AddressSanitizer
+
+on:
+  schedule:
+    # 04:30 Asia/Seoul, on the default branch.
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: address-sanitizer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  asan:
+    name: MSVC ASan CoreTest
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Restore NuGet
+        run: nuget restore MultiSocketRUDP/MultiSocketRUDP.sln
+
+      - name: Build and run ASan detection probe and CoreTest
+        shell: pwsh
+        run: ./Scripts/ASan/Invoke-ASan.ps1 -OutputDirectory asan-results
+
+      - name: Upload ASan diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            asan-results/**/*.log
+            asan-results/**/*.xml
+            asan-results/**/environment.txt
+            asan-results/**/summary.md
+          if-no-files-found: warn
+          retention-days: 14
