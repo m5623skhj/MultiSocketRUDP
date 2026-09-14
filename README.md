@@ -222,6 +222,18 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 ![최근 10회 RTT P95/P99 추세 - 송수신 유실률 10%](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-loss-10.svg)
 
-[최근 RTT 측정 표](https://github.com/m5623skhj/MultiSocketRUDP/tree/benchmark-data#recent-measurements) · [전체 RTT 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-history.json) · [벤치마크 자동화 상세](./Scripts/RTTBenchmark/README.md)
+### 비신뢰성 채널 RTT·응답률
+
+최신 결과와 기록된 측정 조건이 같은 최근 10회 공식 측정을 표시합니다. 각 그래프는 반복 실행의 P95/P99 RTT 중앙값(ms), 응답률, 직전 비교 가능한 측정 대비 변화율을 함께 보여줍니다. 응답률은 송신 시도 대비 제한 시간 내 응답 비율입니다. 유실된 요청은 RTT 계산에서 제외되므로, RTT 감소와 함께 응답률도 확인해야 합니다. 응답이 없는 RTT는 `N/A`로 표시합니다.
+
+비신뢰성 단독 전송:
+
+![비신뢰성 단독 전송 RTT 및 응답률 추이](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-unreliable-only.svg)
+
+신뢰성·비신뢰성 혼합 전송 중 비신뢰성 채널:
+
+![혼합 전송의 비신뢰성 RTT 및 응답률 추이](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-mixed.svg)
+
+[최근 RTT 측정 표](https://github.com/m5623skhj/MultiSocketRUDP/tree/benchmark-data#recent-measurements) · [전체 RTT 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-history.json) · [채널 측정 요약](https://github.com/m5623skhj/MultiSocketRUDP/blob/benchmark-data/channel-summary.md) · [채널 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-history.json) · [벤치마크 자동화 상세](./Scripts/RTTBenchmark/README.md)
 
 ---

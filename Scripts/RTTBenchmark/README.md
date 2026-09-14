@@ -54,6 +54,10 @@ RTT Benchmark는 `ContentsServer`와 BotTester를 서로 다른 프로세스로 
 
 ## 결과 파일
 
+비신뢰성 추이 SVG는 `main` 공식 이력 갱신 시 생성하여 저장소 README에 표시합니다. `unreliable-only`와 `mixed` 각각 최신 결과와 기록된 측정 조건이 같은 최근 10회를 선택합니다. RTT는 ms 단위 P95/P99, 응답률은 송신 시도 대비 제한 시간 내 응답 비율이며 각 run 값의 중앙값입니다. 하단 표에는 직전 비교 가능한 측정 대비 P95/P99 변화율을 표시합니다. 응답이 없는 RTT는 `N/A`로 남기고 그래프 선을 연결하지 않습니다. 조건 비교에는 schema·시나리오·샘플/워밍업 수·timeout·서버 스레드 수·OS·프로세서 수·run 수를 사용하며 실제 CPU 모델 차이까지 보장하지는 않습니다.
+
+`channel_history.py --output-dir <directory>`로 SVG를 생성합니다. 채널 JSON은 최근 150개 시나리오 결과를 보존합니다.
+
 | 파일 | 내용 |
 | --- | --- |
 | `rtt-loss-0.json` | 유실률 0% 개별 run과 집계값 |
@@ -61,5 +65,7 @@ RTT Benchmark는 `ContentsServer`와 BotTester를 서로 다른 프로세스로 
 | `rtt-history.json` | commit 제목을 포함한 commit별 전체 공식 이력 |
 | `rtt-loss-0.svg` | 최근 10회 P95/P99 추세와 측정 상세 표 |
 | `rtt-loss-10.svg` | 최근 10회 P95/P99 추세와 측정 상세 표 |
+| `channel-unreliable-only.svg` | 비신뢰성 단독 전송의 RTT·응답률 추이와 변화율 표 |
+| `channel-mixed.svg` | 혼합 전송 중 비신뢰성 채널의 RTT·응답률 추이와 변화율 표 |
 
 양수 변화율은 RTT 증가를 의미합니다. `Max`는 OS 스케줄링 노이즈에 민감하므로 그래프와 초기 실패 판정에는 사용하지 않고 결과 표의 참고값으로만 보존합니다.
