@@ -11,9 +11,9 @@
 ## 목차
 
 1. [동작 원리](#1-동작-원리)
-2. [생성자 — 콜백 주입](#2-생성자--콜백-주입)
-3. [시작 — StartServerAliveCheck](#3-시작--startserveralivecheck)
-4. [종료 — StopServerAliveCheck](#4-종료--stopserveralivecheck)
+2. [생성자 — 콜백 주입](#2-생성자-콜백-주입)
+3. [시작 — `StartServerAliveCheck`](#3-시작-startserveralivecheck)
+4. [종료 — `StopServerAliveCheck`](#4-종료-stopserveralivecheck)
 5. [내부 루프 상세](#5-내부-루프-상세)
 6. [Deadlock 방지 설계](#6-deadlock-방지-설계)
 7. [타이밍 설정 가이드](#7-타이밍-설정-가이드)
@@ -365,9 +365,27 @@ RUDPClientCore::Stop()
 #### `void StopServerAliveCheck()`
 - 감시 스레드 중지를 요청한다.
 
-#### `bool IsServerAlive(PacketSequence nowPacketSequence)`
-- 이전 체크 지점 대비 수신 시퀀스가 진전됐는지 확인한다.
+### `IsServerAlive`
 
+```cpp
+[[nodiscard]]
+bool IsServerAlive(uint64_t receiveCount);
+```
+
+이전 체크 지점 대비 수신 카운트가 진전됐는지 확인한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `receiveCount` | `uint64_t` | 현재 수신된 카운트 |
+
+**반환값**:
+
+| 반환값 | 조건 |
+|--------|------|
+| `true` | 수신 카운트가 이전보다 증가함 |
+| `false` | 수신 카운트가 증가하지 않음 |
+
+> 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 ### 내부 함수
 
 #### `void RunServerAliveCheckerThread()`
