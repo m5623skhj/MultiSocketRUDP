@@ -50,45 +50,20 @@ namespace MultiSocketRUDPBotTester.Bot
                 return null;
             }
 
-            var buf = new NetBuffer(256);
+            return BuildFromSchema(schema, FieldValues);
+        }
+
+        internal static NetBuffer BuildFromSchema(PacketFieldDef[] schema, IReadOnlyDictionary<string, object> fieldValues)
+        {
+            // Preserve the small allocation for existing scalar-only packets.
+            var hasComposite = schema.Any(field => field.Type is FieldType.Struct or FieldType.Vector
+                or FieldType.List or FieldType.Set or FieldType.UnorderedSet or FieldType.Map or FieldType.UnorderedMap);
+            var buf = new NetBuffer(hasComposite ? 16384 : 256);
             buf.ReserveHeader();
             foreach (var field in schema)
             {
-                var value = FieldValues.TryGetValue(field.Name, out var v) ?
-                    v : field.DefaultValue;
-                switch (field.Type)
-                {
-                    case FieldType.Byte:
-                        {
-                            buf.WriteByte(Convert.ToByte(value));
-                            break;
-                        }
-                    case FieldType.Ushort:
-                        {
-                            buf.WriteUShort(Convert.ToUInt16(value));
-                            break;
-                        }
-                    case FieldType.Int:
-                        {
-                            buf.WriteInt(Convert.ToInt32(value));
-                            break;
-                        }
-                    case FieldType.Uint:
-                        {
-                            buf.WriteUInt(Convert.ToUInt32(value));
-                            break;
-                        }
-                    case FieldType.Ulong:
-                        {
-                            buf.WriteULong(Convert.ToUInt64(value));
-                            break;
-                        }
-                    case FieldType.String:
-                        {
-                            buf.WriteString(Convert.ToString(value) ?? string.Empty);
-                            break;
-                        }
-                }
+                var value = fieldValues.TryGetValue(field.Name, out var supplied) ? supplied : field.DefaultValue;
+                PacketFieldCodec.Write(buf, field, value);
             }
 
             return buf;

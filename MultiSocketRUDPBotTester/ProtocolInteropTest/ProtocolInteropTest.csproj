@@ -8,6 +8,7 @@
   <ItemGroup>
 	<Compile Include="..\MultiSocketRUDPBotTester\GlobalUsing.cs" Link="GlobalUsing.cs" />
     <Compile Include="..\MultiSocketRUDPBotTester\CommonType.cs" Link="CommonType.cs" />
+    <Compile Include="..\MultiSocketRUDPBotTester\Generated\PacketId.g.cs" Link="PacketId.g.cs" />
     <Compile Include="..\MultiSocketRUDPBotTester\ClientCore\CryptoHelper.cs" Link="ClientCore\CryptoHelper.cs" />
     <Compile Include="..\MultiSocketRUDPBotTester\Buffer\NetBuffer.cs" Link="Buffer\NetBuffer.cs" />
   </ItemGroup>

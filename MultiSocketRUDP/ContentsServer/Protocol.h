@@ -2,7 +2,7 @@
 
 #include <string>
 #include "NetServerSerializeBuffer.h"
-#include "../MultiSocketRUDPServer/PacketManager.h"
+#include "PacketManager.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet id type
@@ -52,7 +52,8 @@ virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersT
 // Packet
 ////////////////////////////////////////////////////////////////////////////////////
 
-#pragma pack(push, 1)
+// BEGIN GENERATED PACKET TYPES
+
 class Ping final : public IPacket
 {
 public:
@@ -88,7 +89,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	std::string testString;
+	std::string testString{};
 };
 
 class TestStringPacketRes final : public IPacket
@@ -104,7 +105,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	std::string echoString;
+	std::string echoString{};
 };
 
 class TestPacketReq final : public IPacket
@@ -120,7 +121,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	int order;
+	int order{};
 };
 
 class TestPacketRes final : public IPacket
@@ -136,15 +137,22 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	int order;
+	int order{};
 };
 
-// Benchmark IDs are echoed unchanged; the request selects the response channel.
 class ChannelEchoReq final : public IPacket
 {
 public:
-	GET_PACKET_ID(7)
-	SET_PARAMETERS(requestId, unreliable)
+	ChannelEchoReq() = default;
+	~ChannelEchoReq() override = default;
+
+public:
+	[[nodiscard]]
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
 	uint64_t requestId{};
 	BYTE unreliable{};
 };
@@ -152,12 +160,21 @@ public:
 class ChannelEchoRes final : public IPacket
 {
 public:
-	GET_PACKET_ID(8)
-	SET_PARAMETERS(requestId, unreliable)
+	ChannelEchoRes() = default;
+	~ChannelEchoRes() override = default;
+
+public:
+	[[nodiscard]]
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
 	uint64_t requestId{};
 	BYTE unreliable{};
 };
-#pragma pack(pop)
+
+// END GENERATED PACKET TYPES
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet Register

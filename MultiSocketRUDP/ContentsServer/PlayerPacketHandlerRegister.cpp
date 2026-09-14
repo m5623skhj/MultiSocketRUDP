@@ -8,8 +8,8 @@ namespace ContentsPacketRegister
 	void Init()
 	{
 		PacketHandlerUtil::RegisterPacket<Ping>();
-		PacketHandlerUtil::RegisterPacket<ChannelEchoReq>();
 		PacketHandlerUtil::RegisterPacket<TestStringPacketReq>();
 		PacketHandlerUtil::RegisterPacket<TestPacketReq>();
+		PacketHandlerUtil::RegisterPacket<ChannelEchoReq>();
 	}
 }

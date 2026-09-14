@@ -8,9 +8,11 @@ namespace MultiSocketRUDPBotTester.Contents.Client
 
         private void RegisterPacketHandlers()
         {
-            packetHandlerDictionary.Add(PacketId.Pong, new PongAction());
-            packetHandlerDictionary.Add(PacketId.TestStringPacketRes, new TestStringPacketRes());
-            packetHandlerDictionary.Add(PacketId.TestPacketRes, new TestByteArrayPacketRes());
+            RegisterGeneratedPacketHandlers();
+            // Optional handwritten overrides; regeneration never changes this file.
+            packetHandlerDictionary[PacketId.Pong] = new PongAction();
+            packetHandlerDictionary[PacketId.TestStringPacketRes] = new TestStringPacketRes();
+            packetHandlerDictionary[PacketId.TestPacketRes] = new TestByteArrayPacketRes();
         }
     }
 }

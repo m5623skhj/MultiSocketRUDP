@@ -29,8 +29,8 @@ def GenerateFixture(output):
         shutil.copyfile(GENERATOR / (name + "Origin"), destination)
     with patch.multiple(PacketItemsFilePath, **paths):
         assert PacketGenerator.GenerateProtocolHeader(packets, structs)
-        assert PacketGenerator.GenerateProtocolCpp(packets)
-        assert PacketGenerator.GeneratePacketType(packets)
+        assert PacketGenerator.GenerateProtocolCpp(packets, "GeneratedSchemaPacketId")
+        assert PacketGenerator.GeneratePacketType(packets, "GeneratedSchemaPacketId")
         for path in paths.values():
             os.replace(path + "_new", path)
 
@@ -65,13 +65,13 @@ class PacketSchemaTest(unittest.TestCase):
             packets, structs = ValidateSchema(yaml.safe_load(SCHEMA.read_text()))
             with patch.multiple(PacketItemsFilePath, **paths):
                 self.assertTrue(PacketGenerator.GenerateProtocolHeader(packets, structs))
-                self.assertTrue(PacketGenerator.GenerateProtocolCpp(packets))
+                self.assertTrue(PacketGenerator.GenerateProtocolCpp(packets, "GeneratedSchemaPacketId"))
                 for path in paths.values():
                     self.assertEqual(Path(path).read_text(), Path(path + "_new").read_text())
 
     def test_legacy_schema_and_empty_fields(self):
         packets, structs = ValidateSchema(yaml.safe_load((GENERATOR.parent / "PacketDefine.yml").read_text()))
-        self.assertEqual(len(packets), 6)
+        self.assertEqual(len(packets), 8)
         self.assertEqual(structs, [])
         self.assertNotIn("BufferToPacket", PacketGenerator.MakePacketClasss([packets[0]]))
         packets, _ = ValidateSchema({"Packet": [{"Type": "ReplyPacket", "PacketName": "Empty", "Items": []}]})

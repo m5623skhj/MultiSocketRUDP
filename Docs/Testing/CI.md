@@ -41,13 +41,21 @@ ASan 검사는 PR 필수 체크와 별도로 실행한다. 일반 빌드와 분�
 
 | 변경 경로 | Native GTest | BotTester | actionlint | RTT Benchmark |
 |---|---:|---:|---:|---:|
-| `MultiSocketRUDP/**`, C++ 테스트, submodule | 실행 | 미실행 | 미실행 | 실행 |
-| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
+| C++ 네트워크·공통·콘텐츠 서버 코드, submodule | 실행 | 실행 | 미실행 | 경로별 실행 |
+| 그 밖의 `MultiSocketRUDP/**`, C++ 테스트 | 실행 | 미실행 | 미실행 | 경로별 실행 |
+| BotTester 프로토콜·버퍼·세션·패킷 생성 결과 | 실행 | 실행 | 미실행 | 실행 |
+| 그 밖의 `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
+| 패킷 YAML·생성기·생성 배치 파일 | 실행 | 실행 | 미실행 | 실행 |
 | 공용 `ProtocolInteropV2Vector.json` | 실행 | 실행 | 미실행 | 실행 |
 | `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
 | `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
 | 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
 | 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
+
+프로토콜 경로 변경 시 `Protocol generated code sync`도 실행하여 생성기 회귀 테스트와 `--check`를 수행한다.
+생성 결과가 오래됐거나 양쪽 검사 중 하나라도 실패하면 `build-and-test`가 실패한다.
+기존 네트워크·콘텐츠 구현은 보수적으로 포함하며 정확한 목록은 `CI.yml`의 `protocol` 필터가 기준이다.
+사용 방법은 [패킷 생성기](../Tools/PacketGenerator.md)를 참고한다.
 
 경로 분류 결과는 테스트 면제를 뜻하지 않는다. 문서만 바뀌었더라도 문서가 설명하는 동작과 현재 코드가 일치하는지는 reviewer가 확인한다.
 
