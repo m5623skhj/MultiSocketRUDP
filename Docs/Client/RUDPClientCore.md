@@ -643,44 +643,22 @@ ACK는 PendingQueue나 SendPacketInfo 등록 없이 직접 전송한다. 서버�
 ## 10. ACK 수신 — `OnSendReply`
 
 ```cpp
-void OnSendReply(NetBuffer& recvBuffer)
-{
-    // ① 시퀀스 + advertiseWindow 추출
-    PacketSequence ackedSeq;
-    BYTE remoteWindow;
-    recvBuffer >> ackedSeq >> remoteWindow;
-
-    // ② advertiseWindow 갱신 (원자적)
-    remoteAdvertisedWindow.store(remoteWindow, std::memory_order_release);
-
-    // ③ lastAckedSequence 갱신
-    lastAckedSequence.store(ackedSeq, std::memory_order_release);
-
-    // ④ sequence=0 첫 ACK → isConnected 활성화
-    if (ackedSeq == LOGIN_PACKET_SEQUENCE && !isConnected) {
-        isConnected = true;
-        LOG_DEBUG(std::format("Connected. SessionId={}", sessionId));
-        serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
-    }
-
-    // ⑤ 재전송 맵에서 제거
-    {
-        std::scoped_lock lock(sendPacketInfoMapLock);
-        auto it = sendPacketInfoMap.find(ackedSeq);
-        if (it != sendPacketInfoMap.end()) {
-            NetBuffer::Free(it->second->buffer);
-            sendPacketInfoPool->Free(it->second);
-            sendPacketInfoMap.erase(it);
-        }
-    }
-
-    // ⑥ 보류 큐 처리
-    TryFlushPendingQueue();
-}
+void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence);
 ```
 
----
+상대방으로부터 수신된 ACK 패킷을 처리하여 윈도우 크기를 갱신하고, 재전송 맵에서 해당 패킷을 제거한다.
 
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `recvPacket` | `NetBuffer&` | 수신된 ACK 패킷 버퍼 |
+| `packetSequence` | `PacketSequence` | 확인 응답된 패킷 시퀀스 |
+
+### 내부 동작
+1. `recvPacket`에서 `advertiseWindow` 정보를 추출하여 `remoteAdvertisedWindow`를 갱신한다.
+2. `lastAckedSequence`를 수신된 `packetSequence`로 갱신한다.
+3. 시퀀스가 `LOGIN_PACKET_SEQUENCE`이고 연결 전이라면 `isConnected`를 활성화하고 서버 생존 확인을 시작한다.
+4. 재전송 맵(`sendPacketInfoMap`)에서 해당 시퀀스의 패킷 정보를 찾아 해제한다.
+5. `TryFlushPendingQueue`를 호출하여 보류 중인 패킷 전송을 시도한다.
 ## 11. 송신 스레드 — `sendThread`
 
 ```cpp
@@ -771,9 +749,6 @@ void RunRetransmissionThread()
 | 재전송 시 행동 | `core.SendPacket(info)` | `sendBufferQueue.Enqueue` |
 | 횟수 초과 시 | `session->DoDisconnect()` | `isConnected=false` + `threadStopFlag=true` |
 | RefCount 패턴 | 복잡한 다중 참조자 | 단순 (소유자 1명) |
-
----
-
 ## 13. 흐름 제어 — `TryFlushPendingQueue`
 
 ```cpp
