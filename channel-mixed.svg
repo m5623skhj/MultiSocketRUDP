@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="722" viewBox="0 0 960 722">
+<rect width="100%" height="100%" rx="12" fill="#0d1117"/>
+<style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
+<text x="28" y="38" class="title">Unreliable channel: mixed</text>
+<text x="28" y="66">Latest 10 compatible main measurements · medians across runs</text>
+<text x="28" y="97">RTT (ms)</text>
+<line x1="80" y1="290.0" x2="900" y2="290.0" stroke="#30363d"/>
+<text x="15" y="294.0">0.000</text>
+<line x1="80" y1="246.25" x2="900" y2="246.25" stroke="#30363d"/>
+<text x="15" y="250.25">0.145</text>
+<line x1="80" y1="202.5" x2="900" y2="202.5" stroke="#30363d"/>
+<text x="15" y="206.5">0.290</text>
+<line x1="80" y1="158.75" x2="900" y2="158.75" stroke="#30363d"/>
+<text x="15" y="162.75">0.435</text>
+<line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
+<text x="15" y="119.0">0.580</text>
+<circle cx="80.0" cy="188.41473716876715" r="4" fill="#58a6ff"><title>p95Ms: 0.337</title></circle>
+<line x1="80.0" y1="188.41473716876715" x2="490.0" y2="172.63538092857266" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="490.0" cy="172.63538092857266" r="4" fill="#58a6ff"><title>p95Ms: 0.389</title></circle>
+<line x1="490.0" y1="172.63538092857266" x2="900.0" y2="234.21409237453236" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="234.21409237453236" r="4" fill="#58a6ff"><title>p95Ms: 0.185</title></circle>
+<circle cx="80.0" cy="164.91164250124993" r="4" fill="#f85149"><title>p99Ms: 0.415</title></circle>
+<line x1="80.0" y1="164.91164250124993" x2="490.0" y2="130.90909090909093" stroke="#f85149" stroke-width="2"/>
+<circle cx="490.0" cy="130.90909090909093" r="4" fill="#f85149"><title>p99Ms: 0.527</title></circle>
+<line x1="490.0" y1="130.90909090909093" x2="900.0" y2="221.93455510921848" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="221.93455510921848" r="4" fill="#f85149"><title>p99Ms: 0.226</title></circle>
+<text x="55.0" y="312">0816aa0</text>
+<text x="465.0" y="312">7287ccd</text>
+<text x="875.0" y="312">6ca5c16</text>
+<text x="28" y="347">Responses / attempted (%)</text>
+<line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
+<text x="15" y="494.0">0.000</text>
+<line x1="80" y1="458.75" x2="900" y2="458.75" stroke="#30363d"/>
+<text x="15" y="462.75">25.000</text>
+<line x1="80" y1="427.5" x2="900" y2="427.5" stroke="#30363d"/>
+<text x="15" y="431.5">50.000</text>
+<line x1="80" y1="396.25" x2="900" y2="396.25" stroke="#30363d"/>
+<text x="15" y="400.25">75.000</text>
+<line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
+<text x="15" y="369.0">100.000</text>
+<circle cx="80.0" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
+<line x1="80.0" y1="365.375" x2="490.0" y2="365.75" stroke="#3fb950" stroke-width="2"/>
+<circle cx="490.0" cy="365.75" r="4" fill="#3fb950"><title>deliveryPercent: 99.400</title></circle>
+<line x1="490.0" y1="365.75" x2="900.0" y2="365.625" stroke="#3fb950" stroke-width="2"/>
+<circle cx="900.0" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
+<text x="55.0" y="512">0816aa0</text>
+<text x="465.0" y="512">7287ccd</text>
+<text x="875.0" y="512">6ca5c16</text>
+<text x="650" y="97">P95: blue · P99: red</text>
+<text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
+<text x="28" y="585">Commit</text>
+<text x="180" y="585">P95 ms</text>
+<text x="330" y="585">P99 ms</text>
+<text x="480" y="585">Previous P95</text>
+<text x="650" y="585">Previous P99</text>
+<text x="820" y="585">Response %</text>
+<text x="28" y="615">0816aa0654e9</text>
+<text x="180" y="615">0.337</text>
+<text x="480" y="615">N/A</text>
+<text x="330" y="615">0.415</text>
+<text x="650" y="615">N/A</text>
+<text x="820" y="615">99.700</text>
+<text x="28" y="639">7287ccd1f6cf</text>
+<text x="180" y="639">0.389</text>
+<text x="480" y="639">+15.53%</text>
+<text x="330" y="639">0.527</text>
+<text x="650" y="639">+27.18%</text>
+<text x="820" y="639">99.400</text>
+<text x="28" y="663">6ca5c163b9b8</text>
+<text x="180" y="663">0.185</text>
+<text x="480" y="663">-52.47%</text>
+<text x="330" y="663">0.226</text>
+<text x="650" y="663">-57.22%</text>
+<text x="820" y="663">99.500</text>
+</svg>
