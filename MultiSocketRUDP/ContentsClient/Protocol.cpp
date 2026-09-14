@@ -17,11 +17,13 @@ PacketId TestStringPacketReq::GetPacketId() const
 }
 void TestStringPacketReq::BufferToPacket(NetBuffer& buffer)
 {
-	SetBufferToParameters(buffer, testString);
+	TestStringPacketReq temporary{};
+	buffer.ReadValue(temporary.testString);
+	this->testString = std::move(temporary.testString);
 }
 void TestStringPacketReq::PacketToBuffer(NetBuffer& buffer)
 {
-	SetParametersToBuffer(buffer, testString);
+	buffer.WriteValue(this->testString);
 }
 PacketId TestStringPacketRes::GetPacketId() const
 {
@@ -29,11 +31,13 @@ PacketId TestStringPacketRes::GetPacketId() const
 }
 void TestStringPacketRes::BufferToPacket(NetBuffer& buffer)
 {
-	SetBufferToParameters(buffer, echoString);
+	TestStringPacketRes temporary{};
+	buffer.ReadValue(temporary.echoString);
+	this->echoString = std::move(temporary.echoString);
 }
 void TestStringPacketRes::PacketToBuffer(NetBuffer& buffer)
 {
-	SetParametersToBuffer(buffer, echoString);
+	buffer.WriteValue(this->echoString);
 }
 PacketId TestPacketReq::GetPacketId() const
 {
@@ -41,11 +45,13 @@ PacketId TestPacketReq::GetPacketId() const
 }
 void TestPacketReq::BufferToPacket(NetBuffer& buffer)
 {
-	SetBufferToParameters(buffer, order);
+	TestPacketReq temporary{};
+	buffer.ReadValue(temporary.order);
+	this->order = std::move(temporary.order);
 }
 void TestPacketReq::PacketToBuffer(NetBuffer& buffer)
 {
-	SetParametersToBuffer(buffer, order);
+	buffer.WriteValue(this->order);
 }
 PacketId TestPacketRes::GetPacketId() const
 {
@@ -53,10 +59,46 @@ PacketId TestPacketRes::GetPacketId() const
 }
 void TestPacketRes::BufferToPacket(NetBuffer& buffer)
 {
-	SetBufferToParameters(buffer, order);
+	TestPacketRes temporary{};
+	buffer.ReadValue(temporary.order);
+	this->order = std::move(temporary.order);
 }
 void TestPacketRes::PacketToBuffer(NetBuffer& buffer)
 {
-	SetParametersToBuffer(buffer, order);
+	buffer.WriteValue(this->order);
+}
+PacketId ChannelEchoReq::GetPacketId() const
+{
+	return static_cast<PacketId>(PACKET_ID::CHANNEL_ECHO_REQ);
+}
+void ChannelEchoReq::BufferToPacket(NetBuffer& buffer)
+{
+	ChannelEchoReq temporary{};
+	buffer.ReadValue(temporary.requestId);
+	buffer.ReadValue(temporary.unreliable);
+	this->requestId = std::move(temporary.requestId);
+	this->unreliable = std::move(temporary.unreliable);
+}
+void ChannelEchoReq::PacketToBuffer(NetBuffer& buffer)
+{
+	buffer.WriteValue(this->requestId);
+	buffer.WriteValue(this->unreliable);
+}
+PacketId ChannelEchoRes::GetPacketId() const
+{
+	return static_cast<PacketId>(PACKET_ID::CHANNEL_ECHO_RES);
+}
+void ChannelEchoRes::BufferToPacket(NetBuffer& buffer)
+{
+	ChannelEchoRes temporary{};
+	buffer.ReadValue(temporary.requestId);
+	buffer.ReadValue(temporary.unreliable);
+	this->requestId = std::move(temporary.requestId);
+	this->unreliable = std::move(temporary.unreliable);
+}
+void ChannelEchoRes::PacketToBuffer(NetBuffer& buffer)
+{
+	buffer.WriteValue(this->requestId);
+	buffer.WriteValue(this->unreliable);
 }
 #pragma endregion packet function

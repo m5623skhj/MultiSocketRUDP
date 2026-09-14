@@ -43,7 +43,7 @@ TEST(GeneratedPacketSchemaTest, PacketRoundTripIncludesForwardReferencedNestedTy
     source.PacketToBuffer(buffer);
     GeneratedEnvelopeReq result;
     result.BufferToPacket(buffer);
-    EXPECT_EQ(result.GetPacketId(), static_cast<PacketId>(PACKET_ID::GENERATED_ENVELOPE_REQ));
+    EXPECT_EQ(result.GetPacketId(), static_cast<PacketId>(GeneratedSchemaPacketId::GENERATED_ENVELOPE_REQ));
     EXPECT_EQ(result.sequence, 42);
     ExpectUser(result.user, source.user);
     ASSERT_EQ(result.users.size(), 2);

@@ -5,7 +5,7 @@
 #pragma region packet function
 PacketId GeneratedEnvelopeReq::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::GENERATED_ENVELOPE_REQ);
+	return static_cast<PacketId>(GeneratedSchemaPacketId::GENERATED_ENVELOPE_REQ);
 }
 void GeneratedEnvelopeReq::BufferToPacket(NetBuffer& buffer)
 {
@@ -37,6 +37,6 @@ void GeneratedEnvelopeReq::PacketToBuffer(NetBuffer& buffer)
 }
 PacketId GeneratedEmptyRes::GetPacketId() const
 {
-	return static_cast<PacketId>(PACKET_ID::GENERATED_EMPTY_RES);
+	return static_cast<PacketId>(GeneratedSchemaPacketId::GENERATED_EMPTY_RES);
 }
 #pragma endregion packet function

@@ -21,6 +21,11 @@
   <ItemGroup>
     <ClCompile Include="..\..\CoreTest\subhook\subhook.c" />
     <ClCompile Include="GoogleTest.cpp" />
+    <ClCompile Include="GeneratedPacketPayloadTest.cpp" />
+    <ClCompile Include="GeneratedPacketSchemaPayloadTest.cpp" />
+    <ClCompile Include="..\ContentsServer\Protocol.cpp">
+      <ObjectFileName>$(IntDir)ContentsServerProtocol.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="CoreOptionParserTest.cpp" />
     <ClCompile Include="CryptoHelperTest.cpp" />

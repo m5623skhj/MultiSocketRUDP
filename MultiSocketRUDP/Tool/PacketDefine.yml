@@ -29,3 +29,17 @@ Packet:
     Items:
       - Type: int
         Name: order
+  - Type: RequestPacket
+    PacketName: ChannelEchoReq
+    Items:
+      - Type: uint64_t
+        Name: requestId
+      - Type: BYTE
+        Name: unreliable
+  - Type: ReplyPacket
+    PacketName: ChannelEchoRes
+    Items:
+      - Type: uint64_t
+        Name: requestId
+      - Type: BYTE
+        Name: unreliable

@@ -21,17 +21,6 @@ public static class CommonFunc
     }
 }
 
-public enum PacketId : uint
-{
-    InvalidPacketId = 0
-    , Ping = 1
-    , Pong = 2
-    , TestStringPacketReq = 3
-    , TestStringPacketRes = 4
-    , TestPacketReq = 5
-    , TestPacketRes = 6
-}
-
 public enum PacketDirection : byte
 {
     ClientToServer = 0,

@@ -17,8 +17,9 @@ jobs:
     name: Classify changes
     runs-on: ubuntu-latest
     outputs:
-      server: ${{ steps.filter.outputs.server }}
-      bot_tester: ${{ steps.filter.outputs.bot_tester }}
+      server: ${{ steps.filter.outputs.server == 'true' || steps.filter.outputs.protocol == 'true' }}
+      bot_tester: ${{ steps.filter.outputs.bot_tester == 'true' || steps.filter.outputs.protocol == 'true' }}
+      protocol: ${{ steps.filter.outputs.protocol }}
       workflows: ${{ steps.filter.outputs.workflows }}
 
     steps:
@@ -41,6 +42,51 @@ jobs:
               - '.github/workflows/CI.yml'
             workflows:
               - '.github/workflows/**'
+            protocol:
+              - 'MultiSocketRUDP/Tool/PacketDefine.yml'
+              - 'MultiSocketRUDP/Tool/PacketGenerate*.bat'
+              - 'MultiSocketRUDP/Tool/PacketGenerator/**'
+              - 'MultiSocketRUDP/ContentsServer/**'
+              - 'MultiSocketRUDP/ContentsClient/Protocol.*'
+              - 'MultiSocketRUDP/ContentsClient/PacketIdType.h'
+              - 'MultiSocketRUDP/Common/**'
+              - 'MultiSocketRUDP/MultiSocketRUDPServer/**'
+              - 'MultiSocketRUDP/MultiSocketRUDPClient/**'
+              - 'MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json'
+              - 'MultiSocketRUDP/CoreTest/GeneratedPacketPayloadTest.cpp'
+              - 'MultiSocketRUDP/CoreTest/GeneratedPacketSchemaPayloadTest.cpp'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Generated/**'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/CommonType.cs'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Buffer/**'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/ClientCore/**'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Contents/Client/**'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Bot/PacketSchema.cs'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Bot/PacketFieldCodec.cs'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Bot/SimpleActionNode.cs'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/GeneratedPacketPayloadTests.g.cs'
+              - 'MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/GeneratedPacketSchemaPayloadTests.g.cs'
+              - 'MultiSocketRUDPBotTester/ProtocolInteropTest/**'
+              - 'external/CommonCode/**'
+              - '.gitmodules'
+              - '.github/workflows/CI.yml'
+
+  protocol_sync:
+    name: Protocol generated code sync
+    needs: classify_changes
+    if: needs.classify_changes.outputs.protocol == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install generator dependency
+        run: python -m pip install -r MultiSocketRUDP/Tool/PacketGenerator/requirements.txt
+      - name: Test generator and check committed outputs
+        run: |
+          python -m unittest discover -s MultiSocketRUDP/Tool/PacketGenerator -p 'test_*.py'
+          python -m unittest discover -s MultiSocketRUDP/Tool/PacketGenerator/tests -p 'test_*.py'
+          python MultiSocketRUDP/Tool/PacketGenerator/PacketGenerator.py --check
 
   workflow_lint:
     name: Workflow actionlint
@@ -89,7 +135,7 @@ jobs:
     # Keep this check name stable because branch protection requires it.
     name: build-and-test
     if: always()
-    needs: [classify_changes, workflow_lint, native_gtest, bot_tester]
+    needs: [classify_changes, workflow_lint, native_gtest, bot_tester, protocol_sync]
     runs-on: ubuntu-latest
 
     steps:
@@ -102,9 +148,20 @@ jobs:
           WORKFLOW_LINT_RESULT: ${{ needs.workflow_lint.result }}
           NATIVE_RESULT: ${{ needs.native_gtest.result }}
           BOT_TESTER_RESULT: ${{ needs.bot_tester.result }}
+          PROTOCOL_CHANGED: ${{ needs.classify_changes.outputs.protocol }}
+          PROTOCOL_RESULT: ${{ needs.protocol_sync.result }}
         run: |
           if [ "$CLASSIFIER_RESULT" != "success" ]; then
             echo "Change classification failed: $CLASSIFIER_RESULT"
+            exit 1
+          fi
+
+          if [ "$PROTOCOL_CHANGED" = "true" ] && [ "$PROTOCOL_RESULT" != "success" ]; then
+            echo "Protocol generated code check was required but did not succeed: $PROTOCOL_RESULT"
+            exit 1
+          fi
+          if [ "$PROTOCOL_CHANGED" != "true" ] && [ "$PROTOCOL_RESULT" != "skipped" ]; then
+            echo "Unexpected protocol check result: $PROTOCOL_RESULT"
             exit 1
           fi
 

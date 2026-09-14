@@ -2,7 +2,7 @@
 
 #include <string>
 #include "NetServerSerializeBuffer.h"
-#include "../MultiSocketRUDPServer/PacketManager.h"
+#include "PacketManager.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet id type
@@ -52,7 +52,8 @@ virtual void PacketToBuffer(OUT NetBuffer& recvBuffer) override { SetParametersT
 // Packet
 ////////////////////////////////////////////////////////////////////////////////////
 
-#pragma pack(push, 1)
+// BEGIN GENERATED PACKET TYPES
+
 class Ping final : public IPacket
 {
 public:
@@ -88,7 +89,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	std::string testString;
+	std::string testString{};
 };
 
 class TestStringPacketRes final : public IPacket
@@ -104,7 +105,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	std::string echoString;
+	std::string echoString{};
 };
 
 class TestPacketReq final : public IPacket
@@ -120,7 +121,7 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	int order;
+	int order{};
 };
 
 class TestPacketRes final : public IPacket
@@ -136,10 +137,44 @@ public:
 	void PacketToBuffer(NetBuffer& buffer) override;
 
 public:
-	int order;
+	int order{};
 };
 
-#pragma pack(pop)
+class ChannelEchoReq final : public IPacket
+{
+public:
+	ChannelEchoReq() = default;
+	~ChannelEchoReq() override = default;
+
+public:
+	[[nodiscard]]
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	uint64_t requestId{};
+	BYTE unreliable{};
+};
+
+class ChannelEchoRes final : public IPacket
+{
+public:
+	ChannelEchoRes() = default;
+	~ChannelEchoRes() override = default;
+
+public:
+	[[nodiscard]]
+	PacketId GetPacketId() const override;
+	void BufferToPacket(NetBuffer& buffer) override;
+	void PacketToBuffer(NetBuffer& buffer) override;
+
+public:
+	uint64_t requestId{};
+	BYTE unreliable{};
+};
+
+// END GENERATED PACKET TYPES
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Packet Register

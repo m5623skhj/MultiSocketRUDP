@@ -8,6 +8,20 @@ namespace MultiSocketRUDPBotTester.Bot
         Uint,
         Ulong,
         String,
+        Sbyte,
+        Short,
+        Long,
+        Float,
+        Double,
+        Bool,
+        Wstring,
+        Struct,
+        Vector,
+        List,
+        Set,
+        UnorderedSet,
+        Map,
+        UnorderedMap,
     }
 
     public class PacketFieldDef
@@ -15,32 +29,15 @@ namespace MultiSocketRUDPBotTester.Bot
         public required string Name { get; init; }
         public required FieldType Type { get; init; }
         public object? DefaultValue { get; init; }
+        public PacketFieldDef[] Members { get; init; } = [];
+        public PacketFieldDef? Element { get; init; }
+        public PacketFieldDef? Value { get; init; }
+        public bool Descending { get; init; }
     }
 
-    public static class PacketSchema
+    public static partial class PacketSchema
     {
-        private static readonly Dictionary<PacketId, PacketFieldDef[]> Schemas = new()
-        {
-            [PacketId.Ping] = [],
-            [PacketId.Pong] = [],
-
-            [PacketId.TestStringPacketReq] =
-            [
-                new PacketFieldDef {Name = "testString", Type = FieldType.String, DefaultValue = ""}
-            ],
-            [PacketId.TestStringPacketRes] =
-            [
-                new PacketFieldDef {Name = "echoString", Type = FieldType.String, DefaultValue = ""}
-            ],
-            [PacketId.TestPacketReq] =
-            [
-                new PacketFieldDef {Name = "order", Type = FieldType.Int, DefaultValue = 0}
-            ],
-            [PacketId.TestPacketRes] =
-            [
-                new PacketFieldDef {Name = "order", Type = FieldType.Int, DefaultValue = 0}
-            ],
-        };
+        private static readonly Dictionary<PacketId, PacketFieldDef[]> Schemas = CreateGeneratedSchemas();
 
         public static PacketFieldDef[]? Get(PacketId id) => Schemas.GetValueOrDefault(id);
         public static void Register(PacketId id, PacketFieldDef[] fields) => Schemas[id] = fields;

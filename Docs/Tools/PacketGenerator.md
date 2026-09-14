@@ -1,286 +1,157 @@
-# 패킷 코드 자동 생성기 (Packet Generator)
+# 패킷 코드 자동 생성기
 
-> YAML 정의 파일로부터 C++ 패킷 클래스, 핸들러 등록 코드, Player 핸들러 스텁을 자동 생성한다.
+`MultiSocketRUDP/Tool/PacketDefine.yml`에서 C++ 서버·클라이언트와 BotTester 코드를 함께 생성한다.
+ID는 YAML 목록 순서로 자동 부여하며 사용자가 지정하지 않는다. 기존 ID 1~8은 유지했다.
+목록 끝에 추가하면 기존 ID가 유지된다. 중간 삽입·삭제·정렬 시 이후 ID가 바뀌므로 양쪽을 함께 생성·배포해야 한다.
+서로 다른 버전의 연결 차단 기능은 이번 작업에 포함하지 않는다.
 
----
+## 실행
 
-## 흐름 개요
+Python 3.10 이상에서 저장소 루트 기준으로 실행한다.
 
-```
-PacketDefine.yml
-      │
-      ▼
-PacketGenerator.py
-      │
-      ├──► PacketIdType.h          ← PACKET_ID enum
-      ├──► Protocol.h              ← 패킷 클래스 정의
-      ├──► Protocol.cpp            ← GetPacketId() / BufferToPacket() 등
-      ├──► PlayerPacketHandlerRegister.cpp  ← Init() 등록 코드
-      ├──► Player.h                ← 핸들러 선언 (증분 추가)
-      └──► Player.cpp              ← 핸들러 스텁 (증분 추가)
-                │
-                └──► 클라이언트 측 복사 (PacketIdType.h, Protocol.*)
+```powershell
+python -m pip install -r MultiSocketRUDP/Tool/PacketGenerator/requirements.txt
+./MultiSocketRUDP/Tool/PacketGenerate.bat
+./MultiSocketRUDP/Tool/PacketGenerate.bat --check
+python -m unittest discover -s MultiSocketRUDP/Tool/PacketGenerator -p 'test_*.py'
+python -m unittest discover -s MultiSocketRUDP/Tool/PacketGenerator/tests -p 'test_*.py'
 ```
 
----
+생성기는 자기 위치에서 저장소 경로를 찾는다. `--check`는 파일을 수정하지 않고 생성 결과가 최신인지 확인한다.
+배치 파일은 인자와 종료 코드를 전달하며 인자가 없을 때만 대기한다. 기존 `nopause` 호출도 지원한다.
+`PacketGenerateAndUploader.bat`는 생성 실패 시 업로드를 진행하지 않는다.
 
-## PacketDefine.yml 문법
+## 정의
 
 ```yaml
 Packet:
   - Type: RequestPacket
-    PacketName: Ping
-    Desc: 클라이언트→서버 핑
-
-  - Type: ReplyPacket
-    PacketName: Pong
-    Desc: 서버→클라이언트 퐁
-
-  - Type: RequestPacket
-    PacketName: TestPacketReq
+    PacketName: InventoryReq
     Items:
-      - Type: int
-        Name: order
+      - Type: uint32_t
+        Name: count
+  - Type: ReplyPacket
+    PacketName: InventoryRes
+    Items:
       - Type: std::string
         Name: message
 ```
 
-| 필드 | 설명 |
-|------|------|
-| `Type` | `RequestPacket` (C→S) 또는 `ReplyPacket` (S→C) |
-| `PacketName` | 클래스명 (PascalCase) |
-| `Items` | 직렬화 필드 목록 (없으면 생략) |
+`RequestPacket`은 서버 수신, `ReplyPacket`은 BotTester 수신 방향이다. 필드가 없으면 `Items`를 생략한다.
 
----
+| C++ 타입 | BotTester FieldType | 전송 형식 |
+|---|---|---|
+| `BYTE`, `uint8_t` | Byte | 1바이트 unsigned |
+| `unsigned short`, `uint16_t` | Ushort | 2바이트 little-endian |
+| `int`, `int32_t` | Int | 4바이트 signed little-endian |
+| `unsigned int`, `uint32_t` | Uint | 4바이트 unsigned little-endian |
+| `uint64_t`, `unsigned long long` | Ulong | 8바이트 unsigned little-endian |
+| `std::string` | String | 2바이트 바이트 수 + UTF-8 데이터 |
 
-## 생성 결과 예시
+추가로 부호 있는 8/16/64비트 정수, bool, float, double, std::wstring과
+PacketSchema.py에 정의된 Windows 정수 별칭을 지원한다. C++ std::string에는 UTF-8 바이트를 넣어야 한다.
+Windows/MSVC 형식을 기준으로 long은 32비트, wchar_t는 16비트, long double은 64비트다.
+이름은 양쪽 언어에서 유효한 식별자로 작성한다.
 
-### 사용자 정의 데이터 구조체
+## 구조체·컨테이너
 
-`Structs`에 데이터 타입을 선언하고 패킷의 `Items.Type`에서 이름으로 참조한다.
-YAML 선언 순서는 자유롭다. 아래에서는 `UserData`가 자신이 참조하는 `Position`보다 먼저 나온다.
+main의 전체 스키마 검증, 구조체 의존성 정렬, NetBufferCodec 생성과 안전한 역직렬화를 유지한다.
+전방 참조는 허용하며 순환 참조, 미정의 타입, 중복·예약 이름은 출력 변경 전에 거부한다.
+빈 Structs/Packet 목록도 스키마상 유효하지만, 삭제된 요청의 수동 핸들러는 먼저 정리해야 한다.
+Unique는 기존 C++ 팩토리 등록 의미를 유지하며 자동 응답 핸들러를 만들지 않는다.
 
 ```yaml
 Structs:
-  - Name: UserData
-    Items:
-      - Type: std::uint64_t
-        Name: userId
-      - Type: Position
-        Name: position
-      - Type: std::vector<int>
-        Name: items
   - Name: Position
     Items:
       - Type: float
         Name: x
       - Type: float
         Name: y
-
 Packet:
-  - Type: ReplyPacket
-    PacketName: UserListRes
+  - Type: RequestPacket
+    PacketName: PositionsReq
     Items:
-      - Type: std::vector<UserData>
-        Name: users
+      - Type: std::vector<Position>
+        Name: positions
 ```
 
-생성기는 전체 이름과 필드 타입을 먼저 검증하고, 의존 그래프를 위상 정렬하여
-`Position`, `UserData` 순서로 완전한 구조체 정의를 출력한다. 이어서 모든
-`NetBufferCodec<T>` 선언과 구현을 출력하고 마지막으로 패킷 클래스를 생성한다.
-데이터 구조체는 값 멤버만 가지며 `IPacket` 상속, 패킷 ID, 핸들러를 생성하지 않는다.
-패킷 ID의 순서는 기존처럼 `Packet` 목록 순서를 따른다.
+BotTester의 Send Packet 필드에는 구조체를 JSON 객체, 컨테이너를 JSON 배열로 입력한다.
+위 positions의 입력 예시는 `[{"x":1.25,"y":-2.5}]`다.
+구조체의 생략한 필드는 기본값을 사용하며, 알 수 없는 멤버와 중복 멤버는 거부한다.
+map은 `[[key,value], ...]` 형식이며 값에 구조체나 컨테이너를 중첩할 수 있다.
 
-- 필드는 YAML 순서로 재귀 직렬화한다. 이름이나 타입 메타데이터는 전송하지 않는다.
-- `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`과 중첩 컨테이너를 지원한다. 원소 또는 map 값으로 생성 구조체를 사용할 수 있다.
-- `vector`와 `list`는 원소 순서를 보존한다. `unordered_set`과 `unordered_map`은 데이터만 복원하며 삽입 순서, 순회 순서, bucket 상태를 보존하지 않는다. 같은 데이터라도 직렬화 바이트 순서는 달라질 수 있다.
-- `map/set`의 키/원소는 기본 타입 또는 문자열만 허용한다. 정렬 비교자는
-  `std::less<Key>` 또는 `std::greater<Key>`를 선택할 수 있다.
-- 포인터, 참조, 임의 C++ 타입, 패킷 타입을 데이터 필드로 사용하는 것은 거부한다.
-- 미정의 타입, 중복 이름, 직접 순환 및 컨테이너를 통한 순환은 생성 전에 거부한다.
-  예: `Struct dependency cycle: A -> B -> A`.
-- 빈 구조체와 빈 패킷을 지원한다. 빈 구조체는 전송 바이트가 없다.
-- 구조체와 패킷은 임시 값으로 역직렬화한 뒤 성공하면 반영한다. 실패한 버퍼는 폐기한다.
-- 송수신 양쪽은 같은 스키마를 사용해야 한다. 필드 추가·삭제·순서·타입 변경은 전송 형식 변경이다.
-- 직렬화 중 원본 구조체/컨테이너 변경 및 같은 버퍼의 동시 접근은 호출자가 방지해야 한다.
+| 타입 | 전송 형식 |
+|---|---|
+| 구조체 | YAML 필드 순서대로 재귀 직렬화, 패딩 없음 |
+| vector | uint32 개수 + 원소 |
+| list | Windows x64 size_t(uint64) 개수 + 원소 |
+| set / map | 정렬 방향 1바이트(less=0, greater=1) + uint32 개수 + 원소 또는 key/value |
+| unordered_set / unordered_map | uint32 개수 + 원소 또는 key/value, 순서 계약 없음 |
+| std::wstring | uint16 바이트 길이 + UTF-16LE |
 
-생성 영역은 `// BEGIN GENERATED PACKET TYPES`부터 `// END GENERATED PACKET TYPES`까지다.
-기존 `#pragma pack(push, 1)` 영역은 첫 재생성 시 이 마커로 교체한다. 생성 타입은
-정상 정렬을 사용하며 객체 패딩을 전송하지 않는다. 객체의 `sizeof`/정렬은 바뀔 수 있다.
-**생성 영역 안의 수동 작성 클래스는 재생성 시 보존되지 않으므로 먼저 YAML로 옮기거나
-별도 파일로 분리해야 한다.** 현재 서버의 `ChannelEchoReq/Res`가 이에 해당한다.
+BotTester의 list 상호운용은 x64 서버를 대상으로 한다. 정렬 컨테이너는 less/greater에 맞게 정렬하며,
+set의 중복 원소와 map의 중복 키는 C++ 수신 규칙에 따라 거부한다. 컨테이너 개수는 16,384개 이하로 제한한다.
+복합 패킷은 16 KiB 버퍼 한도 안에서 생성하며 실제 전송 시 헤더·인증 태그 공간도 필요하다.
+기존 기본형 패킷의 256바이트 초기 버퍼는 유지한다.
+디스크립터는 초기화 후 읽기 전용으로 사용하며 직렬화 상태·JSON 값은 호출별로 처리한다.
 
-스키마 오류는 템플릿 생성이나 `_new` 복사 전에 검출하며 기존 생성 파일을 수정하지 않는다.
-데이터 구조체 코드는 `Protocol.h`에 포함되므로 기존 서버→클라이언트 복사 흐름을 그대로 사용한다.
+C++ 생성기는 ReadValue/WriteValue를 사용하고 모든 필드를 임시 객체에 읽은 뒤 대상에 반영한다.
+읽기 실패 시 부분적으로 갱신된 객체를 노출하지 않는다. 읽기 커서는 복구하지 않으므로 실패 패킷은 폐기한다.
+BotTester의 자동 지원은 스키마 기반 송신 직렬화이며, 응답 처리는 아래 수동 partial 핸들러에서 구현한다.
 
-검증 예제는 `Tool/PacketGenerator/tests/Structs.yml`이고 생성 결과는
-`CoreTest/GeneratedPacketSchema`에 있다. PyYAML 설치 후 저장소 루트에서 실행한다.
+## 생성 결과와 수동 코드
 
-```powershell
-python MultiSocketRUDP/Tool/PacketGenerator/tests/test_packet_schema.py -v
-# 예제 스키마나 생성 코드를 바꾼 경우 검증용 C++ 파일 갱신
-python MultiSocketRUDP/Tool/PacketGenerator/tests/test_packet_schema.py --write-fixture
-```
+| 대상 | 갱신 방식 |
+|---|---|
+| C++ 양쪽 `PacketIdType.h`, `Protocol.h`, `Protocol.cpp` | 전체 재생성 |
+| 서버 `PlayerPacketHandlerRegister.cpp` | 요청 팩토리 등록 재생성 |
+| 서버 `PacketHandlerRegister.cpp` | 실제 Player 핸들러 연결 재생성 |
+| 서버 `Player.h`, `PlayerPacketHandler.cpp` | 없는 선언·구현 골격만 추가 |
+| BotTester `Generated/PacketId.g.cs` | 순서 기반 enum |
+| BotTester `Generated/PacketSchema.g.cs` | 필드 이름·타입·순서·기본값 |
+| BotTester `Generated/PacketRegister.g.cs` | 응답 핸들러 연결 |
+| BotTester `Generated/PacketHandlers.g.cs` | 응답별 partial 핸들러 |
+| 양쪽 `GeneratedPacketPayloadTest(s)` | ID·전송 바이트 검사 |
 
-`CoreTest`의 `GeneratedPacketSchemaTest.*`는 이 생성 결과를 실제 컴파일하여
-구조체/패킷 왕복, 컨테이너 연동, 빈 구조체와 실패 시 값 보존을 검증한다.
+서버의 새 요청은 생성된 `On<PacketName>` 본문을 구현한다. 기존 선언의 인자 타입으로 핸들러를 찾아
+이름과 본문을 보존한다. `ChannelEchoReq`는 기존 `OnChannelEcho`에 연결된다.
+요청 삭제·개명 후 수동 선언이 남으면 생성이 실패한다. 선언과 구현을 직접 정리하거나 이전한 뒤 재생성한다.
 
-컨테이너별 count 타입, 정렬 방향 byte, 실패 처리 계약은 [[ContainerSerialization]]을 참고한다.
+BotTester 송신은 기존 스키마 기반 노드가 담당한다. 새 응답 처리는 생성 파일 대신 별도 파일에서 구현한다.
 
-### PacketIdType.h
-```cpp
-enum class PACKET_ID : unsigned int {
-    INVALID_PACKET_ID = 0
-    , PING
-    , PONG
-    , TEST_PACKET_REQ
-};
-```
+```csharp
+using MultiSocketRUDPBotTester.Buffer;
+namespace MultiSocketRUDPBotTester.Contents.Client.Action;
 
-### Protocol.h (패킷 클래스)
-```cpp
-class TestPacketReq final : public IPacket {
-public:
-    [[nodiscard]] PacketId GetPacketId() const override;
-    void BufferToPacket(NetBuffer& buffer) override;
-    void PacketToBuffer(NetBuffer& buffer) override;
-public:
-    int order;
-    std::string message;
-};
-```
-
-### Player.h (핸들러 선언 자동 추가)
-```cpp
-#pragma region Packet Handler
-public:
-    void OnPing(const Ping& packet);
-    void OnTestPacketReq(const TestPacketReq& packet);
-#pragma endregion Packet Handler
-```
-
----
-
-## 증분 업데이트 방식
-
-- 파일을 `_new` 사본으로 수정 후 `filecmp`로 비교, 변경 없으면 교체 안 함
-- `Player.cpp` / `Player.h`는 **기존 핸들러를 보존하고 신규 패킷만 추가**
-- `#pragma region Packet Handler` 블록 사이에 삽입
-
----
-
-## 실행 방법
-
-```batch
-Tool\PacketGenerate.bat             # 코드 생성만
-Tool\PacketGenerateAndUploader.bat  # 생성 + Google Sheets 업로드
-```
-
----
-
-## Google Sheets 업로드
-
-`Tool/PacketUploader/config.json`:
-```json
+public partial class InventoryResHandler
 {
-    "spreadsheet_id": "구글_시트_ID",
-    "sheet_name": "PacketDefine",
-    "yaml_file": "..\\PacketDefine.yml",
-    "auth_file": "credentials.json"
+    partial void OnPacket(NetBuffer buffer)
+    {
+        // 후속 대기자·그래프를 위해 버퍼 읽기 위치를 보존한다.
+    }
 }
 ```
 
----
+기본 핸들러는 버퍼를 읽지 않는다. 기존 `PacketRegister.cs`의 수동 override는 자동 등록 후 적용되므로
+PongAction 등의 기존 처리를 유지한다. 해당 기존 패킷에서는 수동 override가 우선한다.
+사전 초기화는 Client 생성 시에만 수행하며 런타임 교체 기능은 추가하지 않는다.
 
-## 관련 문서
-- [[PacketProcessing]] — 생성된 패킷이 처리되는 방식
-- [[RUDPSession]] — RegisterPacketHandler 사용
-- [[Common/PacketFormat]] — 패킷 구조
----
+## CI와 검증
 
-## 현재 코드 기준 함수 설명
+프로토콜 관련 경로 변경 시 생성 결과 검사와 C++·BotTester 검사를 모두 실행한다.
+생성 누락·불일치 또는 한쪽 실패도 PR 필수 체크 `build-and-test`를 실패시킨다.
+네트워크 구현·콘텐츠 서버는 누락 방지를 위해 보수적으로 포함하고 UI만 변경하면 기존 분류를 유지한다.
 
-문서명은 Packet Generator지만 실제 구현은 `Tool/PacketGenerator/PacketGenerator.py`에 있다.
+모든 출력 준비 후 임시 파일을 교체하며 교체 오류 시 이미 교체한 파일을 복원한다.
+강제 종료·전원 장애까지 여러 파일의 원자적 갱신을 보장하지는 않는다. 이 경우 재생성 후 `--check`로 확인한다.
+회귀 검증은 추가·변경·삭제·잘못된 정의·수동 코드 보존·재실행 무변경·교체 실패 복원을 확인한다.
+main의 구조체 fixture도 별도 회귀 테스트로 유지한다. 동일 fixture를 이용한 C++/C# 바이트 검사는
+중첩 구조체, vector/list/set/map 및 unordered 컨테이너를 검증한다.
+unordered 컨테이너의 정확한 바이트 비교에는 순서가 결정적인 단일 원소를 사용한다.
 
-#### `ToEnumName(name)`
-- PascalCase 패킷 이름을 `PACKET_ID`용 UPPER_SNAKE_CASE로 변환한다.
+C++ 실제 패킷 클래스의 직렬화·역직렬화와 C# 실제 송신 노드의 직렬화를 같은 예상 바이트와 비교한다.
+같은 타입의 필드에도 서로 다른 값을 사용하고 UTF-8 문자열을 포함한다. 대표 입력 검사이며 모든 값·길이·
+구버전 호환성을 보장하지는 않는다. 암호화·헤더의 기존 interop vector 검사도 유지한다.
 
-#### `CopyPacketFiles()`
-- 생성 대상 원본 파일을 `_new` 비교용 사본으로 복사한다.
-
-#### `ReplacePacketFiled()`
-- `_new` 파일들을 실제 결과 파일로 반영한다.
-
-#### `ReplaceFile(originFile, newFile)`
-- 내용이 달라진 경우에만 실제 파일을 교체한다.
-
-#### `CopyServerGeneratedFileToClientPath()`
-- 서버 쪽에서 생성된 `PacketIdType`, `Protocol.*`를 클라이언트 경로로 복사한다.
-
-#### `CopyServerFileToClientFile(serverFilePath, clientFilePath)`
-- 서버 생성 파일 하나를 클라이언트 대응 파일로 복사한다.
-
-#### `DuplicateCheckAndAdd(packetDuplicateCheckerContainer, checkTarget)`
-- 집합 기반 중복 검사를 수행하는 이전 검증 helper다.
-- 현재 전체 생성 경로의 스키마 검증은 `PacketSchema.ValidateSchema()`가 담당한다.
-
-#### `DuplicateCheckPacketItems(items, packetName)`
-- 한 패킷 내부 필드 이름 중복을 검사하는 이전 검증 helper다.
-
-#### `IsValidPacketTypeInYaml(yamlData)`
-- 이전 형식의 패킷 목록만 검증하는 호환 helper다. 현재 생성 파이프라인에서는 호출하지 않는다.
-
-#### `PacketSchema.ParseType(text)`
-- 중첩 컨테이너를 포함한 허용 범위의 C++ 타입 문자열을 구문 분석한다.
-
-#### `PacketSchema.ValidateSchema(data)`
-- `Structs`와 `Packet` 전체를 파일 변경 전에 검증한다.
-- 타입 참조를 확인하고 사용자 정의 구조체를 의존성 순서로 정렬한다. 순환 참조는 오류로 거부한다.
-
-#### `PacketSchema.MakeDataStructs(structs)`
-- 사용자 정의 `struct`와 각 타입의 `NetBufferCodec` 특수화를 생성한다.
-- codec은 필드를 YAML 순서대로 재귀 직렬화하고, 역직렬화 완료 후 임시 객체를 결과에 반영한다.
-
-#### `GeneratePacketType(packetList)`
-- `PACKET_ID` enum 헤더를 생성한다.
-
-#### `MakePacketClasss(packetList)`
-- `Protocol.h`에 들어갈 패킷 클래스 선언 코드를 만든다.
-
-#### `GenerateProtocolHeader(packetList, structList)`
-- `Protocol.h`의 생성 영역을 의존성 순서의 데이터 구조체, codec, 패킷 class로 교체한다.
-- 이전 `#pragma pack` 생성 영역은 새 marker 기반 영역으로 한 번 마이그레이션한다.
-
-#### `GenerateInitInPacketHandlerCpp(packetList, originCode)`
-- 패킷 핸들러 등록 함수 `Init()`에 필요한 등록 코드를 만든다.
-
-#### `GenerateProtocolCpp(packetList)`
-- `GetPacketId`, `BufferToPacket`, `PacketToBuffer` 구현을 생성한다.
-- 각 필드는 `NetBuffer::ReadValue`/`WriteValue`를 통해 처리되므로 구조체와 컨테이너도 같은 재귀 codec 경로를 사용한다.
-
-#### `GeneratePacketHandlerCpp(packetList)`
-- `PlayerPacketHandlerRegister.cpp`의 `Init()` 등록 코드를 갱신한다.
-
-#### `ExtractExistingPlayerHandlers(player_cpp_path)`
-- 기존 `Player.cpp`에 이미 구현된 `OnPacketName` 핸들러 이름을 추출한다.
-- 현재 스크립트에는 동일 이름 함수가 두 번 정의되어 있지만, 최종 동작은 마지막 정의가 덮어쓴다.
-
-#### `ExtractExistingPlayerHandlerDeclarations(player_header_path)`
-- 기존 `Player.h`에 선언된 `OnPacketName(const Packet& packet)` 시그니처를 추출한다.
-
-#### `GetReplyPacketName(request_name, packets)`
-- 요청 패킷 이름으로부터 대응 reply 이름을 추론한다.
-- 현재 스크립트에서는 일반 규칙과 `Ping`→`Pong` 예외를 처리한다.
-
-#### `GeneratePlayerHandlerCode(packet, packets)`
-- 새 request packet에 대한 빈 `Player::OnPacketName(...)` 구현 코드를 생성한다.
-
-#### `GeneratePlayerPacketHandlerDeclarations(packetList)`
-- `Player.h`의 `#pragma region Packet Handler` 구간에 새 핸들러 선언을 추가한다.
-
-#### `GeneratePlayerPacketHandlers(packetList)`
-- `Player.cpp`의 `#pragma region Packet Handler` 구간에 새 핸들러 구현을 추가한다.
-
-#### `ProcessPacketGenerate()`
-- YAML 전체 스키마 검증이 성공한 뒤에만 원본 백업, 코드 생성, 파일 교체, 클라이언트 복사를 실행한다.
-- 검증 실패 시 기존 생성 파일은 유지된다. 반면 비어 있는 `Packet:`/`Structs:` 목록은 유효한 정의이므로 대응 생성 결과가 비워질 수 있다.
+관련 문서: [CI 가이드](../Testing/CI.md), [업로더](PacketUploader.md).

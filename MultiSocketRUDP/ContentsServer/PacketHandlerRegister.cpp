@@ -4,8 +4,8 @@
 
 void Player::RegisterAllPacketHandler()
 {
-	RegisterPacketHandler<Player, ChannelEchoReq>(7, &Player::OnChannelEcho);
 	RegisterPacketHandler<Player, Ping>(static_cast<PacketId>(PACKET_ID::PING), &Player::OnPing);
-	RegisterPacketHandler<Player, TestPacketReq>(static_cast<PacketId>(PACKET_ID::TEST_PACKET_REQ), &Player::OnTestPacketReq);
 	RegisterPacketHandler<Player, TestStringPacketReq>(static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_REQ), &Player::OnTestStringPacketReq);
+	RegisterPacketHandler<Player, TestPacketReq>(static_cast<PacketId>(PACKET_ID::TEST_PACKET_REQ), &Player::OnTestPacketReq);
+	RegisterPacketHandler<Player, ChannelEchoReq>(static_cast<PacketId>(PACKET_ID::CHANNEL_ECHO_REQ), &Player::OnChannelEcho);
 }

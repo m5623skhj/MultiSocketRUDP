@@ -60,6 +60,9 @@ namespace MultiSocketRUDPBotTester.UI
                         labelWidth: 160);
                     fieldInputs[field.Name] = box;
                 }
+                fieldsPanel.Children.Add(ConfigUi.Hint(
+                    "Struct: JSON object {\"member\": value}. Containers: JSON arrays.\n" +
+                    "Map: [[key, value], ...]. Set/map duplicates are rejected."));
             }
 
             RefreshFields((PacketId)combo.SelectedItem);
