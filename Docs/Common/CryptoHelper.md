@@ -1,6 +1,6 @@
 # CryptoHelper
 
-> 아래 nonce 구성 예시는 v1 기준입니다. 현재 v2에서는 방향 3비트와 salt 5비트를 사용합니다. [현재 nonce 규칙](../UnreliableChannel.md)을 참고하세요.
+> 아래 nonce 구성은 프로토콜 v2의 방향 3비트와 salt 5비트 규칙을 기준으로 한다. 채널별 방향값은 [비신뢰성 채널](../UnreliableChannel.md)을 함께 참고한다.
 
 > **Windows BCrypt API를 래핑한 AES-GCM 저수준 암호화 헬퍼.**  
 > 스레드마다 algorithm provider를 가진 `CryptoHelper` 인스턴스를 유지한다.
@@ -215,9 +215,14 @@ static bool CryptoHelper::FillNonce(
         return false;
     }
 
-    // Byte 0: direction 상위 2비트 + sessionSalt[0] 하위 6비트
-    outNonce[0] = (static_cast<unsigned char>(direction) << 6)
-                | (sessionSalt[0] & 0x3F);
+    if (static_cast<unsigned char>(direction) >
+        static_cast<unsigned char>(PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL)) {
+        return false;
+    }
+
+    // Byte 0: direction 상위 3비트 + sessionSalt[0] 하위 5비트
+    outNonce[0] = (static_cast<unsigned char>(direction) << 5)
+                | (sessionSalt[0] & 0x1F);
 
     // Byte 1-3: sessionSalt[1..3] 복사
     outNonce[1] = sessionSalt[1];

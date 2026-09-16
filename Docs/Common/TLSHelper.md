@@ -3,7 +3,7 @@
 > **Windows SChannel(Schannel SSP)을 이용한 TLS 핸드셰이크 및 스트림 암복호화 모듈.**
 > `RUDPSessionBroker`(서버)와 `RUDPClientCore`(클라이언트)가 세션 정보를 안전하게 교환하는 채널을 제공한다.  
 > AES-GCM과 달리 표준 X.509 인증서를 사용하고, 스트림 방식으로 동작한다.
-> 서버 credential은 TLS 1.2로 제한하고, 클라이언트 credential은 OS Schannel 기본 프로토콜 정책을 사용한다.
+> 서버와 클라이언트 credential은 모두 TLS 1.2로 제한한다.
 
 ---
 
@@ -39,7 +39,9 @@ TLSHelperBase
  ├── EncryptData(plainData, size → encryptedBuffer, outSize)
  ├── DecryptData(encryptedData, encryptedSize, outPlain, outPlainSize)
  ├── DecryptDataStream(encryptedStream, outPlain, outPlainSize) → TlsDecryptResult
- └── EncryptCloseNotify(buffer, bufferSize, encryptedSize)
+ ├── EncryptCloseNotify(buffer, bufferSize, encryptedSize)
+ ├── SendProtocolVersion(socket, version)
+ └── ReceiveProtocolVersion(socket, expectedVersion, stopToken)
 
 TLSHelperServer : TLSHelperBase
  ├── certificateConfig (ServerCertificateConfig)
@@ -456,7 +458,8 @@ while (true) {
    certmgr.msc → 컴퓨터 계정 → 개인 → 인증서 → 가져오기
 
 3. 서버 코드
-   TLSHelperServer::Initialize(L"MY", L"your.domain.com")
+   TLSHelperServer(ServerCertificateConfig::FromStore(L"MY", L"your.domain.com"))
+     .Initialize()
 
 4. 클라이언트 코드 (운영)
    SCH_CRED_MANUAL_CRED_VALIDATION 플래그 제거
@@ -575,6 +578,13 @@ SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운�
 
 #### `bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize)`
 - TLS `close_notify` 경고 레코드를 생성한다.
+
+#### `bool SendProtocolVersion(SOCKET socket, uint32_t version)`
+- 버전을 4바이트 big-endian 평문으로 구성해 TLS 레코드 하나로 전송한다.
+
+#### `bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion, const std::stop_token& stopToken)`
+- TLS 스트림에서 정확히 4바이트 버전을 복호화해 비교한다.
+- 전체 수신은 5초 deadline과 `stopToken`을 함께 관찰하며 추가 평문이 있거나 값이 다르면 실패한다.
 
 ### 실패 진단 범위
 

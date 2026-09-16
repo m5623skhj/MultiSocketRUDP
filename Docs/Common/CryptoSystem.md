@@ -1,6 +1,6 @@
 # 암호화 시스템 (Crypto System)
 
-> 이 문서의 nonce 비트 배치와 방향값 예시는 v1 기준입니다. 현재 v2의 3비트 방향 구분과 버전 협상은 [비신뢰성 채널](../UnreliableChannel.md)을 참고하세요.
+> 이 문서는 프로토콜 v2의 3비트 방향 구분과 여섯 nonce 방향을 기준으로 한다. 버전 협상과 채널별 보장은 [비신뢰성 채널](../UnreliableChannel.md)을 함께 참고한다.
 
 > **패킷 1개를 전송할 때 적용되는 AES-128-GCM 기반 암호화 전체 설계를 다룬다.**  
 > 서버가 키/솔트를 생성하는 방법, Nonce를 구성하는 방법,  
@@ -137,7 +137,7 @@ AES-GCM은 96비트(12바이트) Nonce를 사용한다.
 ```
 Byte Index | 크기 | 내용
 ───────────┼──────┼──────────────────────────────────────────────
-    0      │  1B  │ (direction << 6) | (sessionSalt[0] & 0x3F)
+    0      │  1B  │ (direction << 5) | (sessionSalt[0] & 0x1F)
    1~3     │  3B  │ sessionSalt[1..3]
    4~11    │  8B  │ packetSequence (big-endian, uint64)
 ───────────┴──────┴──────────────────────────────────────────────
@@ -145,22 +145,24 @@ Byte Index | 크기 | 내용
 
 **방향(direction) 비트 매핑:**
 
-| `PACKET_DIRECTION` enum | 값 | 상위 2비트 | 의미 |
+| `PACKET_DIRECTION` enum | 값 | 상위 3비트 | 의미 |
 |-------------------------|----|-----------|------|
-| `CLIENT_TO_SERVER`       | 0  | `0b00`    | 클→서버 데이터 |
-| `CLIENT_TO_SERVER_REPLY` | 1  | `0b01`    | 클→서버 ACK |
-| `SERVER_TO_CLIENT`       | 2  | `0b10`    | 서→클라이언트 데이터 |
-| `SERVER_TO_CLIENT_REPLY` | 3  | `0b11`    | 서→클라이언트 ACK |
+| `CLIENT_TO_SERVER`       | 0  | `0b000`   | 클→서버 신뢰성 데이터 |
+| `CLIENT_TO_SERVER_REPLY` | 1  | `0b001`   | 클→서버 ACK |
+| `SERVER_TO_CLIENT`       | 2  | `0b010`   | 서→클라이언트 신뢰성 데이터 |
+| `SERVER_TO_CLIENT_REPLY` | 3  | `0b011`   | 서→클라이언트 ACK |
+| `CLIENT_TO_SERVER_UNREL` | 4  | `0b100`   | 클→서버 비신뢰성 데이터 |
+| `SERVER_TO_CLIENT_UNREL` | 5  | `0b101`   | 서→클라이언트 비신뢰성 데이터 |
 
 **Byte 0 구성 예시:**
 
 ```
-direction = SERVER_TO_CLIENT (0b10)
+direction = SERVER_TO_CLIENT (0b010)
 sessionSalt[0] = 0xA5 (0b10100101)
 
-Byte 0 = (0b10 << 6) | (0xA5 & 0x3F)
-       = 0b10000000  |  0b00100101
-       = 0b10100101 = 0xA5
+Byte 0 = (0b010 << 5) | (0xA5 & 0x1F)
+       = 0b01000000   |  0b00000101
+       = 0b01000101 = 0x45
 ```
 
 ```cpp
@@ -178,9 +180,14 @@ bool CryptoHelper::FillNonce(
         return false;
     }
 
-    // Byte 0: 방향 비트 + 솔트 하위 6비트
-    outNonce[0] = (static_cast<unsigned char>(direction) << 6)
-                | (sessionSalt[0] & 0x3F);
+    if (static_cast<unsigned char>(direction) >
+        static_cast<unsigned char>(PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL)) {
+        return false;
+    }
+
+    // Byte 0: 방향 비트 + 솔트 하위 5비트
+    outNonce[0] = (static_cast<unsigned char>(direction) << 5)
+                | (sessionSalt[0] & 0x1F);
 
     // Byte 1-3: sessionSalt[1..3]
     outNonce[1] = sessionSalt[1];
@@ -203,9 +210,9 @@ bool CryptoHelper::FillNonce(
   packetSequence는 단조 증가 → 같은 sequence 두 번 없음
 
 다른 세션 간:
-  nonce에 반영되는 salt는 30비트
-  (sessionSalt[0] 하위 6비트 + sessionSalt[1..3] 24비트)
-  → 두 세션의 nonce salt 부분이 같을 확률은 2^-30
+  nonce에 반영되는 salt는 29비트
+  (sessionSalt[0] 하위 5비트 + sessionSalt[1..3] 24비트)
+  → 두 세션의 nonce salt 부분이 같을 확률은 2^-29
   → 세션 간 안전성은 독립적인 128비트 sessionKey 생성도 함께 전제
 
 같은 sequence라도 방향이 다르면:
@@ -443,8 +450,8 @@ Step 8. 완료
 
 **direction 비트 포함 시:**
 ```
-서버 S→C: Nonce[0] = (0b10 << 6) | (salt[0] & 0x3F)
-클라이언트 C→S: Nonce[0] = (0b00 << 6) | (salt[0] & 0x3F)
+서버 S→C: Nonce[0] = (0b010 << 5) | (salt[0] & 0x1F)
+클라이언트 C→S: Nonce[0] = (0b000 << 5) | (salt[0] & 0x1F)
 → 항상 다름
 ```
 

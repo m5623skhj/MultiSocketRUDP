@@ -13,7 +13,7 @@
 3. [참조 카운팅 설계](#3-참조-카운팅-설계)
 4. [isErasedPacketInfo — 이중 처리 방지](#4-iserasedpacketinfo--이중-처리-방지)
 5. [scheduleVersion — stale heap entry 방지](#5-scheduleversion--stale-heap-entry-방지)
-6. [isReplyType — ACK 패킷 분리](#6-isreplytype--ack-패킷-분리)
+6. [isReplyType·isUnreliable — 재전송 대상 분리](#6-isreplytypeisunreliable--재전송-대상-분리)
 7. [RTT 샘플링](#7-rtt-샘플링)
 8. [재전송 스레드와의 동시성 시나리오](#8-재전송-스레드와의-동시성-시나리오)
 
@@ -32,6 +32,8 @@ struct SendPacketInfo
     uint64_t scheduleVersion{};
     std::atomic_bool isErasedPacketInfo{};
     bool isReplyType{};
+    bool isUnreliable{};
+    bool RequiresRetransmission() const noexcept;
     std::atomic_int32_t refCount{};
     mutable std::mutex rttSampleLock;
     std::chrono::steady_clock::time_point lastSendTime{};
@@ -49,6 +51,8 @@ struct SendPacketInfo
 | `scheduleVersion` | 재전송 heap에 같은 패킷이 여러 번 들어갈 때 최신 schedule만 유효하게 구분한다. |
 | `isErasedPacketInfo` | ACK 수신 또는 세션 해제로 추적 대상에서 제거됐음을 표시한다. |
 | `isReplyType` | ACK/Reply 패킷 여부. reply 패킷은 재전송 schedule에 등록하지 않는다. |
+| `isUnreliable` | 신뢰성 없는 채널 패킷 여부. ACK map과 재전송 schedule에 등록하지 않는다. |
+| `RequiresRetransmission()` | `!isReplyType && !isUnreliable`인 신뢰 데이터만 `true`를 반환한다. |
 | `refCount` | map, send queue, retransmission heap entry가 공유하는 수명 참조 카운터. |
 | `rttSampleLock` | `lastSendTime` 읽기/쓰기를 보호한다. |
 | `lastSendTime` | 가장 최근 실제 송신 시각. RTT 샘플 계산에 사용한다. |
@@ -63,18 +67,19 @@ struct SendPacketInfo
 
 1. sendPacketInfoPool->Alloc()
 2. Initialize(owner, ownerGeneration, buffer, sequence, isReplyType)
+   - 신뢰성 없는 경로는 직후 isUnreliable = true 설정
    - refCount = 1
-   - canUseRttSample = !isReplyType
-3. InsertSendPacketInfo(sequence, info)
+   - canUseRttSample = !isReplyType (신뢰성 없는 패킷은 RTT 경로에 진입하지 않음)
+3. RequiresRetransmission()인 경우에만 InsertSendPacketInfo(sequence, info)
    - sendPacketInfoMap에 ACK 대기 항목으로 저장
    - map 참조를 위해 AddRefCount()
 4. core.SendPacket(info)
    - 세션 send queue 또는 reserved slot을 거쳐 DoSend에서 전송
 5. RUDPIOHandler::RefreshRetransmissionSendPacketInfo()
-   - reply 패킷이면 schedule하지 않음
+   - reply 또는 신뢰성 없는 패킷이면 schedule하지 않음
    - 데이터 패킷이면 scheduler heap에 deadline/version/info를 push
    - heap entry 참조를 위해 AddRefCount()
-6. ACK 수신
+6. 신뢰 패킷은 ACK 수신
    - FindAndEraseSendPacketInfo(sequence)
    - core.MarkSendPacketInfoErased(info, threadId)
    - SendPacketInfo::Free(info)
@@ -84,6 +89,8 @@ struct SendPacketInfo
 ```
 
 재전송 heap은 `std::priority_queue` 기반이다. heap entry는 제거가 아니라 새 entry를 추가하는 방식으로 갱신되며, 오래된 entry는 pop 시 `scheduleVersion` 비교로 폐기한다.
+
+reply와 신뢰성 없는 패킷은 ACK map·재전송 heap 참조가 없으므로 send queue/예약 slot 참조가 해제되면 곧바로 반환된다.
 
 ---
 
@@ -186,12 +193,13 @@ heap pop version 2:
 
 ---
 
-## 6. `isReplyType` — ACK 패킷 분리
+## 6. `isReplyType`·`isUnreliable` — 재전송 대상 분리
 
-| `isReplyType` | 패킷 예시 | 재전송 schedule | 손실 시 |
-|---------------|-----------|-----------------|---------|
-| `false` | `SEND_TYPE`, `HEARTBEAT_TYPE` | 등록 | 서버가 재전송하고 한계 초과 시 disconnect |
-| `true` | `SEND_REPLY_TYPE`, `HEARTBEAT_REPLY_TYPE` | 미등록 | 상대가 원본을 재전송하면 다시 reply |
+| 분류 | 패킷 예시 | `RequiresRetransmission()` | 손실 시 |
+|------|-----------|----------------------------|---------|
+| 신뢰 데이터 | `SEND_TYPE`, `HEARTBEAT_TYPE` | `true` | 서버가 재전송하고 한계 초과 시 disconnect |
+| reply | `SEND_REPLY_TYPE`, `HEARTBEAT_REPLY_TYPE` | `false` | 상대가 원본을 재전송하면 다시 reply |
+| 신뢰성 없음 | `UNRELIABLE_SEND_TYPE` | `false` | 재전송 없이 유실 허용 |
 
 ACK 패킷을 서버가 별도로 재전송 추적하지 않는 이유는 원본 패킷 송신자가 ACK 유실을 감지해 원본을 재전송하기 때문이다.
 
@@ -277,5 +285,6 @@ Session Release Thread
 - [[RUDPSession]] — `InsertSendPacketInfo`, `FindAndEraseSendPacketInfo`, RTT 샘플 반영
 - [[MultiSocketRUDPCore]] — `RunRetransmissionThread`, `ProcessRetransmission`
 - [[RUDPIOHandler]] — `RefreshRetransmissionSendPacketInfo`
+- [[UnreliableChannel]] — 신뢰성 없는 패킷의 큐·수명 정책
 - [[ThreadModel]] — 재전송 스레드 전체 흐름
 - [[SessionComponents]] — `SessionSendContext` 내 `sendPacketInfoMap`

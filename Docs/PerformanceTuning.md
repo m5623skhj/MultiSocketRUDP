@@ -51,6 +51,8 @@
 
 특히 핸들러가 오래 블로킹되면 advertise window가 줄어들고, 결국 전송 측 throughput도 떨어진다.
 
+신뢰성 채널의 pending queue와 비신뢰성 채널의 큐 한도는 서로 다른 설정이다. `UNRELIABLE_QUEUE_CAPACITY`는 서버와 C++ 클라이언트에서 각각 미송신·미소비 비신뢰성 패킷의 개수를 제한하며 기본값은 64, 허용 범위는 1~65,535다. 한도를 낮추면 지연된 최신 데이터가 오래 머무는 것을 줄일 수 있지만 burst 중 교체되는 패킷 수가 늘어난다.
+
 ---
 
 ## 통계 확인
@@ -82,3 +84,4 @@ GetUnusedSessionCount()
 - [[MultiSocketRUDPCore]] - 통계 조회 API
 - [[Troubleshooting]] - 성능 이슈 점검
 - [[RetransmissionTimeoutEstimator]] - 서버 RTO 계산과 backoff 규칙
+- [[UnreliableChannel]] - 비신뢰성 큐, 교체 정책, RTT 측정

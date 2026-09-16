@@ -11,8 +11,9 @@
 public class RuntimeContext(Client client, NetBuffer? packet)
 {
     public Client Client { get; }                  // 소유 클라이언트
-    private NetBuffer? currentPacket;              // 현재 처리 중인 패킷 (Lock 보호)
+    private AsyncLocal<NetBuffer?> currentPacket;  // 비동기 실행 흐름별 현재 패킷
     private ConcurrentDictionary<string, object> vars;  // 변수 저장소
+    private Task pendingAsyncTask;                 // Interlocked로 교체
 }
 ```
 
@@ -23,7 +24,7 @@ public class RuntimeContext(Client client, NetBuffer? packet)
 ### 패킷 접근
 
 ```csharp
-NetBuffer? GetPacket()        // 현재 패킷 반환 (packetLock 보호)
+NetBuffer? GetPacket()        // 현재 비동기 실행 흐름의 패킷 반환
 void SetPacket(NetBuffer?)    // 패킷 설정 (ContextNodeBase.Execute에서 자동 호출)
 ```
 
@@ -72,7 +73,7 @@ public class RuntimeContext(Client client, NetBuffer? packet)
 public NetBuffer? GetPacket()
 ```
 
-현재 설정된 패킷을 반환한다. 스레드 안전하게 동작한다.
+현재 비동기 실행 흐름에 설정된 패킷을 반환한다. `AsyncLocal<NetBuffer?>`를 사용하므로 같은 `RuntimeContext`에서 동시에 실행되는 노드 체인이 서로의 현재 패킷을 덮어쓰지 않는다.
 
 ### `SetPacket`
 
@@ -80,7 +81,7 @@ public NetBuffer? GetPacket()
 public void SetPacket(NetBuffer? newPacket)
 ```
 
-현재 패킷을 새로 설정한다. 스레드 안전하게 동작한다.
+현재 비동기 실행 흐름의 패킷을 새로 설정한다.
 
 ### `Set<T>`
 
@@ -137,10 +138,10 @@ GlobalContext.Set($"__received_{packetId}_timestamp", CommonFunc.GetNowMs());
 
 #### `NetBuffer? GetPacket()`
 - 현재 처리 중인 패킷을 반환한다.
-- 내부 `packetLock`으로 보호된다.
+- 내부 `AsyncLocal<NetBuffer?>`에서 현재 실행 흐름의 값을 읽는다.
 
 #### `void SetPacket(NetBuffer? newPacket)`
-- 현재 패킷 참조를 교체한다.
+- 현재 비동기 실행 흐름의 패킷 참조를 교체한다.
 
 #### `void Set<T>(string key, T value)`
 - 컨텍스트 변수 저장소에 값을 기록한다.
@@ -171,6 +172,8 @@ GlobalContext.Set($"__received_{packetId}_timestamp", CommonFunc.GetNowMs());
 
 #### `void Clear()`
 - 변수 저장소, 현재 패킷, pending async task를 모두 초기화한다.
+
+`vars`의 개별 추가·조회·제거와 `AtomicIncrement()`는 `ConcurrentDictionary`로 보호된다. `pendingAsyncTask`의 교체는 `Interlocked.Exchange()`를 사용한다. 여러 상태를 하나의 원자적 transaction처럼 함께 바꾸는 기능은 제공하지 않는다.
 
 ### `RuntimeContextExtensions`
 

@@ -59,7 +59,7 @@
 
   <!-- Broker acquires session -->
   <line x1="325" y1="220" x2="755" y2="220" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="540" y="215" text-anchor="middle" font-size="9" fill="#94a3b8">AcquireSession()</text>
+  <text x="540" y="215" text-anchor="middle" font-size="9" fill="#94a3b8">protocol version=2 검증 후 AcquireSession()</text>
 
   <line x1="755" y1="238" x2="335" y2="238" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
   <text x="540" y="234" text-anchor="middle" font-size="9" fill="#94a3b8">RUDPSession* (DISCONNECTED→RESERVED)</text>
@@ -81,7 +81,7 @@
 
   <!-- Send session info -->
   <line x1="315" y1="355" x2="115" y2="355" stroke="#22c55e" stroke-width="2.5" marker-end="url(#arr-g)"/>
-  <text x="210" y="350" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">[TLS] {IP, Port, SessionId, Key, Salt}</text>
+  <text x="210" y="350" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">[TLS] {v2, Result, IP, Port, SessionId, Key, Salt}</text>
 
   <!-- TLS Close -->
   <line x1="105" y1="373" x2="315" y2="373" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arr-y)"/>
@@ -106,7 +106,7 @@
 
   <!-- Phase 3: Normal operation -->
   <rect x="20" y="495" width="820" height="20" rx="4" fill="#1e293b" opacity="0.7"/>
-  <text x="430" y="509" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">Phase 3: 정상 데이터 송수신</text>
+  <text x="430" y="509" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">Phase 3: 신뢰/신뢰성 없는 데이터 송수신</text>
 
   <!-- Client sends data -->
   <line x1="105" y1="530" x2="560" y2="530" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr-b)"/>
@@ -138,5 +138,5 @@
   <text x="380" y="672" font-size="9" fill="#f472b6">━ UDP S→C (Push)</text>
   <text x="500" y="672" font-size="9" fill="#94a3b8">╌ 하트비트</text>
   <text x="580" y="672" font-size="9" fill="#4ade80">■ 서버 내부 처리</text>
-  <text x="690" y="672" font-size="9" fill="#ddd6fe">AES-GCM 암호화 적용됨</text>
+  <text x="660" y="672" font-size="8" fill="#ddd6fe">UNRELIABLE_SEND: 별도 seq, ACK 없음</text>
 </svg>

@@ -25,7 +25,7 @@ enum class THREAD_GROUP : unsigned char {
     IO_WORKER_THREAD         = 0,   // RIO 완료 큐 폴링
     RECV_LOGIC_WORKER_THREAD = 1,   // 패킷 타입 분기, 핸들러 호출
     RETRANSMISSION_THREAD    = 2,   // 미ACK 패킷 재전송
-    SESSION_RELEASE_THREAD   = 3,   // RELEASING 세션 정리
+    SESSION_RELEASE_THREAD   = 3,   // 두 해제 상태 세션 정리
     HEARTBEAT_THREAD         = 4,   // 하트비트 전송, 예약 세션 타임아웃
 };
 ```
@@ -225,7 +225,7 @@ void RunIOWorkerThread(std::stop_token stopToken, ThreadIdType threadId)
 ```
 
 `stop_requested()`는 폴링 루프의 조건문에서 체크한다. `StopServer()`는 먼저 세션을
-`RELEASING`으로 전환하고, IO/Logic/Release worker가 close 취소 완료와 잔여 logic을 모두
+연결 상태에 따라 두 해제 상태 중 하나로 전환하고, IO/Logic/Release worker가 close 취소 완료와 잔여 logic을 모두
 drain하여 세션을 풀로 반환한 뒤에만 IO worker의 stop을 요청한다.
 
 ### RECV_LOGIC_WORKER_THREAD

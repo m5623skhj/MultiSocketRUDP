@@ -36,10 +36,11 @@
   <text x="650" y="224" text-anchor="middle" font-size="13" font-weight="700" fill="#22c55e">CONNECTED</text>
   <text x="650" y="242" text-anchor="middle" font-size="10" fill="#16a34a">패킷 송수신 가능</text>
 
-  <!-- RELEASING (bottom center) -->
-  <ellipse cx="390" cy="370" rx="100" ry="50" fill="#1e293b" stroke="#ef4444" stroke-width="2" filter="url(#glow)"/>
-  <text x="390" y="364" text-anchor="middle" font-size="13" font-weight="700" fill="#f87171">RELEASING</text>
-  <text x="390" y="382" text-anchor="middle" font-size="10" fill="#dc2626">IO 완료 대기 중</text>
+  <!-- release states (bottom center) -->
+  <ellipse cx="390" cy="370" rx="145" ry="50" fill="#1e293b" stroke="#ef4444" stroke-width="2" filter="url(#glow)"/>
+  <text x="390" y="354" text-anchor="middle" font-size="12" font-weight="700" fill="#f87171">RELEASING</text>
+  <text x="390" y="371" text-anchor="middle" font-size="10" font-weight="700" fill="#fb7185">RELEASING_BY_ABORT_RESERVED</text>
+  <text x="390" y="388" text-anchor="middle" font-size="9" fill="#dc2626">연결 여부를 구분하여 IO 완료 대기</text>
 
   <!-- DISCONNECTED → RESERVED -->
   <path d="M 218 175 Q 300 80 288 130" fill="none" stroke="#f59e0b" stroke-width="2" marker-end="url(#arr-yellow)"/>
@@ -59,13 +60,13 @@
   <text x="550" y="306" text-anchor="middle" font-size="9" fill="#f87171">DoDisconnect()</text>
   <text x="550" y="318" text-anchor="middle" font-size="9" fill="#ef4444">오류/재전송초과/</text>
 
-  <!-- RESERVED → RELEASING (timeout) -->
+  <!-- RESERVED → RELEASING_BY_ABORT_RESERVED (timeout) -->
   <path d="M 305 160 Q 240 270 295 350" fill="none" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-red)"/>
   <rect x="186" y="230" width="80" height="28" rx="4" fill="#0f172a"/>
   <text x="226" y="242" text-anchor="middle" font-size="9" fill="#f87171">AbortReserved()</text>
   <text x="226" y="254" text-anchor="middle" font-size="9" fill="#dc2626">30초 타임아웃</text>
 
-  <!-- RELEASING → DISCONNECTED -->
+  <!-- release states → DISCONNECTED -->
   <path d="M 295 390 Q 200 430 168 278" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
   <rect x="154" y="385" width="80" height="28" rx="4" fill="#0f172a"/>
   <text x="194" y="397" text-anchor="middle" font-size="9" fill="#94a3b8">Disconnect()</text>
@@ -73,15 +74,15 @@
 
   <!-- Condition notes -->
   <rect x="30" y="390" width="230" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
-  <text x="145" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">RELEASING → DISCONNECTED 조건</text>
+  <text x="145" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">해제 상태 → DISCONNECTED 조건</text>
   <text x="45" y="424" font-size="9" fill="#64748b">✓ IO_SENDING 상태가 아닐 것</text>
   <text x="45" y="438" font-size="9" fill="#64748b">✓ activeSendOperations = 0</text>
-  <text x="45" y="452" font-size="9" fill="#64748b">✓ SessionReleaseThread가 처리</text>
+  <text x="45" y="452" font-size="9" fill="#64748b">✓ recv/logic/completion 모두 drain</text>
 
   <!-- Connected state description -->
   <rect x="530" y="390" width="230" height="75" rx="8" fill="#1e293b" stroke="#166534" stroke-width="1"/>
   <text x="645" y="408" text-anchor="middle" font-size="10" font-weight="600" fill="#22c55e">CONNECTED 상태에서 가능한 것</text>
-  <text x="545" y="424" font-size="9" fill="#4ade80">✓ SendPacket() — 데이터 전송</text>
-  <text x="545" y="438" font-size="9" fill="#4ade80">✓ OnRecvPacket() — 데이터 수신</text>
+  <text x="545" y="424" font-size="9" fill="#4ade80">✓ SendPacket()/SendUnreliablePacket()</text>
+  <text x="545" y="438" font-size="9" fill="#4ade80">✓ 신뢰/신뢰성 없는 데이터 수신</text>
   <text x="545" y="452" font-size="9" fill="#4ade80">✓ SendHeartbeatPacket()</text>
 </svg>

@@ -70,7 +70,8 @@
 - 성공 → `true 반환` 또는 `성공` (문맥에 맞게)
 - 실패 → `false 반환` / `nullptr 반환` / `실패` (문맥에 맞게)
 - 미정의 동작 → `미정의 동작(UB)` 또는 `동작 미보장`
-- 해제 진행 중인 상태 → `해제 진행 중 (RELEASING)`으로 일관되게 표현
+- 연결 세션 해제 상태 → `해제 진행 중 (RELEASING)`으로 표현
+- 예약 세션 중단 상태 → `예약 해제 진행 중 (RELEASING_BY_ABORT_RESERVED)`으로 표현
 
 ---
 
@@ -156,8 +157,8 @@ RUDPIOHandler& operator=(const RUDPIOHandler&) = delete;
 코드:
 ```cpp
 // ----------------------------------------
-// @brief 현재 세션을 RELEASING 상태로 전이시키고 연결 해제 프로세스를 시작합니다.
-// @details 예약 상태 또는 연결 상태에서만 RELEASING 상태로 전이할 수 있습니다.
+// @brief 현재 세션을 연결 여부에 맞는 해제 상태로 전이시키고 연결 해제 프로세스를 시작합니다.
+// @details 예약 상태는 RELEASING_BY_ABORT_RESERVED, 연결 상태는 RELEASING으로 전이합니다.
 // ----------------------------------------
 void DoDisconnect(const DISCONNECT_REASON disconnectReason);
 ```
@@ -170,8 +171,8 @@ void DoDisconnect(const DISCONNECT_REASON disconnectReason);
 void DoDisconnect(const DISCONNECT_REASON disconnectReason);
 ```
 
-현재 세션을 RELEASING 상태로 전이시키고 연결 해제 프로세스를 시작한다.
-예약(RESERVED) 또는 연결(CONNECTED) 상태에서만 전이 가능하다.
+현재 세션을 연결 여부에 맞는 해제 상태로 전이시키고 연결 해제 프로세스를 시작한다.
+예약(RESERVED)은 RELEASING_BY_ABORT_RESERVED, 연결(CONNECTED)은 RELEASING으로 전이한다.
 
 | `disconnectReason` | 의미 |
 |--------------------|------|

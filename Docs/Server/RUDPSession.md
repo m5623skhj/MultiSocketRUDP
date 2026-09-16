@@ -41,9 +41,10 @@ RegisterPacketHandler<Player, Ping>(
 
 ```cpp
 bool SendPacket(IPacket& packet);
+bool SendUnreliablePacket(IPacket& packet);
 ```
 
-패킷을 송신 큐에 추가하여 전송을 요청한다.
+`SendPacket()`은 ACK·순서 보장·재전송이 있는 신뢰 채널로, `SendUnreliablePacket()`은 최신성 우선 채널로 전송을 요청한다.
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
@@ -53,6 +54,8 @@ bool SendPacket(IPacket& packet);
 |--------|------|
 | `true` | 송신 작업 성공 |
 | `false` | 세션이 연결되지 않았거나 큐가 가득 참 |
+
+`SendUnreliablePacket()`은 별도의 64비트 시퀀스와 `UNRELIABLE_SEND_TYPE`을 사용한다. ACK, CWND, 수신 재정렬, 재전송은 적용하지 않는다. 큐가 가득 찬 경우 가장 오래된 미송신 항목을 교체하므로 `true`는 원격 수신이 아니라 로컬 큐가 요청을 수락했다는 의미다.
 ### 연결 종료 요청
 
 ```cpp
@@ -119,6 +122,7 @@ void RegisterPacketHandler(const PacketId packetId, void (DerivedType::* func)(c
 
 ```cpp
 bool SendPacket(IPacket& packet);
+bool SendUnreliablePacket(IPacket& packet);
 ```
 
 세션을 통해 패킷을 전송한다.
@@ -131,6 +135,8 @@ bool SendPacket(IPacket& packet);
 |--------|------|
 | `true` | 패킷 전송 성공 |
 | `false` | 세션이 연결되지 않았거나 전송 실패 |
+
+신뢰성 없는 전송은 위치·조준·센서 값처럼 오래된 값보다 최신 값이 중요한 데이터에만 사용한다. 로그인, 결제, 인벤토리처럼 반드시 한 번 이상 도착해야 하는 데이터는 `SendPacket()`을 사용한다.
 
 ## 최소 예시
 
@@ -192,6 +198,7 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 - 송신은 즉시 소켓 호출이 아니라 코어 전송 경로를 거친다.
 - ACK와 재전송은 세션 내부 송신 상태와 코어 스레드 모델이 함께 관리한다.
 - 수신 순서 보장, heartbeat, ACK 생성은 내부 로직이 담당한다.
+- 신뢰성 없는 수신은 별도 최신 시퀀스 검사 뒤 같은 등록 핸들러로 전달되며 ACK를 생성하지 않는다.
 
 이 문서는 콘텐츠 확장 관점만 남기고, 오래된 내부 예제는 제거한다.
 
@@ -236,3 +243,4 @@ unsigned int GetRetransmissionTimeoutMs() const noexcept;
 - [[FlowController]] - 흐름 제어 개념
 - [[RetransmissionTimeoutEstimator]] - SRTT/RTTVAR 기반 RTO 계산
 - [[SendPacketInfo]] - RTT 표본 유효성 추적
+- [[UnreliableChannel]] - 신뢰성 없는 채널의 보장 범위와 큐 정책

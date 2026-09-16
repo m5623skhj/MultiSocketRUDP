@@ -21,13 +21,13 @@ Offset  Size  Field          설명
 
 ---
 
-## 일반 데이터 패킷 (SEND_TYPE, isCorePacket=false)
+## 일반 데이터 패킷 (SEND_TYPE / UNRELIABLE_SEND_TYPE, isCorePacket=false)
 
 ```
 Offset  Size  Field          암호화  설명
 ─────────────────────────────────────────────────────────────────────
   0      5B   Header         ─ AAD  HeaderCode + PayloadLength + Reserved
-  5      1B   PacketType     ─ AAD  PACKET_TYPE::SEND_TYPE (0x03)
+  5      1B   PacketType     ─ AAD  SEND_TYPE(0x03) 또는 UNRELIABLE_SEND_TYPE(0x07)
   6      8B   Sequence       ─ AAD  uint64, 단조 증가. Nonce 생성에도 사용.
  14      4B   PacketId       ← ENC  uint32. PACKET_ID enum 값.
  18      NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
@@ -84,6 +84,13 @@ Payload 없음 (헤더 + PacketType + Sequence + AuthTag만 존재)
 (위 일반 데이터 패킷 참조 — PacketId + Payload 포함)
 ```
 
+### UNRELIABLE_SEND_TYPE (0x07) — 양방향 비신뢰성 데이터
+
+```text
+SEND_TYPE과 같은 PacketId + Payload 레이아웃을 사용한다.
+ACK, 재전송, 신뢰성 수신 윈도우와 누락 번호 대기를 사용하지 않는다.
+```
+
 ### SEND_REPLY_TYPE (0x04) — ACK
 
 ```
@@ -120,6 +127,7 @@ enum class PACKET_TYPE : unsigned char {
     SEND_REPLY_TYPE     = 0x04,  // ACK (양방향)
     HEARTBEAT_TYPE      = 0x05,  // 생존 확인 (S→C)
     HEARTBEAT_REPLY_TYPE= 0x06,  // 생존 확인 응답 (C→S)
+    UNRELIABLE_SEND_TYPE= 0x07,  // 비신뢰성 데이터 (양방향)
 };
 ```
 
@@ -127,14 +135,16 @@ enum class PACKET_TYPE : unsigned char {
 
 ## PACKET_DIRECTION 열거형
 
-방향 정보는 Nonce 생성 시 상위 2비트로 인코딩된다.
+방향 정보는 Nonce 생성 시 상위 3비트로 인코딩된다. 신뢰성·비신뢰성 채널이 같은 시퀀스 번호를 사용해도 nonce가 겹치지 않는다.
 
 ```cpp
 enum class PACKET_DIRECTION : uint8_t {
-    CLIENT_TO_SERVER        = 0,  // 0b00 — 클라이언트 송신 데이터
-    CLIENT_TO_SERVER_REPLY  = 1,  // 0b01 — 클라이언트 ACK
-    SERVER_TO_CLIENT        = 2,  // 0b10 — 서버 송신 데이터
-    SERVER_TO_CLIENT_REPLY  = 3,  // 0b11 — 서버 ACK
+    CLIENT_TO_SERVER        = 0,  // 0b000 — 클라이언트 신뢰성 데이터
+    CLIENT_TO_SERVER_REPLY  = 1,  // 0b001 — 클라이언트 ACK
+    SERVER_TO_CLIENT        = 2,  // 0b010 — 서버 신뢰성 데이터
+    SERVER_TO_CLIENT_REPLY  = 3,  // 0b011 — 서버 ACK
+    CLIENT_TO_SERVER_UNREL  = 4,  // 0b100 — 클라이언트 비신뢰성 데이터
+    SERVER_TO_CLIENT_UNREL  = 5,  // 0b101 — 서버 비신뢰성 데이터
     INVALID                 = 255
 };
 ```
@@ -178,7 +188,7 @@ const unsigned char* aad = reinterpret_cast<const unsigned char*>(packet.m_pSeri
 **AAD를 포함한 인증의 의미:**
 - HeaderCode, PayloadLength, PacketType, Sequence는 평문이지만 위변조 불가
 - 공격자가 Sequence를 바꾸면 AuthTag 검증 실패 → 시퀀스 필드 변조 감지
-- 동일 패킷을 그대로 재전송하는 replay 거부는 수신 윈도우와 세션 sequence 검증이 담당
+- 동일 패킷을 그대로 재전송하는 replay 거부는 신뢰성 수신 윈도우 또는 비신뢰성 최신 sequence 검사가 담당
 - PacketType을 바꾸면 AuthTag 검증 실패 → 타입 위조 방지
 
 ---

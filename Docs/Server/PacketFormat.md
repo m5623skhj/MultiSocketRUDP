@@ -200,6 +200,16 @@ packet.PacketToBuffer(buf);  // 콘텐츠 직렬화
 
 ---
 
+### UNRELIABLE_SEND_TYPE (양방향, isCorePacket=false)
+
+`SEND_TYPE`과 동일한 `PacketId(4B) + 콘텐츠 payload` 레이아웃을 사용한다. 차이는 채널 계약과 nonce 방향이다.
+
+- C→S: `CLIENT_TO_SERVER_UNREL`
+- S→C: `SERVER_TO_CLIENT_UNREL`
+- ACK·재전송·advertise window·누락 번호 대기 없음
+
+---
+
 ### SEND_REPLY_TYPE (양방향, isCorePacket=true)
 
 ```
@@ -245,10 +255,11 @@ recvPacket >> remoteAdvertisedWindow; // 서버 수신 윈도우
 enum class PACKET_TYPE : BYTE {
     CONNECT_TYPE          = 0x01,   // C→S  RUDP 연결 요청
     DISCONNECT_TYPE       = 0x02,   // C→S  정상 연결 해제
-    SEND_TYPE             = 0x03,   // 양방향 데이터 전송 (현재 서버→클라이언트만 사용)
+    SEND_TYPE             = 0x03,   // 양방향 신뢰성 데이터 전송
     SEND_REPLY_TYPE       = 0x04,   // 양방향 ACK + advertiseWindow
     HEARTBEAT_TYPE        = 0x05,   // S→C  생존 확인
     HEARTBEAT_REPLY_TYPE  = 0x06,   // C→S  하트비트 응답
+    UNRELIABLE_SEND_TYPE  = 0x07,   // 양방향 비신뢰성 데이터 전송
 };
 ```
 
@@ -258,6 +269,7 @@ switch (static_cast<PACKET_TYPE>(packetType)) {
 case PACKET_TYPE::CONNECT_TYPE:         // DecodePacket(core=true, dir=C2S)
 case PACKET_TYPE::DISCONNECT_TYPE:      // DecodePacket(core=true, dir=C2S)
 case PACKET_TYPE::SEND_TYPE:            // DecodePacket(core=false, dir=C2S)
+case PACKET_TYPE::UNRELIABLE_SEND_TYPE: // DecodePacket(core=false, dir=C2S_UNREL)
 case PACKET_TYPE::SEND_REPLY_TYPE:      // DecodePacket(core=true, dir=C2S_REPLY)
 case PACKET_TYPE::HEARTBEAT_REPLY_TYPE: // DecodePacket(core=true, dir=C2S_REPLY)
 default: LOG_ERROR("Unknown type");
@@ -274,6 +286,9 @@ enum class PACKET_DIRECTION : BYTE {
     CLIENT_TO_SERVER_REPLY = 1,  // 클라이언트 ACK → 서버
     SERVER_TO_CLIENT       = 2,  // 서버 데이터 → 클라이언트
     SERVER_TO_CLIENT_REPLY = 3,  // 서버 ACK → 클라이언트
+    CLIENT_TO_SERVER_UNREL = 4,  // 클라이언트 비신뢰성 데이터 → 서버
+    SERVER_TO_CLIENT_UNREL = 5,  // 서버 비신뢰성 데이터 → 클라이언트
+    INVALID                = 255,
 };
 ```
 
@@ -285,6 +300,8 @@ enum class PACKET_DIRECTION : BYTE {
 | `CLIENT_TO_SERVER_REPLY` | SEND_REPLY_TYPE, HEARTBEAT_REPLY_TYPE | 클라이언트 | 서버 |
 | `SERVER_TO_CLIENT` | SEND_TYPE, HEARTBEAT_TYPE | 서버 | 클라이언트 |
 | `SERVER_TO_CLIENT_REPLY` | SEND_REPLY_TYPE | 서버 | 클라이언트 |
+| `CLIENT_TO_SERVER_UNREL` | UNRELIABLE_SEND_TYPE | 클라이언트 | 서버 |
+| `SERVER_TO_CLIENT_UNREL` | UNRELIABLE_SEND_TYPE | 서버 | 클라이언트 |
 
 ---
 

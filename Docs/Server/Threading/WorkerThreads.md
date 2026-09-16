@@ -50,10 +50,10 @@ ACK timeout
 
 ## RecvLogic Worker
 
-- 입력: IO Worker가 enqueue한 수신 완료 context와 worker별 semaphore 신호
-- 처리: 세션 처리 상태 표시, 패킷 사전 검증, type 분기, 복호화, 순서 보장
+- 입력: IO Worker가 enqueue한 수신 완료 context와 worker별 AutoResetEvent 신호
+- 처리: 세션 처리 상태 표시, 패킷 사전 검증, type 분기, 복호화, 신뢰 채널 순서 보장
 - 출력: 콘텐츠 handler 호출, ACK 송신, `SendPacketInfo` 정리
-- 주의: 완료 context가 보관한 generation을 실행 직전에 다시 확인한다. stale이거나 `RELEASING`인 작업은 자신이 소유한 `NetBuffer`만 해제하고 콘텐츠 처리로 전달하지 않는다.
+- 주의: 완료 context가 보관한 generation을 실행 직전에 다시 확인한다. stale이거나 두 해제 상태 중 하나인 작업은 자신이 소유한 `NetBuffer`만 해제하고 콘텐츠 처리로 전달하지 않는다.
 - 치명 오류: `WaitForMultipleObjects()`의 `WAIT_FAILED` 또는 IO Worker의 recv logic event `SetEvent()` 실패는 queue drain을 보장할 수 없으므로 상위 레이어 재시작 요청 대상으로 전달한다.
 
 [상세 코드 해설](ThreadModelReference.md#3-recvlogic-worker-thread-상세)

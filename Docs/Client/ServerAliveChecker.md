@@ -1,396 +1,171 @@
 # ServerAliveChecker
 
-> **v2 변경:** 현재 구현은 아래의 기존 신뢰성 수신 시퀀스 대신 `authenticatedReceiveCount`를 검사합니다. 신뢰성·비신뢰성 데이터, 하트비트 및 ACK의 인증 성공 시 증가하며, 인증 실패는 반영하지 않습니다. 감시 시작 시 현재 횟수를 기준으로 설정하므로 새 연결에서 이전 검사값을 이어받지 않습니다. 애플리케이션이 `GetReceivedPacket()`을 호출할 필요 없이 수신 활동이 생존 검사에 반영됩니다.
-
-> **서버가 일정 시간 동안 응답하지 않을 경우 클라이언트를 자동 종료하는 생존 감시 모듈.**  
-> 수신 시퀀스 번호의 변화를 폴링해 서버 생존 여부를 판단한다.  
-> 자기 자신 스레드에서 `Stop()`이 호출될 때 발생하는 deadlock을 `detach`로 방지한다.
+> **인증에 성공한 수신 횟수를 기준으로 서버 생존을 감시하는 C++ 클라이언트 모듈.**
+> 신뢰성·비신뢰성 데이터, heartbeat와 ACK를 모두 활동으로 인정한다.
+> 감시 스레드에서 코어 종료 콜백을 호출할 수 있으므로 self-join을 피한다.
 
 ---
 
 ## 목차
 
 1. [동작 원리](#1-동작-원리)
-2. [생성자 — 콜백 주입](#2-생성자-콜백-주입)
-3. [시작 — `StartServerAliveCheck`](#3-시작-startserveralivecheck)
-4. [종료 — `StopServerAliveCheck`](#4-종료-stopserveralivecheck)
-5. [내부 루프 상세](#5-내부-루프-상세)
-6. [Deadlock 방지 설계](#6-deadlock-방지-설계)
-7. [타이밍 설정 가이드](#7-타이밍-설정-가이드)
-8. [전체 호출 시나리오](#8-전체-호출-시나리오)
+2. [생성자 — 콜백 주입](#2-생성자--콜백-주입)
+3. [시작 — `StartServerAliveCheck`](#3-시작--startserveralivecheck)
+4. [생존 판정 — `IsServerAlive`](#4-생존-판정--isserveralive)
+5. [종료 — `StopServerAliveCheck`](#5-종료--stopserveralivecheck)
+6. [동시성과 객체 수명](#6-동시성과-객체-수명)
+7. [타이밍 설정](#7-타이밍-설정)
 
 ---
 
 ## 1. 동작 원리
 
-서버는 주기적으로 `HEARTBEAT_TYPE` 패킷을 전송한다.  
-클라이언트 `recvThread`가 이 패킷을 수신할 때마다 `nextRecvPacketSequence`가 증가한다.
+`RUDPClientCore::ProcessRecvPacket()`은 패킷 타입에 맞는 AES-GCM 인증이 성공한 직후 `authenticatedReceiveCount`를 증가시킨다. 애플리케이션의 수신 큐 소비 여부와는 무관하다.
 
-`ServerAliveChecker`는 이 시퀀스 값을 `checkIntervalMs`마다 폴링해 변화를 확인한다.
+활동으로 인정되는 패킷은 다음과 같다.
 
+- 신뢰성 콘텐츠 `SEND_TYPE`
+- 비신뢰성 콘텐츠 `UNRELIABLE_SEND_TYPE`
+- `HEARTBEAT_TYPE`
+- `SEND_REPLY_TYPE`
+
+인증 실패 패킷, 잘못된 타입, 복호화 전에 거부된 패킷은 횟수를 증가시키지 않는다.
+
+```text
+StartServerAliveCheck(interval)
+  → 시작 시 현재 receiveCount를 기준값으로 저장
+  → interval만큼 Sleep
+  → 현재 receiveCount와 기준값 비교
+      ├─ 증가함: 기준값 갱신 후 계속 감시
+      └─ 동일함: "Server is not alive" 기록
+                  → coreStopFunction() 호출
+                  → 감시 루프 종료
 ```
-매 checkIntervalMs:
-  nowSequence = getNextRecvSequenceFunction()
 
-  if nowSequence == beforeCheckSequence:
-    → 그 동안 패킷이 하나도 안 왔음 = 서버 무응답
-    → LOG: "Server is not alive"
-    → coreStopFunction()  // RUDPClientCore::Stop()
-    → 루프 종료
-
-  else:
-    → 정상, 시퀀스 갱신
-    → beforeCheckSequence = nowSequence
-    → 계속 모니터링
-```
-
-**왜 `HEARTBEAT` 전용 카운터가 아닌 `nextRecvPacketSequence`를 사용하는가:**
-
-`nextRecvPacketSequence`는 HEARTBEAT뿐 아니라 일반 데이터 패킷 수신 시에도 증가한다.  
-즉, 서버가 데이터를 보내는 동안은 HEARTBEAT 없이도 생존으로 판단한다.  
-HEARTBEAT 전용 카운터를 쓰면 데이터 트래픽이 활발한 동안 불필요한 종료가 발생할 수 있다.
+수신 시퀀스가 아니라 인증된 수신 횟수를 사용하므로 비신뢰성 전용 통신과 애플리케이션이 아직 소비하지 않은 heartbeat도 생존 상태에 반영된다.
 
 ---
 
 ## 2. 생성자 — 콜백 주입
 
 ```cpp
-class ServerAliveChecker {
-public:
-    explicit ServerAliveChecker(
-        const std::function<void()>& inCoreStopFunction,
-        const std::function<PacketSequence()>& inGetNextRecvSequenceFunction
-    );
-};
+explicit ServerAliveChecker(
+    const std::function<void()>& inCoreStopFunction,
+    const std::function<uint64_t()>& inGetReceiveCountFunction);
 ```
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `inCoreStopFunction` | `std::function<void()>` | 서버 무응답 시 호출할 종료 콜백 |
-| `inGetNextRecvSequenceFunction` | `std::function<PacketSequence()>` | 현재 수신 시퀀스 조회 콜백 |
+| `inCoreStopFunction` | `const std::function<void()>&` | 서버 무응답 시 호출할 코어 종료 콜백 |
+| `inGetReceiveCountFunction` | `const std::function<uint64_t()>&` | 인증에 성공한 누적 수신 횟수를 반환하는 콜백 |
 
-**`RUDPClientCore` 생성자에서 람다로 주입:**
+`RUDPClientCore`는 아래 의미의 람다를 주입한다.
 
 ```cpp
 RUDPClientCore::RUDPClientCore()
     : serverAliveChecker(
-        // 종료 콜백: Stop() 호출
-        [this] { this->Stop(); },
-
-        // 시퀀스 조회 콜백: nextRecvPacketSequence 반환
-        [this] { return this->nextRecvPacketSequence; }
-    )
-{}
+        [this] { Stop(); },
+        [this] {
+            return authenticatedReceiveCount.load(std::memory_order_relaxed);
+        })
+{
+}
 ```
 
-**왜 직접 포인터 대신 `std::function`을 사용하는가:**
-
-- `RUDPClientCore`의 메서드를 멤버 함수 포인터로 직접 참조하면  
-  `ServerAliveChecker`가 `RUDPClientCore`에 강하게 결합된다.
-- 람다 캡처 방식은 구조를 느슨하게 유지하며, 단위 테스트에서  
-  Mock 함수를 쉽게 주입할 수 있다.
+checker는 `RUDPClientCore`의 구체 타입이나 수신 큐 구조를 알지 않는다. 단, 두 콜백이 `this`를 캡처하므로 checker 스레드가 끝나기 전에 owner를 파괴하면 안 된다.
 
 ---
 
 ## 3. 시작 — `StartServerAliveCheck`
 
 ```cpp
-void ServerAliveChecker::StartServerAliveCheck(unsigned int inCheckIntervalMs)
+void StartServerAliveCheck(unsigned int inCheckIntervalMs);
 ```
 
-**언제 호출되는가:**
+검사 주기를 저장하고, 현재 수신 횟수를 `beforeCheckReceiveCount`의 기준값으로 설정한 뒤 감시 `std::jthread`를 시작한다.
 
 ```cpp
-// RUDPClientCore::OnSendReply (recvThread에서)
-if (ackedSeq == LOGIN_PACKET_SEQUENCE && !isConnected) {
-    isConnected = true;
-    serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
-}
+checkIntervalMs = inCheckIntervalMs;
+beforeCheckReceiveCount = getReceiveCountFunction();
+isStopped.store(false, std::memory_order_release);
+serverAliveCheckThread = std::jthread(
+    &ServerAliveChecker::RunServerAliveCheckerThread, this);
 ```
 
-서버로부터 `sequence=0` ACK를 수신한 시점, 즉 UDP RUDP 연결이 **완전히 수립된 후**에만 시작한다.
+`RUDPClientCore::OnSendReply()`이 CONNECT의 `LOGIN_PACKET_SEQUENCE` ACK를 처리해 연결 상태로 전환한 뒤 호출한다. 시작 시 현재 횟수를 기준값으로 다시 읽으므로 이전 연결의 검사값을 이어받지 않는다.
 
-**왜 연결 완료 후에 시작해야 하는가:**
-
-```
-연결 수립 전:
-  CONNECT 패킷 전송 직후 아직 서버가 ACK를 안 보냄
-  → nextRecvPacketSequence = 0으로 유지
-  → 첫 checkIntervalMs 후 변화 없음 감지
-  → 오탐으로 Stop() 호출
-
-연결 수립 후 (sequence=0 ACK 수신):
-  서버가 정기적으로 HEARTBEAT 전송
-  → nextRecvPacketSequence가 주기적으로 증가
-  → 정상 모니터링 가능
-```
-
-**내부 구현:**
-
-```cpp
-void ServerAliveChecker::StartServerAliveCheck(unsigned int inCheckIntervalMs)
-{
-    checkIntervalMs = inCheckIntervalMs;
-    isStopped.store(false, std::memory_order_release);
-    serverAliveCheckThread = std::jthread(&ServerAliveChecker::RunServerAliveCheckerThread, this);
-}
-```
+> `StartServerAliveCheck()`는 동시 호출이나 이미 실행 중인 checker의 재시작을 위한 API가 아니다. 연결 수명주기에서 한 번만 직렬 호출해야 한다.
 
 ---
 
-## 4. 종료 — `StopServerAliveCheck`
-
-```cpp
-void ServerAliveChecker::StopServerAliveCheck()
-```
-
-**`RUDPClientCore::JoinThreads()`에서 호출:**
-
-```cpp
-void JoinThreads() {
-    serverAliveChecker.StopServerAliveCheck();  // ← 먼저 처리
-    retransmissionThread.join();
-    sendThread.join();
-    recvThread.join();
-}
-```
-
-**내부 구현 (Deadlock 방지 포함):**
-
-```cpp
-void ServerAliveChecker::StopServerAliveCheck()
-{
-    if (isStopped.exchange(true)) return;  // 이미 종료됨
-
-    if (!serverAliveCheckThread.joinable()) return;
-
-    // 자기 자신 스레드에서 호출되면 join() 불가 → detach
-    if (serverAliveCheckThread.get_id() == std::this_thread::get_id()) {
-        serverAliveCheckThread.detach();
-    } else {
-        // 다른 스레드에서 호출되면 안전하게 join
-        serverAliveCheckThread.join();
-    }
-}
-```
-
----
-
-## 5. 내부 루프 상세
-
-```cpp
-void ServerAliveChecker::RunServerAliveCheckerThread()
-{
-    while (!isStopped) {
-        Sleep(checkIntervalMs);
-
-        if (isStopped) break;
-
-        // 시퀀스 변화 확인
-        PacketSequence nowSequence = getNextRecvSequenceFunction();
-
-        if (nowSequence == beforeCheckSequence) {
-            // 변화 없음 → 서버 무응답
-            LOG_ERROR(std::format(
-                "Server is not alive. nextRecvSeq={}, beforeSeq={}",
-                nowSequence, beforeCheckSequence));
-
-            coreStopFunction();  // RUDPClientCore::Stop() 호출
-            break;               // 루프 종료
-        }
-
-        // 정상: 기준값 갱신
-        beforeCheckSequence = nowSequence;
-    }
-}
-```
-
-**종료 대기 시간:**
-
-```
-Sleep(checkIntervalMs) 중에는 stop 신호를 확인하지 않는다.
-따라서 다른 스레드에서 StopServerAliveCheck()를 호출하면
-join()은 최대 checkIntervalMs까지 대기할 수 있다.
-```
-
----
-
-## 6. Deadlock 방지 설계
-
-### 문제 시나리오
-
-```
-[ServerAliveCheckThread]
-  RunServerAliveCheckerThread()
-    → 서버 무응답 감지
-    → coreStopFunction()      // = RUDPClientCore::Stop()
-         → JoinThreads()
-              → serverAliveChecker.StopServerAliveCheck()
-                   → serverAliveCheckThread.join()  ← 자기 자신을 join!
-                        → DEADLOCK (영원히 대기)
-```
-
-### 해결: `get_id()` 비교 + `detach`
-
-```cpp
-if (serverAliveCheckThread.get_id() == std::this_thread::get_id()) {
-    serverAliveCheckThread.detach();
-    // detach: join 없이 스레드를 독립적으로 실행
-    // 이 시점 직후 스레드가 자연스럽게 종료됨 (break 후 return)
-} else {
-    serverAliveCheckThread.join();  // 다른 스레드 → 안전한 join
-}
-```
-
-**`detach` 후 스레드 상태:**
-
-```
-detach 호출 시점: coreStopFunction() 내부 (= RunServerAliveCheckerThread 내)
-  → isStopped = true (exchange에서 설정)
-  → RunServerAliveCheckerThread의 break 직전
-  → 스레드가 곧 return으로 자연 종료됨
-  → detach된 스레드는 백그라운드에서 종료
-```
-
-이 분기는 자기 자신을 `join()`하는 교착을 피한다. 다만 detach된 스레드의 완료를 `Stop()` 호출자가 기다릴 수 있는 별도 barrier는 없다. 따라서 현재 구현만으로 `Stop()` 반환 직후 `RUDPClientCore`가 파괴되는 모든 경우의 메모리 안전성을 절대적으로 보장한다고 설명해서는 안 된다. owner는 checker 함수가 완전히 빠져나갈 때까지 관련 객체의 수명이 유지되도록 해야 하며, 이 전제를 제거하려면 detach 없는 완료 동기화가 필요하다.
-
-### `isStopped.exchange(true)` 원자 연산
-
-```cpp
-if (isStopped.exchange(true)) return;  // 이미 true였으면 즉시 반환
-```
-
-`exchange`는 값을 쓰고 이전 값을 반환한다. 멀티스레드에서 중복 호출 방지.  
-`StopServerAliveCheck`가 복수의 스레드에서 동시에 호출돼도 안전하다.
-
----
-
-## 7. 타이밍 설정 가이드
-
-```ini
-; 서버 설정
-HEARTBEAT_THREAD_SLEEP_MS=5000   ; 현재 샘플 서버 기본값
-
-; 클라이언트 설정
-SERVER_ALIVE_CHECK_MS=15000      ; 현재 샘플 클라이언트 기본값
-```
-
-**최소 요구 관계:**
-
-```
-SERVER_ALIVE_CHECK_MS > HEARTBEAT_THREAD_SLEEP_MS
-
-이유:
-  서버가 5초마다 HEARTBEAT를 보냄
-  클라이언트가 15초마다 확인하면 → 최소 1개의 HEARTBEAT가 수신됨
-  → 정상 감지
-
-  생존 확인 주기 < 하트비트 주기로 설정 시:
-  → HEARTBEAT 오기 전에 이미 체크 → 오탐으로 Stop()
-```
-
-**권장 배율:**
-
-```
-SERVER_ALIVE_CHECK_MS >= HEARTBEAT_THREAD_SLEEP_MS × 2
-
-예: 서버 5000ms → 클라이언트 10000ms 이상
-  → 네트워크 지연 + 재전송으로 HEARTBEAT가 한 번 늦게 도착해도 오탐 없음
-```
-
----
-
-## 8. 전체 호출 시나리오
-
-### 정상 시나리오 (서버 응답 중)
-
-```
-[시작]
-RUDPClientCore::Start()
-  → ... → OnSendReply(seq=0) → StartServerAliveCheck(5000)
-
-[모니터링 중]
-  t=5s:  nowSeq=10, before=0 → 변화 있음 → before=10
-  t=10s: nowSeq=22, before=10 → 변화 있음 → before=22
-  ...
-
-[종료]
-RUDPClientCore::Stop()
-  → JoinThreads()
-      → StopServerAliveCheck()
-          → get_id() != this_thread::get_id()  ← 다른 스레드
-          → isStopped=true
-          → serverAliveCheckThread.join()
-```
-
-### 서버 무응답 시나리오
-
-```
-[서버 다운]
-  (HEARTBEAT 전송 중단)
-  nextRecvPacketSequence 증가 멈춤
-
-  t=5s:  nowSeq=30, before=30 → 변화 없음!
-    → LOG: "Server is not alive"
-    → coreStopFunction()  = RUDPClientCore::Stop()
-         → JoinThreads()
-              → StopServerAliveCheck()
-                   → get_id() == this_thread::get_id()  ← 자기 자신!
-                   → isStopped=true (exchange)
-                   → detach()
-
-[RunServerAliveCheckerThread]
-  break → return → 스레드 자연 종료
-```
-
----
-
-## 관련 문서
-- [[RUDPClientCore]] — StartServerAliveCheck 호출 시점, JoinThreads
-- [[Troubleshooting]] — "Server is not alive" 로그 해석
-- [[PerformanceTuning]] — HEARTBEAT 주기 설정
----
-
-## 현재 코드 기준 함수 설명 및 정정
-
-### 공개 함수
-
-#### `ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<PacketSequence()>& inGetNextRecvSequenceFunction)`
-- 필수 콜백을 받는 생성자다.
-- 코어 중지 요청과 최근 수신 시퀀스 조회를 외부에 위임한다.
-
-#### `void StartServerAliveCheck(unsigned int inCheckIntervalMs)`
-- 서버 생존 감시 스레드를 시작한다.
-
-#### `void StopServerAliveCheck()`
-- 감시 스레드 중지를 요청한다.
-
-### `IsServerAlive`
+## 4. 생존 판정 — `IsServerAlive`
 
 ```cpp
 [[nodiscard]]
 bool IsServerAlive(uint64_t receiveCount);
 ```
 
-이전 체크 지점 대비 수신 카운트가 진전됐는지 확인한다.
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `receiveCount` | `uint64_t` | 현재 수신된 카운트 |
-
-**반환값**:
-
 | 반환값 | 조건 |
 |--------|------|
-| `true` | 수신 카운트가 이전보다 증가함 |
-| `false` | 수신 카운트가 증가하지 않음 |
+| `true` | 전달된 누적 수신 횟수가 직전 기준값과 다름. 기준값도 새 값으로 갱신한다. |
+| `false` | 전달된 누적 수신 횟수가 직전 기준값과 동일함. |
 
 > 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
-### 내부 함수
 
-#### `void RunServerAliveCheckerThread()`
-- 주기적으로 시퀀스 진전을 검사하고, 진전이 없으면 `coreStopFunction`을 호출한다.
+현재 누적 횟수는 증가만 하므로 구현의 `!=` 비교는 검사 구간에 인증된 수신이 하나 이상 있었는지를 뜻한다.
 
-### 현재 코드 기준 주의사항
+---
 
-- 내부 스레드 함수 이름은 `RunServerAliveCheckerThread()`다.
+## 5. 종료 — `StopServerAliveCheck`
+
+```cpp
+void StopServerAliveCheck();
+```
+
+`isStopped.exchange(true, std::memory_order_acq_rel)`로 중복 종료 요청을 막는다. 스레드가 join 가능한 경우 호출 스레드에 따라 다음처럼 처리한다.
+
+```text
+외부 스레드에서 호출
+  → serverAliveCheckThread.join()
+
+감시 스레드 자신에서 호출
+  → serverAliveCheckThread.detach()
+  → coreStopFunction()이 반환되면 감시 루프도 종료
+```
+
+checker 루프는 `std::jthread`의 `stop_token`이 아니라 `isStopped`를 검사한다. 또한 `Sleep(checkIntervalMs)` 중에는 종료를 확인하지 않으므로 외부 스레드의 `join()`은 최대 검사 주기만큼 대기할 수 있다.
+
+---
+
+## 6. 동시성과 객체 수명
+
+- `isStopped`는 atomic이며 시작은 release store, 루프와 종료는 acquire/acq_rel 연산을 사용한다.
+- `authenticatedReceiveCount`는 활동 존재 여부만 필요하므로 relaxed atomic으로 증가·조회한다.
+- `beforeCheckReceiveCount`와 `checkIntervalMs`는 감시 시작 전에 설정하고 이후 checker 스레드만 읽거나 갱신한다.
+- self-join 경로는 교착을 피하기 위해 detach한다. 이 경로에서 `Stop()` 반환만으로 checker 함수가 완전히 빠져나왔다고 보장할 수는 없다.
+- owner는 checker 스레드가 콜백과 루프를 모두 끝낼 때까지 `ServerAliveChecker`와 캡처 대상의 수명을 유지해야 한다.
+
+---
+
+## 7. 타이밍 설정
+
+현재 샘플 설정은 다음과 같다.
+
+```ini
+; 서버 CoreOption.txt
+HEARTBEAT_THREAD_SLEEP_MS = 5000
+
+; C++ 클라이언트 CoreOption.txt
+SERVER_ALIVE_CHECK_MS = 15000
+```
+
+`SERVER_ALIVE_CHECK_MS`는 정상 heartbeat 주기보다 길어야 한다. 네트워크 지연과 worker 스케줄링 변동을 고려해 heartbeat 주기의 두 배 이상을 시작점으로 삼고, 실제 종료 감지 요구 시간과 함께 조정한다.
+
+---
+
+## 관련 문서
+
+- [[RUDPClientCore]] — 수신 횟수 증가와 checker 시작·종료 위치
+- [[UnreliableChannel]] — 비신뢰성 수신도 생존 활동으로 인정하는 규칙
+- [[Troubleshooting]] — `Server is not alive` 로그 조사
+- [[PerformanceTuning]] — heartbeat와 생존 검사 주기

@@ -1,6 +1,6 @@
 # 세션 생명주기 (Session Lifecycle)
 
-> **`RUDPSession`의 4가지 상태와 각 전이 조건, 관여 스레드, 코드 경로를 정리한다.**  
+> **`RUDPSession`의 5가지 상태와 각 전이 조건, 관여 스레드, 코드 경로를 정리한다.**
 > 상태 전이는 모두 CAS(Compare-And-Swap) 또는 store 기반 원자 연산으로 수행된다.
 
 ---
@@ -11,9 +11,9 @@
 2. [상태 정의](#2-상태-정의)
 3. [전이 1: DISCONNECTED → RESERVED](#3-전이-1-disconnected--reserved)
 4. [전이 2: RESERVED → CONNECTED](#4-전이-2-reserved--connected)
-5. [전이 3: RESERVED → RELEASING (타임아웃)](#5-전이-3-reserved--releasing-타임아웃)
+5. [전이 3: RESERVED → RELEASING_BY_ABORT_RESERVED](#5-전이-3-reserved--releasing_by_abort_reserved)
 6. [전이 4: CONNECTED → RELEASING](#6-전이-4-connected--releasing)
-7. [전이 5: RELEASING → DISCONNECTED](#7-전이-5-releasing--disconnected)
+7. [전이 5: 해제 상태 → DISCONNECTED](#7-전이-5-해제-상태--disconnected)
 8. [SessionStateMachine 구현](#8-sessionstatemachine-구현)
 9. [콘텐츠 훅 호출 순서 보장](#9-콘텐츠-훅-호출-순서-보장)
 10. [동시성 시나리오](#10-동시성-시나리오)
@@ -39,9 +39,10 @@ DISCONNECTED ──────────────────► RESERVED
     │         DoDisconnect(reason) 호출             │
     │     (오류/재전송초과/클라이언트종료)              │
     │                   │                           │
+    │                   │                           ▼
+    │                   ▼             RELEASING_BY_ABORT_RESERVED
+    │               RELEASING                      │
     │                   └──────────┬────────────────┘
-    │                              ▼
-    │                          RELEASING
     │                              │
     │         IO_SENDING 아님 AND
     │ outstandingRecvIo/pendingRecvLogic=0 AND
@@ -60,10 +61,11 @@ DISCONNECTED ──────────────────► RESERVED
 
 ```cpp
 enum class SESSION_STATE : unsigned char {
-    DISCONNECTED = 0,   // 풀에 반환됨, 재사용 대기
-    RESERVED     = 1,   // 세션 발급, UDP 수신 대기 중
-    CONNECTED    = 2,   // 클라이언트 연결 완료, 송수신 가능
-    RELEASING    = 3,   // 해제 진행 중, IO 완료 대기
+    DISCONNECTED                 = 0, // 풀에 반환됨, 재사용 대기
+    RESERVED                     = 1, // 세션 발급, UDP 수신 대기 중
+    CONNECTED                    = 2, // 클라이언트 연결 완료, 송수신 가능
+    RELEASING                    = 3, // 연결 세션 해제 진행 중
+    RELEASING_BY_ABORT_RESERVED  = 4, // 연결 전 예약 세션 해제 진행 중
 };
 ```
 
@@ -73,6 +75,7 @@ enum class SESSION_STATE : unsigned char {
 | `RESERVED` | `true` | 있음 (수신 대기) | ✅ |
 | `CONNECTED` | `true` | 있음 (송수신) | ✅ |
 | `RELEASING` | `false` | 있음 (곧 닫힘) | ❌ |
+| `RELEASING_BY_ABORT_RESERVED` | `false` | 있음 (곧 닫힘) | ❌ |
 
 ---
 
@@ -153,7 +156,7 @@ bool RUDPSession::TryConnect(
     // ③ 상태 전이 (RESERVED → CONNECTED, CAS)
     if (!stateMachine.TryTransitionToConnected()) return false;
     // → CAS: RESERVED(1) → CONNECTED(2)
-    // → 이미 CONNECTED이거나 RELEASING이면 실패
+    // → 이미 CONNECTED이거나 두 해제 상태 중 하나이면 실패
 
     // ④ 클라이언트 주소 저장
     this->clientAddr = clientAddr;
@@ -178,11 +181,11 @@ bool RUDPSession::TryConnect(
 |------|-----------|------|
 | `packetSequence == 0` | 아닌 경우 | 잘못된 연결 요청 |
 | `recvSessionId == GetSessionId()` | 불일치 | 다른 세션 ID로 연결 시도 |
-| `TryTransitionToConnected()` CAS | 이미 CONNECTED/RELEASING | 중복 연결 요청 |
+| `TryTransitionToConnected()` CAS | 이미 CONNECTED/해제 상태 | 중복 연결 요청 |
 
 ---
 
-## 5. 전이 3: RESERVED → RELEASING (타임아웃)
+## 5. 전이 3: RESERVED → RELEASING_BY_ABORT_RESERVED
 
 **트리거:** HeartbeatThread, 30초 경과
 
@@ -199,7 +202,7 @@ bool CheckReservedSessionTimeout(unsigned long long now) const {
 void AbortReservedSession() {
     {
         std::scoped_lock lock(sendLifecycleMutex);
-        // CAS: RESERVED → RELEASING (이미 CONNECTED이면 실패)
+        // CAS: RESERVED → RELEASING_BY_ABORT_RESERVED (이미 CONNECTED이면 실패)
         if (!stateMachine.TryAbortReserved()) return;
         disconnectedReason = DISCONNECT_REASON::BY_ABORT_RESERVED;
     }
@@ -232,7 +235,7 @@ void RUDPSession::DoDisconnect(const DISCONNECT_REASON reason)
 {
     {
         std::scoped_lock lock(sendLifecycleMutex);
-        // CAS: RESERVED 또는 CONNECTED → RELEASING
+        // CAS: RESERVED → RELEASING_BY_ABORT_RESERVED 또는 CONNECTED → RELEASING
         if (!stateMachine.TryTransitionToReleasing()) return;
         disconnectedReason = reason;
     }
@@ -249,10 +252,10 @@ void RUDPSession::DoDisconnect(const DISCONNECT_REASON reason)
 ```cpp
 bool SessionStateMachine::TryTransitionToReleasing()
 {
-    // RESERVED → RELEASING 시도
+    // RESERVED → RELEASING_BY_ABORT_RESERVED 시도
     SESSION_STATE expected = SESSION_STATE::RESERVED;
     if (state.compare_exchange_strong(
-            expected, SESSION_STATE::RELEASING,
+            expected, SESSION_STATE::RELEASING_BY_ABORT_RESERVED,
             std::memory_order_acq_rel)) {
         return true;
     }
@@ -267,7 +270,7 @@ bool SessionStateMachine::TryTransitionToReleasing()
 
 ---
 
-## 7. 전이 5: RELEASING → DISCONNECTED
+## 7. 전이 5: 해제 상태 → DISCONNECTED
 
 **트리거:** Session Release Thread (`Disconnect()` 호출)
 
@@ -359,7 +362,7 @@ public:
 
     bool TryTransitionToReleasing() {
         SESSION_STATE expected = SESSION_STATE::RESERVED;
-        if (state.compare_exchange_strong(expected, SESSION_STATE::RELEASING, memory_order_acq_rel))
+        if (state.compare_exchange_strong(expected, SESSION_STATE::RELEASING_BY_ABORT_RESERVED, memory_order_acq_rel))
             return true;
         expected = SESSION_STATE::CONNECTED;
         return state.compare_exchange_strong(expected, SESSION_STATE::RELEASING, memory_order_acq_rel);
@@ -368,13 +371,17 @@ public:
     bool TryAbortReserved() {
         SESSION_STATE expected = SESSION_STATE::RESERVED;
         return state.compare_exchange_strong(
-            expected, SESSION_STATE::RELEASING, memory_order_acq_rel);
+            expected, SESSION_STATE::RELEASING_BY_ABORT_RESERVED, memory_order_acq_rel);
     }
 
     // 조회
     bool IsConnected()    const { return state.load(memory_order_acquire) == SESSION_STATE::CONNECTED; }
     bool IsReserved()     const { return state.load(memory_order_acquire) == SESSION_STATE::RESERVED; }
-    bool IsReleasing()    const { return state.load(memory_order_acquire) == SESSION_STATE::RELEASING; }
+    bool IsReleasing() const {
+        auto s = state.load(memory_order_acquire);
+        return s == SESSION_STATE::RELEASING
+            || s == SESSION_STATE::RELEASING_BY_ABORT_RESERVED;
+    }
     bool IsUsingSession() const {
         auto s = state.load(memory_order_acquire);
         return s == SESSION_STATE::RESERVED || s == SESSION_STATE::CONNECTED;
@@ -431,7 +438,7 @@ DoDisconnect()              DoDisconnect()
 t=29.9s: TryAbortReserved 시작 (HeartbeatThread)
 t=30.0s: CONNECT 패킷 도착 (RecvLogic Worker)
   TryTransitionToConnected: RESERVED → CONNECTED (CAS 성공)
-t=30.0s: TryAbortReserved: RESERVED → RELEASING
+t=30.0s: TryAbortReserved: RESERVED → RELEASING_BY_ABORT_RESERVED
   CAS 실패 (이미 CONNECTED) → return
 ```
 

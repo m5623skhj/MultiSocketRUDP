@@ -43,7 +43,7 @@ RIO buffer 자체를 logic worker에 넘기지 않고 복사하는 이유는 다
 - receive/send `IOContext`는 RIO 등록 직전 `ownerSessionGeneration`을 저장한다. IO Worker와 RecvLogic Worker는 각 단계에서 현재 generation을 다시 검증하며 stale completion은 패킷 처리나 재등록으로 전달하지 않는다.
 - IO에서 logic으로 인계할 때는 `pendingRecvLogic`을 먼저 증가시키고 queue 소유권을 확정한 다음 `outstandingRecvIo`를 감소시킨다. 이 순서는 release worker가 순간적인 0을 drain 완료로 오인하지 않게 한다.
 - release thread는 소켓만 먼저 닫고 send I/O, `outstandingRecvIo`, `pendingRecvLogic`, `activeIOCompletions`가 모두 끝난 뒤 RIO buffer를 deregister한다.
-- 10초 경과는 강제 완료가 아니라 지연 원인을 기록하는 경고 기준이다. 미완료 세션은 `RELEASING` 상태로 격리하며 pool에 반환하지 않는다.
+- 10초 경과는 강제 완료가 아니라 지연 원인을 기록하는 경고 기준이다. 미완료 세션은 기존 해제 상태로 격리하며 pool에 반환하지 않는다.
 - `RIORegisterBuffer`로 page-lock된 메모리는 세션 파괴 전에 반드시 deregister한다.
 - `RecvIOCompletedContext`가 자신의 `NetBuffer*`를 직접 해제하므로 별도 buffer queue와 완료 marker queue의 대응 관계가 필요하지 않다.
 

@@ -37,7 +37,7 @@ Ticker 시작
 ```text
 SessionBroker 중단
   → 새 연결 차단
-  → 모든 session을 RELEASING으로 전환
+  → 모든 session을 연결 상태에 따라 두 해제 상태 중 하나로 전환
   → 모든 session socket만 닫기
   → IO/RecvLogic/Release worker를 유지해 completion drain
   → RIO buffer deregister와 session pool 반환

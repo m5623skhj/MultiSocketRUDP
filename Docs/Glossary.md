@@ -29,6 +29,8 @@
 | **PacketSequence** | `unsigned long long`. 단조 증가하는 패킷 순번 |
 | **PacketId** | `unsigned int`. 콘텐츠 패킷 종류 식별자 (`PACKET_ID` enum) |
 | **CorePacket** | CONNECT, DISCONNECT, REPLY, HEARTBEAT 등 프레임워크 내부 패킷. PacketId 필드 없음 |
+| **Reliable channel** | ACK, 재전송, 수신 순서 보장과 흐름 제어를 사용하는 `SEND_TYPE` 경로 |
+| **Unreliable channel** | ACK·재전송·누락 대기 없이 최신 단조 증가 번호만 수용하는 `UNRELIABLE_SEND_TYPE` 경로 |
 | **SendPacketInfo** | 재전송 추적 구조체. 버퍼 포인터, 소유 세션, 타임스탬프, 참조 카운트 포함 |
 | **PendingQueue** | 흐름 제어로 인해 즉시 전송하지 못한 패킷 대기 큐 |
 | **HoldingQueue** | 순서가 맞지 않아 보관 중인 수신 패킷 큐 |
@@ -46,6 +48,7 @@
 | **RESERVED** | 세션 발급 완료, 클라이언트 CONNECT 패킷 대기 |
 | **CONNECTED** | CONNECT 패킷 수신 완료, 정상 통신 가능 |
 | **RELEASING** | 해제 프로세스 진행 중, IO 완료 대기 |
+| **RELEASING_BY_ABORT_RESERVED** | 연결되지 않은 예약 세션의 해제 진행 상태. 연결·해제 누적 통계에서 실제 연결 해제로 계산하지 않음 |
 | **IO_SENDING** | RIO Send 작업이 진행 중 (atomic enum) |
 | **IO_NONE_SENDING** | Send 작업 없음 (atomic enum) |
 
@@ -55,6 +58,7 @@
 - [[00_Overview]] — 전체 구조 개요
 - [[Common/PacketFormat]] — 패킷 구조 상세
 - [[CryptoSystem]] — 암호화 용어 상세
+- [[UnreliableChannel]] — 비신뢰성 채널과 프로토콜 v2
 
 ---
 

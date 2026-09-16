@@ -260,7 +260,7 @@ struct RIORESULT {
     ULONG    BytesTransferred; // 전송된 바이트 수
     ULONGLONG SocketContext;   // RIOCreateRequestQueue의 RequestContext
                                //  = sessionId (uintptr_t 캐스팅)
-    ULONGLONG RequestContext;  // RIOReceiveEx/RIOSend의 RequestContext
+    ULONGLONG RequestContext;  // RIOReceiveEx/RIOSendEx의 RequestContext
                                //  = IOContext* 포인터
 };
 ```
@@ -380,7 +380,7 @@ RIO 기반 UDP 서버 흐름:
 
 ## 관련 문서
 - [[MultiSocketRUDPCore]] — RIOManager 생성 및 Initialize 호출
-- [[RUDPIOHandler]] — RIOReceiveEx / RIOSend 호출
+- [[RUDPIOHandler]] — RIOReceiveEx / RIOSendEx 호출
 - [[ThreadModel]] — IO Worker Thread의 DequeueCompletions 루프
 - [[SessionComponents]] — SessionRecvContext/SendContext RIO 버퍼 초기화
 - [[PerformanceTuning]] — 완료 큐 크기 및 스레드 설정

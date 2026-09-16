@@ -2,7 +2,7 @@
 
 > **RecvLogic Worker Thread에서 호출되는 패킷 타입 분류기.**  
 > `NetBuffer`를 `PACKET_TYPE`에 따라 해당 세션 메서드로 라우팅하고,  
-> SEND_TYPE이 콘텐츠 수신 파이프라인을 성공적으로 통과한 경우에만 TPS 카운터를 증가시킨다.
+> SEND_TYPE 또는 UNRELIABLE_SEND_TYPE이 콘텐츠 수신 파이프라인을 성공적으로 통과한 경우에만 TPS 카운터를 증가시킨다.
 
 ---
 
@@ -170,6 +170,24 @@ void RUDPPacketProcessor::ProcessByPacketType(
     }
 
     // ────────────────────────────────────────────────────────
+    case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
+    {
+        if (!session.CanProcessPacket(clientAddr)) break;
+
+        constexpr bool isCorePacket = false;  // PacketId 포함
+        auto dir = PACKET_DIRECTION::CLIENT_TO_SERVER_UNREL;
+        DECODE_PACKET()
+
+        if (!session.OnUnreliablePacket(recvPacket)) {
+            session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+            break;
+        }
+
+        tps.fetch_add(1, std::memory_order_relaxed);
+        break;
+    }
+
+    // ────────────────────────────────────────────────────────
     case PACKET_TYPE::SEND_REPLY_TYPE:
     case PACKET_TYPE::HEARTBEAT_REPLY_TYPE:
     {
@@ -198,17 +216,14 @@ void RUDPPacketProcessor::ProcessByPacketType(
 ```cpp
 #define DECODE_PACKET() \
     if (!PacketCryptoHelper::DecodePacket( \
-            recvPacket, \
-            sessionSalt, \
-            SESSION_SALT_SIZE, \
-            sessionKeyHandle, \
-            isCorePacket, \
-            dir)) \
+            recvPacket, sessionSalt, SESSION_SALT_SIZE, \
+            sessionKeyHandle, isCorePacket, dir)) \
     { \
-        LOG_ERROR(std::format( \
-            "DecodePacket failed. type={}, sessionId={}", \
-            static_cast<int>(packetTypeByte), session.GetSessionId())); \
         break; \
+    } \
+    else \
+    { \
+        sessionDelegate.RefreshLastRecvPacketTime(session, GetTickCount64()); \
     }
 ```
 
@@ -219,9 +234,7 @@ AES-GCM 인증 실패의 원인은 알 수 없다:
 - 네트워크 오류로 데이터 깨짐
 - 클라이언트 버그 (잘못된 Nonce 생성)
 
-어떤 경우든 해당 패킷 1개만 폐기하는 것이 안전하다.  
-`DoDisconnect(reason)`를 즉시 호출하면 정상 클라이언트가 네트워크 노이즈 하나로  
-연결이 끊길 수 있다. 반복적인 실패는 로그로 파악한다.
+어떤 경우든 해당 패킷 1개만 폐기하는 것이 안전하다. `DoDisconnect(reason)`를 즉시 호출하지 않는다. 인증에 성공한 패킷은 종류와 관계없이 마지막 수신 시각을 갱신하므로 신뢰성 없는 트래픽만 오가는 연결도 heartbeat timeout으로 잘못 종료되지 않는다.
 
 ---
 
@@ -269,7 +282,7 @@ bool CheckMyClient(const sockaddr_in& target) const
 ```cpp
 std::atomic<int32_t> tps{ 0 };
 
-// SEND_TYPE 처리 성공마다
+// SEND_TYPE 또는 UNRELIABLE_SEND_TYPE 처리 성공마다
 tps.fetch_add(1, std::memory_order_relaxed);
 // ↑ relaxed: 순서 보장 불필요, 최대 성능
 
@@ -342,3 +355,4 @@ public:
 - [[RUDPSession]] — TryConnect, OnRecvPacket, OnSendReply, DoDisconnect 구현
 - [[PacketCryptoHelper]] — DECODE_PACKET 매크로에서 사용
 - [[ThreadModel]] — RecvLogic Worker Thread 상세
+- [[UnreliableChannel]] — UNRELIABLE_SEND_TYPE 처리 보장 범위

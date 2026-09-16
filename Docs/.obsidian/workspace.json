@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Common/TLSHelper.md",
+                "file": "Testing/CI.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "TLSHelper"
+              "title": "CI"
             }
           }
         ]
@@ -41,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "파일 탐색기"
@@ -53,7 +55,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "CI",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -74,7 +76,8 @@
               "title": "북마크"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
@@ -185,6 +188,7 @@
   },
   "active": "d68527863d5119d9",
   "lastOpenFiles": [
+    "Common/TLSHelper.md",
     "ContentServer/PlayerManager.md",
     "Logger/Logger.md",
     "Server/ThreadModel.md",
@@ -210,7 +214,6 @@
     "Server/Threading/LifecycleAndSynchronization.md",
     "Server/Session/StateCryptoAndSocket.md",
     "Server/Session/SessionComponentsReference.md",
-    "Server/Session/SendAndFlow.md",
     "Diagrams/AiTreeFlow.svg",
     "Diagrams/BotTester_Architecture.svg",
     "Diagrams/Connection_Sequence.svg",

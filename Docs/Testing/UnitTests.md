@@ -36,7 +36,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 dotnet test .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug
 ```
 
-주요 검증 범위는 `BufferStore`, 패킷 직렬화·암호화, graph 검증, runtime 통계, trigger 조건, AI 응답 parsing, packet schema, 손실 시뮬레이터다.
+주요 검증 범위는 `BufferStore`, 패킷 직렬화·암호화, 신뢰성·비신뢰성 채널, graph 검증, runtime 통계, trigger 조건, AI 응답 parsing, packet schema, 손실 시뮬레이터, RTT 집계와 stress 옵션이다.
 
 WPF 타입을 참조하므로 target framework와 `UseWPF` 설정을 임의로 제거하지 않는다. static registry나 schema를 변경하는 테스트는 원래 상태를 복원해야 하며, 병렬 실행 설정을 바꿀 때는 공유 상태의 thread-safety를 먼저 검토한다.
 
@@ -59,4 +59,3 @@ git ls-files -- <path>
 
 - [테스트 상세 레퍼런스 — 유닛 테스트](TestingReference.md#유닛-테스트)
 - [테스트 상세 레퍼런스 — BotTester 유닛 테스트](TestingReference.md#bottester-유닛-테스트)
-

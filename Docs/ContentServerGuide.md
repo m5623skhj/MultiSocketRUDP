@@ -30,13 +30,13 @@ ContentsServer/
   PlayerManager.h / PlayerManager.cpp
   Protocol.h / Protocol.cpp
   PacketIdType.h
-  ContentsPacketRegister.h / .cpp
+  PlayerPacketHandlerRegister.h / .cpp  # ContentsPacketRegister namespace
   ServerOptionFile/
     CoreOption.txt
     SessionBrokerOption.txt
 ```
 
-`Protocol.*`, `PacketIdType.h`, `ContentsPacketRegister.*`, 일부 `Player` 스켈레톤은 PacketGenerator 결과물 기준으로 맞춰 쓰는 편이 안전하다.
+`Protocol.*`, `PacketIdType.h`, `PlayerPacketHandlerRegister.*`, 일부 `Player` 스켈레톤은 PacketGenerator 결과물 기준으로 맞춰 쓰는 편이 안전하다.
 
 ---
 
@@ -140,6 +140,25 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 
 ---
 
+## 비신뢰성 송신
+
+ACK와 재전송 없이 최신 값을 우선해 보내려면 같은 콘텐츠 패킷 타입을 `SendUnreliablePacket()`에 전달한다.
+
+```cpp
+PositionUpdate update;
+update.x = x;
+update.y = y;
+
+if (!SendUnreliablePacket(update))
+{
+    DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+}
+```
+
+`true`는 로컬 송신 큐에 수용됐음을 뜻한다. 큐가 가득 차면 가장 오래된 미송신 비신뢰성 패킷을 교체하고도 `true`를 반환하므로 전달 성공으로 해석하지 않는다. 서버 옵션 `UNRELIABLE_QUEUE_CAPACITY`의 기본값은 64다.
+
+---
+
 ## 다른 세션 참조에 대한 주의
 
 현재 `MultiSocketRUDPCore::GetUsingSession()`과 `GetReleasingSession()`은 `private`이다.  
@@ -177,3 +196,4 @@ auto* session = core.GetUsingSession(sessionId); // 현재 콘텐츠 코드에�
 - [[MultiSocketRUDPCore]] - 서버 코어 공개 API
 - [[Server/RUDPSessionBroker]] - 세션 발급 경로
 - [[PlayerManager]] - 샘플 player 조회와 동시성 제한
+- [[UnreliableChannel]] - 비신뢰성 채널의 큐·순서·호환성 계약
