@@ -1612,6 +1612,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "38c37e896ade80a86e6d5e5050e5c6672db0a47d",
+      "commitSubject": "* 패킷 생성기에서 사용자 정의 구조체를 정의하고, 이를 패킷에서 사용할 수 있도록 수정",
+      "recordedAtUtc": "2026-09-19T23:13:51.5792932+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001218",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.18270689999999976,
+            "medianMinRttMs": 0.1087,
+            "medianP50RttMs": 0.189,
+            "medianP95RttMs": 0.2452,
+            "medianP99RttMs": 0.295,
+            "medianMaxRttMs": 0.6801,
+            "worstMaxRttMs": 6.046,
+            "medianElapsedSeconds": 0.189401,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.336002900000006,
+            "medianMinRttMs": 0.0599,
+            "medianP50RttMs": 0.1474,
+            "medianP95RttMs": 33.4189,
+            "medianP99RttMs": 64.3276,
+            "medianMaxRttMs": 200.7779,
+            "worstMaxRttMs": 501.936,
+            "medianElapsedSeconds": 6.3396493,
+            "totalRetransmissionSuspectedCount": 205
+          }
+        }
+      ]
     }
   ]
 }

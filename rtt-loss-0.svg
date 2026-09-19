@@ -2,64 +2,64 @@
 <rect width="100%" height="100%" fill="#0d1117" rx="12"/>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}.table-header{font-size:12px;font-weight:600}.table-row{font-size:12px}</style>
 <text x="28" y="38" class="title">RTT trend — packet loss 0%</text>
-<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 +9.72%, P99 +7.47%</text>
+<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 +9.51%, P99 +21.20%</text>
 <line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>
 <line x1="830" y1="36" x2="860" y2="36" stroke="#f85149" stroke-width="3"/><text x="868" y="41" class="legend">P99</text>
 <line x1="78" y1="340.00" x2="930" y2="340.00" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="344.00" text-anchor="end" class="axis">105.2</text>
+<text x="68" y="344.00" text-anchor="end" class="axis">101.2</text>
 <line x1="78" y1="294.40" x2="930" y2="294.40" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="298.40" text-anchor="end" class="axis">144.8</text>
+<text x="68" y="298.40" text-anchor="end" class="axis">146.4</text>
 <line x1="78" y1="248.80" x2="930" y2="248.80" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="252.80" text-anchor="end" class="axis">184.4</text>
+<text x="68" y="252.80" text-anchor="end" class="axis">191.6</text>
 <line x1="78" y1="203.20" x2="930" y2="203.20" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="207.20" text-anchor="end" class="axis">224.1</text>
+<text x="68" y="207.20" text-anchor="end" class="axis">236.9</text>
 <line x1="78" y1="157.60" x2="930" y2="157.60" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="161.60" text-anchor="end" class="axis">263.7</text>
+<text x="68" y="161.60" text-anchor="end" class="axis">282.1</text>
 <line x1="78" y1="112.00" x2="930" y2="112.00" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="116.00" text-anchor="end" class="axis">303.3</text>
+<text x="68" y="116.00" text-anchor="end" class="axis">327.3</text>
 <text x="18" y="226.00" transform="rotate(-90 18 226.00)" text-anchor="middle" class="axis">RTT (µs)</text>
-<text x="78.00" y="367" text-anchor="middle" class="label">b8ed6ca</text>
+<text x="78.00" y="367" text-anchor="middle" class="label">c73035c</text>
 <text x="78.00" y="384" text-anchor="middle" class="label">09-09</text>
-<text x="172.67" y="367" text-anchor="middle" class="label">c73035c</text>
+<text x="172.67" y="367" text-anchor="middle" class="label">6de51f6</text>
 <text x="172.67" y="384" text-anchor="middle" class="label">09-09</text>
-<text x="267.33" y="367" text-anchor="middle" class="label">6de51f6</text>
-<text x="267.33" y="384" text-anchor="middle" class="label">09-09</text>
-<text x="362.00" y="367" text-anchor="middle" class="label">d5186d0</text>
-<text x="362.00" y="384" text-anchor="middle" class="label">09-10</text>
-<text x="456.67" y="367" text-anchor="middle" class="label">5a2b890</text>
-<text x="456.67" y="384" text-anchor="middle" class="label">09-11</text>
-<text x="551.33" y="367" text-anchor="middle" class="label">5201fe3</text>
+<text x="267.33" y="367" text-anchor="middle" class="label">d5186d0</text>
+<text x="267.33" y="384" text-anchor="middle" class="label">09-10</text>
+<text x="362.00" y="367" text-anchor="middle" class="label">5a2b890</text>
+<text x="362.00" y="384" text-anchor="middle" class="label">09-11</text>
+<text x="456.67" y="367" text-anchor="middle" class="label">5201fe3</text>
+<text x="456.67" y="384" text-anchor="middle" class="label">09-13</text>
+<text x="551.33" y="367" text-anchor="middle" class="label">0816aa0</text>
 <text x="551.33" y="384" text-anchor="middle" class="label">09-13</text>
-<text x="646.00" y="367" text-anchor="middle" class="label">0816aa0</text>
+<text x="646.00" y="367" text-anchor="middle" class="label">7287ccd</text>
 <text x="646.00" y="384" text-anchor="middle" class="label">09-13</text>
-<text x="740.67" y="367" text-anchor="middle" class="label">7287ccd</text>
-<text x="740.67" y="384" text-anchor="middle" class="label">09-13</text>
-<text x="835.33" y="367" text-anchor="middle" class="label">6ca5c16</text>
-<text x="835.33" y="384" text-anchor="middle" class="label">09-14</text>
-<text x="930.00" y="367" text-anchor="middle" class="label">530e610</text>
+<text x="740.67" y="367" text-anchor="middle" class="label">6ca5c16</text>
+<text x="740.67" y="384" text-anchor="middle" class="label">09-14</text>
+<text x="835.33" y="367" text-anchor="middle" class="label">530e610</text>
+<text x="835.33" y="384" text-anchor="middle" class="label">09-19</text>
+<text x="930.00" y="367" text-anchor="middle" class="label">38c37e8</text>
 <text x="930.00" y="384" text-anchor="middle" class="label">09-19</text>
-<polyline points="78.00,220.07 172.67,211.44 267.33,289.47 362.00,268.87 456.67,307.08 551.33,203.38 646.00,220.76 740.67,194.87 835.33,307.43 930.00,197.40" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="220.07" r="4" fill="#58a6ff"><title>209.400 µs</title></circle>
-<circle cx="172.67" cy="211.44" r="4" fill="#58a6ff"><title>216.900 µs</title></circle>
-<circle cx="267.33" cy="289.47" r="4" fill="#58a6ff"><title>149.100 µs</title></circle>
-<circle cx="362.00" cy="268.87" r="4" fill="#58a6ff"><title>167.000 µs</title></circle>
-<circle cx="456.67" cy="307.08" r="4" fill="#58a6ff"><title>133.800 µs</title></circle>
-<circle cx="551.33" cy="203.38" r="4" fill="#58a6ff"><title>223.900 µs</title></circle>
-<circle cx="646.00" cy="220.76" r="4" fill="#58a6ff"><title>208.800 µs</title></circle>
-<circle cx="740.67" cy="194.87" r="4" fill="#58a6ff"><title>231.300 µs</title></circle>
-<circle cx="835.33" cy="307.43" r="4" fill="#58a6ff"><title>133.500 µs</title></circle>
-<circle cx="930.00" cy="197.40" r="4" fill="#58a6ff"><title>229.100 µs</title></circle>
-<polyline points="78.00,187.62 172.67,182.09 267.33,256.90 362.00,220.88 456.67,291.20 551.33,180.94 646.00,197.74 740.67,144.57 835.33,288.44 930.00,178.06" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="187.62" r="4" fill="#f85149"><title>237.600 µs</title></circle>
-<circle cx="172.67" cy="182.09" r="4" fill="#f85149"><title>242.400 µs</title></circle>
-<circle cx="267.33" cy="256.90" r="4" fill="#f85149"><title>177.400 µs</title></circle>
-<circle cx="362.00" cy="220.88" r="4" fill="#f85149"><title>208.700 µs</title></circle>
-<circle cx="456.67" cy="291.20" r="4" fill="#f85149"><title>147.600 µs</title></circle>
-<circle cx="551.33" cy="180.94" r="4" fill="#f85149"><title>243.400 µs</title></circle>
-<circle cx="646.00" cy="197.74" r="4" fill="#f85149"><title>228.800 µs</title></circle>
-<circle cx="740.67" cy="144.57" r="4" fill="#f85149"><title>275.000 µs</title></circle>
-<circle cx="835.33" cy="288.44" r="4" fill="#f85149"><title>150.000 µs</title></circle>
-<circle cx="930.00" cy="178.06" r="4" fill="#f85149"><title>245.900 µs</title></circle>
+<polyline points="78.00,223.33 172.67,291.70 267.33,273.65 362.00,307.13 456.67,216.27 551.33,231.50 646.00,208.81 740.67,307.43 835.33,211.03 930.00,194.79" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="223.33" r="4" fill="#58a6ff"><title>216.900 µs</title></circle>
+<circle cx="172.67" cy="291.70" r="4" fill="#58a6ff"><title>149.100 µs</title></circle>
+<circle cx="267.33" cy="273.65" r="4" fill="#58a6ff"><title>167.000 µs</title></circle>
+<circle cx="362.00" cy="307.13" r="4" fill="#58a6ff"><title>133.800 µs</title></circle>
+<circle cx="456.67" cy="216.27" r="4" fill="#58a6ff"><title>223.900 µs</title></circle>
+<circle cx="551.33" cy="231.50" r="4" fill="#58a6ff"><title>208.800 µs</title></circle>
+<circle cx="646.00" cy="208.81" r="4" fill="#58a6ff"><title>231.300 µs</title></circle>
+<circle cx="740.67" cy="307.43" r="4" fill="#58a6ff"><title>133.500 µs</title></circle>
+<circle cx="835.33" cy="211.03" r="4" fill="#58a6ff"><title>229.100 µs</title></circle>
+<circle cx="930.00" cy="194.79" r="4" fill="#58a6ff"><title>245.200 µs</title></circle>
+<polyline points="78.00,197.61 172.67,263.16 267.33,231.60 362.00,293.21 456.67,196.61 551.33,211.33 646.00,164.74 740.67,290.79 835.33,194.08 930.00,144.57" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="197.61" r="4" fill="#f85149"><title>242.400 µs</title></circle>
+<circle cx="172.67" cy="263.16" r="4" fill="#f85149"><title>177.400 µs</title></circle>
+<circle cx="267.33" cy="231.60" r="4" fill="#f85149"><title>208.700 µs</title></circle>
+<circle cx="362.00" cy="293.21" r="4" fill="#f85149"><title>147.600 µs</title></circle>
+<circle cx="456.67" cy="196.61" r="4" fill="#f85149"><title>243.400 µs</title></circle>
+<circle cx="551.33" cy="211.33" r="4" fill="#f85149"><title>228.800 µs</title></circle>
+<circle cx="646.00" cy="164.74" r="4" fill="#f85149"><title>275.000 µs</title></circle>
+<circle cx="740.67" cy="290.79" r="4" fill="#f85149"><title>150.000 µs</title></circle>
+<circle cx="835.33" cy="194.08" r="4" fill="#f85149"><title>245.900 µs</title></circle>
+<circle cx="930.00" cy="144.57" r="4" fill="#f85149"><title>295.000 µs</title></circle>
 <text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>
 <line x1="28" y1="426" x2="932" y2="426" stroke="#30363d" stroke-width="1"/>
 <text x="28" y="447" class="table-header">Date (UTC)</text>
@@ -69,53 +69,53 @@
 <text x="930" y="447" text-anchor="end" class="table-header">P99</text>
 <line x1="28" y1="456" x2="932" y2="456" stroke="#30363d" stroke-width="1"/>
 <text x="28" y="478" class="table-row">2026-09-09</text>
-<text x="122" y="478" class="table-row">b8ed6ca</text>
-<text x="210" y="478" class="table-row">* 예약 세션 종료 상태를 분리하여 접속자 수와 종료 콜백 처리 수정   * RESERVED에서 종료 시 RELEAS…</text>
-<text x="815" y="478" text-anchor="end" class="table-row">0.209 ms</text>
-<text x="930" y="478" text-anchor="end" class="table-row">0.238 ms</text>
+<text x="122" y="478" class="table-row">c73035c</text>
+<text x="210" y="478" class="table-row">* 송신 흐름 제어 상태의 동시 접근 동기화   * ACK·타임아웃 갱신과 송신 가능 여부 조회를 동일한 mutex로…</text>
+<text x="815" y="478" text-anchor="end" class="table-row">0.217 ms</text>
+<text x="930" y="478" text-anchor="end" class="table-row">0.242 ms</text>
 <text x="28" y="499" class="table-row">2026-09-09</text>
-<text x="122" y="499" class="table-row">c73035c</text>
-<text x="210" y="499" class="table-row">* 송신 흐름 제어 상태의 동시 접근 동기화   * ACK·타임아웃 갱신과 송신 가능 여부 조회를 동일한 mutex로…</text>
-<text x="815" y="499" text-anchor="end" class="table-row">0.217 ms</text>
-<text x="930" y="499" text-anchor="end" class="table-row">0.242 ms</text>
-<text x="28" y="520" class="table-row">2026-09-09</text>
-<text x="122" y="520" class="table-row">6de51f6</text>
-<text x="210" y="520" class="table-row">* TLS 교환 진행할 때 TCP를 연결하고 아무 행동도 하지 않을 시 접속 마비가 가능한 현상 수정</text>
-<text x="815" y="520" text-anchor="end" class="table-row">0.149 ms</text>
-<text x="930" y="520" text-anchor="end" class="table-row">0.177 ms</text>
-<text x="28" y="541" class="table-row">2026-09-10</text>
-<text x="122" y="541" class="table-row">d5186d0</text>
-<text x="210" y="541" class="table-row">* 동시 송신 시 시퀀스 발급 순서를 보장하고 패킷 헤더 구성 경로 분리   * 사용자 직렬화 이후 대기열 락 안에서…</text>
-<text x="815" y="541" text-anchor="end" class="table-row">0.167 ms</text>
-<text x="930" y="541" text-anchor="end" class="table-row">0.209 ms</text>
-<text x="28" y="562" class="table-row">2026-09-11</text>
-<text x="122" y="562" class="table-row">5a2b890</text>
-<text x="210" y="562" class="table-row">* ACK로 취소된 재전송 패킷이 송신 길이에 포함되는 문제 수정   * 패킷 폐기 검사 통과 후 totalSendS…</text>
-<text x="815" y="562" text-anchor="end" class="table-row">0.134 ms</text>
-<text x="930" y="562" text-anchor="end" class="table-row">0.148 ms</text>
+<text x="122" y="499" class="table-row">6de51f6</text>
+<text x="210" y="499" class="table-row">* TLS 교환 진행할 때 TCP를 연결하고 아무 행동도 하지 않을 시 접속 마비가 가능한 현상 수정</text>
+<text x="815" y="499" text-anchor="end" class="table-row">0.149 ms</text>
+<text x="930" y="499" text-anchor="end" class="table-row">0.177 ms</text>
+<text x="28" y="520" class="table-row">2026-09-10</text>
+<text x="122" y="520" class="table-row">d5186d0</text>
+<text x="210" y="520" class="table-row">* 동시 송신 시 시퀀스 발급 순서를 보장하고 패킷 헤더 구성 경로 분리   * 사용자 직렬화 이후 대기열 락 안에서…</text>
+<text x="815" y="520" text-anchor="end" class="table-row">0.167 ms</text>
+<text x="930" y="520" text-anchor="end" class="table-row">0.209 ms</text>
+<text x="28" y="541" class="table-row">2026-09-11</text>
+<text x="122" y="541" class="table-row">5a2b890</text>
+<text x="210" y="541" class="table-row">* ACK로 취소된 재전송 패킷이 송신 길이에 포함되는 문제 수정   * 패킷 폐기 검사 통과 후 totalSendS…</text>
+<text x="815" y="541" text-anchor="end" class="table-row">0.134 ms</text>
+<text x="930" y="541" text-anchor="end" class="table-row">0.148 ms</text>
+<text x="28" y="562" class="table-row">2026-09-13</text>
+<text x="122" y="562" class="table-row">5201fe3</text>
+<text x="210" y="562" class="table-row">* 연결 ACK 유실 복구 및 중복 연결 처리 방지   * 서버가 동일 클라이언트의 연결 재요청에 ACK만 재전송하도…</text>
+<text x="815" y="562" text-anchor="end" class="table-row">0.224 ms</text>
+<text x="930" y="562" text-anchor="end" class="table-row">0.243 ms</text>
 <text x="28" y="583" class="table-row">2026-09-13</text>
-<text x="122" y="583" class="table-row">5201fe3</text>
-<text x="210" y="583" class="table-row">* 연결 ACK 유실 복구 및 중복 연결 처리 방지   * 서버가 동일 클라이언트의 연결 재요청에 ACK만 재전송하도…</text>
-<text x="815" y="583" text-anchor="end" class="table-row">0.224 ms</text>
-<text x="930" y="583" text-anchor="end" class="table-row">0.243 ms</text>
+<text x="122" y="583" class="table-row">0816aa0</text>
+<text x="210" y="583" class="table-row">* 비신뢰성·혼합 채널 RTT 성능 측정 CI 추가   * 요청 ID 기반 에코 패킷으로 신뢰성·비신뢰성 왕복 측정 …</text>
+<text x="815" y="583" text-anchor="end" class="table-row">0.209 ms</text>
+<text x="930" y="583" text-anchor="end" class="table-row">0.229 ms</text>
 <text x="28" y="604" class="table-row">2026-09-13</text>
-<text x="122" y="604" class="table-row">0816aa0</text>
-<text x="210" y="604" class="table-row">* 비신뢰성·혼합 채널 RTT 성능 측정 CI 추가   * 요청 ID 기반 에코 패킷으로 신뢰성·비신뢰성 왕복 측정 …</text>
-<text x="815" y="604" text-anchor="end" class="table-row">0.209 ms</text>
-<text x="930" y="604" text-anchor="end" class="table-row">0.229 ms</text>
-<text x="28" y="625" class="table-row">2026-09-13</text>
-<text x="122" y="625" class="table-row">7287ccd</text>
-<text x="210" y="625" class="table-row">* 멀티스레드 안정성 검증을 위한 야간·수동 CI 추가   * 동시 송수신·연결 해제·세션 풀 회수 및 재사용 통합 …</text>
-<text x="815" y="625" text-anchor="end" class="table-row">0.231 ms</text>
-<text x="930" y="625" text-anchor="end" class="table-row">0.275 ms</text>
-<text x="28" y="646" class="table-row">2026-09-14</text>
-<text x="122" y="646" class="table-row">6ca5c16</text>
-<text x="210" y="646" class="table-row">* 비신뢰성 채널 RTT·응답률 추이 그래프 및 README 연동   * 단독·혼합 전송별 P95/P99 RTT와 응…</text>
-<text x="815" y="646" text-anchor="end" class="table-row">0.134 ms</text>
-<text x="930" y="646" text-anchor="end" class="table-row">0.150 ms</text>
+<text x="122" y="604" class="table-row">7287ccd</text>
+<text x="210" y="604" class="table-row">* 멀티스레드 안정성 검증을 위한 야간·수동 CI 추가   * 동시 송수신·연결 해제·세션 풀 회수 및 재사용 통합 …</text>
+<text x="815" y="604" text-anchor="end" class="table-row">0.231 ms</text>
+<text x="930" y="604" text-anchor="end" class="table-row">0.275 ms</text>
+<text x="28" y="625" class="table-row">2026-09-14</text>
+<text x="122" y="625" class="table-row">6ca5c16</text>
+<text x="210" y="625" class="table-row">* 비신뢰성 채널 RTT·응답률 추이 그래프 및 README 연동   * 단독·혼합 전송별 P95/P99 RTT와 응…</text>
+<text x="815" y="625" text-anchor="end" class="table-row">0.134 ms</text>
+<text x="930" y="625" text-anchor="end" class="table-row">0.150 ms</text>
+<text x="28" y="646" class="table-row">2026-09-19</text>
+<text x="122" y="646" class="table-row">530e610</text>
+<text x="210" y="646" class="table-row">* 버퍼 컨테이너 추가로 인한 연관 테스트 추가</text>
+<text x="815" y="646" text-anchor="end" class="table-row">0.229 ms</text>
+<text x="930" y="646" text-anchor="end" class="table-row">0.246 ms</text>
 <text x="28" y="667" class="table-row">2026-09-19</text>
-<text x="122" y="667" class="table-row">530e610</text>
-<text x="210" y="667" class="table-row">* 버퍼 컨테이너 추가로 인한 연관 테스트 추가</text>
-<text x="815" y="667" text-anchor="end" class="table-row">0.229 ms</text>
-<text x="930" y="667" text-anchor="end" class="table-row">0.246 ms</text>
+<text x="122" y="667" class="table-row">38c37e8</text>
+<text x="210" y="667" class="table-row">* 패킷 생성기에서 사용자 정의 구조체를 정의하고, 이를 패킷에서 사용할 수 있도록 수정</text>
+<text x="815" y="667" text-anchor="end" class="table-row">0.245 ms</text>
+<text x="930" y="667" text-anchor="end" class="table-row">0.295 ms</text>
 </svg>
