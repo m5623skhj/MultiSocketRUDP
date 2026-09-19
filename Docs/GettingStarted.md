@@ -11,20 +11,32 @@
 `Tool/PacketDefine.yml`에 패킷을 추가한 뒤 `Tool/PacketGenerate.bat`를 실행한다.
 
 ```yaml
+Structs:
+  - Name: ItemData
+    Items:
+      - Type: std::int32_t
+        Name: dataId
+      - Type: std::int64_t
+        Name: itemId
+
 Packet:
   - Type: RequestPacket
     PacketName: MyRequest
     Items:
-      - Type: int
-        Name: value
+      - Type: ItemData
+        Name: target
+      - Type: std::vector<ItemData>
+        Name: items
   - Type: ReplyPacket
     PacketName: MyResponse
     Items:
-      - Type: int
-        Name: result
+      - Type: std::unordered_map<int, ItemData>
+        Name: itemsById
 ```
 
 생성 결과물은 `Protocol.*`, `PacketIdType.h`, `Player.h`, `PlayerPacketHandler.cpp`, `PlayerPacketHandlerRegister.*`에 반영된다. `ContentsPacketRegister`는 `PlayerPacketHandlerRegister.*` 안에 선언된 namespace다.
+
+`Structs`의 선언 순서는 자유롭다. 생성기가 구조체 의존성을 정렬하고 각 필드를 YAML 순서대로 재귀 직렬화한다. `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`을 구조체 또는 패킷 필드로 사용할 수 있다. `unordered_set`과 `unordered_map`은 원소와 key/value만 복원하며 기존 삽입 순서나 순회 순서를 보장하지 않는다. 송수신 측은 같은 YAML에서 생성된 `Protocol.*`을 사용해야 한다.
 
 ### 2. 세션 클래스 구현
 

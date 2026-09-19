@@ -17,6 +17,7 @@
 | 콘텐츠 서버 구현 | [콘텐츠 서버 가이드](ContentServerGuide.md) |
 | 서버 구조 이해 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) |
 | 패킷 흐름 추적 | [패킷 처리 파이프라인](Server/PacketProcessing.md) |
+| 패킷 구조체·컨테이너 정의 | [패킷 생성기](Tools/PacketGenerator.md) · [컨테이너 직렬화](Server/ContainerSerialization.md) |
 | 프로토콜 v2·비신뢰성 채널 사용 | [비신뢰성 채널](UnreliableChannel.md) |
 | 스레드·동시성 검토 | [스레드 모델 허브](Server/ThreadModel.md) |
 | 치명 오류·프로세스 재시작 연동 | [치명 오류 통지와 프로세스 재시작](Server/FatalErrorHandling.md) |

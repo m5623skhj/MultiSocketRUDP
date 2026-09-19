@@ -215,6 +215,10 @@ PacketCryptoHelper::EncodePacket(
 // → WriteBuffer(authTag, 16) 호출 (버퍼 끝에 추가)
 ```
 
+콘텐츠 데이터는 YAML 필드 순서대로 기록한다. 생성된 사용자 정의 구조체는 `NetBufferCodec<T>`가 멤버를 재귀 직렬화하므로 C++ 객체의 padding이나 `sizeof(struct)`는 wire 형식에 포함되지 않는다. 패킷과 구조체 필드는 `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`을 포함할 수 있다.
+
+`unordered_set`과 `unordered_map`은 원소 또는 key/value만 전달한다. 삽입 순서, 순회 순서, hash bucket 상태를 전송하지 않으며 수신 후에도 이전 상태를 보장하지 않는다. 따라서 비정렬 컨테이너의 현재 순서를 게임 로직, 재현 가능한 hash, 다른 필드와의 위치 대응에 사용하면 안 된다. 정확한 count와 정렬 컨테이너의 방향 byte는 [[ContainerSerialization]]을 참고한다.
+
 ### 클라이언트 측 (C#)
 
 ```csharp

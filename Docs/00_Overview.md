@@ -46,6 +46,7 @@
 | [SendAndFlow](Server/Session/SendAndFlow.md) | send queue/map, ACK·재전송 수명, CWND·pending queue |
 | [PacketProcessing](Server/PacketProcessing.md) | 수신 전체 파이프라인, PacketType 분기, 순서 보장, 이상 처리 |
 | [PacketFormat](Server/PacketFormat.md) | 서버 패킷 처리 기준 레이아웃과 오프셋 |
+| [ContainerSerialization](Server/ContainerSerialization.md) | 컨테이너·사용자 정의 구조체의 wire 형식, 정렬 방향과 실패 처리 계약 |
 | [ThreadModel](Server/ThreadModel.md) | 스레드 문서 허브, 그룹 요약, 동시성 핵심 계약 |
 | [WorkerThreads](Server/Threading/WorkerThreads.md) | IO/Logic/Retransmission/Release/Heartbeat worker별 입출력과 실패 영향 |
 | [LifecycleAndSynchronization](Server/Threading/LifecycleAndSynchronization.md) | 시작·종료 순서, 공유 데이터, 객체 수명 검토 |

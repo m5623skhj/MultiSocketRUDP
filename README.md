@@ -141,10 +141,14 @@
         * Protocol.h
         * PacketIdType.h
       * 각 파일 생성 경로를 Tool/PacketGenerator/PacketItemsFilePath.py에 정의하면 해당 경로에 생성됩니다.
-      * PacketDefine.yml 파일의 내용이 비어있을 경우, 파일의 삭제 및 생성을 시도하지 않습니다.
+      * YAML 구문이나 타입 검증에 실패하면 기존 생성 파일을 수정하지 않습니다. `Packet:` 또는 `Structs:` 목록을 명시적으로 비운 유효한 스키마는 해당 생성 영역을 비우는 정의로 처리됩니다.
       * 해당하는 파일이 없을 경우 새로 생성합니다.
       * 각 파일들의 diff를 확인해 보고, 패킷 제네레이트의 결과물 파일이 이전 각 파일들의 원본과 비교하여 수정 사항이 없을 경우, 파일을 수정하지 않습니다.
         * 필요 없는 빌드 횟수를 줄이기 위하여 위와 같은 동작을 채택함
+      * `Structs`에 함수 없는 사용자 정의 데이터 구조체를 선언하고 패킷 필드에서 사용할 수 있습니다.
+      * 패킷과 구조체 필드에는 `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map` 및 이들의 중첩 타입을 사용할 수 있습니다.
+      * `unordered_set`과 `unordered_map`은 데이터만 복원하며 삽입 순서, 순회 순서, bucket 배치를 보존하지 않습니다.
+      * 자세한 YAML 문법과 지원 제한은 [PacketGenerator](./Docs/Tools/PacketGenerator.md), wire 형식은 [NetBuffer 컨테이너 직렬화](./Docs/Server/ContainerSerialization.md)를 참고합니다.
    2. RunDebug
       * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다.
    3. 개발용 인증서

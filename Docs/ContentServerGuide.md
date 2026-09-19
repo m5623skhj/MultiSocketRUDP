@@ -46,6 +46,12 @@ ContentsServer/
 2. `Tool/PacketGenerate.bat` 실행
 3. 생성된 `PACKET_ID`, 패킷 클래스, 등록 코드 확인
 
+YAML의 `Structs`에는 함수 없는 데이터 구조체를 선언할 수 있다. 패킷과 구조체 필드는 다른 생성 구조체 및 `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`을 포함할 수 있으며 생성기는 의존 타입을 먼저 정의하고 필드를 재귀 직렬화한다.
+
+`std::map`과 `std::set`은 `std::less<Key>` 또는 `std::greater<Key>` 정렬 방향을 wire에 포함하고 수신 타입과 일치하는지 검사한다. `std::unordered_map`과 `std::unordered_set`은 원소만 전달한다. 삽입 순서, 반복 순서, bucket 수와 배치는 프로토콜의 일부가 아니므로 이 상태에 의존하는 콘텐츠 로직을 작성하면 안 된다.
+
+포인터·참조·순환 구조체는 지원하지 않으며, map key와 set 원소에는 기본 타입 또는 문자열만 사용할 수 있다. 필드 순서나 타입 변경은 wire 형식 변경이므로 서버와 클라이언트의 생성 결과를 함께 배포한다. 자세한 문법은 [[PacketGenerator]], 실제 컨테이너 형식은 [[ContainerSerialization]]을 참고한다.
+
 핸들러는 보통 세션 생성자에서 등록한다.
 
 ```cpp

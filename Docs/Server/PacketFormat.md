@@ -344,32 +344,46 @@ constexpr size_t CRYPTO_START_OFFSET = df_HEADER_SIZE; // = 5
 
 ## 9. 직렬화 (`NetBuffer << / >>`)
 
+기본 숫자 타입은 기존 `WriteBuffer`/`ReadBuffer`로 고정 크기 값을 기록한다. 생성된 사용자 정의 구조체는 객체 메모리나 padding을 복사하지 않고 `NetBufferCodec<T>`가 YAML 필드 순서대로 재귀 처리한다.
+
 ```cpp
-// 쓰기 (직렬화)
-template<typename T>
-NetBuffer& operator<<(T value) {
-    memcpy(&m_pSerializeBuffer[m_iWrite], &value, sizeof(T));
-    m_iWrite += sizeof(T);
-    return *this;
-}
+template<>
+struct NetBufferCodec<Item>
+{
+    static void Write(NetBuffer& buffer, const Item& value)
+    {
+        buffer.WriteValue(value.dataId);
+        buffer.WriteValue(value.itemId);
+    }
 
-// std::string 특수화
-NetBuffer& operator<<(const std::string& str) {
-    uint16_t len = static_cast<uint16_t>(str.size());
-    *this << len;
-    memcpy(&m_pSerializeBuffer[m_iWrite], str.c_str(), len);
-    m_iWrite += len;
-    return *this;
-}
+    static void Read(NetBuffer& buffer, Item& value)
+    {
+        Item temporary{};
+        buffer.ReadValue(temporary.dataId);
+        buffer.ReadValue(temporary.itemId);
+        value = std::move(temporary);
+    }
+};
 
-// 읽기 (역직렬화)
-template<typename T>
-NetBuffer& operator>>(T& value) {
-    memcpy(&value, &m_pSerializeBuffer[m_iRead], sizeof(T));
-    m_iRead += sizeof(T);
-    return *this;
+void DeleteItem::PacketToBuffer(NetBuffer& buffer)
+{
+    buffer.WriteValue(target); // Item codec → dataId → itemId
+    buffer.WriteValue(reason);
 }
 ```
+
+컨테이너도 동일한 `WriteValue`/`ReadValue` 경로를 사용한다.
+
+| 타입 | wire 형식 | 순서 계약 |
+|---|---|---|
+| `vector<T>` | `uint32 count` + 각 원소 | vector 원소 순서 보존 |
+| `list<T>` | `size_t count` + 각 원소 | list 원소 순서 보존 |
+| `set<T>` | 정렬 방향 1B + `uint32 count` + 원소 | `less`/`greater` 방향 검사 |
+| `map<K,V>` | 정렬 방향 1B + `uint32 count` + key/value | `less`/`greater` 방향 검사 |
+| `unordered_set<T>` | `uint32 count` + 원소 | 삽입·순회·bucket 순서 비보장 |
+| `unordered_map<K,V>` | `uint32 count` + key/value | 삽입·순회·bucket 순서 비보장 |
+
+구조체와 컨테이너는 수신 임시 값에 전부 읽은 뒤 성공할 때 대상에 반영한다. 실패하면 대상 값은 유지되지만 버퍼 read cursor는 복구하지 않으므로 실패한 패킷을 폐기해야 한다. 비정렬 컨테이너는 같은 데이터를 복원해도 프로세스나 실행마다 직렬화 바이트 순서가 달라질 수 있다.
 
 **주의**: 엔디안 변환 없음. 서버/클라이언트 모두 같은 바이트 순서(little-endian, x86/x64)를 가정.  
 ARM 또는 big-endian 플랫폼에서 클라이언트를 구현할 때는 명시적 변환 필요.
@@ -405,3 +419,5 @@ Header(5) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 16384 (
 - [[PacketProcessing]] — 수신 패킷 파싱 흐름
 - [[RUDPSession]] — SendPacket 직렬화 과정
 - [[RUDPClientCore]] — 클라이언트 측 직렬화
+- [[ContainerSerialization]] — 컨테이너 wire 형식과 실패 처리
+- [[PacketGenerator]] — YAML 구조체·컨테이너 정의
