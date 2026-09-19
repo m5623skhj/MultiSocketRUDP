@@ -39,6 +39,9 @@
     <ClCompile Include="MemoryTracerTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
+    <ClCompile Include="NetBufferContainerTest.cpp">
+      <Filter>소스 파일\GoogleTestForServerCore</Filter>
+    </ClCompile>
     <ClCompile Include="TimerEventTest.cpp">
       <Filter>소스 파일\GoogleTestForServerCore</Filter>
     </ClCompile>
