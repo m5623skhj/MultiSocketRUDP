@@ -1,0 +1,44 @@
+# Deliberately refer to data types declared later in this file.
+Packet:
+  - Type: RequestPacket
+    PacketName: GeneratedEnvelopeReq
+    Items:
+      - Type: int
+        Name: sequence
+      - Type: GeneratedUser
+        Name: user
+      - Type: std::vector<GeneratedUser>
+        Name: users
+      - Type: std::map<int, GeneratedUser, std::greater<int>>
+        Name: byId
+      - Type: std::unordered_map<int, GeneratedUser>
+        Name: lookup
+      - Type: std::list<GeneratedUser>
+        Name: history
+      - Type: std::vector<GeneratedEmpty>
+        Name: emptyValues
+  - Type: ReplyPacket
+    PacketName: GeneratedEmptyRes
+    Items: []
+Structs:
+  - Name: GeneratedUser
+    Items:
+      - Type: std::uint64_t
+        Name: userId
+      - Type: std::string
+        Name: nickname
+      - Type: GeneratedPosition
+        Name: position
+      - Type: std::vector<int>
+        Name: items
+      - Type: std::set<int, std::greater<int>>
+        Name: achievements
+      - Type: std::unordered_set<std::string>
+        Name: labels
+  - Name: GeneratedEmpty
+  - Name: GeneratedPosition
+    Items:
+      - Type: float
+        Name: x
+      - Type: float
+        Name: y
