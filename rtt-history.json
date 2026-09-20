@@ -1798,6 +1798,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "48b1829de289722a9457dd493ce81c9d96a081c1",
+      "commitSubject": "* 클라이언트 reliable 송신 대기 큐의 ACK 경합으로 인한 정체 수정   * 콘텐츠 송신을 pending 큐로 통합하고 삽입 후 flush 수행   * 윈도우 확인과 콘텐츠 등록을 직렬화해 중복 슬롯 사용 방지   * outstanding 개수의 BYTE 변환 제거 * TLS 평문 누적 오류 수정",
+      "recordedAtUtc": "2026-09-20T09:21:20.1284913+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001245",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.11479099999999985,
+            "medianMinRttMs": 0.0788,
+            "medianP50RttMs": 0.1091,
+            "medianP95RttMs": 0.141,
+            "medianP99RttMs": 0.1936,
+            "medianMaxRttMs": 0.3355,
+            "worstMaxRttMs": 1.7335,
+            "medianElapsedSeconds": 0.1200633,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.246470399999995,
+            "medianMinRttMs": 0.044,
+            "medianP50RttMs": 0.0987,
+            "medianP95RttMs": 32.4412,
+            "medianP99RttMs": 67.6113,
+            "medianMaxRttMs": 200.8681,
+            "worstMaxRttMs": 401.2159,
+            "medianElapsedSeconds": 6.2497353,
+            "totalRetransmissionSuspectedCount": 190
+          }
+        }
+      ]
     }
   ]
 }
