@@ -167,6 +167,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 {
 	auto& recvBuffer = *NetBuffer::Alloc();
 	recvBuffer.m_iRead = 0;
+	// Append plaintext across TLS records, including a split session header.
+	recvBuffer.m_iWrite = 0;
 
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
 	std::vector<char> encryptedStream;
@@ -214,7 +216,6 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 
 		if (plainSize > 0)
 		{
-			recvBuffer.m_iWrite = 0;
 			recvBuffer.WriteBuffer(plainBuffer, static_cast<int>(plainSize));
 			totalPlainReceived += static_cast<int>(plainSize);
 		}

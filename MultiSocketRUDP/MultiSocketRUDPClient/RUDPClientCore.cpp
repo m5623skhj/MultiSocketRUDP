@@ -877,27 +877,14 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 
 	if (not isCorePacket)
 	{
-		const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
-		if (window == 0)
 		{
 			std::scoped_lock lock(pendingPacketQueueLock);
 			pendingPacketQueue.push({ inSendPacketSequence, &buffer });
-			return;
 		}
 
-
-		BYTE outstanding;
-		{
-			std::scoped_lock lock(sendPacketInfoMapLock);
-			outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
-		}
-
-		if (outstanding >= window)
-		{
-			std::scoped_lock lock(pendingPacketQueueLock);
-			pendingPacketQueue.push({ inSendPacketSequence, &buffer });
-			return;
-		}
+		// Retry admission even if the last ACK arrived before this enqueue.
+		TryFlushPendingQueue();
+		return;
 	}
 
 	RegisterSendPacketInfo(buffer, inSendPacketSequence);
@@ -941,18 +928,19 @@ void RUDPClientCore::RegisterSendPacketInfo(NetBuffer& buffer, const PacketSeque
 
 void RUDPClientCore::TryFlushPendingQueue()
 {
-	const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
-	if (window == 0)
-	{
-		return;
-	}
-
+	// Serialize content admission through registration; lock order is pending -> map.
 	std::scoped_lock pendingLock(pendingPacketQueueLock);
 	while (not pendingPacketQueue.empty())
 	{
+		const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
+		if (window == 0)
+		{
+			break;
+		}
+
 		{
 			std::scoped_lock infoLock(sendPacketInfoMapLock);
-			if (const auto outstanding = static_cast<BYTE>(sendPacketInfoMap.size()); outstanding >= window)
+			if (sendPacketInfoMap.size() >= window)
 			{
 				break;
 			}
