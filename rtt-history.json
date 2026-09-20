@@ -1736,6 +1736,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "ed19d087967f6bbbc32c01792c29a0b6334c89df",
+      "commitSubject": "* 공통 패킷 생성·CI 동기화 검사와 BotTester 구조체·컨테이너 지원 통합   * main 기준 rebase 및 패킷 생성기·문서 충돌 해소   * C++ 스키마 검증과 안전한 역직렬화를 유지하며 C# 중첩 스키마·송신 직렬화 추가   * 순서 기반 패킷 ID·기존 수동 핸들러 보존 및 생성 결과 검사 연결   * C++ 테스트 오브젝트·fixture 타입 충돌 해소와 양쪽 직렬화 회귀 검증 추가",
+      "recordedAtUtc": "2026-09-20T09:12:55.446369+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001242",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.1756289000000001,
+            "medianMinRttMs": 0.1051,
+            "medianP50RttMs": 0.1814,
+            "medianP95RttMs": 0.2192,
+            "medianP99RttMs": 0.2412,
+            "medianMaxRttMs": 0.3774,
+            "worstMaxRttMs": 2.0539,
+            "medianElapsedSeconds": 0.1830159,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.790613700000002,
+            "medianMinRttMs": 0.0592,
+            "medianP50RttMs": 0.1369,
+            "medianP95RttMs": 32.3525,
+            "medianP99RttMs": 64.5414,
+            "medianMaxRttMs": 126.5613,
+            "worstMaxRttMs": 165.2558,
+            "medianElapsedSeconds": 5.7937178,
+            "totalRetransmissionSuspectedCount": 168
+          }
+        }
+      ]
     }
   ]
 }
