@@ -84,9 +84,21 @@ ConfigUi.SaveButton(onClick)          // Save 버튼
 
 ### 패널 공통 규칙
 
-#### `CanConfigure(NodeVisual node)`
-- 패널이 특정 노드 타입을 처리할 수 있는지 판단한다.
+#### `CanConfigure`
 
+```csharp
+bool CanConfigure(NodeVisual node);
+```
+
+패널이 특정 노드 타입을 처리할 수 있는지 판단한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `node` | `NodeVisual` | 설정 확인 대상 노드 |
+
+**반환값**
+- `true`: `node.NodeType`이 `SendPacketNode`인 경우
+- `false`: 그 외 모든 경우
 #### `Build(StackPanel stack, NodeVisual node, Action<string> log, Action closeDialog)`
 - 전달받은 `StackPanel`에 WPF 설정 UI를 구성한다.
 - 저장 시 `NodeConfiguration`을 갱신하고 로그 기록 및 다이얼로그 종료 콜백을 호출한다.

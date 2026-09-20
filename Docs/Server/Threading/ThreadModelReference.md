@@ -32,9 +32,9 @@
 | 그룹 | `THREAD_GROUP` enum | 수 | 종료 메커니즘 | 주 역할 |
 |------|--------------------|----|---------------|---------|
 | IO Worker | `IO_WORKER_THREAD` | N | `stop_token` | RIO 완료 큐 디큐 |
-| RecvLogic Worker | `RECV_LOGIC_WORKER_THREAD` | N | `stop_token` + ManualResetEvent | 패킷 타입 분기, 핸들러 호출 |
+| RecvLogic Worker | `RECV_LOGIC_WORKER_THREAD` | N | `stop_token` + worker별 AutoResetEvent + 전역 ManualResetEvent | 패킷 타입 분기, 핸들러 호출 |
 | Retransmission | `RETRANSMISSION_THREAD` | N | `stop_token` | 미ACK 패킷 재전송 |
-| Session Release | `SESSION_RELEASE_THREAD` | 1 | `stop_token` + ManualResetEvent | RELEASING 세션 정리 |
+| Session Release | `SESSION_RELEASE_THREAD` | 1 | `stop_token` + AutoResetEvent + ManualResetEvent | 두 해제 상태 세션 정리 |
 | Heartbeat | `HEARTBEAT_THREAD` | 1 | `stop_token` | 하트비트 전송, 예약 타임아웃 |
 | SessionBroker | - | 1 + 4 | `stop_token` + accept 에러 | TLS 세션 발급 |
 | Ticker | - | 1 | 내부 stop 신호 | TimerEvent 주기 발화 |
@@ -113,7 +113,7 @@ if (status != 0) {
 }
 ```
 
-RIO 오류나 `RELEASING` 상태도 context를 먼저 버리지 않는다. 성공·오류·취소 completion 모두 `RUDPIOHandler::IOCompleted`를 통과해야 수신 카운터와 slot을 정확히 한 번 정리할 수 있다.
+RIO 오류나 두 해제 상태에서도 context를 먼저 버리지 않는다. 성공·오류·취소 completion 모두 `RUDPIOHandler::IOCompleted`를 통과해야 수신 카운터와 slot을 정확히 한 번 정리할 수 있다.
 
 > **`rioResult.Status != 0` 의미:** `WSAECONNRESET`은 정상 종료 사유로 매핑하고, 해제 중 `WSA_OPERATION_ABORTED`는 예상된 취소로 처리한다. 그 외는 오류 종료로 전환한다. recv/send completion은 상태와 무관하게 slot·카운터·context를 먼저 정리한다. `StopServer()`는 모든 세션의 I/O와 logic이 drain되어 풀로 반환된 뒤에만 worker stop을 요청한다.
 
@@ -187,7 +187,7 @@ IO Worker가 완료 context를 logic queue에 넣은 뒤 `SetEvent()`에 실패�
 
 서버 종료 시퀀스:
 ```
-1. CloseAllSessions()  ← 활성 세션을 RELEASING으로 전환
+1. CloseAllSessions()  ← 연결 상태에 따라 활성 세션을 두 해제 상태 중 하나로 전환
 2. Release Thread가 socket close를 시작
 3. IO/Logic Worker가 취소 완료와 큐 작업을 처리
 4. recv I/O·logic·send drain 완료 후 세션을 풀로 반환
@@ -354,7 +354,7 @@ RefCount가 1보다 크면 메모리를 실제로 해제하지 않아 heap entry
 
 ### 역할
 
-`DoDisconnect(reason)`에 의해 RELEASING 상태가 된 세션의 소켓을 닫고 풀에 반환한다.  
+`DoDisconnect(reason)`에 의해 두 해제 상태 중 하나가 된 세션의 소켓을 닫고 풀에 반환한다.  
 IO 완료 여부를 확인해 race condition을 방지한다.
 
 ### 코드 해석
@@ -409,7 +409,7 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 }
 ```
 
-이 worker는 사용자 recv logic이 끝난 뒤 `OnDisconnected()`를 한 번 호출하고 소켓만 먼저 닫는다. 이후 send I/O, `outstandingRecvIo`, `activeIOCompletions`가 끝날 때까지 세션을 `RELEASING`으로 유지한다. close와 경합해 들어온 stale logic도 `pendingRecvLogic`으로 추적한다. 10초 제한은 강제 반환이 아니라 지연 진단 기준이다.
+이 worker는 사용자 recv logic이 끝난 뒤 `OnDisconnected()`를 한 번 호출하고 소켓만 먼저 닫는다. 이후 send I/O, `outstandingRecvIo`, `activeIOCompletions`가 끝날 때까지 세션을 기존 해제 상태로 유지한다. close와 경합해 들어온 stale logic도 `pendingRecvLogic`으로 추적한다. 10초 제한은 강제 반환이 아니라 지연 진단 기준이다.
 
 ### AutoResetEvent vs ManualResetEvent
 
@@ -460,7 +460,7 @@ void RUDPSessionManager::HeartbeatCheck(const unsigned long long now) const
             if (sessionDelegate.CheckReservedSessionTimeout(*session, now)) {
                 // RUDPSession::reservedSessionTimeoutMs 기본값 = 30000ms
                 sessionDelegate.AbortReservedSession(*session);
-                // → TryAbortReserved() CAS: RESERVED → RELEASING
+                // → TryAbortReserved() CAS: RESERVED → RELEASING_BY_ABORT_RESERVED
                 // → 공통 release queue 등록
                 // → close → drain → cleanup → ReleaseSession
             }
@@ -531,7 +531,7 @@ SendHeartbeatPacket()
    └─ 이유: 새 클라이언트 차단 (이후 진행 중 세션들만 정리)
 
 2. CloseAllSessions()
-   └─ 이유: 활성 세션을 RELEASING으로 전환
+   └─ 이유: 연결 상태에 따라 활성 세션을 두 해제 상태 중 하나로 전환
 
 3. 세션 socket close-only 후 모든 send/receive/logic 작업 drain
    └─ 이유: RIO buffer와 context를 worker보다 먼저 파괴하지 않기 위해

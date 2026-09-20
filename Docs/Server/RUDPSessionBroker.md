@@ -45,10 +45,13 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 
 1. `TLSHelperServer localTlsHelper(serverCertificateConfig)`
 2. `localTlsHelper.Initialize()`
-3. `localTlsHelper.Handshake(clientSocket)`
-4. `ReserveSession(sendBuffer, rudpSessionIP)`
-5. `SendSessionInfoToClient(clientSocket, localTlsHelper, sendBuffer)`
-6. 실패 시 `sessionDelegate.AbortReservedSession(*session)`
+3. `localTlsHelper.Handshake(clientSocket, stopToken)`
+4. `ReceiveProtocolVersion(clientSocket, RUDP_PROTOCOL_VERSION, stopToken)`
+5. `ReserveSession(sendBuffer, rudpSessionIP)`
+6. `SendSessionInfoToClient(clientSocket, localTlsHelper, sendBuffer)`
+7. 전송 실패 시 `sessionDelegate.AbortReservedSession(*session)`
+
+버전은 TLS 레코드 안의 4바이트 big-endian 값이며 현재 상수는 `2`다. 누락·불일치·5초 deadline 초과·중지 요청이면 세션을 예약하기 전에 연결을 종료한다.
 
 핵심은 TLS helper가 "브로커 전역 1개"가 아니라 "연결당 1개"라는 점이다.
 
@@ -61,9 +64,9 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 1. `AcquireSession()`
 2. `InitReserveSession(*session)`
 3. `InitSessionCrypto(*session)`
-4. `sendBuffer << connectResultCode`
+4. `sendBuffer << RUDP_PROTOCOL_VERSION << connectResultCode`
 5. 성공 시 `serverIp`, `port`, `sessionId`, `sessionKey`, `sessionSalt` 기록
-6. 실패 시 `session->DoDisconnect(DISCONNECT_REASON::BY_ERROR)`
+6. 실패 시 예약 상태는 `AbortReservedSession()`, 그 밖의 상태는 `DoDisconnect(DISCONNECT_REASON::BY_ERROR)`로 정리
 
 ---
 
@@ -75,6 +78,7 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 [HeaderCode 1B]
 [PayloadLen 2B]
 [Reserved 2B]
+[RUDP_PROTOCOL_VERSION 4B, little-endian]
 [CONNECT_RESULT_CODE 1B]
 [serverIp string]
 [serverPort 2B]
@@ -108,7 +112,8 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 - 현재 브로커 생성자는 `ServerCertificateConfig` 기반이다.
 - 현재 TLS helper는 per-connection 인스턴스로 생성된다.
 - `ReserveSession()` 실패 시 세션 정리 흐름까지 포함한다.
-- 세션 정보 응답 포맷의 결과 코드는 1바이트다.
+- TLS 핸드셰이크 뒤 프로토콜 버전 `2`를 먼저 검증한다.
+- 세션 정보 응답은 동일한 버전 4바이트 뒤에 1바이트 결과 코드를 둔다.
 
 ---
 

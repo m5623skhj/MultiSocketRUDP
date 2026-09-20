@@ -256,13 +256,16 @@ jobs:
             "${channel_history_arguments[@]}" \
             --results results/channel-unreliable-only.json results/channel-reliable-baseline.json results/channel-mixed.json \
             --output-history "$history_root/channel-history.json" \
-            --markdown "$history_root/channel-summary.md"
+            --markdown "$history_root/channel-summary.md" \
+            --output-dir "$history_root"
 
           git -C "$history_root" config user.name "github-actions[bot]"
           git -C "$history_root" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$history_root" add \
             channel-history.json \
             channel-summary.md \
+            channel-unreliable-only.svg \
+            channel-mixed.svg \
             rtt-history.json \
             rtt-loss-0.svg \
             rtt-loss-10.svg \

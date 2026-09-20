@@ -36,6 +36,10 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 | `stop` | 클라이언트 stop의 정상 종료 |
 | `multi-echo` | 복수 클라이언트 동시 왕복 |
 | `ordered-burst` | 연속 요청의 순서 보장 |
+| `unreliable-only` | 비신뢰성 전용 왕복과 인증된 수신 기반 생존 검사 |
+| `mixed-channels` | 신뢰성·비신뢰성 채널을 함께 사용할 때의 독립 순서와 응답 |
+| `unreliable-checks` | C++ 클라이언트의 큐 교체·번호·수신 API 자체 검사 |
+| `concurrent-echo-disconnect` | 복수 worker의 동시 송수신·연결 해제 경합 |
 
 실패 재현에는 단일 filter를 우선 사용한다.
 
@@ -54,7 +58,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 
 ## C++/C# 프로토콜 상호운용
 
-`MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json`을 C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 함께 사용한다. 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문과 예상 패킷이 양쪽에서 일치해야 한다.
+`MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json`의 10개 vector를 C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 함께 사용한다. 키, salt, sequence, 신뢰성·비신뢰성 방향, core/full 구분, packet type, packet ID, 평문과 예상 패킷이 양쪽에서 일치해야 한다.
 
 ```powershell
 msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x64

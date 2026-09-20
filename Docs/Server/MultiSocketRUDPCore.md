@@ -319,9 +319,10 @@ unsigned int GetHeartbeatThreadSleepMs() const;
 unsigned int GetInitialRetransmissionMs() const;
 unsigned int GetMinRetransmissionMs() const;
 unsigned int GetMaxRetransmissionMs() const;
+unsigned int GetUnreliableQueueCapacity() const;
 ```
 
-- heartbeat 주기와 초기/최소/최대 재전송 timeout(RTO)을 반환한다.
+- heartbeat 주기, 초기/최소/최대 재전송 timeout(RTO), 세션별 신뢰성 없는 송신 큐 용량을 반환한다.
 
 ### 비공개 함수
 
@@ -347,7 +348,7 @@ unsigned int GetMaxRetransmissionMs() const;
 inline RUDPSession* GetReleasingSession(SessionIdType sessionId) const;
 ```
 
-RELEASING 상태 세션을 조회한다.
+두 해제 상태(`RELEASING`, `RELEASING_BY_ABORT_RESERVED`)의 세션을 조회한다.
 Session Release Thread 내부 로직에서 사용된다.
 
 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
@@ -427,7 +428,7 @@ void DisconnectSession(SessionIdType disconnectTargetSessionId) const;
 // 내부 구현
 void MultiSocketRUDPCore::DisconnectSession(SessionIdType id) const {
     if (!sessionManager->ReleaseSession(id)) return;
-    // → 세션이 RELEASING 상태인지 확인
+    // → 세션이 두 해제 상태 중 하나인지 확인
     // → unusedSessionIdList에 반환
 
     LOG_INFO(std::format("Session {} disconnected", id));
@@ -571,8 +572,9 @@ RIOCreateRequestQueue(
 ```ini
 :CORE
 {
+    UNRELIABLE_QUEUE_CAPACITY = 64
     THREAD_COUNT = 4
-    NUM_OF_SOCKET = 500
+    NUM_OF_SOCKET = 1100
     MAX_PACKET_RETRANSMISSION_COUNT = 16
     WORKER_THREAD_ONE_FRAME_MS = 16
     RETRANSMISSION_MS = 50
@@ -608,6 +610,8 @@ RIOCreateRequestQueue(
 
 재전송 범위는 `0 < MIN_RETRANSMISSION_MS <= RETRANSMISSION_MS <= MAX_RETRANSMISSION_MS`를 만족해야 한다. 최소값과 최대값 중 하나만 제공하거나 범위를 어기면 옵션 로딩이 실패한다. `SIMULATED_PACKET_LOSS_PERCENT`는 코드에서 상한을 검사하지 않으므로 반드시 `[0, 100]` 범위로 설정한다.
 
+`UNRELIABLE_QUEUE_CAPACITY`는 세션별 최신성 우선 송신 큐의 최대 미송신 항목 수이며 기본값은 `64`, 허용 범위는 `1..65535`다. 큐가 가득 차면 가장 오래된 미송신 항목이 새 항목으로 교체된다.
+
 > **`WORKER_THREAD_ONE_FRAME_MS` 제한:** 현재 `BuildConfig.h`의 `USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME`은 `USE_WORKER_THREAD_SLEEP_ZERO`로 고정돼 IO Worker가 항상 `Sleep(0)`을 호출한다. 이 빌드에서는 옵션 파일의 `WORKER_THREAD_ONE_FRAME_MS` 값이 실행 동작에 반영되지 않는다. `USE_WORKER_THREAD_SLEEP_FOR_FRAME`로 다시 빌드한 경우에만 이 값으로 frame 잔여 시간을 sleep한다.
 
 | 시나리오 | 권장 설정 |
@@ -616,6 +620,7 @@ RIOCreateRequestQueue(
 | 세션 수 많음 (1000+) | `THREAD_COUNT` ≥ 4, `NUM_OF_SOCKET` 적절히 |
 | 불안정 네트워크 | `MAX_PACKET_RETRANSMISSION_COUNT` 증가, `RETRANSMISSION_MS`와 `MAX_RETRANSMISSION_MS`를 함께 조정 |
 | 고빈도 하트비트 필요 | `HEARTBEAT_THREAD_SLEEP_MS` 감소 |
+| 최신 상태 갱신 burst 흡수 | 메모리와 지연 상한을 고려해 `UNRELIABLE_QUEUE_CAPACITY` 조정 |
 
 ---
 

@@ -21,9 +21,9 @@
 | 그룹 | 수 | 주 역할 | 주요 대기·종료 수단 |
 |---|---:|---|---|
 | IO Worker | N | RIO 완료 큐 처리 | polling, `stop_token` |
-| RecvLogic Worker | N | 패킷 검증·분기·콘텐츠 전달 | worker별 semaphore, `stop_token` |
+| RecvLogic Worker | N | 패킷 검증·분기·콘텐츠 전달 | worker별 AutoResetEvent, 전역 ManualResetEvent, `stop_token` |
 | Retransmission | N | deadline 기반 미ACK 재전송 | scheduler timer, `stop_token` |
-| Session Release | 1 | `RELEASING` 세션의 안전한 반환 | release event, `stop_token` |
+| Session Release | 1 | 두 해제 상태 세션의 안전한 반환 | release AutoResetEvent, stop ManualResetEvent, `stop_token` |
 | Heartbeat | 1 | heartbeat와 예약 timeout | 주기 확인, `stop_token` |
 | SessionBroker | 1 + worker | TLS 세션 발급 | accept 중단과 stop 요청 |
 | Ticker | 1 | `TimerEvent` 실행 | 내부 stop 신호 |

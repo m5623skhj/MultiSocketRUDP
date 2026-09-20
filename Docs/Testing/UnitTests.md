@@ -25,6 +25,9 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 - lock-free 또는 ref-count 경로는 중복 해제, stale entry, 잘못된 generation을 포함한다.
 - RIO와 socket 의존 코드는 실패 시 context, I/O mode, 등록 버퍼가 원복되는지 확인한다.
 - 패킷·암호화 테스트는 실제 helper 경로를 사용하고 임의의 대체 구현으로 계약을 재작성하지 않는다.
+- `NetBufferContainerTest.*`는 컨테이너 wire 형식, 정렬 방향, 중복·손상 데이터 거부를 검증한다.
+- `GeneratedPacketSchemaTest.*`는 YAML 생성 구조체, 중첩 컨테이너, 빈 구조체와 실패 시 대상 값 보존을 실제 생성 코드로 검증한다.
+- YAML parser와 생성 결과 재현성은 `MultiSocketRUDP/Tool/PacketGenerator/tests/test_packet_schema.py`로 검증한다.
 
 ---
 
@@ -36,7 +39,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 dotnet test .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests\MultiSocketRUDPBotTester.UnitTests.csproj --configuration Debug
 ```
 
-주요 검증 범위는 `BufferStore`, 패킷 직렬화·암호화, graph 검증, runtime 통계, trigger 조건, AI 응답 parsing, packet schema, 손실 시뮬레이터다.
+주요 검증 범위는 `BufferStore`, 패킷 직렬화·암호화, 신뢰성·비신뢰성 채널, graph 검증, runtime 통계, trigger 조건, AI 응답 parsing, packet schema, 손실 시뮬레이터, RTT 집계와 stress 옵션이다.
 
 WPF 타입을 참조하므로 target framework와 `UseWPF` 설정을 임의로 제거하지 않는다. static registry나 schema를 변경하는 테스트는 원래 상태를 복원해야 하며, 병렬 실행 설정을 바꿀 때는 공유 상태의 thread-safety를 먼저 검토한다.
 
@@ -59,4 +62,3 @@ git ls-files -- <path>
 
 - [테스트 상세 레퍼런스 — 유닛 테스트](TestingReference.md#유닛-테스트)
 - [테스트 상세 레퍼런스 — BotTester 유닛 테스트](TestingReference.md#bottester-유닛-테스트)
-

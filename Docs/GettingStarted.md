@@ -11,20 +11,32 @@
 `Tool/PacketDefine.yml`에 패킷을 추가한 뒤 `Tool/PacketGenerate.bat`를 실행한다.
 
 ```yaml
+Structs:
+  - Name: ItemData
+    Items:
+      - Type: std::int32_t
+        Name: dataId
+      - Type: std::int64_t
+        Name: itemId
+
 Packet:
   - Type: RequestPacket
     PacketName: MyRequest
     Items:
-      - Type: int
-        Name: value
+      - Type: ItemData
+        Name: target
+      - Type: std::vector<ItemData>
+        Name: items
   - Type: ReplyPacket
     PacketName: MyResponse
     Items:
-      - Type: int
-        Name: result
+      - Type: std::unordered_map<int, ItemData>
+        Name: itemsById
 ```
 
-생성 결과물은 `Protocol.*`, `PacketIdType.h`, `Player.*`, `ContentsPacketRegister.*`에 반영된다.
+생성 결과물은 `Protocol.*`, `PacketIdType.h`, `Player.h`, `PlayerPacketHandler.cpp`, `PlayerPacketHandlerRegister.*`에 반영된다. `ContentsPacketRegister`는 `PlayerPacketHandlerRegister.*` 안에 선언된 namespace다.
+
+`Structs`의 선언 순서는 자유롭다. 생성기가 구조체 의존성을 정렬하고 각 필드를 YAML 순서대로 재귀 직렬화한다. `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`을 구조체 또는 패킷 필드로 사용할 수 있다. `unordered_set`과 `unordered_map`은 원소와 key/value만 복원하며 기존 삽입 순서나 순회 순서를 보장하지 않는다. 송수신 측은 같은 YAML에서 생성된 `Protocol.*`을 사용해야 한다.
 
 ### 2. 세션 클래스 구현
 
@@ -149,6 +161,24 @@ while (client.IsConnected())
 client.Disconnect();
 ```
 
+전달 보장보다 최신 데이터가 중요한 경우에는 비신뢰성 채널을 선택할 수 있다.
+
+```cpp
+if (!client.SendUnreliablePacket(req))
+{
+    // 연결 종료, 직렬화 또는 암호화 실패
+}
+
+if (NetBuffer* buf = client.GetReceivedUnreliablePacket())
+{
+    PacketId packetId;
+    *buf >> packetId;
+    NetBuffer::Free(buf);
+}
+```
+
+`SendUnreliablePacket()`의 `true`는 로컬 큐 수용을 뜻하며 전달을 보장하지 않는다. 반환 버퍼의 해제 책임은 신뢰성 수신과 동일하게 호출자에게 있다.
+
 ---
 
 ## TLS 인증서 설정
@@ -184,6 +214,8 @@ ClientOptionFile/SessionGetterOption.txt
 
 예전 문서에 있던 `ClientOption.ini`, `SessionGetterOption.ini` 경로는 현재 샘플 코드 기준이 아니다.
 
+서버와 C++ 클라이언트의 `CoreOption.txt`는 `UNRELIABLE_QUEUE_CAPACITY`를 선택적으로 받는다. 기본값은 64이며 허용 범위는 1~65,535다. 범위를 벗어나면 옵션 로드가 실패한다.
+
 ---
 
 ## BotTester
@@ -214,6 +246,7 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/WithGeminiClient/GeminiClientC
 - `RUDPSession::DoDisconnect()`는 현재 `DISCONNECT_REASON` 인자를 받는다.
 - `MultiSocketRUDPCore::GetUsingSession()`은 콘텐츠 코드에서 직접 호출하는 공개 API가 아니다.
 - SessionBroker 응답의 `CONNECT_RESULT_CODE`는 현재 `1B` enum이다.
+- 프로토콜 v2 클라이언트만 접속할 수 있으며 TLS 직후 4바이트 big-endian 버전 `2`를 전송한다.
 
 ---
 
@@ -223,3 +256,4 @@ MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/WithGeminiClient/GeminiClientC
 - [[RUDPSession]] - 세션 상속 포인트
 - [[RUDPClientCore]] - C++ 클라이언트 내부 동작
 - [[RudpSession_CS]] - BotTester C# 세션 구현
+- [[UnreliableChannel]] - 비신뢰성 채널과 프로토콜 v2

@@ -27,7 +27,7 @@
 ```cpp
 class RUDPSession {
     // ─── 서브 컴포넌트 ──────────────────────────────────────────────
-    SessionStateMachine   stateMachine;      // 세션 상태 (DISCONNECTED/RESERVED/CONNECTED/RELEASING)
+    SessionStateMachine   stateMachine;      // 세션 상태 (연결 전 예약 중단 상태 포함 5종)
     SessionCryptoContext  cryptoContext;     // AES-GCM 키/솔트/핸들
     SessionSocketContext  socketContext;     // 소켓 핸들, 클라이언트 주소, 락 (RUDPSession 미포함)
     SessionRIOContext     rioContext;        // RIO 버퍼/컨텍스트 (Recv + Send, 시퀀스 포함)
@@ -68,7 +68,7 @@ public:
     SESSION_STATE GetSessionState() const noexcept;
     bool IsConnected()    const noexcept;   // state == CONNECTED
     bool IsReserved()     const noexcept;   // state == RESERVED
-    bool IsReleasing()    const noexcept;   // state == RELEASING
+    bool IsReleasing()    const noexcept;   // RELEASING || RELEASING_BY_ABORT_RESERVED
     bool IsUsingSession() const noexcept;   // RESERVED || CONNECTED
     // IsDisconnected()는 없음 — state == DISCONNECTED 확인 시 !IsUsingSession() && !IsReleasing() 사용
 
@@ -78,8 +78,8 @@ public:
 
     // ─── 전이 (CAS, 경쟁 가능) ────────────────────────────────────────
     bool TryTransitionToConnected();    // RESERVED → CONNECTED
-    bool TryTransitionToReleasing();    // RESERVED|CONNECTED → RELEASING (2회 시도)
-    bool TryAbortReserved();            // RESERVED → RELEASING (HeartbeatThread 전용)
+    bool TryTransitionToReleasing();    // RESERVED → RELEASING_BY_ABORT_RESERVED, CONNECTED → RELEASING
+    bool TryAbortReserved();            // RESERVED → RELEASING_BY_ABORT_RESERVED
 };
 ```
 
@@ -315,6 +315,9 @@ class SessionSendContext {
     // ─── 송신 큐 ───────────────────────────────────────────────────
     std::mutex sendPacketInfoQueueLock;
     std::queue<SendPacketInfo*> sendPacketInfoQueue;
+    std::deque<SendPacketInfo*> unreliableQueue;
+    size_t unreliableQueueCapacity{ DEFAULT_UNRELIABLE_QUEUE_CAPACITY };
+    bool preferUnreliable{};
 
     // ─── ACK 대기 추적 ──────────────────────────────────────────────
     std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
@@ -326,7 +329,7 @@ class SessionSendContext {
     // IO_NONE_SENDING: 현재 RIO Send 없음
     // IO_SENDING:      RIO Send 진행 중
 
-    // ─── 패킷 시퀀스 ────────────────────────────────────────────────
+    // ─── 신뢰 채널 패킷 시퀀스 ─────────────────────────────────────
     std::atomic<PacketSequence> lastSendPacketSequence;
 
     // ─── 시퀀스 캐시 (중복 전송 방지) ────────────────────────────────
@@ -356,6 +359,8 @@ public:
 };
 ```
 
+`sendPacketInfoQueue`와 `unreliableQueue`는 같은 `sendPacketInfoQueueLock`으로 보호한다. 두 큐가 모두 비어 있지 않으면 `preferUnreliable`을 토글해 배치 후보를 번갈아 선택한다. 신뢰성 없는 큐가 설정 용량에 도달하면 아직 스트림에 실리지 않은 예약 항목을 먼저, 없으면 큐의 가장 오래된 항목을 교체한다. 따라서 `SendUnreliablePacket()`의 `true`는 원격 전달이 아니라 로컬 큐 수락 또는 교체 완료를 뜻한다.
+
 **`cachedSequenceSet` 중복 전송 방지:**
 
 ```cpp
@@ -382,6 +387,8 @@ memcpy_s(&rioSendBuffer[beforeSendSize],
 ACK 수신 전 같은 sequence가 다시 schedule되는 경우
 같은 sequence의 패킷이 스트림에 두 번 포함될 수 있다.
 재전송 schedule 자체의 중복 entry는 `SendPacketInfo::scheduleVersion`으로 stale 처리된다.
+
+`cachedSequenceSet`은 `IO_NONE_SENDING → IO_SENDING`을 획득한 단일 send-stream 작성자만 접근하므로 별도 mutex가 없다. 이 소유권 계약을 깨는 새 호출 경로를 추가할 때는 동기화를 다시 설계해야 한다.
 
 **`sendPacketInfoMap shared_mutex` 패턴:**
 
@@ -524,7 +531,7 @@ sessionPacketOrderer
 **해제 순서 (AbortReservedSession — 공통 release queue 사용):**
 
 ```
-1. sendLifecycleMutex 안에서 RESERVED → RELEASING 전이 및 종료 사유 설정
+1. sendLifecycleMutex 안에서 RESERVED → RELEASING_BY_ABORT_RESERVED 전이 및 종료 사유 설정
 2. release target queue에 session id 등록
 3. Session Release Thread가 송신 작업과 recv logic quiescence 확인 후 socket close-only와 RIO drain 수행
 4. FinalizeRIOCleanup() 뒤 DisconnectSession(id)

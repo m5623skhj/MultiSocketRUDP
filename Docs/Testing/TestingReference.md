@@ -19,11 +19,11 @@
   - TLS 세션 브로커, UDP CONNECT, 요청/응답, 클라이언트 disconnect/stop, 재전송 실패 disconnect, 다중 클라이언트, 순서 보장 흐름을 검증
 - `ProtocolInteropTest`
   - BotTester의 C# 패킷 암호화 구현을 검증하는 실행형 테스트
-  - C++ CoreTest와 8개의 공용 protocol vector를 사용해 방향·core/full packet별 AES-GCM 결과 호환성을 검증
+  - C++ CoreTest와 10개의 공용 protocol vector를 사용해 신뢰성·비신뢰성 방향과 core/full packet별 AES-GCM 결과 호환성을 검증
 - `MultiSocketRUDPBotTester.UnitTests`
   - BotTester의 저장소, 암호화, graph, 실행 통계, AI 응답 파서, 조건 평가, 패킷 schema, 손실 시뮬레이터를 검증하는 xUnit 프로젝트
 - `MultiSocketRUDPBotTester.RttBenchmark`
-  - Release 서버와 전용 콘솔 클라이언트를 별도 프로세스로 실행해 0%·10% 유실 조건의 RTT 추세를 수집하는 성능 벤치마크
+  - Release 서버와 전용 콘솔 클라이언트를 별도 프로세스로 실행해 0%·10% 유실 조건과 신뢰성·비신뢰성 채널의 RTT·응답률 추세를 수집하는 성능 벤치마크
   - 기능 정합성 테스트가 아니라 P95/P99 회귀 후보를 찾기 위한 정보성 측정
 
 `IntegrationClientHarness`는 `IntegrationTest`가 별도 프로세스로 실행하는 테스트용 클라이언트 실행 파일이다.
@@ -71,7 +71,7 @@ MultiSocketRUDP/CoreTest/CoreTest.vcxproj
   - UDP 주소 버퍼가 `sockaddr_in`보다 짧은 경우, 패킷 본문 처리 전에 조기 반환되는지 검증한다.
 - `RUDPSessionManagerTest`
   - 유효하지 않은 `sessionId` 반환 요청을 거부한다.
-  - `RELEASING` 상태가 아닌 세션 반환 요청을 거부한다.
+  - 두 해제 상태가 아닌 세션 반환 요청을 거부한다.
   - `BY_RETRANSMISSION` disconnect가 전체 disconnect 및 retransmission disconnect 통계를 함께 증가시키는지 검증한다.
   - `BY_ABORT_RESERVED`는 연결된 세션의 disconnect 통계로 계산하지 않는지 검증한다.
 - `ServerUtilityTypesTest`
@@ -105,7 +105,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj
 ```
 
-현재 12개 테스트 파일에 `[Fact]`/`[Theory]` 선언 107개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
+현재 15개 테스트 파일에 `[Fact]`/`[Theory]` 선언 127개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
 
 ```powershell
 rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests -g "*Tests.cs"
@@ -125,6 +125,9 @@ rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.Un
 | `RttBenchmarkAggregationTests.cs` | 여러 RTT run의 Average/P95/P99/Max 중앙값 집계 |
 | `BotTestCompletionTrackerTests.cs` | setup/disconnect 완료 시점, 완료 알림 1회 보장, 취소와 동시 disconnect 처리 |
 | `BotRttSampleCollectorTests.cs` | RTT 요약, 빈 표본 결과, 동시 표본 수집 |
+| `ChannelRttTests.cs` | 비신뢰성 단독·혼합 채널 RTT 표본, 중복 응답, 응답률 집계 |
+| `RttStressBenchmarkTests.cs` | 폐루프 stress 옵션 검증, histogram과 결과 집계 |
+| `UnreliableChannelTests.cs` | 비신뢰성 큐 교체, 번호·nonce 분리, 수신 순서, 생존 검사와 종료 경합 |
 
 실행:
 
@@ -205,7 +208,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 MultiSocketRUDP/CoreTest/ProtocolInteropV2Vector.json
 ```
 
-C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문 및 예상 패킷을 읽는다. 현재 vector는 네 방향과 core/full 조합을 모두 포함한다.
+C++ `PacketCryptoTest`와 C# `ProtocolInteropTest`가 같은 키, salt, sequence, 방향, core/full 구분, packet type, packet ID, 평문 및 예상 패킷을 읽는다. 현재 10개 vector는 신뢰성 네 방향과 비신뢰성 두 방향, core/full 조합을 포함한다.
 
 C++과 C# vector consumer를 각각 실행한다.
 
@@ -302,10 +305,10 @@ C++ consumer는 Native GTest의 `PacketCryptoTest.AesGcmMatchesProtocolV2GoldenV
 
 ### RTT Benchmark
 
-`RttBenchmark.yml`은 Windows hosted runner에서 서버를 MSVC x64 Release `/O2`로 빌드하고, `RUDP_RTT_BENCHMARK_BUILD`로 IO worker sleep을 제거한다. 측정 중에는 hosted runner CPU 경합을 줄이기 위해 서버 `THREAD_COUNT`를 1로 고정하며 0%와 TX/RX 각각 10% 유실 시나리오를 순차 측정한다.
+`RttBenchmark.yml`은 Windows hosted runner에서 서버를 MSVC x64 Release `/O2`로 빌드하고, `RUDP_RTT_BENCHMARK_BUILD`로 IO worker sleep을 제거한다. 측정 중에는 hosted runner CPU 경합을 줄이기 위해 서버 `THREAD_COUNT`를 1로 고정하며 0%와 TX/RX 각각 10% 유실 시나리오, 비신뢰성 단독·신뢰성 기준·혼합 채널 시나리오를 순차 측정한다.
 
-- PR: 직전 공식 측정 대비 P95/P99 변화율을 Job Summary와 PR 코멘트에 표시
-- `main` push: 측정 후 `benchmark-data` 브랜치의 전체 JSON 이력과 최근 10회 SVG 그래프를 자동 갱신
+- PR: 직전 공식 측정 대비 P95/P99 변화율과 채널별 응답률을 Job Summary와 PR 코멘트에 표시
+- `main` push: 측정 후 `benchmark-data` 브랜치의 RTT·채널 JSON 이력과 최근 10회 SVG 그래프를 자동 갱신
 - 수동 실행: 진단 결과와 artifact만 만들고 공식 이력은 변경하지 않음
 
 측정 조건, 변화율 해석, 권한 및 실패 조사 절차는 [CI 가이드 — RTT 성능 벤치마크](CI.md#rtt-성능-벤치마크)를 따른다. 로컬 실행과 결과 파일 형식은 [RTT Benchmark 자동화](../../Scripts/RTTBenchmark/README.md)에 정리되어 있다.

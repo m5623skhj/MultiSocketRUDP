@@ -211,7 +211,7 @@ unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
 - 사용 중인 세션을 조회한다.
 
 #### `RUDPSession* GetReleasingSession(SessionIdType sessionId) const`
-- RELEASING 상태 세션을 조회한다.
+- `RELEASING` 또는 `RELEASING_BY_ABORT_RESERVED` 상태 세션을 조회한다.
 
 #### `unsigned short GetNowSessionCount() const`
 - 현재 연결 세션 수를 반환한다.
@@ -233,7 +233,7 @@ unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
 
 #### `void CloseAllSessions()`
 - CONNECTED 세션은 `NORMAL`, RESERVED 세션은 `BY_ABORT_RESERVED` 경로로
-  `RELEASING` 상태에 전달한다.
+  각각 `RELEASING`, `RELEASING_BY_ABORT_RESERVED` 상태에 전달한다.
 - 실제 소켓 close와 풀 반환은 release worker의 drain 절차가 수행한다.
 
 ### `ClearAllSessions`
@@ -266,7 +266,7 @@ RUDPSession* GetUsingSession(SessionIdType sessionId) const
     return session->IsUsingSession() ? session : nullptr;
 }
 
-// RELEASING 세션 접근 (Session Release Thread 전용)
+// 두 해제 상태의 세션 접근 (Session Release Thread 전용)
 RUDPSession* GetReleasingSession(SessionIdType sessionId) const
 {
     if (sessionId >= sessionList.size()) return nullptr;
@@ -285,7 +285,7 @@ GetUsingSession:
   → RELEASING은 이미 DoDisconnect됨 → 전송 의미 없음
 
 GetReleasingSession:
-  IsReleasing() = RELEASING만
+  IsReleasing() = RELEASING || RELEASING_BY_ABORT_RESERVED
   → Session Release Thread에서 해제할 세션 찾을 때
   → CONNECTED/RESERVED를 실수로 해제하면 안 됨
 ```
@@ -316,8 +316,8 @@ IncrementConnectedCount():
   → TryConnect() 반환 true 직후
 
 DecrementConnectedCount():
-  → ReleaseSession() 내부에서 자동 감소
-  → (pool 반환 시 연결 수 감소)
+  → ReleaseSession()이 일반 RELEASING 상태를 반환할 때만 호출
+  → RELEASING_BY_ABORT_RESERVED는 연결된 적이 없으므로 통계에서 제외
 ```
 
 **`MultiSocketRUDPCore::GetNowSessionCount()`:**
@@ -335,10 +335,12 @@ unsigned short MultiSocketRUDPCore::GetNowSessionCount() const {
 ```cpp
 // MultiSocketRUDPCore::StopServer에서의 정리 순서:
 
-// ① 모든 활성 세션을 RELEASING으로 전환
+// ① 모든 활성 세션을 연결 여부에 맞는 해제 상태로 전환
 CloseAllSessions();
 for (auto* session : sessionList) {
-    if (session->IsUsingSession()) {
+    if (session->IsReserved()) {
+        session->AbortReservedSession();
+    } else if (session->IsConnected()) {
         session->DoDisconnect(DISCONNECT_REASON::NORMAL);
     }
 }

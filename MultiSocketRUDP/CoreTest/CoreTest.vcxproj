@@ -25,6 +25,9 @@
     <ClCompile Include="CoreOptionParserTest.cpp" />
     <ClCompile Include="CryptoHelperTest.cpp" />
     <ClCompile Include="MemoryTracerTest.cpp" />
+    <ClCompile Include="NetBufferContainerTest.cpp" />
+    <ClCompile Include="GeneratedPacketSchemaTest.cpp" />
+    <ClCompile Include="GeneratedPacketSchema\Protocol.cpp" />
     <ClCompile Include="PacketManagerTest.cpp" />
     <ClCompile Include="RingBufferTest.cpp" />
     <ClCompile Include="RUDPFlowControllerTest.cpp" />

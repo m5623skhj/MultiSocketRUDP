@@ -15,6 +15,7 @@
 | 서버 구조 전체 파악 | [MultiSocketRUDPCore](Server/MultiSocketRUDPCore.md) |
 | 세션 상속 및 API | [RUDPSession](Server/RUDPSession.md) |
 | 패킷 흐름 이해 | [PacketProcessing](Server/PacketProcessing.md) |
+| 프로토콜 v2·비신뢰성 채널 | [UnreliableChannel](UnreliableChannel.md) |
 | 스레드 구조 이해 | [ThreadModel](Server/ThreadModel.md) → [WorkerThreads](Server/Threading/WorkerThreads.md) |
 | 연결 오류 해결 | [Troubleshooting](Troubleshooting.md) |
 | 성능 최적화 | [PerformanceTuning](PerformanceTuning.md) |
@@ -38,13 +39,14 @@
 | [RUDPSession](Server/RUDPSession.md) | 상속 방법, 핸들러 등록, 송신 API, 이벤트 훅, 동시성 보호 |
 | [RUDPSessionBroker](Server/RUDPSessionBroker.md) | TLS 세션 발급 흐름, 실패 처리, 인증서 설정 |
 | [RUDPSessionManager](Server/RUDPSessionManager.md) | 세션 풀 O(1) 할당/반환, 이중 반환 방지 |
-| [SessionLifecycle](Server/SessionLifecycle.md) | 4상태 전이 다이어그램, 각 전이 조건 및 코드 |
+| [SessionLifecycle](Server/SessionLifecycle.md) | 5상태 전이 다이어그램, 연결 여부를 구분한 해제 상태와 각 전이 조건 |
 | [SessionComponents](Server/SessionComponents.md) | 세션 하위 컴포넌트 허브와 수명 체크포인트 |
 | [StateCryptoAndSocket](Server/Session/StateCryptoAndSocket.md) | 상태 전이, 암호 key handle, socket close 동기화 |
 | [ReceiveContext](Server/Session/ReceiveContext.md) | RIO receive buffer, 완료 queue, 수신 객체 수명 |
 | [SendAndFlow](Server/Session/SendAndFlow.md) | send queue/map, ACK·재전송 수명, CWND·pending queue |
 | [PacketProcessing](Server/PacketProcessing.md) | 수신 전체 파이프라인, PacketType 분기, 순서 보장, 이상 처리 |
 | [PacketFormat](Server/PacketFormat.md) | 서버 패킷 처리 기준 레이아웃과 오프셋 |
+| [ContainerSerialization](Server/ContainerSerialization.md) | 컨테이너·사용자 정의 구조체의 wire 형식, 정렬 방향과 실패 처리 계약 |
 | [ThreadModel](Server/ThreadModel.md) | 스레드 문서 허브, 그룹 요약, 동시성 핵심 계약 |
 | [WorkerThreads](Server/Threading/WorkerThreads.md) | IO/Logic/Retransmission/Release/Heartbeat worker별 입출력과 실패 영향 |
 | [LifecycleAndSynchronization](Server/Threading/LifecycleAndSynchronization.md) | 시작·종료 순서, 공유 데이터, 객체 수명 검토 |
@@ -89,6 +91,7 @@
 | [IntegrationTests](Testing/IntegrationTests.md) | 실제 서버·클라이언트 및 C++/C# protocol 검증 |
 | [CI](Testing/CI.md) | 변경 경로별 PR 검사와 필수 체크 |
 | [Glossary](Glossary.md) | 용어집 |
+| [UnreliableChannel](UnreliableChannel.md) | 프로토콜 v2 호환성, 비신뢰성 송수신·큐·nonce 계약 |
 
 ## BotTester/
 

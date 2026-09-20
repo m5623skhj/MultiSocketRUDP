@@ -47,6 +47,7 @@ GitHub에서는 이 문서와 허브 문서의 표준 Markdown 링크를 따라�
 2. [RUDPClientCore](Client/RUDPClientCore.md)의 연결 흐름과 공개 API
 3. [ServerAliveChecker](Client/ServerAliveChecker.md)의 종료·deadlock 방지 규칙
 4. [공통 패킷 포맷](Common/PacketFormat.md)과 [암호화 시스템](Common/CryptoSystem.md)
+5. ACK 없는 최신값 전송이 필요하면 [비신뢰성 채널](UnreliableChannel.md)
 
 ### 30분: BotTester 사용·확장
 
@@ -82,6 +83,7 @@ GitHub에서는 이 문서와 허브 문서의 표준 Markdown 링크를 따라�
 | ACK 또는 재전송이 이상하다 | [SendPacketInfo](Server/SendPacketInfo.md), [RetransmissionTimeoutEstimator](Server/RetransmissionTimeoutEstimator.md) |
 | 암복호화가 C++/C#에서 다르다 | [CryptoSystem](Common/CryptoSystem.md), [IntegrationTests](Testing/IntegrationTests.md) |
 | 테스트가 CI에서만 실패한다 | [Testing CI](Testing/CI.md), [IntegrationTests](Testing/IntegrationTests.md) |
+| 비신뢰성 패킷이 누락되거나 교체된다 | [UnreliableChannel](UnreliableChannel.md), [PerformanceTuning](PerformanceTuning.md) |
 | worker가 종료됐거나 서버 재시작 로그가 발생했다 | [치명 오류 통지와 프로세스 재시작](Server/FatalErrorHandling.md), [WorkerThreads](Server/Threading/WorkerThreads.md) |
 | 옵션 값을 조정하고 싶다 | [PerformanceTuning](PerformanceTuning.md), 해당 컴포넌트의 옵션 섹션 |
 

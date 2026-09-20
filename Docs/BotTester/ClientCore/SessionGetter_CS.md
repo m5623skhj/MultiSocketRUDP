@@ -65,14 +65,13 @@ new Client(buffer[PacketHeaderSize..totalBytes])
 public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
 ```
 
-지정된 호스트와 포트로 TCP 연결을 맺고 TLS 인증 후 프로토콜 버전 2를 보낸다. 브로커 응답 본문은 4바이트 little-endian 버전 필드로 시작하며 `SessionBrokerResponseParser`가 구버전·알 수 없는 버전·잘린 응답을 거부한다.
+지정된 호스트와 포트로 TCP 연결을 맺고 TLS 인증 후 프로토콜 버전 정보를 전송한다. 프로토콜 버전은 4바이트 big-endian으로 전송된다.
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
 | `host` | `string` | 접속할 호스트 주소 |
 | `port` | `int` | 접속할 포트 번호 |
 | `certFingerprint` | `string?` | 인증서 검증을 위한 지문. `null`이면 인증서를 검증하지 않음 |
-
 ### `ReceiveAsync`
 
 ```csharp
@@ -109,8 +108,20 @@ public void Dispose()
 ## 함수 설명
 
 #### `ConnectAsync(string host, int port, string? certFingerprint = null)`
-- TCP 연결을 열고 `SslStream`으로 TLS 인증을 완료한다.
 
+```csharp
+public async Task ConnectAsync(string host, int port, string? certFingerprint = null)
+```
+
+TCP 연결을 수행하고 `SslStream`을 사용하여 TLS 인증을 완료한다. 이후 프로토콜 버전을 전송하여 세션을 준비한다.
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `host` | `string` | 연결할 서버 호스트 주소 |
+| `port` | `int` | 연결할 서버 포트 번호 |
+| `certFingerprint` | `string?` | 서버 인증서의 지문(fingerprint). `null`이면 인증서 검증을 생략한다. |
+
+> **주의:** 비동기 메서드로, 호출 완료 시까지 연결 및 TLS 핸드셰이크 과정을 대기한다. 연결 실패 또는 TLS 인증 실패 시 예외가 발생할 수 있다.
 #### `ReceiveAsync(byte[] buffer, int offset)`
 - SSL 스트림에서 지정 버퍼 위치부터 데이터를 계속 읽는다.
 

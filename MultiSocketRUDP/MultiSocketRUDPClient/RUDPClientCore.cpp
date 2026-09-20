@@ -456,7 +456,10 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		recvPacketBuffer->m_iRead = 0;
 
 		const WORD payloadLength = GetPayloadLength(*recvPacketBuffer);
-		if (payloadLength <= 0 || payloadLength > dfDEFAULTSIZE || payloadLength > recvSize)
+		const int remainingPayloadSize = recvSize - df_HEADER_SIZE;
+		if (payloadLength <= 0 ||
+			payloadLength > dfDEFAULTSIZE - df_HEADER_SIZE || 
+			payloadLength > remainingPayloadSize)
 		{
 			NetBuffer::Free(recvPacketBuffer);
 			break;

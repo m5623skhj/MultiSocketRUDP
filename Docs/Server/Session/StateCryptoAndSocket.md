@@ -6,15 +6,17 @@
 
 ## SessionStateMachine
 
-상태는 `DISCONNECTED`, `RESERVED`, `CONNECTED`, `RELEASING` 순환을 따른다. 조회는 atomic load를 사용하고 경쟁 가능한 전이는 CAS로 제한한다.
+상태는 `DISCONNECTED`, `RESERVED`, `CONNECTED`, `RELEASING`, `RELEASING_BY_ABORT_RESERVED`로 구성된다. 조회는 atomic load를 사용하고 경쟁 가능한 전이는 CAS로 제한한다.
 
 | 작업 | 허용 전이 또는 의미 |
 |---|---|
 | `SetReserved` | 초기화된 미사용 세션을 예약 상태로 설정 |
 | `TryTransitionToConnected` | `RESERVED → CONNECTED` |
-| `TryTransitionToReleasing` | `RESERVED/CONNECTED → RELEASING` |
-| `TryAbortReserved` | heartbeat가 timeout 예약을 release로 전환 |
+| `TryTransitionToReleasing` | `RESERVED → RELEASING_BY_ABORT_RESERVED`, `CONNECTED → RELEASING` |
+| `TryAbortReserved` | heartbeat가 `RESERVED → RELEASING_BY_ABORT_RESERVED`로 전환 |
 | `SetDisconnected` | 자원 정리 후 pool 반환 가능한 상태 |
+
+`IsReleasing()`은 두 해제 상태를 모두 `true`로 취급한다. `RELEASING_BY_ABORT_RESERVED`는 연결 통계와 콘텐츠의 `OnDisconnected()`·`OnReleased()` 훅에서 예약 중단을 분리하기 위한 상태다.
 
 상태를 확인한 뒤 별도 작업을 수행하는 check-then-act는 그 사이 전이가 가능한지 검토한다. 단순 atomic 상태 조회만으로 socket이나 context 수명이 고정되지는 않는다.
 

@@ -25,7 +25,7 @@
 
 ```
 RUDPIOHandler
- ├── IRIOManager&           ← RIOReceiveEx / RIOSend 호출
+ ├── IRIOManager&           ← RIOReceiveEx / RIOSendEx 호출
  ├── ISessionDelegate&      ← 세션 내부 접근 (shared_ptr 없이 인터페이스)
  ├── CTLSMemoryPool<IOContext>&  ← Send IOContext TLS 풀 (lock-free)
  ├── vector<unique_ptr<RetransmissionScheduler>>& retransmissionSchedulers[N]
@@ -68,13 +68,13 @@ bool DoRecv(RUDPSession& session) const override;
 - 송신 완료 후 `IO_NONE_SENDING`을 복구하고 후속 송신을 이어간다.
 
 #### `bool TryRIOSend(RUDPSession& session, IOContext* context) const`
-- 준비된 send context를 실제 RIO Send 호출로 연결한다.
+- 준비된 send context를 실제 `RIOSendEx` 호출로 연결한다.
 
 #### `std::pair<bool, IOContext*> MakeSendContext(RUDPSession& session, ThreadIdType threadId) const`
 - 이번 송신에 사용할 `IOContext`를 만들고 전송 컨텍스트를 준비한다.
 
 #### `std::pair<bool, unsigned int> MakeSendStream(RUDPSession& session, ThreadIdType threadId) const`
-- 이번 `RIOSend`에 실을 전송 스트림을 구성한다.
+- 이번 `RIOSendEx`에 실을 전송 스트림을 구성한다.
 - 성공 여부와 총 송신 바이트 수를 함께 반환한다.
 
 #### `SEND_PACKET_INFO_TO_STREAM_RETURN ReservedSendPacketInfoToStream(...) const`
@@ -84,7 +84,7 @@ bool DoRecv(RUDPSession& session) const override;
 - 세션 send queue에서 꺼낸 송신 후보를 스트림 버퍼에 적재한다.
 
 #### `bool RefreshRetransmissionSendPacketInfo(SendPacketInfo* sendPacketInfo, ThreadIdType threadId) const`
-- 데이터 패킷의 RTO deadline을 계산하고 thread별 `RetransmissionScheduler` heap에 schedule entry를 등록한다.
+- `RequiresRetransmission()`인 신뢰 데이터 패킷의 RTO deadline을 계산하고 thread별 `RetransmissionScheduler` heap에 schedule entry를 등록한다.
 
 ---
 
@@ -173,12 +173,12 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, ThreadIdType threadId) const
 
 ```
 RIO_RQ(Request Queue)는 세션당 1개.
-같은 세션에 복수의 RIOSend가 동시에 등록되면:
+같은 세션에 복수의 RIOSendEx가 동시에 등록되면:
   → 완료 순서가 보장되지 않음
   → 패킷 순서가 뒤바뀔 수 있음 (seq=5가 seq=3보다 먼저 도착)
 
 SpinLock(CAS)으로 직렬화:
-  → 한 번에 하나의 RIOSend만 진행
+  → 한 번에 하나의 RIOSendEx만 진행
   → SendIOCompleted에서 IO_NONE_SENDING 복원 후 DoSend 재호출
   → 큐에 남은 패킷을 순차적으로 전송
 ```
@@ -193,9 +193,9 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 ```
 
 `MakeSendContext()`는 이번 송신에 사용할 `IOContext`를 준비하고,  
-`MakeSendStream()`은 여러 패킷을 송신 버퍼에 묶어 단일 `RIOSend`에 실을 스트림을 구성한다.
+`MakeSendStream()`은 신뢰·신뢰성 없는 두 큐에서 선택한 여러 패킷을 송신 버퍼에 묶어 단일 `RIOSendEx`에 실을 스트림을 구성한다.
 
-**여러 패킷을 32KB 버퍼에 묶어 단일 `RIOSend`로 전송한다.**
+**여러 패킷을 32KB 버퍼에 묶어 단일 `RIOSendEx`로 전송한다.**
 
 ```cpp
 {
@@ -226,10 +226,10 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 
 ```
 패킷 3개를 개별 전송:
-  RIOSend 3회 → 완료 큐 3개 항목 → DequeueCompletion 3회
+  RIOSendEx 3회 → 완료 큐 3개 항목 → DequeueCompletion 3회
 
 패킷 3개를 배치 전송:
-  memcpy × 3 → RIOSend 1회 → 완료 큐 1개 항목 → DequeueCompletion 1회
+  memcpy × 3 → RIOSendEx 1회 → 완료 큐 1개 항목 → DequeueCompletion 1회
 
 → 커널 진입 횟수 3→1 감소
 → 완료 큐 처리 비용 감소
@@ -256,6 +256,8 @@ MAX_SEND_BUFFER_SIZE = 32768 bytes
 - `ReservedSendPacketInfoToStream()`은 reserved slot의 패킷을 먼저 적재하고 cache에 등록한다.
 - `StoredSendPacketInfoToStream()`은 송신 큐 front를 적재하면서 중복 sequence 제거, erased 상태 검사, 버퍼 용량 한계 검사, 재전송 schedule 갱신을 담당한다.
 - 스트림 용량을 넘는 패킷은 `SetReservedSendPacketInfo()`로 보류해 다음 send 완료 후 이어서 처리한다.
+- `TryGetFrontAndPop()`은 신뢰 큐와 신뢰성 없는 큐가 모두 차 있을 때 선택 우선순위를 번갈아 바꾼다.
+- 중복 키는 `(isReplyType, sequence, isUnreliable)`로 구성해 서로 다른 채널의 같은 시퀀스를 구분한다.
 
 ---
 
@@ -440,7 +442,7 @@ SendPacket()
        → CAS NONE→SENDING 성공
        → MakeSendStream (패킷 10개)
        → RefreshRetransmissionSendPacketInfo에서 데이터 패킷 schedule 등록
-       → RIOSend (스트림)
+       → RIOSendEx (스트림)
 
 RIO 완료 큐에서 SEND 완료 디큐
   → SendIOCompleted
@@ -473,7 +475,7 @@ bool RUDPIOHandler::RefreshRetransmissionSendPacketInfo(
         return false;
     }
 
-    if (sendPacketInfo->isReplyType == true) {
+    if (!sendPacketInfo->RequiresRetransmission()) {
         return true;
     }
 
@@ -577,6 +579,7 @@ bool ShouldDropSendingDatagram();
 ## 관련 문서
 - [[ThreadModel]] — IO Worker Thread에서 IOCompleted 호출
 - [[PacketProcessing]] — RecvIOCompleted → RecvLogic Worker 경로
-- [[RIOManager]] — RIOReceiveEx / RIOSend API 상세
+- [[RIOManager]] — RIOReceiveEx / RIOSendEx API 상세
 - [[SendPacketInfo]] — scheduleVersion, isErasedPacketInfo, RTT 샘플링
 - [[SessionComponents]] — SessionSendContext의 ioMode SpinLock
+- [[UnreliableChannel]] — 신뢰성 없는 송신 큐와 무재전송 정책

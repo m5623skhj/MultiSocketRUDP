@@ -10,19 +10,24 @@
 
 - `RUDPFlowController`: 송신 혼잡 윈도우(CWND) 관리
 - `RUDPReceiveWindow`: 수신 윈도우와 advertise window 관리
+- `RUDPFlowManager`: 두 객체를 묶고 송신 측 접근을 동기화
 
 ACK를 받으면 송신 가능량을 조정하고, 수신 윈도우는 reorder/holding 상황을 반영해 광고 가능한 여유 공간을 계산한다.
 
 ---
 
-## 서버 측에서 문서화해야 하는 것
+## 동시성 계약
 
-- ACK 수신 시 CWND 조정
-- timeout 시 보수적 축소
-- receive window 기반 advertise window 계산
-- pending queue와의 연동
+`RUDPFlowManager`의 `sendFlowMutex`는 아래 송신 측 연산 전체를 직렬화한다.
 
-이 부분은 현재 C++ 구현과 맞는다.
+- `CanSend()`의 CWND와 마지막 ACK 조합 조회
+- `OnAckReceived()`의 ACK 반영
+- `OnTimeout()`의 timeout 반영
+- `GetCwnd()`와 `Reset()`의 송신 상태 접근
+
+따라서 ACK worker와 timeout·송신 판단이 불완전한 중간 상태를 관찰하지 않는다. 다만 `CanSend()`는 송신 용량을 예약하지 않으므로, 판단 직후 실제 pending queue 등록까지를 원자적으로 보장하지는 않는다.
+
+수신 측 `RUDPReceiveWindow`는 같은 mutex로 보호되지 않는다. `CanAccept()`, `MarkReceived()`, `GetReceiveWindowEnd()`, `GetAdvertisableWindow()`는 receive worker 단일 소유 계약에서 호출해야 하며, `Reset()`과 크기 변경은 세션이 drain된 시점에 수행해야 한다.
 
 ---
 
@@ -67,3 +72,4 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 - [[RUDPSession]] - 서버 세션 송수신
 - [[RudpSession_CS]] - C# 세션 구현
 - [[PerformanceTuning]] - 튜닝 포인트
+- [[SendAndFlow]] - 세션 송신 큐와 흐름 제어 결합

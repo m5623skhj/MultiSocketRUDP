@@ -68,6 +68,8 @@ Type | PacketName | Description | ItemType | ItemName
 - `Items`가 있으면 item마다 한 행을 만든다.
 - `Items`가 없으면 `ItemType`, `ItemName`에 `-`를 기록한다.
 
+현재 uploader는 최상위 `Packet` 목록만 업로드하며 `Structs` 정의는 worksheet에 기록하지 않는다. 사용자 정의 구조체까지 시트에서 검토해야 한다면 YAML 원본 또는 생성된 `Protocol.h`를 함께 확인해야 한다. `PacketGenerateAndUploader.bat`을 실행해도 이 제한은 동일하다.
+
 ---
 
 ## 외부 상태 변경

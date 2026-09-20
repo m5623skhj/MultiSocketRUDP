@@ -57,7 +57,7 @@ PR CI는 PR 번호를 concurrency group으로 사용한다. 같은 PR에 새 com
 
 ## RTT 성능 벤치마크
 
-`RttBenchmark.yml`은 `ContentsServer`와 전용 BotTester 콘솔 클라이언트를 서로 다른 프로세스로 실행해 루프백 Ping/Pong RTT를 측정한다. 기능 정합성을 판정하는 기존 CI와 달리, 수정 전후의 지연 시간 추세를 관찰하기 위한 정보성 workflow다.
+`RttBenchmark.yml`은 `ContentsServer`와 전용 BotTester 콘솔 클라이언트를 서로 다른 프로세스로 실행해 루프백 Ping/Pong RTT와 신뢰성·비신뢰성 채널의 RTT·응답률을 측정한다. 기능 정합성을 판정하는 기존 CI와 달리, 수정 전후의 지연 시간과 전달률 추세를 관찰하기 위한 정보성 workflow다.
 
 ### 이벤트별 동작
 
@@ -81,16 +81,20 @@ PR 결과는 `benchmark-data`의 직전 공식 측정과 비교한다. `main`에
 | 유실률 0% | 워밍업 500회, 1,000회 × 5 runs |
 | 유실률 10% | 워밍업 100회, 1,000회 × 5 runs |
 | 유실 모델 | BotTester 송신과 수신에 각각 독립적으로 10% 적용 |
+| 채널 비교 | 비신뢰성 10개/10ms, 신뢰성 1개/10ms, 혼합은 둘을 함께 전송 |
+| 채널 표본 | 기본 워밍업 100단위, 본 측정 1,000단위 × 3 runs, 응답 timeout 1초 |
 | 대표값 | 각 run 통계의 중앙값 |
 | 실행 제한 | warmup과 각 run은 최대 300초, workflow는 최대 45분 |
 
-0%와 10% 시나리오는 같은 runner에서 순차 실행한다. 병렬 측정은 CPU 경합으로 RTT를 왜곡하고 singleton BotTester 상태를 공유할 수 있으므로 사용하지 않는다.
+0%·10%와 세 채널 시나리오는 같은 runner에서 순차 실행한다. 병렬 측정은 CPU 경합으로 RTT를 왜곡하고 singleton BotTester 상태를 공유할 수 있으므로 사용하지 않는다.
 각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 처리량을 콘솔에 출력한다. 진행 로그가 300초 안에 완료되지 않으면 해당 run을 실패 처리하므로 무응답 상태로 전체 job 시간을 소비하지 않는다.
 
 ### 이력과 그래프 해석
 
 - `benchmark-data/rtt-history.json`은 commit별 전체 공식 이력을 보존한다.
 - `rtt-loss-0.svg`와 `rtt-loss-10.svg`는 최근 10개 공식 측정의 P95/P99를 표시한다.
+- `channel-unreliable-only.svg`와 `channel-mixed.svg`는 조건이 같은 최근 공식 측정의 비신뢰성 P95/P99와 응답률을 표시한다.
+- `channel-history.json`은 최근 150개 채널 시나리오 결과를 보존한다.
 - 그래프의 변화율은 현재 값과 이전 5개 측정 중앙값의 차이다. 양수면 RTT가 증가해 느려진 것이다.
 - Job Summary와 PR 코멘트의 변화율은 직전 공식 측정과 비교한다.
 - `Max`는 hosted runner의 OS 스케줄링 노이즈에 민감하므로 표의 참고값으로만 남기고 추세 그래프에는 사용하지 않는다.
@@ -131,8 +135,9 @@ RTT workflow가 실패하면 다음 순서로 확인한다.
 1. 서버가 Release x64, `/O2`, `RUDP_RTT_BENCHMARK_BUILD` 조건으로 빌드됐는지 확인한다.
 2. 임시 인증서 생성과 정리, 서버 프로세스 종료, 사용 포트 충돌 여부를 확인한다.
 3. `rtt-loss-0.json`과 `rtt-loss-10.json` 생성 여부를 artifact에서 확인한다.
-4. PR 비교가 실패하면 `benchmark-data` 브랜치의 `rtt-history.json`을 읽을 수 있는지 확인한다.
-5. `main` 측정은 성공했지만 이력 기록이 실패하면 workflow의 `contents: write` 권한과 branch 정책을 확인한다.
+4. `channel-unreliable-only.json`, `channel-reliable-baseline.json`, `channel-mixed.json` 생성 여부를 확인한다.
+5. PR 비교가 실패하면 `benchmark-data` 브랜치의 `rtt-history.json`과 `channel-history.json`을 읽을 수 있는지 확인한다.
+6. `main` 측정은 성공했지만 이력 기록이 실패하면 workflow의 `contents: write` 권한과 branch 정책을 확인한다.
 
 ---
 

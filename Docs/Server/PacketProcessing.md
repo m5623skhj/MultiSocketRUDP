@@ -61,6 +61,7 @@
 │              │                                                               │
 │              ├─ CONNECT_TYPE  → TryConnect()                                 │
 │              ├─ SEND_TYPE     → OnRecvPacket() → 순서 보장 → 핸들러            │
+│              ├─ UNRELIABLE_SEND_TYPE → OnUnreliablePacket() → 최신 번호 검사  │
 │              ├─ SEND_REPLY_TYPE → OnSendReply() → CWND 증가                   │
 │              ├─ DISCONNECT_TYPE → DoDisconnect(DISCONNECT_REASON::NORMAL)    │
 │              └─ HEARTBEAT_REPLY_TYPE → OnSendReply()                         │
@@ -223,6 +224,8 @@ void RUDPPacketProcessor::ProcessByPacketType(
         // ...
     case PACKET_TYPE::SEND_TYPE:
         // ...
+    case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
+        // ...
     case PACKET_TYPE::SEND_REPLY_TYPE:
         // ...
     case PACKET_TYPE::DISCONNECT_TYPE:
@@ -291,6 +294,28 @@ break;
 
 `HEARTBEAT_TYPE`은 서버가 클라이언트로 보내는 방향이므로 서버의 수신 switch에는 없다. 서버는 `HEARTBEAT_REPLY_TYPE`만 수신 처리한다.
 
+### UNRELIABLE_SEND_TYPE 처리
+
+```cpp
+case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
+{
+    if (!session.CanProcessPacket(clientAddr)) break;
+
+    constexpr bool isCorePacket = false;
+    auto direction = PACKET_DIRECTION::CLIENT_TO_SERVER_UNREL;
+    DECODE_PACKET()
+
+    if (!session.OnUnreliablePacket(recvPacket)) {
+        session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+    } else {
+        tps.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+break;
+```
+
+`OnUnreliablePacket()`은 연결 상태를 확인하고 별도 64비트 시퀀스를 읽는다. 최초 인증 패킷은 임의 번호를 허용하며 이후에는 마지막 번호보다 큰 패킷만 핸들러에 전달한다. 오래되거나 중복된 패킷은 정상 drop으로 처리한다. 이 경로에는 ACK, 수신 재정렬, 흐름 제어 window, 재전송이 없다.
+
 ### SEND_REPLY_TYPE 처리 (ACK 수신)
 
 ```cpp
@@ -335,16 +360,14 @@ break;
 ```cpp
 #define DECODE_PACKET() \
     if (!PacketCryptoHelper::DecodePacket( \
-            recvPacket, \
-            session.GetSessionSalt(), \
-            SESSION_SALT_SIZE, \
-            session.GetSessionKeyHandle(), \
-            isCorePacket, \
-            direction)) \
+            recvPacket, sessionSalt, SESSION_SALT_SIZE, \
+            sessionKeyHandle, isCorePacket, direction)) \
     { \
-        LOG_ERROR(std::format("DecodePacket failed. SessionId={}, type={}", \
-            session.GetSessionId(), packetType)); \
         break; \
+    } \
+    else \
+    { \
+        sessionDelegate.RefreshLastRecvPacketTime(session, GetTickCount64()); \
     }
 ```
 
@@ -354,8 +377,7 @@ AES-GCM 인증 실패는 다음 중 하나를 의미한다:
 - 재전송 공격 (Nonce 재사용)
 - 네트워크 오류로 인한 데이터 깨짐
 
-어떤 경우든 세션을 즉시 종료할 이유는 없다. 단순 폐기가 더 안전하다.  
-(단, 반복적으로 발생하면 로그를 통해 파악 가능)
+어떤 경우든 세션을 즉시 종료할 이유는 없다. 해당 데이터그램만 폐기한다. 인증에 성공하면 신뢰·신뢰성 없는 데이터와 ACK를 포함해 마지막 수신 시각을 갱신한다.
 
 ### DecodePacket 내부 동작
 
@@ -586,6 +608,7 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 | 알 수 없는 PacketId | LOG_ERROR | ✅ (`DoDisconnect`) |
 | BufferToPacket 실패 | LOG_ERROR | ✅ |
 | HoldingQueue 가득 참 | LOG_ERROR | ✅ |
+| 신뢰성 없는 패킷의 오래된/중복 시퀀스 | 정상 폐기 | ❌ |
 | TryConnect 실패 (SessionId 불일치 등) | LOG_ERROR | ❌ (단순 drop) |
 | BytesTransferred=0 | 빈 데이터그램으로 처리 후 다음 수신 등록 | ❌ |
 | RIO Status=`WSAECONNRESET` | `NORMAL` 사유로 세션 종료 | ✅ |
@@ -600,3 +623,4 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 - [[ThreadModel]] — IO Worker / RecvLogic 스레드 구조
 - [[FlowController]] — CanAccept, MarkReceived, advertiseWindow
 - [[Troubleshooting]] — 패킷 처리 실패 시 디버깅
+- [[UnreliableChannel]] — 최신성 우선 채널의 송수신 정책

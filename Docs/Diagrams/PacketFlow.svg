@@ -59,15 +59,15 @@
   <text x="244" y="308" text-anchor="middle" font-size="8" fill="#86efac">PacketOrderer</text>
   <text x="244" y="321" text-anchor="middle" font-size="8" fill="#86efac">::OnReceive()  ▼ ④</text>
   <rect x="322" y="263" width="155" height="72" rx="6" fill="#1a3828"/>
-  <text x="399" y="281" text-anchor="middle" font-size="9" font-weight="600" fill="#4ade80">SEND_REPLY_TYPE</text>
+  <text x="399" y="281" text-anchor="middle" font-size="9" font-weight="600" fill="#4ade80">UNRELIABLE_SEND</text>
   <text x="399" y="295" text-anchor="middle" font-size="8" fill="#86efac">CanProcessPacket() 확인</text>
-  <text x="399" y="308" text-anchor="middle" font-size="8" fill="#86efac">OnSendReply()</text>
-  <text x="399" y="321" text-anchor="middle" font-size="8" fill="#86efac">TryFlushPendingQueue()</text>
+  <text x="399" y="308" text-anchor="middle" font-size="8" fill="#86efac">OnUnreliablePacket()</text>
+  <text x="399" y="321" text-anchor="middle" font-size="8" fill="#86efac">최신 번호만 수용</text>
   <rect x="487" y="263" width="150" height="72" rx="6" fill="#1a2030"/>
-  <text x="562" y="281" text-anchor="middle" font-size="9" font-weight="600" fill="#93c5fd">HEARTBEAT_TYPE</text>
+  <text x="562" y="281" text-anchor="middle" font-size="9" font-weight="600" fill="#93c5fd">REPLY TYPES</text>
   <text x="562" y="295" text-anchor="middle" font-size="8" fill="#93c5fd">CanProcessPacket() 확인</text>
-  <text x="562" y="308" text-anchor="middle" font-size="8" fill="#93c5fd">HEARTBEAT_REPLY 직접 송신</text>
-  <text x="562" y="321" text-anchor="middle" font-size="8" fill="#93c5fd">(PacketOrderer 미사용)</text>
+  <text x="562" y="308" text-anchor="middle" font-size="8" fill="#93c5fd">SEND/HEARTBEAT_REPLY</text>
+  <text x="562" y="321" text-anchor="middle" font-size="8" fill="#93c5fd">OnSendReply()</text>
   <rect x="647" y="263" width="203" height="72" rx="6" fill="#2d1515"/>
   <text x="748" y="281" text-anchor="middle" font-size="9" font-weight="600" fill="#f87171">DISCONNECT_TYPE</text>
   <text x="748" y="295" text-anchor="middle" font-size="8" fill="#fca5a5">CanProcessPacket() 확인</text>

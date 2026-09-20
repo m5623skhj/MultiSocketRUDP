@@ -58,14 +58,14 @@
 * `MultiSocketRUDPCore`
   * UDP와 RIO를 사용하는 서버 코어입니다.
   * 스레드는 아래와 같이 구성됩니다.
-    * `IOWorkerThread` : IO 처리를 담당합니다.
-    * `RecvLogicThread` : 클라이언트에게 받은 패킷을 바탕으로 연결, 연결 해제, 패킷 핸들러 호출 등을 담당합니다.
+    * `IO_WORKER_THREAD` : RIO 완료 큐를 처리합니다.
+    * `RECV_LOGIC_WORKER_THREAD` : 클라이언트에게 받은 패킷을 바탕으로 연결, 연결 해제, 패킷 핸들러 호출 등을 담당합니다.
     * `SessionBrokerThread` : 클라이언트가 어떤 소켓과 통신할 것인지 알 수 있도록 지원하는 스레드입니다.
-    * `RetransmissionThread` : 패킷 유실 등으로 인한 타임 아웃이 발생했을 때, 해당 패킷을 재전송해주는 스레드입니다.
-      * 일정 횟수 재전송을 해보고, 응답이 오지 않을 경우, 클라이언트가 끊겼다고 판단하고, 해당 세션을 ReleaseThread에서 정리할 수 있도록 전달합니다.
-    * `ReleaseThread` : 세션 정리를 전담하는 스레드입니다.
+    * `RETRANSMISSION_THREAD` : 패킷 유실 등으로 인한 타임 아웃이 발생했을 때, 해당 패킷을 재전송해주는 스레드입니다.
+      * 일정 횟수 재전송을 해보고, 응답이 오지 않을 경우, 클라이언트가 끊겼다고 판단하고, 해당 세션을 `SESSION_RELEASE_THREAD`에서 정리할 수 있도록 전달합니다.
+    * `SESSION_RELEASE_THREAD` : 세션 정리를 전담하는 스레드입니다.
       * 단일 스레드입니다.
-    * `HeartbeatThread` : 각 세션의 통신 상태를 확인하기 위하여 일정 시간마다 하트비트 패킷을 보내는 스레드입니다.
+    * `HEARTBEAT_THREAD` : 각 세션의 통신 상태를 확인하기 위하여 일정 시간마다 하트비트 패킷을 보내고, 연결되지 않은 예약 세션의 만료를 검사하는 스레드입니다.
       * 단일 스레드입니다.
   
 * `RUDPSession`
@@ -78,10 +78,11 @@
   * 최초로 클라이언트와 연결하여, 유저에게 실제로 연결될 세션을 알려주는 역할을 담당합니다.
   * 세션 브로커의 경우, 클라이언트와 TCP로 연결됩니다.
   * 유저가 접속하면, 아래의 행동을 진행합니다.
-  	* 1. 클라이언트와 TLS로 통신을 하기 위하여 핸드 셰이크를 진행
-  	* 2. 세션 브로커는 연결할 세션 정보와 세션 키, 세션 솔트를 클라이언트에게 발급
-    * 3. 대상이 된 세션을 예약 처리한 후 연결을 종료
-    * 4. 2에서 얻은 정보로 클라이언트가 패킷을 송신하면, 서버에서는 예약된 클라이언트인지를 확인하고 RUDPSession을 해당 클라이언트의 주소에 귀속
+    * 1. 클라이언트와 TLS로 통신하기 위한 핸드셰이크를 진행
+    * 2. 클라이언트가 보낸 RUDP 프로토콜 버전 `2`를 검증
+    * 3. 세션 브로커는 연결할 세션 정보와 세션 키, 세션 솔트를 클라이언트에게 발급
+    * 4. 대상이 된 세션을 예약 처리한 후 연결을 종료
+    * 5. 3에서 얻은 정보로 클라이언트가 패킷을 송신하면, 서버에서는 예약된 클라이언트인지를 확인하고 RUDPSession을 해당 클라이언트의 주소에 귀속
 
 * `Ticker`와 `TimerEvent`
   * 일정 시간 마다 등록한 이벤트를 호출하는 객체입니다.
@@ -123,7 +124,7 @@
     * `Packet header` 5byte
     * `Packet type` 1byte
     * `Packet sequence` 8byte
-    * `Packet id` 4byte (`SEND_TYPE` 일반 데이터 패킷에만 존재하며 코어 패킷에는 없음)
+    * `Packet id` 4byte (`SEND_TYPE`, `UNRELIABLE_SEND_TYPE` 콘텐츠 패킷에만 존재하며 코어 패킷에는 없음)
     * `Packet body` nbyte
     * `Auth tag` 16byte
 
@@ -136,15 +137,18 @@
         * Player.h의 패킷 핸들러 부문
         * PlayerPacketHandlerRegister.cpp
         * PlayerPacketHandlerRegister.h
-        * PacketHandler.h
         * Protocol.cpp
         * Protocol.h
         * PacketIdType.h
       * 각 파일 생성 경로를 Tool/PacketGenerator/PacketItemsFilePath.py에 정의하면 해당 경로에 생성됩니다.
-      * PacketDefine.yml 파일의 내용이 비어있을 경우, 파일의 삭제 및 생성을 시도하지 않습니다.
+      * YAML 구문이나 타입 검증에 실패하면 기존 생성 파일을 수정하지 않습니다. `Packet:` 또는 `Structs:` 목록을 명시적으로 비운 유효한 스키마는 해당 생성 영역을 비우는 정의로 처리됩니다.
       * 해당하는 파일이 없을 경우 새로 생성합니다.
       * 각 파일들의 diff를 확인해 보고, 패킷 제네레이트의 결과물 파일이 이전 각 파일들의 원본과 비교하여 수정 사항이 없을 경우, 파일을 수정하지 않습니다.
         * 필요 없는 빌드 횟수를 줄이기 위하여 위와 같은 동작을 채택함
+      * `Structs`에 함수 없는 사용자 정의 데이터 구조체를 선언하고 패킷 필드에서 사용할 수 있습니다.
+      * 패킷과 구조체 필드에는 `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map` 및 이들의 중첩 타입을 사용할 수 있습니다.
+      * `unordered_set`과 `unordered_map`은 데이터만 복원하며 삽입 순서, 순회 순서, bucket 배치를 보존하지 않습니다.
+      * 자세한 YAML 문법과 지원 제한은 [PacketGenerator](./Docs/Tools/PacketGenerator.md), wire 형식은 [NetBuffer 컨테이너 직렬화](./Docs/Server/ContainerSerialization.md)를 참고합니다.
    2. RunDebug
       * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다.
    3. 개발용 인증서
@@ -180,7 +184,7 @@
 * `CoreTest`는 GoogleTest 기반 유닛 테스트입니다.
 * `IntegrationTest`는 실제 서버/클라이언트, TLS, UDP 흐름을 사용하는 통합 테스트입니다.
 * `MultiSocketRUDPBotTester.UnitTests`는 xUnit 기반 BotTester 유닛 테스트입니다.
-* `ProtocolInteropTest`는 8개의 공용 vector로 C++/C# 패킷 암호화 호환성을 검증합니다.
+* `ProtocolInteropTest`는 10개의 공용 vector로 신뢰성·비신뢰성 방향을 포함한 C++/C# 패킷 암호화 호환성을 검증합니다.
 * PR CI는 변경 경로에 따라 Native GTest, BotTester xUnit/프로토콜 테스트와 workflow actionlint를 선택적으로 실행하고, `build-and-test` 체크로 결과를 집계합니다.
 * 자세한 실행 방법과 CI 주의점은 [Testing](./Docs/Testing.md)을 참고합니다.
 
@@ -195,7 +199,8 @@ GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지�
 | PR CI | [PR CI](./.github/workflows/CI.yml) | PR 생성, 갱신, 재오픈 | 변경 경로를 분류해 필요한 테스트와 workflow actionlint를 실행한 뒤 `build-and-test` 필수 체크로 결과를 집계합니다. 같은 PR의 이전 실행은 새 commit이 올라오면 취소합니다. |
 | PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
 | PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C# protocol vector 검증을 수행합니다. 공용 vector 변경 시에는 PR CI가 Native GTest도 함께 호출합니다. |
-| 성능 추세 | [RTT Benchmark](./.github/workflows/RttBenchmark.yml) | 관련 PR, `main` 병합, 수동 실행 | 서버와 BotTester를 Release 최적화로 빌드해 유실률 0%·10% RTT를 측정합니다. `main` 측정만 공식 이력과 그래프에 자동 반영합니다. |
+| 성능 추세 | [RTT Benchmark](./.github/workflows/RttBenchmark.yml) | 관련 PR, `main` 병합, 수동 실행 | 서버와 BotTester를 Release 최적화로 빌드해 유실률 0%·10% RTT와 신뢰성·비신뢰성 혼합 채널 RTT/응답률을 측정합니다. `main` 측정만 공식 이력과 그래프에 자동 반영합니다. |
+| 안정성 | [Native Stability](./.github/workflows/Stability.yml) | 매일 03:30 KST, 수동 실행 | 동시 송수신·연결 해제·세션 풀 재사용 통합 테스트를 독립 프로세스로 반복하고 최초 실패 자료를 보존합니다. |
 | 리뷰 보조 | [Gemini PR Comment Bot](./.github/workflows/GeminiPRCommoentBot.yml) | PR 생성, 갱신, 재오픈 | 코드 diff를 분석해 AI 리뷰 주석을 남깁니다. 병합 필수 체크로 사용하지 않습니다. |
 | 문서 자동화 | [docs-bot](./.github/workflows/docs-bot.yml) | 매일, `docs-review` 라벨, 수동 실행 | 병합된 코드의 인터페이스 변경을 분석해 문서 최신화 PR을 제안합니다. |
 | 품질 분석 | [Daily Static Analysis](./.github/workflows/StaticAnalysis.yml) | 매일 09:30 KST, 수동 실행 | C++ MSVC Native Analysis와 .NET Roslyn Analysis를 수행하고 분석 로그를 artifact로 보관합니다. |
@@ -222,6 +227,18 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 ![최근 10회 RTT P95/P99 추세 - 송수신 유실률 10%](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-loss-10.svg)
 
-[최근 RTT 측정 표](https://github.com/m5623skhj/MultiSocketRUDP/tree/benchmark-data#recent-measurements) · [전체 RTT 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-history.json) · [벤치마크 자동화 상세](./Scripts/RTTBenchmark/README.md)
+### 비신뢰성 채널 RTT·응답률
+
+최신 결과와 기록된 측정 조건이 같은 최근 10회 공식 측정을 표시합니다. 각 그래프는 반복 실행의 P95/P99 RTT 중앙값(ms), 응답률, 직전 비교 가능한 측정 대비 변화율을 함께 보여줍니다. 응답률은 송신 시도 대비 제한 시간 내 응답 비율입니다. 유실된 요청은 RTT 계산에서 제외되므로, RTT 감소와 함께 응답률도 확인해야 합니다. 응답이 없는 RTT는 `N/A`로 표시합니다.
+
+비신뢰성 단독 전송:
+
+![비신뢰성 단독 전송 RTT 및 응답률 추이](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-unreliable-only.svg)
+
+신뢰성·비신뢰성 혼합 전송 중 비신뢰성 채널:
+
+![혼합 전송의 비신뢰성 RTT 및 응답률 추이](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-mixed.svg)
+
+[최근 RTT 측정 표](https://github.com/m5623skhj/MultiSocketRUDP/tree/benchmark-data#recent-measurements) · [전체 RTT 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/rtt-history.json) · [채널 측정 요약](https://github.com/m5623skhj/MultiSocketRUDP/blob/benchmark-data/channel-summary.md) · [채널 이력 JSON](https://raw.githubusercontent.com/m5623skhj/MultiSocketRUDP/benchmark-data/channel-history.json) · [벤치마크 자동화 상세](./Scripts/RTTBenchmark/README.md)
 
 ---
