@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="770" viewBox="0 0 960 770">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="794" viewBox="0 0 960 794">
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 <style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
 <text x="28" y="38" class="title">Unreliable channel: mixed</text>
@@ -15,28 +15,33 @@
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
 <text x="15" y="119.0">0.580</text>
 <circle cx="80.0" cy="188.41473716876715" r="4" fill="#58a6ff"><title>p95Ms: 0.337</title></circle>
-<line x1="80.0" y1="188.41473716876715" x2="285.0" y2="172.63538092857266" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="285.0" cy="172.63538092857266" r="4" fill="#58a6ff"><title>p95Ms: 0.389</title></circle>
-<line x1="285.0" y1="172.63538092857266" x2="490.0" y2="234.21409237453236" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="490.0" cy="234.21409237453236" r="4" fill="#58a6ff"><title>p95Ms: 0.185</title></circle>
-<line x1="490.0" y1="234.21409237453236" x2="695.0" y2="176.04468734375808" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="695.0" cy="176.04468734375808" r="4" fill="#58a6ff"><title>p95Ms: 0.378</title></circle>
-<line x1="695.0" y1="176.04468734375808" x2="900.0" y2="172.72589348826784" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="900.0" cy="172.72589348826784" r="4" fill="#58a6ff"><title>p95Ms: 0.389</title></circle>
+<line x1="80.0" y1="188.41473716876715" x2="244.0" y2="172.63538092857266" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="244.0" cy="172.63538092857266" r="4" fill="#58a6ff"><title>p95Ms: 0.389</title></circle>
+<line x1="244.0" y1="172.63538092857266" x2="408.0" y2="234.21409237453236" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="408.0" cy="234.21409237453236" r="4" fill="#58a6ff"><title>p95Ms: 0.185</title></circle>
+<line x1="408.0" y1="234.21409237453236" x2="572.0" y2="176.04468734375808" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="572.0" cy="176.04468734375808" r="4" fill="#58a6ff"><title>p95Ms: 0.378</title></circle>
+<line x1="572.0" y1="176.04468734375808" x2="736.0" y2="172.72589348826784" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="736.0" cy="172.72589348826784" r="4" fill="#58a6ff"><title>p95Ms: 0.389</title></circle>
+<line x1="736.0" y1="172.72589348826784" x2="900.0" y2="233.1279416581901" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="233.1279416581901" r="4" fill="#58a6ff"><title>p95Ms: 0.189</title></circle>
 <circle cx="80.0" cy="164.91164250124993" r="4" fill="#f85149"><title>p99Ms: 0.415</title></circle>
-<line x1="80.0" y1="164.91164250124993" x2="285.0" y2="130.90909090909093" stroke="#f85149" stroke-width="2"/>
-<circle cx="285.0" cy="130.90909090909093" r="4" fill="#f85149"><title>p99Ms: 0.527</title></circle>
-<line x1="285.0" y1="130.90909090909093" x2="490.0" y2="221.93455510921848" stroke="#f85149" stroke-width="2"/>
-<circle cx="490.0" cy="221.93455510921848" r="4" fill="#f85149"><title>p99Ms: 0.226</title></circle>
-<line x1="490.0" y1="221.93455510921848" x2="695.0" y2="147.2013516542248" stroke="#f85149" stroke-width="2"/>
-<circle cx="695.0" cy="147.2013516542248" r="4" fill="#f85149"><title>p99Ms: 0.473</title></circle>
-<line x1="695.0" y1="147.2013516542248" x2="900.0" y2="155.76987397203592" stroke="#f85149" stroke-width="2"/>
-<circle cx="900.0" cy="155.76987397203592" r="4" fill="#f85149"><title>p99Ms: 0.445</title></circle>
+<line x1="80.0" y1="164.91164250124993" x2="244.0" y2="130.90909090909093" stroke="#f85149" stroke-width="2"/>
+<circle cx="244.0" cy="130.90909090909093" r="4" fill="#f85149"><title>p99Ms: 0.527</title></circle>
+<line x1="244.0" y1="130.90909090909093" x2="408.0" y2="221.93455510921848" stroke="#f85149" stroke-width="2"/>
+<circle cx="408.0" cy="221.93455510921848" r="4" fill="#f85149"><title>p99Ms: 0.226</title></circle>
+<line x1="408.0" y1="221.93455510921848" x2="572.0" y2="147.2013516542248" stroke="#f85149" stroke-width="2"/>
+<circle cx="572.0" cy="147.2013516542248" r="4" fill="#f85149"><title>p99Ms: 0.473</title></circle>
+<line x1="572.0" y1="147.2013516542248" x2="736.0" y2="155.76987397203592" stroke="#f85149" stroke-width="2"/>
+<circle cx="736.0" cy="155.76987397203592" r="4" fill="#f85149"><title>p99Ms: 0.445</title></circle>
+<line x1="736.0" y1="155.76987397203592" x2="900.0" y2="219.58122855714362" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="219.58122855714362" r="4" fill="#f85149"><title>p99Ms: 0.233</title></circle>
 <text x="55.0" y="312">0816aa0</text>
-<text x="260.0" y="312">7287ccd</text>
-<text x="465.0" y="312">6ca5c16</text>
-<text x="670.0" y="312">530e610</text>
-<text x="875.0" y="312">38c37e8</text>
+<text x="219.0" y="312">7287ccd</text>
+<text x="383.0" y="312">6ca5c16</text>
+<text x="547.0" y="312">530e610</text>
+<text x="711.0" y="312">38c37e8</text>
+<text x="875.0" y="312">7a88abe</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -49,19 +54,22 @@
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
 <circle cx="80.0" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="80.0" y1="365.375" x2="285.0" y2="365.75" stroke="#3fb950" stroke-width="2"/>
-<circle cx="285.0" cy="365.75" r="4" fill="#3fb950"><title>deliveryPercent: 99.400</title></circle>
-<line x1="285.0" y1="365.75" x2="490.0" y2="365.625" stroke="#3fb950" stroke-width="2"/>
-<circle cx="490.0" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
-<line x1="490.0" y1="365.625" x2="695.0" y2="365.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="695.0" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="695.0" y1="365.375" x2="900.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
-<circle cx="900.0" cy="365.0" r="4" fill="#3fb950"><title>deliveryPercent: 100.000</title></circle>
+<line x1="80.0" y1="365.375" x2="244.0" y2="365.75" stroke="#3fb950" stroke-width="2"/>
+<circle cx="244.0" cy="365.75" r="4" fill="#3fb950"><title>deliveryPercent: 99.400</title></circle>
+<line x1="244.0" y1="365.75" x2="408.0" y2="365.625" stroke="#3fb950" stroke-width="2"/>
+<circle cx="408.0" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
+<line x1="408.0" y1="365.625" x2="572.0" y2="365.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="572.0" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
+<line x1="572.0" y1="365.375" x2="736.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
+<circle cx="736.0" cy="365.0" r="4" fill="#3fb950"><title>deliveryPercent: 100.000</title></circle>
+<line x1="736.0" y1="365.0" x2="900.0" y2="365.125" stroke="#3fb950" stroke-width="2"/>
+<circle cx="900.0" cy="365.125" r="4" fill="#3fb950"><title>deliveryPercent: 99.900</title></circle>
 <text x="55.0" y="512">0816aa0</text>
-<text x="260.0" y="512">7287ccd</text>
-<text x="465.0" y="512">6ca5c16</text>
-<text x="670.0" y="512">530e610</text>
-<text x="875.0" y="512">38c37e8</text>
+<text x="219.0" y="512">7287ccd</text>
+<text x="383.0" y="512">6ca5c16</text>
+<text x="547.0" y="512">530e610</text>
+<text x="711.0" y="512">38c37e8</text>
+<text x="875.0" y="512">7a88abe</text>
 <text x="650" y="97">P95: blue · P99: red</text>
 <text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="585">Commit</text>
@@ -100,4 +108,10 @@
 <text x="330" y="711">0.445</text>
 <text x="650" y="711">-6.00%</text>
 <text x="820" y="711">100.000</text>
+<text x="28" y="735">7a88abee008b</text>
+<text x="180" y="735">0.189</text>
+<text x="480" y="735">-51.51%</text>
+<text x="330" y="735">0.233</text>
+<text x="650" y="735">-47.54%</text>
+<text x="820" y="735">99.900</text>
 </svg>
