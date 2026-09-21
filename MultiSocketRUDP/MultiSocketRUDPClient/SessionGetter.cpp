@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include "LogExtension.h"
 #include "../Common/Crypto/CryptoHelper.h"
+#include "ClientOptionFile.h"
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -66,33 +67,22 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 
 bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFilePath)
 {
-	_wsetlocale(LC_ALL, L"Korean");
-
-	CParser parser;
-	WCHAR cBuffer[BUFFER_MAX];
-
-	FILE* fp;
-	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
-
-	const int iJumpBOM = ftell(fp);
-	fseek(fp, 0, SEEK_END);
-	const int iFileSize = ftell(fp);
-	fseek(fp, iJumpBOM, SEEK_SET);
-	const int fileSize = static_cast<int>(fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp));
-	const int iAmend = iFileSize - fileSize; // 개행 문자와 파일 사이즈에 대한 보정값
-	fclose(fp);
-
-	cBuffer[iFileSize - iAmend] = '\0';
-	WCHAR* pBuff = cBuffer;
-
-	if (!parser.GetValue_String(pBuff, L"SESSION_BROKER", L"IP", sessionBrokerIP))
-		return false;
-	if (!parser.GetValue_Short(pBuff, L"SESSION_BROKER", L"PORT", reinterpret_cast<short*>(&sessionBrokerPort)))
-		return false;
-	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_CODE", &NetBuffer::m_byHeaderCode))
-		return false;
-	if (!parser.GetValue_Byte(pBuff, L"SERIALIZEBUF", L"PACKET_KEY", &NetBuffer::m_byXORCode))
-		return false;
+	ClientOptionFile options;
+	if (not options.Load(optionFilePath)) return false;
+	const auto ip = options.GetValue(L"SESSION_BROKER", L"IP");
+	if (not ip || ip->size() < 3 || ip->front() != L'"' || ip->back() != L'"') return false;
+	const auto address = ip->substr(1, ip->size() - 2);
+	IN_ADDR parsedAddress{};
+	if (address.size() >= std::size(sessionBrokerIP) ||
+		InetPtonW(AF_INET, address.c_str(), &parsedAddress) != 1) return false;
+	unsigned int brokerPort{}, packetCode{}, packetKey{};
+	if (not options.GetNumber(L"SESSION_BROKER", L"PORT", 1, 65535, brokerPort) ||
+		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_CODE", 0, 255, packetCode) ||
+		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_KEY", 0, 255, packetKey)) return false;
+	wcscpy_s(sessionBrokerIP, address.c_str());
+	sessionBrokerPort = static_cast<PortType>(brokerPort);
+	NetBuffer::m_byHeaderCode = static_cast<BYTE>(packetCode);
+	NetBuffer::m_byXORCode = static_cast<BYTE>(packetKey);
 
 	return true;
 }

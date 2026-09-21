@@ -6,6 +6,12 @@ namespace TLSHelper
 {
     bool TLSHelperClient::Initialize()
     {
+        // Reusing a client for a new session must release its previous TLS state.
+        if (ctxtHandle.dwLower || ctxtHandle.dwUpper) DeleteSecurityContext(&ctxtHandle);
+        if (credHandle.dwLower || credHandle.dwUpper) FreeCredentialsHandle(&credHandle);
+        ZeroMemory(&ctxtHandle, sizeof(ctxtHandle));
+        ZeroMemory(&credHandle, sizeof(credHandle));
+        handshakeCompleted = false;
         SCHANNEL_CRED cred = {};
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <array>
 #include <map>
 #include "ServerAliveChecker.h"
@@ -75,7 +76,8 @@ struct RecvPacketInfo
 
 // ----------------------------------------
 // @brief 세션 브로커 연결, RUDP 송수신, 흐름 제어 및 재전송을 담당하는 클라이언트 코어입니다.
-// Stop과 Disconnect의 생명주기 변경은 lifecycleLock으로 직렬화되며 Start는 외부에서 직렬 호출해야 합니다.
+// Start/Stop은 startStopLock으로 직렬화하고 Stop은 종료 담당 스레드의 정리 완료를 기다립니다.
+// 작업 스레드는 RequestStop만 호출하며 송신 승인과 종료 요청은 lifecycleLock으로 보호합니다.
 // 송신·수신 공유 컨테이너는 각 전용 mutex로 보호됩니다.
 // SendPacket은 입력 패킷을 내부 버퍼로 직렬화하며 GetReceivedPacket이 반환한 NetBuffer의 해제 책임은 호출자에게 전달됩니다.
 // ----------------------------------------
@@ -84,7 +86,7 @@ class RUDPClientCore
 	friend class RUDPClientCoreTestAccess;
 public:
 	RUDPClientCore();
-	virtual ~RUDPClientCore() = default;
+	virtual ~RUDPClientCore();
 	RUDPClientCore& operator=(const RUDPClientCore&) = delete;
 	RUDPClientCore(RUDPClientCore&&) = delete;
 
@@ -128,6 +130,14 @@ private:
 	std::atomic_bool hasClientProcessReference{};
 	std::atomic<uint64_t> authenticatedReceiveCount{};
 	std::mutex lifecycleLock;
+	// External Start/Stop calls own the shutdown thread; workers only request shutdown.
+	std::mutex startStopLock;
+	std::condition_variable stopRequested;
+	std::jthread shutdownThread;
+	bool loggerStarted{};
+	bool acceptingConnectAck{};
+	void RequestStop();
+	void CleanupStoppedSession();
 
 #pragma region SessionGetter
 #if USE_IOCP_SESSION_GETTER
@@ -210,10 +220,10 @@ private:
 	void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence);
 	void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
 	void DoSend();
-	static void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
+	void SleepRemainingFrameTime(OUT TickSet& tickSet, unsigned int intervalMs);
 
 private:
-	SOCKET rudpSocket{ INVALID_SOCKET };
+	std::atomic<SOCKET> rudpSocket{ INVALID_SOCKET };
 	sockaddr_in serverAddr{};
 
 	std::jthread recvThread{};
@@ -311,7 +321,7 @@ private:
 	std::deque<NetBuffer*> unreliableSendQueue;
 	bool preferUnreliableSend{};
 	PacketSequence lastUnreliableSendSequence{};
-	uint64_t unreliableSendGeneration{}; // Protected by lifecycleLock; invalidates paused serializers on Stop.
+	uint64_t unreliableSendGeneration{}; // Shared by both channels; invalidates paused serializers on Stop.
 	std::deque<NetBuffer*> unreliableReceivedPackets;
 	LatestPacketSequence unreliableReceiveState;
 	unsigned int unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;

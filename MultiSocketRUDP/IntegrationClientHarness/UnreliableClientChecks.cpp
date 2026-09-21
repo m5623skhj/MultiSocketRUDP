@@ -3,8 +3,13 @@
 #include <string>
 #include <algorithm>
 #include <functional>
+#include <future>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include "../MultiSocketRUDPClient/RUDPClientCore.h"
 #include "../ContentsServer/Protocol.h"
+#include "../ContentsServer/PacketIdType.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include <format>
 #ifndef LOG_ERROR
@@ -26,6 +31,135 @@ class RUDPClientCoreTestAccess
 		std::function<void()> callback;
 	};
 public:
+	static bool RunLifecycle(const std::wstring& corePath, const std::wstring& brokerPath, bool timeout)
+	{
+		RUDPClientCore client;
+		if (timeout)
+		{
+			// Reserve a real TLS session but direct CONNECT to a silent local UDP sink.
+			class ReservedClient final : public RUDPClientCore
+			{
+				bool ShouldSendConnectPacketOnStart() const override { return false; }
+			} reserved;
+			if (not reserved.Start(corePath, brokerPath, true)) return false;
+			const SOCKET sink = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+			sockaddr_in sinkAddress{};
+			sinkAddress.sin_family = AF_INET;
+			sinkAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+			if (sink == INVALID_SOCKET || ::bind(sink, reinterpret_cast<sockaddr*>(&sinkAddress), sizeof(sinkAddress)) != 0)
+			{
+				if (sink != INVALID_SOCKET) closesocket(sink);
+				return false;
+			}
+			int size = sizeof(sinkAddress);
+			getsockname(sink, reinterpret_cast<sockaddr*>(&sinkAddress), &size);
+			{
+				std::scoped_lock lock(reserved.lifecycleLock);
+				reserved.serverAddr = sinkAddress;
+				reserved.SendConnectPacket();
+			}
+			const bool stopped = WaitUntil([&] { return reserved.IsStopped(); });
+			closesocket(sink);
+			reserved.Stop();
+			return stopped && not reserved.IsConnected() && reserved.sendPacketInfoMap.empty() &&
+				reserved.sendEventHandles[0] == nullptr && reserved.rudpSocket == INVALID_SOCKET;
+		}
+
+		if (not client.Start(corePath, brokerPath, true) ||
+			not WaitUntil([&] { return client.IsConnected(); })) return false;
+		bool restarted = false;
+		// Stop and restart while an old reliable call is still serializing user data.
+		CallbackPacket pausedSerializer([&]
+		{
+			client.Stop();
+			restarted = client.Start(corePath, brokerPath, true) &&
+				WaitUntil([&] { return client.IsConnected(); });
+		});
+		client.SendPacket(pausedSerializer);
+		if (not restarted || client.lastSendPacketSequence != 0) return false;
+
+		for (int cycle = 0; cycle < 2; ++cycle)
+		{
+			TestStringPacketReq request;
+			request.testString = "lifecycle-restart";
+			client.SendPacket(request);
+			if (client.lastSendPacketSequence != 1) return false;
+			bool echo = false;
+			if (not WaitUntil([&]
+			{
+				auto* buffer = client.GetReceivedPacket();
+				if (buffer == nullptr) return false;
+				PacketId id{};
+				*buffer >> id;
+				if (id == static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_RES))
+				{
+					TestStringPacketRes reply;
+					reply.BufferToPacket(*buffer);
+					echo = reply.echoString == request.testString;
+				}
+				NetBuffer::Free(buffer);
+				return echo;
+			})) return false;
+			std::promise<void> gate;
+			auto ready = gate.get_future().share();
+			const auto stop = [&]
+			{
+				ready.wait();
+				client.Stop();
+				return client.IsStopped() && not client.IsConnected();
+			};
+			auto first = std::async(std::launch::async, stop);
+			auto second = std::async(std::launch::async, stop);
+			gate.set_value();
+			if (not first.get() || not second.get() || client.sendEventHandles[0] != nullptr ||
+				not client.sendPacketInfoMap.empty() || not client.pendingPacketQueue.empty()) return false;
+			if (cycle == 0 && (not client.Start(corePath, brokerPath, true) ||
+				not WaitUntil([&] { return client.IsConnected(); }))) return false;
+		}
+		return true;
+	}
+
+	static bool RunOptionChecks()
+	{
+		RUDPClientCore client;
+		const auto path = std::filesystem::temp_directory_path() /
+			(L"RudpClientOptions-" + std::to_wstring(GetCurrentProcessId()) + L".txt");
+		const auto write = [&](const std::wstring& text)
+		{
+			std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+			const wchar_t bom = 0xfeff;
+			stream.write(reinterpret_cast<const char*>(&bom), sizeof(bom));
+			stream.write(reinterpret_cast<const char*>(text.data()), text.size() * sizeof(wchar_t));
+			return stream.good();
+		};
+		bool passed = not client.ReadClientCoreOptionFile(path.wstring() + L".missing") &&
+			not client.ReadSessionGetterOptionFile(path.wstring() + L".missing");
+		for (const auto* value : { L"0", L"-1", L"2147483648", L"999999999999999999999", L"abc", L"" })
+		{
+			passed &= write(L":CORE\n{\nMAX_PACKET_RETRANSMISSION_COUNT = 3\nRETRANSMISSION_MS = " +
+				std::wstring(value) + L"\nSERVER_ALIVE_CHECK_MS = 15000\n}\n");
+			passed &= not client.ReadClientCoreOptionFile(path.wstring());
+		}
+		passed &= write(L":CORE\n{\nMAX_PACKET_RETRANSMISSION_COUNT = 65535\nRETRANSMISSION_MS = 50\nSERVER_ALIVE_CHECK_MS = 15000\n}\n");
+		passed &= client.ReadClientCoreOptionFile(path.wstring());
+		passed &= client.maxPacketRetransmissionCount == 65535;
+		for (const auto* value : { L"0", L"-1", L"65536" })
+		{
+			passed &= write(L":CORE\n{\nMAX_PACKET_RETRANSMISSION_COUNT = " + std::wstring(value) +
+				L"\nRETRANSMISSION_MS = 50\nSERVER_ALIVE_CHECK_MS = 15000\n}\n");
+			passed &= not client.ReadClientCoreOptionFile(path.wstring());
+			passed &= write(L":SESSION_BROKER\n{\nIP = \"127.0.0.1\"\nPORT = " + std::wstring(value) +
+				L"\n}\n:SERIALIZEBUF\n{\nPACKET_CODE = 119\nPACKET_KEY = 50\n}\n");
+			passed &= not client.ReadSessionGetterOptionFile(path.wstring());
+		}
+		passed &= write(std::wstring(2048, L' '));
+		passed &= not client.ReadClientCoreOptionFile(path.wstring());
+		passed &= write(L"");
+		passed &= not client.ReadSessionGetterOptionFile(path.wstring());
+		std::filesystem::remove(path);
+		return passed;
+	}
+
 	static bool Run()
 	{
 		RUDPClientCore client;
@@ -129,6 +263,17 @@ public:
 	}
 
 private:
+	template <typename Predicate>
+	static bool WaitUntil(Predicate predicate)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+		while (std::chrono::steady_clock::now() < deadline)
+		{
+			if (predicate()) return true;
+			Sleep(5);
+		}
+		return predicate();
+	}
 	static void Receive(RUDPClientCore& client, const PacketSequence sequence, const bool tampered,
 		PACKET_TYPE type = PACKET_TYPE::UNRELIABLE_SEND_TYPE)
 	{
@@ -151,4 +296,10 @@ private:
 bool RunUnreliableClientChecks()
 {
 	return RUDPClientCoreTestAccess::Run();
+}
+
+bool RunClientLifecycleChecks(const std::wstring& corePath, const std::wstring& brokerPath, bool timeout)
+{
+	return RUDPClientCoreTestAccess::RunOptionChecks() &&
+		RUDPClientCoreTestAccess::RunLifecycle(corePath, brokerPath, timeout);
 }

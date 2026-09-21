@@ -983,6 +983,20 @@ namespace
 		EXPECT_NE(std::adjacent_find(sessionIds.begin(), sessionIds.end()), sessionIds.end());
 	}
 
+	TEST_F(IntegrationFixture, ClientRestartRejectsOldSerializerAndConcurrentStopWaitsForCleanup)
+	{
+		const auto result = RunClientScenario({ L"--scenario", L"lifecycle-restart" }, 90s);
+		ASSERT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
+	TEST_F(IntegrationFixture, ClientConnectRetryExhaustionCompletesAutomaticCleanup)
+	{
+		const auto result = RunClientScenario({ L"--scenario", L"connect-timeout" }, 45s);
+		ASSERT_TRUE(result.completed);
+		EXPECT_EQ(result.exitCode, 0u) << result.output;
+	}
+
 	TEST_F(IntegrationFixture, OrderedBurstRoundTripPreservesApplicationOrder)
 	{
 		ClientHarnessProcess process;
