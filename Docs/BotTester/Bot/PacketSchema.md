@@ -68,6 +68,16 @@ PacketSchema.Register(
 
 ---
 
+## `Get` 및 `Register`
+
+```csharp
+public static PacketFieldDef[]? Get(PacketId id);
+public static void Register(PacketId id, PacketFieldDef[] fields);
+```
+
+- `Get`: 지정된 `PacketId`에 해당하는 필드 정의 배열을 반환한다. 존재하지 않으면 `null`을 반환한다.
+- `Register`: 지정된 `PacketId`에 대응하는 필드 정의 배열을 스키마 사전에 등록한다.
+
 ## 동시성 및 소유권
 
 - 내부 저장소는 일반 `Dictionary`이며 별도 lock이 없다.
@@ -75,7 +85,6 @@ PacketSchema.Register(
 - `Get()`은 내부 배열 참조를 그대로 반환한다. 호출 측에서 배열을 수정하면 전역 schema가 바뀔 수 있으므로 읽기 전용으로 취급해야 한다.
 
 ---
-
 ## 관련 문서
 
 - [[ActionNodes]] - `SendPacketNode` 동작
