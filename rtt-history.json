@@ -1860,6 +1860,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "4fbb027293364134c4944a878808b243733c609d",
+      "commitSubject": "* 클라이언트 종료·재시작 동시성 및 설정 검증 문제 수정   * reliable 송신의 연결 세대 검증과 버퍼 수명 보호 적용   * 종료 요청과 정리를 분리하고 Stop의 완료 대기 보장   * 재전송 한도 초과를 공통 종료 경로로 연결   * 재시작 시 송신 상태 초기화 및 이전 TLS 자원 해제   * 설정 파일 읽기 실패와 숫자 범위·오버플로 검증   * 재시작·동시 종료·CONNECT ACK 유실 회귀 테스트 추가   * Debug·Release 빌드 및 관련 테스트 통과",
+      "recordedAtUtc": "2026-09-21T21:30:16.1825896+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001253",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.1298213,
+            "medianMinRttMs": 0.0836,
+            "medianP50RttMs": 0.1223,
+            "medianP95RttMs": 0.1621,
+            "medianP99RttMs": 0.2013,
+            "medianMaxRttMs": 0.5229,
+            "worstMaxRttMs": 2.259,
+            "medianElapsedSeconds": 0.1369442,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.905396700000005,
+            "medianMinRttMs": 0.0428,
+            "medianP50RttMs": 0.0952,
+            "medianP95RttMs": 32.0565,
+            "medianP99RttMs": 63.7458,
+            "medianMaxRttMs": 197.1299,
+            "worstMaxRttMs": 241.6919,
+            "medianElapsedSeconds": 5.9089751,
+            "totalRetransmissionSuspectedCount": 176
+          }
+        }
+      ]
     }
   ]
 }
