@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="866" viewBox="0 0 960 866">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="890" viewBox="0 0 960 890">
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 <style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
 <text x="28" y="38" class="title">Unreliable channel: unreliable-only</text>
@@ -15,48 +15,53 @@
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
 <text x="15" y="119.0">0.472</text>
 <circle cx="80.0" cy="177.68745234262477" r="4" fill="#58a6ff"><title>p95Ms: 0.303</title></circle>
-<line x1="80.0" y1="177.68745234262477" x2="182.5" y2="164.82525629077355" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="182.5" cy="164.82525629077355" r="4" fill="#58a6ff"><title>p95Ms: 0.338</title></circle>
-<line x1="182.5" y1="164.82525629077355" x2="285.0" y2="212.7526899940693" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="285.0" cy="212.7526899940693" r="4" fill="#58a6ff"><title>p95Ms: 0.208</title></circle>
-<line x1="285.0" y1="212.7526899940693" x2="387.5" y2="172.7946284842837" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="387.5" cy="172.7946284842837" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
-<line x1="387.5" y1="172.7946284842837" x2="490.0" y2="172.7204947894603" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="490.0" cy="172.7204947894603" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
-<line x1="490.0" y1="172.7204947894603" x2="592.5" y2="221.09273066169618" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="592.5" cy="221.09273066169618" r="4" fill="#58a6ff"><title>p95Ms: 0.186</title></circle>
-<line x1="592.5" y1="221.09273066169618" x2="695.0" y2="169.6439464542913" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="695.0" cy="169.6439464542913" r="4" fill="#58a6ff"><title>p95Ms: 0.325</title></circle>
-<line x1="695.0" y1="169.6439464542913" x2="797.5" y2="197.62941625010592" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="797.5" cy="197.62941625010592" r="4" fill="#58a6ff"><title>p95Ms: 0.249</title></circle>
-<line x1="797.5" y1="197.62941625010592" x2="900.0" y2="196.480343980344" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="900.0" cy="196.480343980344" r="4" fill="#58a6ff"><title>p95Ms: 0.252</title></circle>
+<line x1="80.0" y1="177.68745234262477" x2="171.11111111111111" y2="164.82525629077355" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="164.82525629077355" r="4" fill="#58a6ff"><title>p95Ms: 0.338</title></circle>
+<line x1="171.11111111111111" y1="164.82525629077355" x2="262.22222222222223" y2="212.7526899940693" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="212.7526899940693" r="4" fill="#58a6ff"><title>p95Ms: 0.208</title></circle>
+<line x1="262.22222222222223" y1="212.7526899940693" x2="353.3333333333333" y2="172.7946284842837" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="353.3333333333333" cy="172.7946284842837" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
+<line x1="353.3333333333333" y1="172.7946284842837" x2="444.44444444444446" y2="172.7204947894603" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="172.7204947894603" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
+<line x1="444.44444444444446" y1="172.7204947894603" x2="535.5555555555555" y2="221.09273066169618" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="221.09273066169618" r="4" fill="#58a6ff"><title>p95Ms: 0.186</title></circle>
+<line x1="535.5555555555555" y1="221.09273066169618" x2="626.6666666666666" y2="169.6439464542913" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="169.6439464542913" r="4" fill="#58a6ff"><title>p95Ms: 0.325</title></circle>
+<line x1="626.6666666666666" y1="169.6439464542913" x2="717.7777777777778" y2="197.62941625010592" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="197.62941625010592" r="4" fill="#58a6ff"><title>p95Ms: 0.249</title></circle>
+<line x1="717.7777777777778" y1="197.62941625010592" x2="808.8888888888889" y2="196.480343980344" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="196.480343980344" r="4" fill="#58a6ff"><title>p95Ms: 0.252</title></circle>
+<line x1="808.8888888888889" y1="196.480343980344" x2="900.0" y2="224.09514530204186" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="224.09514530204186" r="4" fill="#58a6ff"><title>p95Ms: 0.178</title></circle>
 <circle cx="80.0" cy="151.62945861221723" r="4" fill="#f85149"><title>p99Ms: 0.373</title></circle>
-<line x1="80.0" y1="151.62945861221723" x2="182.5" y2="144.84622553588073" stroke="#f85149" stroke-width="2"/>
-<circle cx="182.5" cy="144.84622553588073" r="4" fill="#f85149"><title>p99Ms: 0.392</title></circle>
-<line x1="182.5" y1="144.84622553588073" x2="285.0" y2="183.21041260696433" stroke="#f85149" stroke-width="2"/>
-<circle cx="285.0" cy="183.21041260696433" r="4" fill="#f85149"><title>p99Ms: 0.288</title></circle>
-<line x1="285.0" y1="183.21041260696433" x2="387.5" y2="155.37321020079642" stroke="#f85149" stroke-width="2"/>
-<circle cx="387.5" cy="155.37321020079642" r="4" fill="#f85149"><title>p99Ms: 0.363</title></circle>
-<line x1="387.5" y1="155.37321020079642" x2="490.0" y2="144.73502499364568" stroke="#f85149" stroke-width="2"/>
-<circle cx="490.0" cy="144.73502499364568" r="4" fill="#f85149"><title>p99Ms: 0.392</title></circle>
-<line x1="490.0" y1="144.73502499364568" x2="592.5" y2="179.94853003473696" stroke="#f85149" stroke-width="2"/>
-<circle cx="592.5" cy="179.94853003473696" r="4" fill="#f85149"><title>p99Ms: 0.297</title></circle>
-<line x1="592.5" y1="179.94853003473696" x2="695.0" y2="130.9090909090909" stroke="#f85149" stroke-width="2"/>
-<circle cx="695.0" cy="130.9090909090909" r="4" fill="#f85149"><title>p99Ms: 0.429</title></circle>
-<line x1="695.0" y1="130.9090909090909" x2="797.5" y2="165.01059052783194" stroke="#f85149" stroke-width="2"/>
-<circle cx="797.5" cy="165.01059052783194" r="4" fill="#f85149"><title>p99Ms: 0.337</title></circle>
-<line x1="797.5" y1="165.01059052783194" x2="900.0" y2="181.54240447343895" stroke="#f85149" stroke-width="2"/>
-<circle cx="900.0" cy="181.54240447343895" r="4" fill="#f85149"><title>p99Ms: 0.293</title></circle>
+<line x1="80.0" y1="151.62945861221723" x2="171.11111111111111" y2="144.84622553588073" stroke="#f85149" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="144.84622553588073" r="4" fill="#f85149"><title>p99Ms: 0.392</title></circle>
+<line x1="171.11111111111111" y1="144.84622553588073" x2="262.22222222222223" y2="183.21041260696433" stroke="#f85149" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="183.21041260696433" r="4" fill="#f85149"><title>p99Ms: 0.288</title></circle>
+<line x1="262.22222222222223" y1="183.21041260696433" x2="353.3333333333333" y2="155.37321020079642" stroke="#f85149" stroke-width="2"/>
+<circle cx="353.3333333333333" cy="155.37321020079642" r="4" fill="#f85149"><title>p99Ms: 0.363</title></circle>
+<line x1="353.3333333333333" y1="155.37321020079642" x2="444.44444444444446" y2="144.73502499364568" stroke="#f85149" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="144.73502499364568" r="4" fill="#f85149"><title>p99Ms: 0.392</title></circle>
+<line x1="444.44444444444446" y1="144.73502499364568" x2="535.5555555555555" y2="179.94853003473696" stroke="#f85149" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="179.94853003473696" r="4" fill="#f85149"><title>p99Ms: 0.297</title></circle>
+<line x1="535.5555555555555" y1="179.94853003473696" x2="626.6666666666666" y2="130.9090909090909" stroke="#f85149" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="130.9090909090909" r="4" fill="#f85149"><title>p99Ms: 0.429</title></circle>
+<line x1="626.6666666666666" y1="130.9090909090909" x2="717.7777777777778" y2="165.01059052783194" stroke="#f85149" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="165.01059052783194" r="4" fill="#f85149"><title>p99Ms: 0.337</title></circle>
+<line x1="717.7777777777778" y1="165.01059052783194" x2="808.8888888888889" y2="181.54240447343895" stroke="#f85149" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="181.54240447343895" r="4" fill="#f85149"><title>p99Ms: 0.293</title></circle>
+<line x1="808.8888888888889" y1="181.54240447343895" x2="900.0" y2="198.8526222146912" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="198.8526222146912" r="4" fill="#f85149"><title>p99Ms: 0.246</title></circle>
 <text x="55.0" y="312">0816aa0</text>
-<text x="157.5" y="312">7287ccd</text>
-<text x="260.0" y="312">6ca5c16</text>
-<text x="362.5" y="312">530e610</text>
-<text x="465.0" y="312">38c37e8</text>
-<text x="567.5" y="312">7a88abe</text>
-<text x="670.0" y="312">ed19d08</text>
-<text x="772.5" y="312">48b1829</text>
-<text x="875.0" y="312">4fbb027</text>
+<text x="146.11111111111111" y="312">7287ccd</text>
+<text x="237.22222222222223" y="312">6ca5c16</text>
+<text x="328.3333333333333" y="312">530e610</text>
+<text x="419.44444444444446" y="312">38c37e8</text>
+<text x="510.55555555555554" y="312">7a88abe</text>
+<text x="601.6666666666666" y="312">ed19d08</text>
+<text x="692.7777777777778" y="312">48b1829</text>
+<text x="783.8888888888889" y="312">4fbb027</text>
+<text x="875.0" y="312">fc496f9</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -69,31 +74,34 @@
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
 <circle cx="80.0" cy="365.0" r="4" fill="#3fb950"><title>deliveryPercent: 100.000</title></circle>
-<line x1="80.0" y1="365.0" x2="182.5" y2="365.5" stroke="#3fb950" stroke-width="2"/>
-<circle cx="182.5" cy="365.5" r="4" fill="#3fb950"><title>deliveryPercent: 99.600</title></circle>
-<line x1="182.5" y1="365.5" x2="285.0" y2="365.875" stroke="#3fb950" stroke-width="2"/>
-<circle cx="285.0" cy="365.875" r="4" fill="#3fb950"><title>deliveryPercent: 99.300</title></circle>
-<line x1="285.0" y1="365.875" x2="387.5" y2="365.625" stroke="#3fb950" stroke-width="2"/>
-<circle cx="387.5" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
-<line x1="387.5" y1="365.625" x2="490.0" y2="365.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="490.0" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="490.0" y1="365.375" x2="592.5" y2="365.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="592.5" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="592.5" y1="365.375" x2="695.0" y2="365.625" stroke="#3fb950" stroke-width="2"/>
-<circle cx="695.0" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
-<line x1="695.0" y1="365.625" x2="797.5" y2="365.25" stroke="#3fb950" stroke-width="2"/>
-<circle cx="797.5" cy="365.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.800</title></circle>
-<line x1="797.5" y1="365.25" x2="900.0" y2="365.5" stroke="#3fb950" stroke-width="2"/>
-<circle cx="900.0" cy="365.5" r="4" fill="#3fb950"><title>deliveryPercent: 99.600</title></circle>
+<line x1="80.0" y1="365.0" x2="171.11111111111111" y2="365.5" stroke="#3fb950" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="365.5" r="4" fill="#3fb950"><title>deliveryPercent: 99.600</title></circle>
+<line x1="171.11111111111111" y1="365.5" x2="262.22222222222223" y2="365.875" stroke="#3fb950" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="365.875" r="4" fill="#3fb950"><title>deliveryPercent: 99.300</title></circle>
+<line x1="262.22222222222223" y1="365.875" x2="353.3333333333333" y2="365.625" stroke="#3fb950" stroke-width="2"/>
+<circle cx="353.3333333333333" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
+<line x1="353.3333333333333" y1="365.625" x2="444.44444444444446" y2="365.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
+<line x1="444.44444444444446" y1="365.375" x2="535.5555555555555" y2="365.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
+<line x1="535.5555555555555" y1="365.375" x2="626.6666666666666" y2="365.625" stroke="#3fb950" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="365.625" r="4" fill="#3fb950"><title>deliveryPercent: 99.500</title></circle>
+<line x1="626.6666666666666" y1="365.625" x2="717.7777777777778" y2="365.25" stroke="#3fb950" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="365.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.800</title></circle>
+<line x1="717.7777777777778" y1="365.25" x2="808.8888888888889" y2="365.5" stroke="#3fb950" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="365.5" r="4" fill="#3fb950"><title>deliveryPercent: 99.600</title></circle>
+<line x1="808.8888888888889" y1="365.5" x2="900.0" y2="366.25" stroke="#3fb950" stroke-width="2"/>
+<circle cx="900.0" cy="366.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.000</title></circle>
 <text x="55.0" y="512">0816aa0</text>
-<text x="157.5" y="512">7287ccd</text>
-<text x="260.0" y="512">6ca5c16</text>
-<text x="362.5" y="512">530e610</text>
-<text x="465.0" y="512">38c37e8</text>
-<text x="567.5" y="512">7a88abe</text>
-<text x="670.0" y="512">ed19d08</text>
-<text x="772.5" y="512">48b1829</text>
-<text x="875.0" y="512">4fbb027</text>
+<text x="146.11111111111111" y="512">7287ccd</text>
+<text x="237.22222222222223" y="512">6ca5c16</text>
+<text x="328.3333333333333" y="512">530e610</text>
+<text x="419.44444444444446" y="512">38c37e8</text>
+<text x="510.55555555555554" y="512">7a88abe</text>
+<text x="601.6666666666666" y="512">ed19d08</text>
+<text x="692.7777777777778" y="512">48b1829</text>
+<text x="783.8888888888889" y="512">4fbb027</text>
+<text x="875.0" y="512">fc496f9</text>
 <text x="650" y="97">P95: blue · P99: red</text>
 <text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="585">Commit</text>
@@ -156,4 +164,10 @@
 <text x="330" y="807">0.293</text>
 <text x="650" y="807">-13.23%</text>
 <text x="820" y="807">99.600</text>
+<text x="28" y="831">fc496f9e4c58</text>
+<text x="180" y="831">0.178</text>
+<text x="480" y="831">-29.53%</text>
+<text x="330" y="831">0.246</text>
+<text x="650" y="831">-15.96%</text>
+<text x="820" y="831">99.000</text>
 </svg>

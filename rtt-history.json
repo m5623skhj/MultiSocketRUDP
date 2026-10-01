@@ -1922,6 +1922,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "fc496f9e4c58c09d1d867175d717ee1a9bdf1209",
+      "commitSubject": "* 서버 종료 시 대기 중인 브로커 소켓 정리 지연 개선   * 전체 워커 중지 요청 후 큐 소켓을 먼저 닫고 워커 종료 대기   * 종료 테스트 실패 메시지에 소켓 인덱스와 실제 대기 시간 추가   * Debug 빌드 및 종료 테스트 5회·관련 TLS 테스트 2개 통과",
+      "recordedAtUtc": "2026-10-01T04:57:57.6415824+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001319",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.10050769999999985,
+            "medianMinRttMs": 0.05,
+            "medianP50RttMs": 0.099,
+            "medianP95RttMs": 0.1354,
+            "medianP99RttMs": 0.1559,
+            "medianMaxRttMs": 0.2364,
+            "worstMaxRttMs": 1.5371,
+            "medianElapsedSeconds": 0.1045953,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.060921799999996,
+            "medianMinRttMs": 0.0335,
+            "medianP50RttMs": 0.071,
+            "medianP95RttMs": 32.3799,
+            "medianP99RttMs": 64.6056,
+            "medianMaxRttMs": 165.0261,
+            "worstMaxRttMs": 264.8824,
+            "medianElapsedSeconds": 6.0635117,
+            "totalRetransmissionSuspectedCount": 186
+          }
+        }
+      ]
     }
   ]
 }
