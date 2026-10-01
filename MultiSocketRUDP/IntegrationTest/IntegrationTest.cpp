@@ -739,9 +739,14 @@ namespace
 		// Allow workers to enter TLS receive; the remaining sockets stay queued.
 		Sleep(200);
 		auto stopResult = std::async(std::launch::async, [this]() { server->Stop(); });
-		for (auto& client : idleClients)
+		for (size_t clientIndex = 0; clientIndex < idleClients.size(); ++clientIndex)
 		{
-			EXPECT_TRUE(client.WaitForClose(1));
+			auto& client = idleClients[clientIndex];
+			const auto waitStarted = std::chrono::steady_clock::now();
+			const bool closed = client.WaitForClose(1);
+			const auto waitedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now() - waitStarted).count();
+			EXPECT_TRUE(closed) << "clientIndex=" << clientIndex << ", waitedMs=" << waitedMs;
 			// Close locally even on failure so a regression cannot strand teardown.
 			client.Close();
 		}

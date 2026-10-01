@@ -76,6 +76,17 @@ void RUDPSessionBroker::Stop()
 		thread.request_stop();
 	}
 
+	{
+		// Accept has stopped and workers cannot dequeue after their stop requests.
+		// Close queued sockets without waiting for active workers to finish cleanup.
+		std::scoped_lock lock(clientQueueLock);
+		while (not clientQueue.empty())
+		{
+			closesocket(clientQueue.front().first);
+			clientQueue.pop();
+		}
+	}
+
 	for (auto& thread : threadPool)
 	{
 		if (thread.joinable())
@@ -84,14 +95,6 @@ void RUDPSessionBroker::Stop()
 		}
 	}
 	threadPool.clear();
-	{
-		std::scoped_lock lock(clientQueueLock);
-		while (not clientQueue.empty())
-		{
-			closesocket(clientQueue.front().first);
-			clientQueue.pop();
-		}
-	}
 
 	isRunning = false;
 
