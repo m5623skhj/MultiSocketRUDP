@@ -1984,6 +1984,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "26e1e6c2d27a2efae4d7df11e8b730befff8a757",
+      "commitSubject": "* 수신 패킷 복호화 후 인증 태그가 읽기 범위에 남는 버그 수정   * 인증 성공 시 버퍼 끝 위치를 인증 태그 앞으로 조정   * 콘텐츠 소비 후 잔여 크기 및 범위 초과 읽기 회귀 검증   * 신뢰성·비신뢰성 수신 API 검사와 관련 문서 보완",
+      "recordedAtUtc": "2026-10-02T09:41:39.0626366+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001337",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.19128870000000014,
+            "medianMinRttMs": 0.1038,
+            "medianP50RttMs": 0.1945,
+            "medianP95RttMs": 0.2242,
+            "medianP99RttMs": 0.252,
+            "medianMaxRttMs": 0.3462,
+            "worstMaxRttMs": 1.8161,
+            "medianElapsedSeconds": 0.1982572,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 6.4448112000000055,
+            "medianMinRttMs": 0.0574,
+            "medianP50RttMs": 0.1384,
+            "medianP95RttMs": 32.8332,
+            "medianP99RttMs": 67.2905,
+            "medianMaxRttMs": 197.0615,
+            "worstMaxRttMs": 401.7056,
+            "medianElapsedSeconds": 6.4480748,
+            "totalRetransmissionSuspectedCount": 191
+          }
+        }
+      ]
     }
   ]
 }
