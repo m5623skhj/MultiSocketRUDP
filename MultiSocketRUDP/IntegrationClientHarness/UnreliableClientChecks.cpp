@@ -212,6 +212,7 @@ public:
 			PacketSequence value{};
 			*buffer >> packetId >> value;
 			passed &= packetId == 77 && value == sequence;
+			passed &= buffer->GetUseSize() == 0;
 			NetBuffer::Free(buffer);
 		}
 		Receive(client, 10, false);
@@ -230,6 +231,7 @@ public:
 			PacketSequence value{};
 			*content >> id >> value;
 			passed &= id == 77 && value == 2;
+			passed &= content->GetUseSize() == 0;
 			NetBuffer::Free(content);
 		}
 		else passed = false;

@@ -427,11 +427,13 @@ Step 7. AES-GCM 복호화 + 태그 검증 (in-place)
   )
   if !ok → return false  (인증 실패 → 패킷 폐기)
 
-Step 8. 완료
+Step 8. 인증 태그를 읽기 범위에서 제외
+  m_iWrite = authTagOffset
+  m_iWriteLast = m_iWrite
   return true
 
-  // 현재 DecodePacket은 body를 in-place 복호화하지만
-  // m_iWrite를 줄이거나 AuthTag를 버퍼에서 제거하지 않음
+  // body는 in-place 복호화하고, AuthTag 바이트는 읽기 범위 밖에 둠
+  // 읽기 위치와 수신 헤더의 wire payload 길이는 유지
 ```
 
 ---
