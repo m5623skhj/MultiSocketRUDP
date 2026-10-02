@@ -265,6 +265,7 @@ public:
 	unsigned int GetRemainPacketSize();
 	// ----------------------------------------
 	// @brief 다음 기대 시퀀스의 콘텐츠 패킷을 큐에서 꺼냅니다.
+	// 읽기 범위는 PacketId부터 콘텐츠 끝까지이며 인증 태그는 제외됩니다.
 	// 중복·하트비트 패킷은 내부에서 해제하며 반환된 NetBuffer의 해제 책임은 호출자에게 있습니다.
 	// @return 시퀀스 갭이 있거나 큐가 비어 있으면 nullptr을 반환합니다.
 	// ----------------------------------------
@@ -274,7 +275,7 @@ public:
 	// ----------------------------------------
 	void SendPacket(OUT IPacket& packet);
 	bool SendUnreliablePacket(IPacket& packet);
-	// Returns an authenticated packet positioned at packetId; caller frees the buffer.
+	// Returns an authenticated packet positioned at packetId with the tag excluded; caller frees the buffer.
 	NetBuffer* GetReceivedUnreliablePacket();
 	// ----------------------------------------
 	// @brief 연결 상태를 해제로 표시하고 서버에 연결 해제 코어 패킷을 보냅니다.

@@ -108,7 +108,7 @@ public:
 			return false;
 		}
 
-		return CryptoHelper::DecryptAESGCM(
+		if (not CryptoHelper::DecryptAESGCM(
 			nonce,
 			NONCE_SIZE,
 			aad,
@@ -119,7 +119,15 @@ public:
 			&packet.m_pSerializeBuffer[bodyOffset],
 			bodySize,
 			sessionKeyHandle
-		);
+		))
+		{
+			return false;
+		}
+
+		// Exclude the authenticated trailer from subsequent payload reads.
+		packet.m_iWrite = static_cast<WORD>(authTagOffset);
+		packet.m_iWriteLast = packet.m_iWrite;
+		return true;
 	}
 
 	static void SetHeader(OUT NetBuffer& netBuffer, const int extraSize = 0)
