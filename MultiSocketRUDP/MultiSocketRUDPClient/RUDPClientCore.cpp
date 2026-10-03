@@ -5,6 +5,8 @@
 #include "PacketManager.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 #include <mutex>
+#include "ClientOptionFile.h"
+#include <limits>
 
 void SendPacketInfo::Free(SendPacketInfo* target)
 {
@@ -21,83 +23,110 @@ void SendPacketInfo::Free(SendPacketInfo* target)
 }
 
 RUDPClientCore::RUDPClientCore()
-	: serverAliveChecker([this] { Stop(); }
+	: serverAliveChecker([this] { RequestStop(); }
 	                     , [this] { return authenticatedReceiveCount.load(std::memory_order_relaxed); })
 {
 }
 
+RUDPClientCore::~RUDPClientCore()
+{
+	RUDPClientCore::Stop();
+}
+
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
+	std::scoped_lock operationGuard(startStopLock);
+	if (not isStopped) return false;
+	if (shutdownThread.joinable()) shutdownThread.join();
 	threadStopFlag = false;
 	isConnected = false;
+	acceptingConnectAck = true;
+	lastSendPacketSequence = 0;
+	lastAckedSequence = 0;
+	remoteAdvertisedWindow = 1;
 	authenticatedReceiveCount.store(0, std::memory_order_relaxed);
 	Logger::GetInstance().RunLoggerThread(printLogToConsole);
+	loggerStarted = true;
+	isStopped = false;
+	// Failed startup uses the same cleanup path, including partially acquired resources.
+	const auto failStart = [this]()
+	{
+		RequestStop();
+		CleanupStoppedSession();
+		return false;
+	};
 
 	if (not ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath))
 	{
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+		return failStart();
 	}
 
 	if (not AcquireClientProcessReference())
 	{
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+		return failStart();
 	}
 
 #if USE_IOCP_SESSION_GETTER
 	if (not sessionGetter.Start(optionFilePath))
 	{
-		ReleaseClientProcessReference();
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+		return failStart();
 	}
 #else
 	if (not RunGetSessionFromServer(sessionGetterOptionFilePath))
 	{
-		ReleaseClientProcessReference();
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+		return failStart();
 	}
 #endif
 
 	if (not CreateRUDPSocket())
 	{
-		ReleaseClientProcessReference();
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+		return failStart();
 	}
-	if (not RunThreads())
+	try
 	{
-		if (rudpSocket != INVALID_SOCKET)
+		if (not RunThreads()) return failStart();
+		shutdownThread = std::jthread([this]()
 		{
-			closesocket(rudpSocket);
-			rudpSocket = INVALID_SOCKET;
-		}
-		ReleaseClientProcessReference();
-		Logger::GetInstance().StopLoggerThread();
-		return false;
+			{
+				std::unique_lock lock(lifecycleLock);
+				stopRequested.wait(lock, [this] { return threadStopFlag.load(); });
+			}
+			CleanupStoppedSession();
+		});
 	}
-	Sleep(1000);
+	catch (const std::system_error&)
+	{
+		return failStart();
+	}
 
+	std::scoped_lock lock(lifecycleLock);
 	if (ShouldSendConnectPacketOnStart())
 	{
 		SendConnectPacket();
 	}
 
-	isStopped.store(false, std::memory_order_release);
 	return true;
 }
 
 void RUDPClientCore::Stop()
 {
+	std::scoped_lock operationGuard(startStopLock);
+	RequestStop();
+	if (shutdownThread.joinable()) shutdownThread.join();
+	else if (not isStopped) CleanupStoppedSession();
+}
+
+void RUDPClientCore::RequestStop()
+{
 	{
 		std::scoped_lock lock(lifecycleLock);
-		if (isStopped.exchange(true, std::memory_order_acq_rel))
+		if (isStopped || threadStopFlag.exchange(true))
 		{
 			return;
 		}
 		++unreliableSendGeneration;
+		isConnected = false;
+		acceptingConnectAck = false;
 
 		if (sessionBrokerSocket != INVALID_SOCKET)
 		{
@@ -105,22 +134,26 @@ void RUDPClientCore::Stop()
 			sessionBrokerSocket = INVALID_SOCKET;
 		}
 
-		threadStopFlag = true;
 		if (sendEventHandles[1] != nullptr)
 		{
 			SetEvent(sendEventHandles[1]);
 		}
 
-		if (rudpSocket != INVALID_SOCKET)
+		if (const SOCKET socket = rudpSocket.exchange(INVALID_SOCKET); socket != INVALID_SOCKET)
 		{
-			closesocket(rudpSocket);
-			rudpSocket = INVALID_SOCKET;
+			closesocket(socket);
 		}
 	}
+	stopRequested.notify_all();
+}
 
+void RUDPClientCore::CleanupStoppedSession()
+{
 	JoinThreads();
 	{
 		std::scoped_lock lock(sendBufferQueueLock);
+		NetBuffer* queuedBuffer{};
+		while (sendBufferQueue.Dequeue(&queuedBuffer)) NetBuffer::Free(queuedBuffer);
 		for (auto* buffer : unreliableSendQueue) NetBuffer::Free(buffer);
 		unreliableSendQueue.clear();
 		lastUnreliableSendSequence = 0;
@@ -185,6 +218,10 @@ void RUDPClientCore::Stop()
 		delete[] keyObjectBuffer;
 		keyObjectBuffer = nullptr;
 	}
+	lastSendPacketSequence = 0;
+	lastAckedSequence = 0;
+	remoteAdvertisedWindow = 1;
+	isStopped.store(true, std::memory_order_release);
 }
 
 bool RUDPClientCore::AcquireClientProcessReference()
@@ -227,7 +264,6 @@ void RUDPClientCore::ReleaseClientProcessReference()
 
 void RUDPClientCore::JoinThreads()
 {
-	serverAliveChecker.StopServerAliveCheck();
 	if (retransmissionThread.joinable())
 	{
 		retransmissionThread.join();
@@ -240,7 +276,13 @@ void RUDPClientCore::JoinThreads()
 	{
 		recvThread.join();
 	}
-	Logger::GetInstance().StopLoggerThread();
+	// Receive callbacks can start the checker; join receive before stopping it.
+	serverAliveChecker.StopServerAliveCheck();
+	if (loggerStarted)
+	{
+		Logger::GetInstance().StopLoggerThread();
+		loggerStarted = false;
+	}
 }
 
 bool RUDPClientCore::CreateRUDPSocket()
@@ -260,7 +302,7 @@ bool RUDPClientCore::CreateRUDPSocket()
 	recvAddr.sin_addr.s_addr = INADDR_ANY;
 	recvAddr.sin_port = 0;
 
-	if (bind(rudpSocket, reinterpret_cast<sockaddr*>(&recvAddr), sizeof(recvAddr)) == SOCKET_ERROR)
+	if (::bind(rudpSocket.load(), reinterpret_cast<sockaddr*>(&recvAddr), sizeof(recvAddr)) == SOCKET_ERROR)
 	{
 		LOG_ERROR(std::format("bind() failed with error {}", WSAGetLastError()));
 		closesocket(rudpSocket);
@@ -428,8 +470,7 @@ void RUDPClientCore::RunRetransmissionThread()
 			if (shouldDisconnect)
 			{
 				LOG_ERROR("The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates");
-				isConnected = false;
-				threadStopFlag = true;
+				RequestStop();
 				SendPacketInfo::Free(sendPacketInfo);
 				continue;
 			}
@@ -594,10 +635,15 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	remoteAdvertisedWindow.store(remoteWindow, std::memory_order_relaxed);
 	lastAckedSequence.store(packetSequence, std::memory_order_relaxed);
 
-	if (packetSequence == 0 && not isConnected)
 	{
-		isConnected = true;
-		serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
+		std::scoped_lock lock(lifecycleLock);
+		if (threadStopFlag) return;
+		if (packetSequence == 0 && not isConnected && acceptingConnectAck)
+		{
+			isConnected = true;
+			acceptingConnectAck = false;
+			serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
+		}
 	}
 
 	{
@@ -654,7 +700,7 @@ void RUDPClientCore::DoSend()
 			else break;
 		}
 
-		if (rudpSocket == INVALID_SOCKET)
+		if (rudpSocket == INVALID_SOCKET || threadStopFlag)
 		{
 			NetBuffer::Free(packet);
 			return;
@@ -675,7 +721,9 @@ void RUDPClientCore::SleepRemainingFrameTime(OUT TickSet& tickSet, const unsigne
 
 	if (const UINT64 delta = now - tickSet.nowTick; delta < intervalMs)
 	{
-		Sleep(static_cast<DWORD>(intervalMs - delta));
+		std::unique_lock lock(lifecycleLock);
+		stopRequested.wait_for(lock, std::chrono::milliseconds(intervalMs - delta),
+			[this] { return threadStopFlag.load(); });
 	}
 
 	tickSet.nowTick = GetTickCount64();
@@ -730,6 +778,12 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 
 void RUDPClientCore::SendPacket(OUT IPacket& packet)
 {
+	uint64_t expectedGeneration;
+	{
+		std::scoped_lock lock(lifecycleLock);
+		if (isStopped || not isConnected || threadStopFlag) return;
+		expectedGeneration = unreliableSendGeneration;
+	}
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -737,12 +791,20 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 		return;
 	}
 
-	constexpr auto packetType = PACKET_TYPE::SEND_TYPE;
-	const PacketSequence packetSequence = ++lastSendPacketSequence;
-	*buffer << packetType << packetSequence << packet.GetPacketId();
+	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
+	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
+	const PacketId packetId = packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
 
-	return SendPacket(*buffer, packetSequence, false);
+	std::scoped_lock lifecycleGuard(lifecycleLock);
+	if (isStopped || not isConnected || threadStopFlag || sendEventHandles[0] == nullptr ||
+		unreliableSendGeneration != expectedGeneration) return;
+	const PacketSequence packetSequence = ++lastSendPacketSequence;
+	buffer->MoveWritePosThisPos(0);
+	constexpr auto packetType = PACKET_TYPE::SEND_TYPE;
+	*buffer << packetType << packetSequence << packetId;
+	buffer->MoveWritePosBeforeCallThisPos();
+	SendPacket(*bufferGuard.release(), packetSequence, false);
 }
 
 bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
@@ -801,14 +863,14 @@ NetBuffer* RUDPClientCore::GetReceivedUnreliablePacket()
 
 void RUDPClientCore::Disconnect()
 {
-	serverAliveChecker.StopServerAliveCheck();
-	std::scoped_lock lock(lifecycleLock);
-	if (isStopped.load(std::memory_order_acquire))
+	std::unique_lock lock(lifecycleLock);
+	if (isStopped || threadStopFlag)
 	{
 		return;
 	}
 
 	isConnected = false;
+	acceptingConnectAck = false;
 
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
@@ -843,11 +905,15 @@ void RUDPClientCore::Disconnect()
 	}
 
 	ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+	lock.unlock();
+	serverAliveChecker.StopServerAliveCheck();
 }
 
 #if _DEBUG
 void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 {
+	std::scoped_lock lock(lifecycleLock);
+	if (isStopped || not isConnected || threadStopFlag) return;
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -874,6 +940,11 @@ void RUDPClientCore::SendPacket(OUT NetBuffer& buffer, const PacketSequence inSe
 		sessionKeyHandle,
 		isCorePacket
 	);
+	if (not buffer.m_bIsEncoded)
+	{
+		NetBuffer::Free(&buffer);
+		return;
+	}
 
 	if (not isCorePacket)
 	{
@@ -979,41 +1050,19 @@ bool RUDPClientCore::ReadOptionFile(const std::wstring& clientCoreOptionFile, co
 
 bool RUDPClientCore::ReadClientCoreOptionFile(const std::wstring& optionFilePath)
 {
-	_wsetlocale(LC_ALL, L"Korean");
-
-	CParser parser;
-	WCHAR cBuffer[BUFFER_MAX];
-
-	FILE* fp;
-	_wfopen_s(&fp, optionFilePath.c_str(), L"rt, ccs=UNICODE");
-
-	const int iJumpBom = ftell(fp);
-	fseek(fp, 0, SEEK_END);
-	const int iFileSize = ftell(fp);
-	fseek(fp, iJumpBom, SEEK_SET);
-	const int fileSize = static_cast<int>(fread_s(cBuffer, BUFFER_MAX, sizeof(WCHAR), iFileSize / 2, fp));
-	const int amend = iFileSize - fileSize;
-	fclose(fp);
-
-	cBuffer[iFileSize - amend] = '\0';
-	WCHAR* pBuff = cBuffer;
-
-	if (!parser.GetValue_Short(pBuff, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", reinterpret_cast<short*>(&maxPacketRetransmissionCount)))
-	{
-		return false;
-	}
-	if (!parser.GetValue_Int(pBuff, L"CORE", L"RETRANSMISSION_MS", reinterpret_cast<int*>(&retransmissionThreadSleepMs)))
-	{
-		return false;
-	}
-	if (!parser.GetValue_Int(pBuff, L"CORE", L"SERVER_ALIVE_CHECK_MS", reinterpret_cast<int*>(&serverAliveCheckMs)))
-	{
-		return false;
-	}
-
-	int queueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
-	parser.GetValue_Int(pBuff, L"CORE", L"UNRELIABLE_QUEUE_CAPACITY", &queueCapacity);
-	if (queueCapacity < 1 || queueCapacity > 65535) return false;
-	unreliableQueueCapacity = static_cast<unsigned int>(queueCapacity);
+	ClientOptionFile options;
+	if (not options.Load(optionFilePath)) return false;
+	unsigned int retryCount{}, retryMs{}, aliveMs{};
+	unsigned int queueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
+	constexpr auto MAX_INTERVAL = static_cast<unsigned int>((std::numeric_limits<int>::max)());
+	if (not options.GetNumber(L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", 1, 65535, retryCount) ||
+		not options.GetNumber(L"CORE", L"RETRANSMISSION_MS", 1, MAX_INTERVAL, retryMs) ||
+		not options.GetNumber(L"CORE", L"SERVER_ALIVE_CHECK_MS", 1, MAX_INTERVAL, aliveMs)) return false;
+	if (options.GetValue(L"CORE", L"UNRELIABLE_QUEUE_CAPACITY") &&
+		not options.GetNumber(L"CORE", L"UNRELIABLE_QUEUE_CAPACITY", 1, 65535, queueCapacity)) return false;
+	maxPacketRetransmissionCount = static_cast<PacketRetransmissionCount>(retryCount);
+	retransmissionThreadSleepMs = retryMs;
+	serverAliveCheckMs = aliveMs;
+	unreliableQueueCapacity = queueCapacity;
 	return true;
 }

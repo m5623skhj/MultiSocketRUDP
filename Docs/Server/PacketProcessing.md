@@ -414,12 +414,17 @@ bool PacketCryptoHelper::DecodePacket(
         return false;
     }
 
-    return CryptoHelper::DecryptAESGCM(
+    if (!CryptoHelper::DecryptAESGCM(
         nonce, NONCE_SIZE, aad, aadSize,
         &packet.m_pSerializeBuffer[bodyOffset], bodySize,
         authTag,
         &packet.m_pSerializeBuffer[bodyOffset], bodySize,
-        sessionKeyHandle);
+        sessionKeyHandle)) {
+        return false;
+    }
+    packet.m_iWrite = static_cast<WORD>(authTagOffset);
+    packet.m_iWriteLast = packet.m_iWrite;
+    return true;
 }
 ```
 

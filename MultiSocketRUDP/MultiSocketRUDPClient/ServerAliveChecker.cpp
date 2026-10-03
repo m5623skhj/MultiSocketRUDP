@@ -12,6 +12,8 @@ ServerAliveChecker::ServerAliveChecker(const std::function<void()>& inCoreStopFu
 
 void ServerAliveChecker::StartServerAliveCheck(const unsigned int inCheckIntervalMs)
 {
+	std::scoped_lock threadGuard(threadLock);
+	if (serverAliveCheckThread.joinable()) return;
 	checkIntervalMs = inCheckIntervalMs;
 	beforeCheckReceiveCount = getReceiveCountFunction();
 	isStopped.store(false, std::memory_order_release);
@@ -20,23 +22,15 @@ void ServerAliveChecker::StartServerAliveCheck(const unsigned int inCheckInterva
 
 void ServerAliveChecker::StopServerAliveCheck()
 {
-	if (isStopped.exchange(true, std::memory_order_acq_rel))
+	std::scoped_lock threadGuard(threadLock);
 	{
-		return;
+		std::scoped_lock lock(waitLock);
+		isStopped.store(true, std::memory_order_release);
 	}
-
-	if (not serverAliveCheckThread.joinable())
-	{
-		return;
-	}
-
-	if (serverAliveCheckThread.get_id() != std::this_thread::get_id())
+	wake.notify_all();
+	if (serverAliveCheckThread.joinable())
 	{
 		serverAliveCheckThread.join();
-	}
-	else
-	{
-		serverAliveCheckThread.detach();
 	}
 }
 
@@ -55,10 +49,10 @@ void ServerAliveChecker::RunServerAliveCheckerThread()
 {
 	while (not isStopped)
 	{
-		Sleep(checkIntervalMs);
-		if (isStopped.load(std::memory_order_acquire))
 		{
-			break;
+			std::unique_lock lock(waitLock);
+			if (wake.wait_for(lock, std::chrono::milliseconds(checkIntervalMs),
+				[this] { return isStopped.load(std::memory_order_acquire); })) break;
 		}
 
 		if (not IsServerAlive(getReceiveCountFunction()))

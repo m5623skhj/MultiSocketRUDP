@@ -150,6 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BuildConfig.h" />
+    <ClInclude Include="ClientOptionFile.h" />
     <ClInclude Include="LogExtension.h" />
     <ClInclude Include="PacketManager.h" />
     <ClInclude Include="RUDPClientCore.h" />

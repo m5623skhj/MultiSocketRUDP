@@ -2,18 +2,20 @@
 #include "../Common/etc/CoreType.h"
 #include <thread>
 #include <functional>
+#include <mutex>
+#include <condition_variable>
 
 // ----------------------------------------
 // @brief 일정 주기마다 인증된 수신 횟수를 확인하여 서버 생존 상태를 감시합니다.
-// 두 검사 사이에 인증된 수신이 없으면 등록된 코어 종료 함수를 감시 스레드에서 호출합니다.
-// Stop은 감시 스레드 자신에게서 호출될 수 있으므로 self-join을 피하도록 구현되어 있습니다.
+// 두 검사 사이에 인증된 수신이 없으면 감시 스레드에서 종료 요청 콜백을 호출합니다.
+// 콜백은 감시기를 직접 join하지 않습니다. 외부 종료 경로에서 Stop을 호출합니다.
 // ----------------------------------------
 class ServerAliveChecker
 {
 public:
 	ServerAliveChecker() = delete;
 	explicit ServerAliveChecker(const std::function<void()>& inCoreStopFunction, const std::function<uint64_t()>& inGetReceiveCountFunction);
-	~ServerAliveChecker() = default;
+	~ServerAliveChecker() { StopServerAliveCheck(); }
 	ServerAliveChecker(const ServerAliveChecker&) = delete;
 	ServerAliveChecker& operator=(const ServerAliveChecker&) = delete;
 	ServerAliveChecker(ServerAliveChecker&&) = delete;
@@ -39,6 +41,9 @@ private:
 
 private:
 	std::atomic_bool isStopped{ false };
+	std::mutex threadLock;
+	std::mutex waitLock;
+	std::condition_variable wake;
 
 private:
 	unsigned int checkIntervalMs{ 0 };

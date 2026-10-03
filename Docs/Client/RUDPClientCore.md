@@ -13,8 +13,8 @@
 3. [종료 — `Stop`](#3-종료-stop)
 4. [TLS 세션 정보 수신](#4-tls-세션-정보-수신)
 5. [CONNECT 패킷 전송](#5-connect-패킷-전송)
-6. [데이터 송신 — `SendPacket` / `SendUnreliablePacket`](#6-데이터-송신-sendpacket)
-7. [데이터 수신 — `GetReceivedPacket` / `GetReceivedUnreliablePacket`](#7-데이터-수신-getreceivedpacket)
+6. [데이터 송신 — `SendPacket`](#6-데이터-송신-sendpacket)
+7. [데이터 수신 — `GetReceivedPacket`](#7-데이터-수신-getreceivedpacket)
 8. [수신 스레드 — `recvThread`](#8-수신-스레드-recvthread)
 9. [수신 처리 — `ProcessRecvPacket`](#9-수신-처리-processrecvpacket)
 10. [ACK 수신 — `OnSendReply`](#10-ack-수신-onsendreply)
@@ -935,10 +935,18 @@ void TryFlushPendingQueue()
 - 일반 콘텐츠 패킷 송신 진입점이다.
 - 내부에서 시퀀스 부여, 암호화, 재전송 추적 등록까지 이어진다.
 
-#### `bool SendUnreliablePacket(IPacket& packet)`
-- 최신성 우선 채널 송신 진입점이다.
-- 로컬 bounded queue 수락 여부를 반환하며 ACK와 재전송을 제공하지 않는다.
+### `SendUnreliablePacket`
 
+```cpp
+bool SendUnreliablePacket(IPacket& packet);
+```
+
+최신성 우선 채널 송신 진입점이다. 로컬 bounded queue 수락 여부를 반환하며 ACK와 재전송을 제공하지 않는다.
+
+| 반환값 | 의미 |
+|--------|------|
+| `true` | 송신 요청 성공 |
+| `false` | 로컬 큐가 가득 차서 송신 실패 |
 #### `void Disconnect()`
 - 연결 해제 코어 패킷을 보낸 뒤 종료 흐름으로 들어간다.
 

@@ -16,6 +16,7 @@
 #include "../IntegrationTest/TestableRUDPClient.h"
 
 bool RunUnreliableClientChecks();
+bool RunClientLifecycleChecks(const std::wstring& corePath, const std::wstring& brokerPath, bool timeout);
 
 namespace
 {
@@ -426,6 +427,11 @@ int wmain(const int argc, wchar_t* argv[])
 	else if (scenario == L"disconnect")
 	{
 		exitCode = RunDisconnectScenario(clientCoreOptionPath, sessionGetterOptionPath) ? 0 : 1;
+	}
+	else if (scenario == L"lifecycle-restart" || scenario == L"connect-timeout")
+	{
+		exitCode = RunClientLifecycleChecks(clientCoreOptionPath, sessionGetterOptionPath,
+			scenario == L"connect-timeout") ? 0 : 1;
 	}
 	else if (scenario == L"stop")
 	{

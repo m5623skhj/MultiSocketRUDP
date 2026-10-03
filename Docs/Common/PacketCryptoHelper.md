@@ -89,6 +89,9 @@ static bool DecodePacket(
 
 수신 패킷의 sequence와 AuthTag를 읽고, 송신 시와 같은 nonce/AAD 범위로 AES-GCM 복호화를 수행한다.
 복호화 또는 인증 검증에 실패하면 `false`를 반환한다.
+성공하면 `m_iWrite`와 `m_iWriteLast`를 AuthTag 시작 위치로 맞춰 태그를 읽기 가능한 범위에서 제외한다.
+읽기 위치는 유지하므로 호출자는 sequence와 콘텐츠를 기존 순서대로 읽을 수 있다.
+헤더의 payload 길이는 수신한 wire 길이로 유지되며 AuthTag를 포함한다.
 
 ### `SetHeader`
 

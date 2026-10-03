@@ -195,6 +195,9 @@ TEST_F(PacketCryptoTest, DataPacket_RoundTripPreservesPayload)
 	EXPECT_EQ(decodedSequence, sequence);
 	EXPECT_EQ(decodedId, 77u);
 	EXPECT_EQ(decodedPayload, "encrypted-payload");
+	EXPECT_EQ(packet.GetUseSize(), 0);
+	char extraByte{};
+	EXPECT_ANY_THROW(packet.ReadBuffer(&extraByte, sizeof(extraByte)));
 }
 
 TEST_F(PacketCryptoTest, CorePacket_EmptyBodyRoundTripSucceedsAtSequenceBoundaries)
@@ -206,8 +209,12 @@ TEST_F(PacketCryptoTest, CorePacket_EmptyBodyRoundTripSucceedsAtSequenceBoundari
 		PacketCryptoHelper::EncodePacket(packet, sequence, PACKET_DIRECTION::SERVER_TO_CLIENT,
 			salt.data(), salt.size(), key.Get(), true);
 		AdvanceToPacketBody(packet);
-		EXPECT_TRUE(PacketCryptoHelper::DecodePacket(packet, salt.data(), salt.size(), key.Get(), true,
+		ASSERT_TRUE(PacketCryptoHelper::DecodePacket(packet, salt.data(), salt.size(), key.Get(), true,
 			PACKET_DIRECTION::SERVER_TO_CLIENT));
+		PacketSequence decodedSequence{};
+		packet >> decodedSequence;
+		EXPECT_EQ(decodedSequence, sequence);
+		EXPECT_EQ(packet.GetUseSize(), 0);
 	}
 }
 
@@ -218,8 +225,12 @@ TEST_F(PacketCryptoTest, TamperedTagIsRejected)
 		salt.data(), salt.size(), key.Get(), false);
 	packet.GetReadBufferPtr()[packet.GetUseSize() - 1] ^= 0x01;
 	AdvanceToPacketBody(packet);
+	const auto* readPosition = packet.GetReadBufferPtr();
+	const int remainingSize = packet.GetUseSize();
 	EXPECT_FALSE(PacketCryptoHelper::DecodePacket(packet, salt.data(), salt.size(), key.Get(), false,
 		PACKET_DIRECTION::CLIENT_TO_SERVER));
+	EXPECT_EQ(packet.GetReadBufferPtr(), readPosition);
+	EXPECT_EQ(packet.GetUseSize(), remainingSize);
 }
 
 TEST_F(PacketCryptoTest, WrongDirectionAndSaltAreRejected)
@@ -341,5 +352,6 @@ TEST_F(PacketCryptoTest, AesGcmMatchesProtocolV2GoldenVectors)
 			packet.ReadBuffer(reinterpret_cast<char*>(decodedPlaintext.data()), static_cast<int>(decodedPlaintext.size()));
 		}
 		EXPECT_EQ(decodedPlaintext, testVector.plaintext);
+		EXPECT_EQ(packet.GetUseSize(), 0);
 	}
 }
