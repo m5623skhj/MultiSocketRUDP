@@ -1,6 +1,7 @@
 #include "PreCompile.h"
 #include "TLSHelper.h"
 #include <vector>
+#include <chrono>
 
 namespace TLSHelper
 {
@@ -34,12 +35,36 @@ namespace TLSHelper
 
     bool TLSHelperClient::Handshake(const SOCKET socket)
     {
+        return Handshake(socket, std::stop_token{});
+    }
+
+    bool TLSHelperClient::Handshake(const SOCKET socket, const std::stop_token& inStopToken)
+    {
         handshakeCompleted = false;
         CtxtHandle* context = nullptr;
         std::vector<char> recvBuffer;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+        // Only this thread reads the socket; readiness polling makes receive cancellable.
+        const auto receiveData = [&]()
+        {
+            while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
+            {
+                fd_set readable{};
+                FD_SET(socket, &readable);
+                timeval timeout{ 0, 100000 };
+                const int ready = select(0, &readable, nullptr, nullptr, &timeout);
+                if (ready == SOCKET_ERROR) return false;
+                if (ready > 0) return ReceiveHandshakeData(socket, recvBuffer);
+            }
+            return false;
+        };
 
         while (true)
         {
+            if (inStopToken.stop_requested() || std::chrono::steady_clock::now() >= deadline)
+            {
+                return false;
+            }
             SecBuffer outBuffers[1] = {};
             outBuffers[0].BufferType = SECBUFFER_TOKEN;
 
@@ -91,7 +116,7 @@ namespace TLSHelper
             if (lastStatus == SEC_E_INCOMPLETE_MESSAGE)
             {
                 // Schannel needs the existing partial token plus additional socket data.
-                if (not ReceiveHandshakeData(socket, recvBuffer))
+                if (not receiveData())
                 {
                     return false;
                 }
@@ -112,7 +137,7 @@ namespace TLSHelper
                 recvBuffer.clear();
             }
 
-            if (not ReceiveHandshakeData(socket, recvBuffer))
+            if (not receiveData())
             {
                 return false;
             }

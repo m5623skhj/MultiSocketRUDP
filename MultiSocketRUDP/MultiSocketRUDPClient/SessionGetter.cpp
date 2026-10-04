@@ -4,6 +4,7 @@
 #include "LogExtension.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include "ClientOptionFile.h"
+#include <chrono>
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -46,7 +47,7 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 }
 
 #else
-bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
+bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken)
 {
 	if (not tlsHelper.Initialize())
 	{
@@ -56,7 +57,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath)
 		return false;
 	}
 
-	if (not GetSessionFromServer())
+	if (not GetSessionFromServer(inStopToken))
 	{
 		LOG_ERROR("RUDPClientCore::GetSessionFromServer() failed");
 		return false;
@@ -87,8 +88,9 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	return true;
 }
 
-bool RUDPClientCore::GetSessionFromServer()
+bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 {
+	if (inStopToken.stop_requested()) return false;
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
@@ -96,7 +98,7 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
-	if (not TryConnectToSessionBroker())
+	if (not TryConnectToSessionBroker(inStopToken))
 	{
 		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
 		closesocket(sessionBrokerSocket);
@@ -104,7 +106,19 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
-	if (not tlsHelper.Handshake(sessionBrokerSocket))
+	// Bound sends as well as reads before the TLS handshake starts.
+	constexpr DWORD BROKER_IO_TIMEOUT_MS = 6000;
+	if (setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
+		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR ||
+		setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
+		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR)
+	{
+		closesocket(sessionBrokerSocket);
+		sessionBrokerSocket = INVALID_SOCKET;
+		return false;
+	}
+
+	if (not tlsHelper.Handshake(sessionBrokerSocket, inStopToken))
 	{
 		LOG_ERROR(std::format(
 			"TLS Handshake failed in GetSessionFromServer() with security status {:#010x}",
@@ -114,46 +128,56 @@ bool RUDPClientCore::GetSessionFromServer()
 		return false;
 	}
 
-	constexpr DWORD VERSION_TIMEOUT_MS = 6000;
-	if (setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
-		reinterpret_cast<const char*>(&VERSION_TIMEOUT_MS), sizeof(VERSION_TIMEOUT_MS)) == SOCKET_ERROR ||
-		setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
-			reinterpret_cast<const char*>(&VERSION_TIMEOUT_MS), sizeof(VERSION_TIMEOUT_MS)) == SOCKET_ERROR ||
-		not tlsHelper.SendProtocolVersion(sessionBrokerSocket, RUDP_PROTOCOL_VERSION))
+	if (inStopToken.stop_requested() || not tlsHelper.SendProtocolVersion(sessionBrokerSocket, RUDP_PROTOCOL_VERSION))
 	{
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
 	}
-	return TrySetTargetSessionInfo();
+	return TrySetTargetSessionInfo(inStopToken);
 }
 
-bool RUDPClientCore::TryConnectToSessionBroker() const
+// Poll a nonblocking connect so startup cancellation never waits for the OS TCP timeout.
+bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToken) const
 {
-	sockaddr_in sessionGetterAddr;
+	sockaddr_in sessionGetterAddr{};
 	sessionGetterAddr.sin_family = AF_INET;
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
 	InetPton(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr);
 
-	bool connected{ false };
-	for (int i = 0; i < 5; ++i)
+	u_long nonblocking = 1;
+	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR) return false;
+	bool connected = false;
+	if (!inStopToken.stop_requested())
 	{
-		if (connect(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&sessionGetterAddr), sizeof(sessionGetterAddr)) == SOCKET_ERROR)
+		const int result = connect(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&sessionGetterAddr), sizeof(sessionGetterAddr));
+		connected = result == 0;
+		const int connectError = connected ? 0 : WSAGetLastError();
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+		while (!connected && (connectError == WSAEWOULDBLOCK || connectError == WSAEINPROGRESS)
+			&& !inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 		{
-			Sleep(1000);
-			{
-				continue;
-			}
+			fd_set writable{}, errors{};
+			FD_SET(sessionBrokerSocket, &writable);
+			FD_SET(sessionBrokerSocket, &errors);
+			timeval timeout{ 0, 100000 };
+			const int ready = select(0, nullptr, &writable, &errors, &timeout);
+			if (ready == SOCKET_ERROR) break;
+			if (ready == 0) continue;
+			int socketError{};
+			int errorSize = sizeof(socketError);
+			connected = getsockopt(sessionBrokerSocket, SOL_SOCKET, SO_ERROR,
+				reinterpret_cast<char*>(&socketError), &errorSize) == 0 && socketError == 0
+				&& FD_ISSET(sessionBrokerSocket, &writable);
+			break;
 		}
-
-		connected = true;
-		break;
 	}
-
-	return connected;
+	nonblocking = 0;
+	return ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == 0
+		&& connected && !inStopToken.stop_requested();
 }
 
-bool RUDPClientCore::TrySetTargetSessionInfo()
+bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 {
 	auto& recvBuffer = *NetBuffer::Alloc();
 	recvBuffer.m_iRead = 0;
@@ -168,9 +192,16 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 	WORD payloadLength{};
 
 	bool payloadComplete{ false };
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
 
-	while (true)
+	while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 	{
+		fd_set readable{};
+		FD_SET(sessionBrokerSocket, &readable);
+		timeval timeout{ 0, 100000 };
+		const int ready = select(0, &readable, nullptr, nullptr, &timeout);
+		if (ready == SOCKET_ERROR) break;
+		if (ready == 0) continue;
 		char tlsRecvBuffer[maxTlsPacketSize];
 		const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 		if (bytesReceived <= 0)
@@ -235,7 +266,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo()
 	closesocket(sessionBrokerSocket);
 	sessionBrokerSocket = INVALID_SOCKET;
 
-	if (not payloadComplete)
+	if (inStopToken.stop_requested() || not payloadComplete)
 	{
 		NetBuffer::Free(&recvBuffer);
 		return false;

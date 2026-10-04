@@ -35,8 +35,14 @@ RUDPClientCore::~RUDPClientCore()
 
 bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, const bool printLogToConsole)
 {
+	return Start(clientCoreOptionFile, sessionGetterOptionFilePath, printLogToConsole, std::stop_token{});
+}
+
+bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath,
+	const bool printLogToConsole, const std::stop_token& inStopToken)
+{
 	std::scoped_lock operationGuard(startStopLock);
-	if (not isStopped) return false;
+	if (not isStopped || inStopToken.stop_requested()) return false;
 	if (shutdownThread.joinable()) shutdownThread.join();
 	threadStopFlag = false;
 	isConnected = false;
@@ -72,12 +78,13 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 		return failStart();
 	}
 #else
-	if (not RunGetSessionFromServer(sessionGetterOptionFilePath))
+	if (not RunGetSessionFromServer(sessionGetterOptionFilePath, inStopToken))
 	{
 		return failStart();
 	}
 #endif
 
+	if (inStopToken.stop_requested()) return failStart();
 	if (not CreateRUDPSocket())
 	{
 		return failStart();
@@ -297,6 +304,19 @@ bool RUDPClientCore::CreateRUDPSocket()
 		return false;
 	}
 
+	// Idle receive and congested send must return so workers can observe shutdown.
+	constexpr DWORD UDP_IO_TIMEOUT_MS = 200;
+	if (setsockopt(rudpSocket.load(), SOL_SOCKET, SO_RCVTIMEO,
+		reinterpret_cast<const char*>(&UDP_IO_TIMEOUT_MS), sizeof(UDP_IO_TIMEOUT_MS)) == SOCKET_ERROR ||
+		setsockopt(rudpSocket.load(), SOL_SOCKET, SO_SNDTIMEO,
+			reinterpret_cast<const char*>(&UDP_IO_TIMEOUT_MS), sizeof(UDP_IO_TIMEOUT_MS)) == SOCKET_ERROR)
+	{
+		LOG_ERROR(std::format("UDP I/O timeout setup failed with error {}", WSAGetLastError()));
+		closesocket(rudpSocket);
+		rudpSocket = INVALID_SOCKET;
+		return false;
+	}
+
 	sockaddr_in recvAddr;
 	recvAddr.sin_family = AF_INET;
 	recvAddr.sin_addr.s_addr = INADDR_ANY;
@@ -365,7 +385,10 @@ void RUDPClientCore::RunRecvThread()
 		if (bytesReceived == SOCKET_ERROR)
 		{
 			const int error = WSAGetLastError();
-			
+			if (threadStopFlag) break;
+			// A timeout on an idle UDP socket is expected, not a connection failure.
+			if (error == WSAETIMEDOUT || error == WSAEWOULDBLOCK) continue;
+
 			const auto log = Logger::MakeLogObject<ClientLog>();
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
@@ -389,7 +412,8 @@ void RUDPClientCore::RunRecvThread()
 
 void RUDPClientCore::RunSendThread()
 {
-	while (true)
+	// Exit on shutdown even when the send semaphore has accumulated wakeups.
+	while (not threadStopFlag)
 	{
 		switch (WaitForMultipleObjects(static_cast<DWORD>(sendEventHandles.size()), sendEventHandles.data(), FALSE, INFINITE))
 		{

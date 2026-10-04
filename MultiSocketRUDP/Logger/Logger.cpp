@@ -3,8 +3,8 @@
 #include <syncstream>
 #include <filesystem>
 
-#define LOG_HANDLE  WAIT_OBJECT_0
-#define STOP_HANDLE WAIT_OBJECT_0 + 1
+#define STOP_HANDLE WAIT_OBJECT_0
+#define LOG_HANDLE  (WAIT_OBJECT_0 + 1)
 
 Logger::Logger()
 {
@@ -87,10 +87,12 @@ void Logger::RunLoggerThread(const bool isAlsoPrintToConsole)
 void Logger::Worker()
 {
 	std::queue<std::shared_ptr<LogBase>> copyLogWaitingQueue;
+	// WaitForMultipleObjects chooses the lowest signaled index: shutdown comes first.
+	const HANDLE waitHandles[] = { loggerEventHandles[1], loggerEventHandles[0] };
 
 	while (true)
 	{
-		const auto result = WaitForMultipleObjects(2, loggerEventHandles, FALSE, INFINITE);
+		const auto result = WaitForMultipleObjects(2, waitHandles, FALSE, INFINITE);
 
 		{
 			std::scoped_lock lock(logQueueLock);
@@ -103,10 +105,9 @@ void Logger::Worker()
 		}
 		else if (result == STOP_HANDLE)
 		{
-			// Wait 10 seconds
-			Sleep(10000);
-
+			// Drain and flush logs before completing shutdown.
 			WriteLogImpl(copyLogWaitingQueue);
+			logFileStream.flush();
 			break;
 		}
 		else

@@ -4,6 +4,7 @@
 #include "../Common/etc/CoreType.h"
 #include <atomic>
 #include <thread>
+#include <stop_token>
 #include <mutex>
 #include <condition_variable>
 #include <array>
@@ -96,6 +97,9 @@ protected:
 	// @return 초기화 단계 중 하나라도 실패하면 false를 반환합니다.
 	// ----------------------------------------
 	virtual bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
+	// Broker waits observe cancellation; cleanup still runs on the startup owner.
+	bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath,
+		bool printLogToConsole, const std::stop_token& inStopToken);
 	// ----------------------------------------
 	// @brief 작업 스레드와 감시기를 중단하고 소켓·암호 및 송신 추적·보류 자원을 정리합니다.
 	// ----------------------------------------
@@ -167,10 +171,10 @@ private:
 	// TLS 세션 브로커 연결과 응답 스트림 조립
 	// TrySetTargetSessionInfo는 TLS close_notify와 전체 RUDP 세션 페이로드를 모두 확인합니다.
 	// ----------------------------------------
-	bool RunGetSessionFromServer(const std::wstring& optionFilePath);
-	bool GetSessionFromServer();
-	bool TryConnectToSessionBroker() const;
-	bool TrySetTargetSessionInfo();
+	bool RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken);
+	bool GetSessionFromServer(const std::stop_token& inStopToken);
+	bool TryConnectToSessionBroker(const std::stop_token& inStopToken) const;
+	bool TrySetTargetSessionInfo(const std::stop_token& inStopToken);
 
 private:
 	WCHAR sessionBrokerIP[16]{};

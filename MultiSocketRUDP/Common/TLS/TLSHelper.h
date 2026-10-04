@@ -120,6 +120,9 @@ namespace TLSHelper
 		bool Initialize() override;
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
+		[[nodiscard]]
+		// Client receive waits share a deadline and observe startup cancellation.
+		bool Handshake(SOCKET socket, const std::stop_token& inStopToken);
 
 	private:
 		std::wstring serverName{};
