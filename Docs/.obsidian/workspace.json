@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Testing/CI.md",
+                "file": "UnreliableChannel.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "CI"
+              "title": "UnreliableChannel"
             }
           }
         ]
@@ -55,7 +55,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "CI",
+                "query": "채널",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -188,6 +188,8 @@
   },
   "active": "d68527863d5119d9",
   "lastOpenFiles": [
+    "00_Overview.md",
+    "Testing/CI.md",
     "Common/TLSHelper.md",
     "ContentServer/PlayerManager.md",
     "Logger/Logger.md",
@@ -212,8 +214,6 @@
     "Server/FatalErrorHandling.md",
     "Server/Threading/WorkerThreads.md",
     "Server/Threading/LifecycleAndSynchronization.md",
-    "Server/Session/StateCryptoAndSocket.md",
-    "Server/Session/SessionComponentsReference.md",
     "Diagrams/AiTreeFlow.svg",
     "Diagrams/BotTester_Architecture.svg",
     "Diagrams/Connection_Sequence.svg",

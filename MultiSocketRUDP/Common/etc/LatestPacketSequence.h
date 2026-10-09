@@ -8,12 +8,17 @@ class LatestPacketSequence
 public:
     bool Accept(const PacketSequence sequence) noexcept
     {
-        if (hasReceived && sequence <= latest) return false;
+        if (hasReceived && sequence <= latest)
+        {
+            return false;
+        }
+
         latest = sequence;
         hasReceived = true;
         return true;
     }
     void Reset() noexcept { latest = 0; hasReceived = false; }
+
 private:
     PacketSequence latest{};
     bool hasReceived{};
