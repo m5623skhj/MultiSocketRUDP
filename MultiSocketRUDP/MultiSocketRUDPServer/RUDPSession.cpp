@@ -609,7 +609,11 @@ bool RUDPSession::IsOlderRecvSequence(
 
 bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recvPacketSequence)
 {
-	if (not DispatchContentPacket(recvPacket)) return false;
+	if (not DispatchContentPacket(recvPacket))
+	{
+		return false;
+	}
+
 	flowManager.MarkReceived(recvPacketSequence);
 	SendReplyToClient(recvPacketSequence);
 	return true;
@@ -617,10 +621,18 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, const PacketSequence recv
 
 bool RUDPSession::OnUnreliablePacket(NetBuffer& packet)
 {
-	if (not IsConnected()) return false;
+	if (not IsConnected())
+	{
+		return false;
+	}
+
 	PacketSequence sequence;
 	packet >> sequence;
-	if (not unreliableReceiveState.Accept(sequence)) return true;
+	if (not unreliableReceiveState.Accept(sequence))
+	{
+		return true;
+	}
+
 	return DispatchContentPacket(packet);
 }
 
@@ -634,14 +646,14 @@ bool RUDPSession::DispatchContentPacket(NetBuffer& recvPacket)
 	PacketId packetId;
 	recvPacket >> packetId;
 
-	auto const itor = packetFactoryMap.find(packetId);
-	if (itor == packetFactoryMap.end())
+	auto const handlerItor = packetFactoryMap.find(packetId);
+	if (handlerItor == packetFactoryMap.end())
 	{
 		LOG_ERROR(std::format("Received unknown packet. packetId: {}", packetId));
 		return false;
 	}
 
-	if (not itor->second(this, &recvPacket)())
+	if (not handlerItor->second(this, &recvPacket)())
 	{
 		LOG_ERROR(std::format("Failed to process received packet. packetId: {}", packetId));
 		return false;

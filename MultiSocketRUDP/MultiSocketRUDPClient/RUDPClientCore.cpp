@@ -797,6 +797,7 @@ NetBuffer* RUDPClientCore::GetReceivedPacket()
 	++nextRecvPacketSequence;
 	// Consume following heartbeats even if the application makes no further receive calls.
 	DrainReceivedControlPackets();
+
 	return buffer;
 }
 
@@ -821,13 +822,21 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	packet.PacketToBuffer(*buffer);
 
 	std::scoped_lock lifecycleGuard(lifecycleLock);
-	if (isStopped || not isConnected || threadStopFlag || sendEventHandles[0] == nullptr ||
-		unreliableSendGeneration != expectedGeneration) return;
+	if (isStopped ||
+		not isConnected ||
+		threadStopFlag ||
+		sendEventHandles[0] == nullptr ||
+		unreliableSendGeneration != expectedGeneration)
+	{
+		return;
+	}
+
 	const PacketSequence packetSequence = ++lastSendPacketSequence;
 	buffer->MoveWritePosThisPos(0);
 	constexpr auto packetType = PACKET_TYPE::SEND_TYPE;
 	*buffer << packetType << packetSequence << packetId;
 	buffer->MoveWritePosBeforeCallThisPos();
+
 	SendPacket(*bufferGuard.release(), packetSequence, false);
 }
 
@@ -836,15 +845,25 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 	uint64_t expectedGeneration;
 	{
 		std::scoped_lock lock(lifecycleLock);
-		if (isStopped || not isConnected || threadStopFlag) return false;
+		if (isStopped || not isConnected || threadStopFlag)
+		{
+			return false;
+		}
+
 		expectedGeneration = unreliableSendGeneration;
 	}
+
 	NetBuffer* buffer = NetBuffer::Alloc();
-	if (buffer == nullptr) return false;
+	if (buffer == nullptr)
+	{
+		return false;
+	}
+
 	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
 	packet.PacketToBuffer(*buffer);
+
 	// Stop waits for an admitted producer before destroying the key or wake handle.
 	std::scoped_lock lifecycleGuard(lifecycleLock);
 	if (isStopped || not isConnected || threadStopFlag || sendEventHandles[0] == nullptr ||
@@ -852,6 +871,7 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 	{
 		return false;
 	}
+
 	const auto sequence = ++lastUnreliableSendSequence;
 	buffer->MoveWritePosThisPos(0);
 	auto type = PACKET_TYPE::UNRELIABLE_SEND_TYPE;
@@ -863,6 +883,7 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 	{
 		return false;
 	}
+
 	std::scoped_lock queueGuard(sendBufferQueueLock);
 	const bool needsWake = unreliableSendQueue.empty();
 	if (unreliableSendQueue.size() >= unreliableQueueCapacity)
@@ -870,18 +891,28 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 		NetBuffer::Free(unreliableSendQueue.front());
 		unreliableSendQueue.pop_front();
 	}
+
 	unreliableSendQueue.push_back(buffer);
 	bufferGuard.release();
-	if (needsWake) ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+	if (needsWake == true)
+	{
+		ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
+	}
+
 	return true;
 }
 
 NetBuffer* RUDPClientCore::GetReceivedUnreliablePacket()
 {
 	std::scoped_lock lock(recvPacketHoldingQueueLock);
-	if (unreliableReceivedPackets.empty()) return nullptr;
+	if (unreliableReceivedPackets.empty())
+	{
+		return nullptr;
+	}
+
 	auto* buffer = unreliableReceivedPackets.front();
 	unreliableReceivedPackets.pop_front();
+
 	return buffer;
 }
 
