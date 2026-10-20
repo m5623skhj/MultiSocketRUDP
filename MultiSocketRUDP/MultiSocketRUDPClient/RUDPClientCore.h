@@ -111,7 +111,7 @@ protected:
 	[[nodiscard]]
 	virtual bool ShouldSendConnectPacketOnStart() const { return true; }
 	[[nodiscard]]
-	virtual bool ShouldSendReplyToServer(PacketSequence inRecvPacketSequence, unsigned int inPacketId) const { return true; }
+	virtual bool ShouldSendReplyToServer(PacketSequence, unsigned int) const { return true; }
 
 public:
 	bool IsStopped() const { return isStopped.load(std::memory_order_acquire); }
