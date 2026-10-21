@@ -160,7 +160,8 @@ TEST_F(SessionSendOrderTest, OversizeRejectionDoesNotConsumeSequenceOrDisconnect
 {
 	CallbackPacket oversized([](NetBuffer& buffer) { buffer << std::string(MAX_WIRE_PACKET_SIZE, 'x'); });
 	CallbackPacket capacityOverflow([](NetBuffer& buffer) { buffer << std::string(BUFFFER_MAX, 'x'); });
-	for (auto* packet : { &oversized, &capacityOverflow })
+	CallbackPacket containerOverflow([](NetBuffer& buffer) { buffer << std::vector<int>(BUFFFER_MAX, 1); });
+	for (auto* packet : { &oversized, &capacityOverflow, &containerOverflow })
 	{
 		EXPECT_FALSE(session.SendPacket(*packet));
 		EXPECT_FALSE(session.SendUnreliablePacket(*packet));

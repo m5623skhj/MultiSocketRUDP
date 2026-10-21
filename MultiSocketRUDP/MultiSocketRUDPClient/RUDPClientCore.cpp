@@ -822,8 +822,10 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
 	try { packet.PacketToBuffer(*buffer); }
-	catch (const std::length_error&)
+	catch (const std::exception&)
 	{
+		// Container writers use runtime_error; only translate NetBuffer write errors.
+		if (buffer->GetBufferError() != 2) throw;
 		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
 		return;
 	}
@@ -876,8 +878,10 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
 	try { packet.PacketToBuffer(*buffer); }
-	catch (const std::length_error&)
+	catch (const std::exception&)
 	{
+		// Container writers use runtime_error; only translate NetBuffer write errors.
+		if (buffer->GetBufferError() != 2) throw;
 		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
 		return false;
 	}

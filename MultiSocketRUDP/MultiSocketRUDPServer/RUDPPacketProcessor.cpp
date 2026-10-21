@@ -130,9 +130,10 @@ void RUDPPacketProcessor::OnRecvPacket(RUDPSession& session, NetBuffer& buffer, 
 		return;
 	}
 	
-    if (buffer.m_iWrite > MAX_WIRE_PACKET_SIZE || buffer.GetUseSize() != GetPayloadLength(buffer))
+    const int wireBytes = buffer.GetUseSize() + df_HEADER_SIZE;
+    if (wireBytes > MAX_WIRE_PACKET_SIZE || buffer.GetUseSize() != GetPayloadLength(buffer))
     {
-        PacketCryptoHelper::TraceRejectedReceiveSize(GetPayloadLength(buffer) + df_HEADER_SIZE, buffer.m_iWrite);
+        PacketCryptoHelper::TraceRejectedReceiveSize(GetPayloadLength(buffer) + df_HEADER_SIZE, wireBytes);
         return;
     }
 
