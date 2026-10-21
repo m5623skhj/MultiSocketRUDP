@@ -404,11 +404,12 @@ constexpr DWORD MAX_SEND_BUFFER_SIZE = 1024 * 32;   // 32KB
 
 **최대 단일 패킷 크기:**
 ```
-Header(5) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 16384 (RECV_BUFFER_SIZE)
-→ N <= 16384 - 34 = 16350 bytes
+Header(5) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 1024 (MAX_WIRE_PACKET_SIZE)
+→ N <= 1024 - 34 = 990 bytes
 ```
 
-> 단일 패킷 페이로드가 16350 bytes를 초과하면 수신 버퍼 한도를 넘으므로 정상 패킷으로 처리할 수 없다.
+> 문자열 길이·컨테이너 개수 필드도 990바이트 본문에 포함한다. 초과 송신은 시퀀스 발급 전에 거절한다.
+> 여러 프레임을 묶는 서버 UDP 데이터그램도 1024바이트 이하이며 32KB 송신 버퍼와 16KB 수신 버퍼는 할당 용량이다.
 > 대용량 데이터는 애플리케이션 레이어에서 분할 전송해야 한다.
 
 ---

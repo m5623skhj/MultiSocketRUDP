@@ -1011,6 +1011,12 @@ void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetTy
 #### `bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath)`
 - 클라이언트 코어와 SessionBroker 접속 설정을 읽는다.
 
+### 패킷 크기 제한
+
+`MAX_WIRE_PACKET_SIZE`는 암호화 헤더와 태그를 포함한 1024바이트다. `SendPacket(IPacket&)`와 `SendUnreliablePacket`은 직렬화 후 시퀀스 발급 전에 검사하므로 거절된 큰 패킷이 reliable 수신 순서에 빈 번호를 만들지 않는다. reliable API는 기존 `void`를 유지하며 로그를 남기고 반환하고, unreliable API는 `false`를 반환한다. 자동 분할은 하지 않는다. 본문 최대 990바이트에는 문자열 길이·컨테이너 개수 필드도 포함한다.
+
+수신 시 같은 프레임 상한을 검사하며 초과/잘린 프레임은 인증·ACK 전에 거절한다. 수신 거절 로그는 누적 건수의 2의 거듭제곱마다 남긴다. 서버의 묶음 UDP 송신도 1024바이트로 제한되므로 16KB 수신 버퍼 초과를 방지한다. 패킷 필드와 프로토콜 버전은 변하지 않으며 서버와 클라이언트 모두 갱신해야 송신 선행 검사가 양쪽에 적용된다.
+
 ### SessionGetter 분기
 
 `USE_IOCP_SESSION_GETTER` 빌드에서는 중첩 `SessionGetter` 클래스가 TLS 세션 조회를 담당한다.

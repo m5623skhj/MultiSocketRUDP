@@ -162,6 +162,8 @@ private:
 	static bool IsOlderRecvSequence(PacketSequence sequence, PacketSequence expectedSequence) noexcept;
 	void SendReplyToClient(PacketSequence recvPacketSequence);
 	void OnSendReply(NetBuffer& recvPacket);
+	/** @brief Log header/timing metadata only, outside scheduler locks while the send guard retains this generation. */
+	void TraceRetransmissionFailure(const SendPacketInfo& inPacketInfo, PacketRetransmissionCount inRetryCount);
 	void OnRetransmissionTimeout() noexcept;
 	void OnRttSample(std::chrono::steady_clock::duration sample);
 
@@ -277,6 +279,12 @@ private:
 	unsigned long long onSessionReleaseTime{};
 	unsigned long long sessionReservedTime{};
 	std::atomic_ullong lastReceivedPacketTime{};
+	// Independent diagnostic snapshots; never used for transport decisions.
+	std::atomic_ullong receivedAckCount{};
+	std::atomic<PacketSequence> lastReceivedAckSequence{};
+	std::atomic_ullong acknowledgedPacketCount{};
+	std::atomic_ullong lastAcknowledgedAtTick{};
+	std::atomic<PacketSequence> lastAcknowledgedSequence{};
 
 public:
 	void SetStateMachineToDisconnect();

@@ -7,6 +7,7 @@
 #include <mutex>
 #include "ClientOptionFile.h"
 #include <limits>
+#include <stdexcept>
 
 void SendPacketInfo::Free(SendPacketInfo* target)
 {
@@ -523,9 +524,10 @@ void RUDPClientCore::OnRecvStream(NetBuffer& recvBuffer, int recvSize)
 		const WORD payloadLength = GetPayloadLength(*recvPacketBuffer);
 		const int remainingPayloadSize = recvSize - df_HEADER_SIZE;
 		if (payloadLength <= 0 ||
-			payloadLength > dfDEFAULTSIZE - df_HEADER_SIZE || 
+			payloadLength > MAX_WIRE_PACKET_SIZE - df_HEADER_SIZE ||
 			payloadLength > remainingPayloadSize)
 		{
+			PacketCryptoHelper::TraceRejectedReceiveSize(payloadLength + df_HEADER_SIZE, recvSize);
 			NetBuffer::Free(recvPacketBuffer);
 			break;
 		}
@@ -819,7 +821,18 @@ void RUDPClientCore::SendPacket(OUT IPacket& packet)
 	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
-	packet.PacketToBuffer(*buffer);
+	try { packet.PacketToBuffer(*buffer); }
+	catch (const std::length_error&)
+	{
+		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
+		return;
+	}
+	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
+	{
+		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
+			buffer->m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+		return;
+	}
 
 	std::scoped_lock lifecycleGuard(lifecycleLock);
 	if (isStopped ||
@@ -862,7 +875,18 @@ bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
 	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
-	packet.PacketToBuffer(*buffer);
+	try { packet.PacketToBuffer(*buffer); }
+	catch (const std::length_error&)
+	{
+		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
+		return false;
+	}
+	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
+	{
+		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
+			buffer->m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+		return false;
+	}
 
 	// Stop waits for an admitted producer before destroying the key or wake handle.
 	std::scoped_lock lifecycleGuard(lifecycleLock);
@@ -969,6 +993,12 @@ void RUDPClientCore::SendPacketForTest(char* streamData, const int streamSize)
 {
 	std::scoped_lock lock(lifecycleLock);
 	if (isStopped || not isConnected || threadStopFlag) return;
+	constexpr int MAX_BODY_SIZE = MAX_WIRE_PACKET_SIZE - df_HEADER_SIZE - sizeof(PACKET_TYPE) - sizeof(PacketSequence) - AUTH_TAG_SIZE;
+	if (streamSize < 0 || streamSize > MAX_BODY_SIZE)
+	{
+		LOG_ERROR(std::format("RUDP test send size rejected: bodyBytes={} limit={}", streamSize, MAX_BODY_SIZE));
+		return;
+	}
 	NetBuffer* buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{

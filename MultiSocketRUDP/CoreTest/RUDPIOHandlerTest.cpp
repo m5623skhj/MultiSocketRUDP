@@ -772,6 +772,34 @@ TEST_F(RUDPIOHandlerTest, DoSend_DataPacketBuildsStreamSchedulesRetransmissionAn
 	EXPECT_EQ(mockDelegate.GetSendIOMode(session).load(), IO_MODE::IO_NONE_SENDING);
 }
 
+TEST_F(RUDPIOHandlerTest, DoSend_SplitsBatchAtWireLimitAndSendsReservedFrameOnCompletion)
+{
+	SetupValidSendPath();
+	for (PacketSequence sequence : { PacketSequence{1}, PacketSequence{2} })
+	{
+		auto* info = AllocSendPacketInfo(sequence);
+		ASSERT_NE(info, nullptr);
+		std::string body(MAX_WIRE_PACKET_SIZE - df_HEADER_SIZE, static_cast<char>(sequence));
+		info->buffer->WriteBuffer(body.data(), static_cast<int>(body.size()));
+		PacketCryptoHelper::SetHeader(*info->buffer);
+		mockDelegate.queuedSendPacketInfos.push_back(info);
+	}
+	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
+	EXPECT_EQ(mockRIO.lastSendLength, MAX_WIRE_PACKET_SIZE);
+	ASSERT_NE(mockDelegate.reservedSendReturn, nullptr);
+	EXPECT_EQ(mockDelegate.reservedSendReturn->sendPacketSequence, 2);
+	// Completing the first RIO write immediately posts the reserved frame.
+	auto* firstContext = static_cast<IOContext*>(mockRIO.lastSendRequestContext);
+	mockRIO.lastSendRequestContext = nullptr;
+	ASSERT_TRUE(handler->IOCompleted(firstContext, 0, THREAD_ID));
+	EXPECT_EQ(mockRIO.rioSendExCallCount, 2);
+	EXPECT_EQ(mockRIO.lastSendLength, MAX_WIRE_PACKET_SIZE);
+	EXPECT_EQ(mockDelegate.reservedSendReturn, nullptr);
+	EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
+	CompleteOutstandingSend();
+}
+
 TEST_F(RUDPIOHandlerTest, DoSend_ErasedPacketDoesNotPostStaleBufferContents)
 {
 	SetupValidSendPath();

@@ -1,10 +1,31 @@
 #pragma once
 #include "NetServerSerializeBuffer.h"
 #include "../Crypto/CryptoHelper.h"
+#include "../etc/CoreConstants.h"
+#include <atomic>
+#include <format>
+
+static_assert(MAX_WIRE_PACKET_SIZE <= dfDEFAULTSIZE, "Receive copies require the initial NetBuffer allocation to fit a frame");
 
 class PacketCryptoHelper
 {
 public:
+    static bool FitsWireLimit(const NetBuffer& packet) noexcept
+    {
+        return packet.m_iWrite >= df_HEADER_SIZE && packet.m_iWrite <=
+            MAX_WIRE_PACKET_SIZE - (packet.m_bIsEncoded ? 0 : static_cast<int>(AUTH_TAG_SIZE));
+    }
+
+    // Size headers are unauthenticated here. Rate-limit diagnostics and never log packet bodies.
+    static void TraceRejectedReceiveSize(int declaredBytes, int receivedBytes)
+    {
+        static std::atomic_uint64_t rejectedCount{};
+        const auto count = rejectedCount.fetch_add(1, std::memory_order_relaxed) + 1;
+        if ((count & (count - 1)) == 0)
+            LOG_ERROR(std::format("RUDP receive size rejected: declaredBytes={} receivedBytes={} limit={} count={}",
+                declaredBytes, receivedBytes, MAX_WIRE_PACKET_SIZE, count));
+    }
+
 	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
 	{
 		EncodePacket(
@@ -24,6 +45,15 @@ public:
 		{
 			return;
 		}
+
+        if (not FitsWireLimit(packet))
+        {
+            LOG_ERROR(std::format("RUDP encode size rejected: wireBytes={} limit={}", packet.m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+            return;
+        }
+        // Reserve tag space before obtaining pointers used by AES-GCM.
+        if (packet.GetFreeSize() < static_cast<int>(AUTH_TAG_SIZE))
+            packet.Resize(packet.m_iWrite + static_cast<int>(AUTH_TAG_SIZE));
 
 		unsigned char nonce[NONCE_SIZE];
 		if (not CryptoHelper::FillNonce(sessionSalt, sessionSaltSize, packetSequence, direction, nonce, NONCE_SIZE))

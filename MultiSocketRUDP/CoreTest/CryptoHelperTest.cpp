@@ -200,6 +200,32 @@ TEST_F(PacketCryptoTest, DataPacket_RoundTripPreservesPayload)
 	EXPECT_ANY_THROW(packet.ReadBuffer(&extraByte, sizeof(extraByte)));
 }
 
+TEST_F(PacketCryptoTest, WireLimitIncludesHeaderAndAuthenticationTag)
+{
+	constexpr int overhead = df_HEADER_SIZE + sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId) + sizeof(unsigned short) + AUTH_TAG_SIZE;
+	const std::string payload(MAX_WIRE_PACKET_SIZE - overhead, 'x');
+	auto exact = MakeDataPacket(42, payload);
+	ASSERT_TRUE(PacketCryptoHelper::FitsWireLimit(exact));
+	PacketCryptoHelper::EncodePacket(exact, 42, PACKET_DIRECTION::SERVER_TO_CLIENT,
+		salt.data(), salt.size(), key.Get(), false);
+	ASSERT_EQ(exact.GetUseSize(), MAX_WIRE_PACKET_SIZE);
+	AdvanceToPacketBody(exact);
+	ASSERT_TRUE(PacketCryptoHelper::DecodePacket(exact, salt.data(), salt.size(), key.Get(), false,
+		PACKET_DIRECTION::SERVER_TO_CLIENT));
+	PacketSequence sequence{};
+	PacketId id{};
+	std::string restored;
+	exact >> sequence >> id >> restored;
+	EXPECT_EQ(restored, payload);
+
+	auto oversized = MakeDataPacket(43, payload + 'x');
+	ASSERT_FALSE(PacketCryptoHelper::FitsWireLimit(oversized));
+	const int before = oversized.GetUseSize();
+	PacketCryptoHelper::EncodePacket(oversized, 43, PACKET_DIRECTION::SERVER_TO_CLIENT,
+		salt.data(), salt.size(), key.Get(), false);
+	EXPECT_EQ(oversized.GetUseSize(), before);
+}
+
 TEST_F(PacketCryptoTest, CorePacket_EmptyBodyRoundTripSucceedsAtSequenceBoundaries)
 {
 	constexpr PacketSequence maxSequence = (std::numeric_limits<PacketSequence>::max)();

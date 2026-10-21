@@ -156,6 +156,23 @@ public:
 using SessionSendLifecycleTest = SessionSendTestBase<LifecycleTestCore>;
 using SessionSendOrderTest = SessionSendTestBase<SendOrderTestCore>;
 
+TEST_F(SessionSendOrderTest, OversizeRejectionDoesNotConsumeSequenceOrDisconnect)
+{
+	CallbackPacket oversized([](NetBuffer& buffer) { buffer << std::string(MAX_WIRE_PACKET_SIZE, 'x'); });
+	CallbackPacket capacityOverflow([](NetBuffer& buffer) { buffer << std::string(BUFFFER_MAX, 'x'); });
+	for (auto* packet : { &oversized, &capacityOverflow })
+	{
+		EXPECT_FALSE(session.SendPacket(*packet));
+		EXPECT_FALSE(session.SendUnreliablePacket(*packet));
+	}
+	EXPECT_TRUE(session.IsConnected());
+	EXPECT_TRUE(core.sentSequences.empty());
+	EXPECT_EQ(RUDPSessionBehaviorAccess::GetSendContext(session).GetLastSendPacketSequence(), 0u);
+	NoOpPacket valid;
+	ASSERT_TRUE(session.SendPacket(valid));
+	EXPECT_EQ(core.sentSequences, (std::vector<PacketSequence>{ 1 }));
+}
+
 TEST_F(SessionSendOrderTest, RepeatedConnectResendsAckOnlyToOriginalPeerWithoutResettingSession)
 {
 	RUDPSessionBehaviorAccess::SetReserved(session);
@@ -680,6 +697,39 @@ TEST_F(RetransmissionLifecycleTest, CurrentGenerationAtLimitDisconnectsOnceAndRe
 	EXPECT_EQ(packet->refCount.load(), 1);
 	RUDPSessionBehaviorAccess::BeginIOShutdown(session);
 	EXPECT_EQ(session.disconnectedCount, 1);
+}
+
+TEST_F(RetransmissionLifecycleTest, AckClaimBeforeErasePreventsRetryLimitDisconnect)
+{
+	MultiSocketRUDPCoreTestAccess::SetRetransmissionLimit(core, 1);
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	// Model ACK's completed CAS while its subsequent scheduler erase is still waiting.
+	packet->completion.store(SendPacketInfo::Completion::Acknowledged);
+	Process(packet.get());
+	EXPECT_TRUE(session.IsConnected());
+	EXPECT_EQ(core.sendCalls, 0);
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_TRUE(MultiSocketRUDPCoreTestAccess::TakeReleaseSessionIds(core).empty());
+}
+
+TEST_F(RetransmissionLifecycleTest, LateAckCannotCompleteAClaimedRetryFailure)
+{
+	MultiSocketRUDPCoreTestAccess::SetRetransmissionLimit(core, 1);
+	auto packet = MakePacket(session.GetSessionGeneration());
+	ASSERT_NE(packet, nullptr);
+	auto& context = RUDPSessionBehaviorAccess::GetSendContext(session);
+	const auto sequence = context.IncrementLastSendPacketSequence();
+	context.InsertSendPacketInfo(sequence, packet.get());
+	Process(packet.get());
+	NetBuffer ack;
+	ack << sequence;
+	RUDPSessionBehaviorAccess::OnSendReply(session, ack);
+	EXPECT_EQ(packet->completion.load(), SendPacketInfo::Completion::RetryLimit);
+	EXPECT_TRUE(packet->isErasedPacketInfo.load());
+	EXPECT_TRUE(context.IsSendPacketInfoQueueEmpty());
+	EXPECT_EQ(packet->refCount.load(), 1);
+	EXPECT_EQ(session.GetDisconnectedReason(), DISCONNECT_REASON::BY_RETRANSMISSION);
 }
 
 TEST_F(RetransmissionLifecycleTest, ReleasingSessionRejectsTimeoutAndResend)

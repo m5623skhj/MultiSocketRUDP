@@ -295,7 +295,22 @@ void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, 
 
 	if (shouldDisconnect)
 	{
+		bool claimed = false;
+		{
+			std::scoped_lock lock(scheduler.lock);
+			auto expected = SendPacketInfo::Completion::Pending;
+			if (not sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
+				claimed = sendPacketInfo->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::RetryLimit,
+					std::memory_order_acq_rel);
+		}
+		if (not claimed)
+		{
+			SendPacketInfo::Free(sendPacketInfo);
+			return;
+		}
+		// Never disconnect while holding scheduler.lock; ACK wins if it completed before the claim above.
 		owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
+		owner->TraceRetransmissionFailure(*sendPacketInfo, sendPacketInfo->retransmissionCount);
 		SendPacketInfo::Free(sendPacketInfo);
 		return;
 	}

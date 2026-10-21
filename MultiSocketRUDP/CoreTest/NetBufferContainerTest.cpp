@@ -1,6 +1,7 @@
 #include "PreCompile.h"
 #include <gtest/gtest.h>
 #include "NetServerSerializeBuffer.h"
+#include <stdexcept>
 
 namespace
 {
@@ -129,6 +130,39 @@ TEST(NetBufferContainerTest, GrowsStorageAndEnforcesPacketCapacity)
     EXPECT_EQ(buffer.GetBufferError(), 2);
     buffer.Init();
     EXPECT_THROW(buffer << std::vector<std::string>{std::string(65536, 'x')}, std::runtime_error);
+}
+
+TEST(NetBufferContainerTest, ScalarAndStringWritesGrowActualAllocation)
+{
+    NetBuffer buffer;
+    const std::string text(2000, 'x');
+    buffer << text;
+    std::string restored;
+    buffer >> restored;
+    EXPECT_EQ(restored, text);
+    buffer.Init();
+    for (int i = 0; i < 1000; ++i) buffer << i;
+    for (int i = 0; i < 1000; ++i)
+    {
+        int value{};
+        buffer >> value;
+        EXPECT_EQ(value, i);
+    }
+}
+
+TEST(NetBufferContainerTest, RawWritesRejectOverflowBeforeChangingCursor)
+{
+    NetBuffer buffer;
+    std::string bytes(BUFFFER_MAX - df_HEADER_SIZE, 'x');
+    buffer.WriteBuffer(bytes.data(), static_cast<int>(bytes.size()));
+    const int size = buffer.GetUseSize();
+    EXPECT_THROW(buffer << char{'y'}, std::length_error);
+    EXPECT_THROW(buffer.WriteBuffer(bytes.data(), -1), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), size);
+    buffer.Init();
+    EXPECT_THROW(buffer << std::string(65536, 'x'), std::length_error);
+    EXPECT_THROW(buffer << std::wstring(32768, L'x'), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), 0);
 }
 
 TEST(NetBufferContainerTest, PreservesUnorderedPolicyAndLegacyListFormat)

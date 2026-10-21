@@ -6,6 +6,7 @@
 #include <NetServerSerializeBuffer.h>
 
 #include "../Common/etc/CoreType.h"
+#include "PacketManager.h"
 
 class RUDPSession;
 
@@ -14,11 +15,17 @@ extern CTLSMemoryPool<SendPacketInfo>* sendPacketInfoPool;
 
 struct SendPacketInfo
 {
+    enum class Completion : uint8_t { Pending, Acknowledged, RetryLimit };
+    std::atomic<Completion> completion{Completion::Pending};
 	NetBuffer* buffer{};
 	RUDPSession* owner{};
 	uint32_t ownerGeneration{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
+	PACKET_TYPE packetType{ PACKET_TYPE::INVALID_TYPE };
+	PacketId packetId{};
+	uint32_t wireBytes{};
+	std::chrono::steady_clock::time_point firstSendTime{}; // Protected by rttSampleLock, like lastSendTime.
 	uint64_t scheduleVersion{};
 	std::atomic_bool isErasedPacketInfo{};
 	bool isReplyType{};

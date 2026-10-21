@@ -10,6 +10,10 @@
 #include "SendPacketInfo.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 #include "../Common/etc/UtilFunc.h"
+#include <cstring>
+#include <iostream>
+#include <syncstream>
+#include <stdexcept>
 
 BYTE RUDPSession::maximumHoldingPacketQueueSize = 0;
 unsigned long long RUDPSession::reservedSessionTimeoutMs = 30000;
@@ -49,6 +53,11 @@ void RUDPSession::InitializeSession()
 	sessionReservedTime = {};
 	onSessionReleaseTime = {};
 	lastReceivedPacketTime.store(0, std::memory_order_relaxed);
+	receivedAckCount.store(0, std::memory_order_relaxed);
+	lastReceivedAckSequence.store(0, std::memory_order_relaxed);
+	acknowledgedPacketCount.store(0, std::memory_order_relaxed);
+	lastAcknowledgedAtTick.store(0, std::memory_order_relaxed);
+	lastAcknowledgedSequence.store(0, std::memory_order_relaxed);
 
 	retransmissionTimeoutEstimator.Configure(
 		core.GetInitialRetransmissionMs(),
@@ -137,12 +146,24 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	}
 
 	// Reserve the protocol fields without assigning a sequence before user serialization.
+	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	constexpr int SEND_HEADER_SIZE = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
 	buffer->MoveWritePos(SEND_HEADER_SIZE);
 	const PacketId packetId = packet.GetPacketId();
-	packet.PacketToBuffer(*buffer);
+	try { packet.PacketToBuffer(*buffer); }
+	catch (const std::length_error&)
+	{
+		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
+		return false;
+	}
+	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
+	{
+		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
+			buffer->m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+		return false;
+	}
 
-	if (not SendPacket(*buffer, packetId))
+	if (not SendPacket(*bufferGuard.release(), packetId))
 	{
 		DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		return false;
@@ -172,7 +193,18 @@ bool RUDPSession::SendUnreliablePacket(IPacket& packet)
 	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
-	packet.PacketToBuffer(*buffer);
+	try { packet.PacketToBuffer(*buffer); }
+	catch (const std::length_error&)
+	{
+		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
+		return false;
+	}
+	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
+	{
+		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
+			buffer->m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+		return false;
+	}
 	// Keep numbering and queue admission ordered, but never lock around user code.
 	std::scoped_lock lock(unreliableSendMutex);
 	const auto sequence = ++lastUnreliableSendSequence;
@@ -251,6 +283,12 @@ bool RUDPSession::SendPacketImmediate(
 	const bool isCorePacket,
 	const bool isUnreliable)
 {
+	if (not PacketCryptoHelper::FitsWireLimit(buffer))
+	{
+		LOG_ERROR(std::format("RUDP immediate size rejected: bytes={} limit={}", buffer.m_iWrite, MAX_WIRE_PACKET_SIZE));
+		NetBuffer::Free(&buffer);
+		return false;
+	}
 	const auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
@@ -261,6 +299,18 @@ bool RUDPSession::SendPacketImmediate(
 
 	sendPacketInfo->Initialize(this, sessionGeneration.load(std::memory_order_acquire), &buffer, inSendPacketSequence, isReplyType);
 	sendPacketInfo->isUnreliable = isUnreliable;
+	// Preserve only protocol headers before encryption; do not move the buffer's read cursor.
+	if (sendPacketInfo->RequiresRetransmission() && not buffer.m_bIsEncoded)
+	{
+		constexpr int TRANSPORT_HEADER_SIZE = sizeof(PACKET_TYPE) + sizeof(PacketSequence);
+		if (buffer.GetUseSize() >= TRANSPORT_HEADER_SIZE)
+		{
+			const char* header = buffer.GetReadBufferPtr();
+			std::memcpy(&sendPacketInfo->packetType, header, sizeof(PACKET_TYPE));
+			if (not isCorePacket && buffer.GetUseSize() >= TRANSPORT_HEADER_SIZE + static_cast<int>(sizeof(PacketId)))
+				std::memcpy(&sendPacketInfo->packetId, header + TRANSPORT_HEADER_SIZE, sizeof(PacketId));
+		}
+	}
 	if (sendPacketInfo->RequiresRetransmission())
 	{
 		rioContext.GetSendContext().InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
@@ -281,13 +331,8 @@ bool RUDPSession::SendPacketImmediate(
 		);
 	}
 
-	if (isUnreliable && not buffer.m_bIsEncoded)
-	{
-		SendPacketInfo::Free(sendPacketInfo);
-		return false;
-	}
-
-	if (not core.SendPacket(sendPacketInfo))
+	sendPacketInfo->wireBytes = static_cast<uint32_t>(buffer.m_iWrite);
+	if (not buffer.m_bIsEncoded || not core.SendPacket(sendPacketInfo))
 	{
 		if (sendPacketInfo->RequiresRetransmission())
 		{
@@ -692,6 +737,9 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 {
 	PacketSequence packetSequence;
 	recvPacket >> packetSequence;
+	// The processor has already authenticated this ACK; matching an outstanding send is separate.
+	lastReceivedAckSequence.store(packetSequence, std::memory_order_relaxed);
+	receivedAckCount.fetch_add(1, std::memory_order_relaxed);
 
 	if (rioContext.GetSendContext().GetLastSendPacketSequence() < packetSequence)
 	{
@@ -703,9 +751,21 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	{
 		return;
 	}
+	// ACK and retry exhaustion share one atomic completion point. A late ACK cannot undo failure.
+	auto expected = SendPacketInfo::Completion::Pending;
+	if (not sendPacketInfo->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::Acknowledged,
+		std::memory_order_acq_rel))
+	{
+		core.MarkSendPacketInfoErased(sendPacketInfo, threadId);
+		SendPacketInfo::Free(sendPacketInfo);
+		return;
+	}
 
 	flowManager.OnAckReceived(packetSequence);
 	core.MarkSendPacketInfoErased(sendPacketInfo, threadId);
+	lastAcknowledgedSequence.store(packetSequence, std::memory_order_relaxed);
+	lastAcknowledgedAtTick.store(GetTickCount64(), std::memory_order_relaxed);
+	acknowledgedPacketCount.fetch_add(1, std::memory_order_relaxed);
 	std::chrono::steady_clock::duration rttSample{};
 	if (sendPacketInfo->TryGetRttSample(std::chrono::steady_clock::now(), rttSample))
 	{
@@ -713,6 +773,39 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	}
 	SendPacketInfo::Free(sendPacketInfo);
 	TryFlushPendingQueue();
+}
+
+void RUDPSession::TraceRetransmissionFailure(const SendPacketInfo& inPacketInfo, const PacketRetransmissionCount inRetryCount)
+{
+	std::chrono::steady_clock::time_point firstSent{}, lastSent{};
+	{
+		std::scoped_lock lock(inPacketInfo.rttSampleLock);
+		firstSent = inPacketInfo.firstSendTime;
+		lastSent = inPacketInfo.lastSendTime;
+	}
+	const auto now = std::chrono::steady_clock::now();
+	const auto ageMs = [now](const auto inTime)
+	{
+		return inTime.time_since_epoch().count() == 0 ? -1LL
+			: static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(now - inTime).count());
+	};
+	const auto lastAckTick = lastAcknowledgedAtTick.load(std::memory_order_relaxed);
+	const auto nowTick = GetTickCount64();
+	const auto lastAckAgeMs = lastAckTick == 0 ? -1LL : static_cast<long long>(nowTick - lastAckTick);
+	std::osyncstream(std::cerr) << "[RudpRetransmission] timeMs="
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
+		<< " event=retry_limit session=" << GetSessionId() << " generation=" << inPacketInfo.ownerGeneration
+		<< " transportType=" << static_cast<unsigned>(inPacketInfo.packetType) << " packetId=" << inPacketInfo.packetId
+		<< " wireBytes=" << inPacketInfo.wireBytes << " completion=" << static_cast<unsigned>(inPacketInfo.completion.load(std::memory_order_acquire))
+		<< " sequence=" << inPacketInfo.sendPacketSequence << " retryCount=" << inRetryCount
+		<< " firstSentAgeMs=" << ageMs(firstSent) << " lastSentAgeMs=" << ageMs(lastSent)
+		<< " rtoMs=" << GetRetransmissionTimeoutMs()
+		<< " receivedAckCount=" << receivedAckCount.load(std::memory_order_relaxed)
+		<< " lastReceivedAckSequence=" << lastReceivedAckSequence.load(std::memory_order_relaxed)
+		<< " ackCount=" << acknowledgedPacketCount.load(std::memory_order_relaxed)
+		<< " lastAckSequence=" << lastAcknowledgedSequence.load(std::memory_order_relaxed)
+		<< " lastAckAgeMs=" << lastAckAgeMs
+		<< " ackMarkedErased=" << inPacketInfo.isErasedPacketInfo.load(std::memory_order_acquire) << '\n';
 }
 
 void RUDPSession::OnRetransmissionTimeout() noexcept

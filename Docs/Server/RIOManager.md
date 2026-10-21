@@ -226,7 +226,7 @@ bool Initialize(
 }
 ```
 
-`RECV_OUTSTANDING_COUNT`는 세션 요청 큐가 동시에 유지할 수 있는 수신 작업 수다. 현재 값은 8이다. 송신은 32KB `MAX_SEND_BUFFER_SIZE` 버퍼에 여러 패킷을 묶더라도 하나의 `RIOSendEx` 작업으로 등록하므로 `MaxOutstandingSend`는 1이다. 버퍼의 바이트 크기와 outstanding 작업 개수는 서로 다른 단위다.
+`RECV_OUTSTANDING_COUNT`는 세션 요청 큐가 동시에 유지할 수 있는 수신 작업 수다. 현재 값은 8이다. 송신은 32KB `MAX_SEND_BUFFER_SIZE` 버퍼를 할당하되 실제 묶음은 `MAX_WIRE_PACKET_SIZE`(1024바이트) 이하로 제한한다. 하나의 `RIOSendEx` 작업으로 등록하므로 `MaxOutstandingSend`는 1이다. 버퍼의 바이트 크기와 outstanding 작업 개수는 서로 다른 단위다.
 
 ---
 
