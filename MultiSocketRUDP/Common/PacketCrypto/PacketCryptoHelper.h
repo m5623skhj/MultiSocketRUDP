@@ -22,8 +22,10 @@ public:
         static std::atomic_uint64_t rejectedCount{};
         const auto count = rejectedCount.fetch_add(1, std::memory_order_relaxed) + 1;
         if ((count & (count - 1)) == 0)
+        {
             LOG_ERROR(std::format("RUDP receive size rejected: declaredBytes={} receivedBytes={} limit={} count={}",
                 declaredBytes, receivedBytes, MAX_WIRE_PACKET_SIZE, count));
+        }
     }
 
 	static void EncodePacket(OUT NetBuffer& packet, const PacketSequence packetSequence, const PACKET_DIRECTION direction, const std::vector<unsigned char>& sessionSalt, const BCRYPT_KEY_HANDLE& sessionKeyHandle, const bool isCorePacket)
