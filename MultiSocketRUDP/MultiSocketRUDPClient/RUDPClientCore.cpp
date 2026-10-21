@@ -494,6 +494,14 @@ void RUDPClientCore::RunRetransmissionThread()
 
 			if (shouldDisconnect)
 			{
+				// Give an ACK processed after the first check a final chance to win.
+				auto expected = SendPacketInfo::Completion::Pending;
+				if (not sendPacketInfo->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::RetryLimit,
+					std::memory_order_acq_rel))
+				{
+					SendPacketInfo::Free(sendPacketInfo);
+					continue;
+				}
 				LOG_ERROR("The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates");
 				RequestStop();
 				SendPacketInfo::Free(sendPacketInfo);
@@ -658,6 +666,18 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 
 	BYTE remoteWindow;
 	recvPacket >> remoteWindow;
+	{
+		std::scoped_lock lock(sendPacketInfoMapLock);
+		const auto itor = sendPacketInfoMap.find(packetSequence);
+		if (itor == sendPacketInfoMap.end()) return;
+		SendPacketInfo* info = itor->second;
+		auto expected = SendPacketInfo::Completion::Pending;
+		const bool acknowledged = info->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::Acknowledged,
+			std::memory_order_acq_rel);
+		sendPacketInfoMap.erase(itor);
+		SendPacketInfo::Free(info);
+		if (not acknowledged) return;
+	}
 	remoteAdvertisedWindow.store(remoteWindow, std::memory_order_relaxed);
 	lastAckedSequence.store(packetSequence, std::memory_order_relaxed);
 
@@ -669,17 +689,6 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 			isConnected = true;
 			acceptingConnectAck = false;
 			serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
-		}
-	}
-
-	{
-		std::scoped_lock lock(sendPacketInfoMapLock);
-		const auto itor = sendPacketInfoMap.find(packetSequence);
-		if (itor != sendPacketInfoMap.end())
-		{
-			SendPacketInfo* info = itor->second;
-			sendPacketInfoMap.erase(itor);
-			SendPacketInfo::Free(info);
 		}
 	}
 

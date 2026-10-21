@@ -1017,6 +1017,8 @@ void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetTy
 
 수신 시 같은 프레임 상한을 검사하며 초과/잘린 프레임은 인증·ACK 전에 거절한다. 수신 거절 로그는 누적 건수의 2의 거듭제곱마다 남긴다. 서버의 묶음 UDP 송신도 1024바이트로 제한되므로 16KB 수신 버퍼 초과를 방지한다. 패킷 필드와 프로토콜 버전은 변하지 않으며 서버와 클라이언트 모두 갱신해야 송신 선행 검사가 양쪽에 적용된다.
 
+클라이언트도 `SendPacketInfo::completion`의 CAS로 ACK와 재전송 한도 초과를 한 번만 확정한다. ACK가 먼저 승리하면 종료를 건너뛰고, 실패가 먼저 승리하면 늦은 ACK는 맵 참조만 정리하며 연결·송신 윈도우를 갱신하지 않는다. 맵 잠금은 lifecycle 잠금이나 `RequestStop()` 호출 전에 해제한다. 종료 담당 스레드는 기존처럼 재전송/수신 스레드 종료를 기다린 후 풀과 버퍼를 정리한다.
+
 ### SessionGetter 분기
 
 `USE_IOCP_SESSION_GETTER` 빌드에서는 중첩 `SessionGetter` 클래스가 TLS 세션 조회를 담당한다.

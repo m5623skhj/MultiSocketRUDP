@@ -165,6 +165,23 @@ TEST(NetBufferContainerTest, RawWritesRejectOverflowBeforeChangingCursor)
     EXPECT_EQ(buffer.GetUseSize(), 0);
 }
 
+TEST(NetBufferContainerTest, RewriteCursorRejectsUnallocatedPositionsAndResizePreservesSavedPayload)
+{
+    NetBuffer buffer;
+    const std::string text(800, 'x');
+    buffer << text;
+    const int size = buffer.GetUseSize();
+    EXPECT_THROW(buffer.MoveWritePosThisPos(2000), std::length_error);
+    EXPECT_THROW(buffer.MoveWritePosThisPos(-1), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), size);
+    buffer.MoveWritePosThisPos(0);
+    buffer.Resize(2048);
+    buffer.MoveWritePosBeforeCallThisPos();
+    std::string restored;
+    buffer >> restored;
+    EXPECT_EQ(restored, text);
+}
+
 TEST(NetBufferContainerTest, PreservesUnorderedPolicyAndLegacyListFormat)
 {
     NetBuffer buffer;
