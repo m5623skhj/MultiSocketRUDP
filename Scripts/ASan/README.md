@@ -26,7 +26,10 @@ Visual Studio C++ 도구와 MSVC AddressSanitizer 구성 요소, 저장소의 �
 - 링크 시 전용 출력 디렉터리에서 프로젝트 라이브러리를 찾도록 제한한다.
 - 의도적인 heap-buffer-overflow를 발생시키는 `DetectionProbe`가 비정상 종료하고
   정확한 ASan 진단을 출력해야 검출 확인에 성공한다. 이 오류는 검증용으로 예상된 오류다.
-- 이어서 CoreTest를 실행한다. ASan 진단, 비정상 종료, timeout, XML 누락·손상,
+- 별도 프로세스에서 NetBuffer 풀 동시 최초 접근을 검사한다. 8개 스레드가 동시에
+  버퍼를 할당하고 4096바이트 문자열로 확장·복원한 뒤, 메인 스레드에서 반환한다.
+  최초 접근 검사는 최대 60초이며 `NetBufferPool.*.log`와 `NetBufferPool.xml`에 기록된다.
+- 이어서 전체 CoreTest를 실행한다. ASan 진단, 비정상 종료, timeout, XML 누락·손상,
   테스트 0건, skip 또는 assertion 실패는 workflow 실패로 처리한다. 재시도하지 않는다.
 
 검출 확인은 최대 30초, CoreTest는 종료까지 최대 15분, 전체 CI job은 최대 45분이다.

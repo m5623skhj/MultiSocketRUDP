@@ -789,6 +789,7 @@ TEST_F(RUDPIOHandlerTest, DoSend_SplitsBatchAtWireLimitAndSendsReservedFrameOnCo
 	EXPECT_EQ(mockRIO.lastSendLength, MAX_WIRE_PACKET_SIZE);
 	ASSERT_NE(mockDelegate.reservedSendReturn, nullptr);
 	EXPECT_EQ(mockDelegate.reservedSendReturn->sendPacketSequence, 2);
+	EXPECT_FALSE(mockDelegate.IsNothingToSend(session));
 	// Completing the first RIO write immediately posts the reserved frame.
 	auto* firstContext = static_cast<IOContext*>(mockRIO.lastSendRequestContext);
 	mockRIO.lastSendRequestContext = nullptr;
@@ -798,6 +799,7 @@ TEST_F(RUDPIOHandlerTest, DoSend_SplitsBatchAtWireLimitAndSendsReservedFrameOnCo
 	EXPECT_EQ(mockDelegate.reservedSendReturn, nullptr);
 	EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
 	CompleteOutstandingSend();
+	EXPECT_TRUE(mockDelegate.IsNothingToSend(session));
 }
 
 TEST_F(RUDPIOHandlerTest, DoSend_ErasedPacketDoesNotPostStaleBufferContents)
