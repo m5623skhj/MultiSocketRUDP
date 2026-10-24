@@ -8,6 +8,7 @@
 #include <string>
 #include <optional>
 #include <stop_token>
+#include <utility>
 
 #pragma comment(lib, "Secur32.lib")
 #pragma comment(lib, "Crypt32.lib")
@@ -42,6 +43,7 @@ namespace TLSHelper
 		ServerCertificateSource source{ ServerCertificateSource::Store };
 		std::wstring storeName{};
 		std::wstring certSubjectName{};
+		std::wstring certThumbprint{};
 		std::wstring pfxFilePath{};
 		std::wstring pfxPassword{};
 
@@ -56,6 +58,15 @@ namespace TLSHelper
 		}
 
 		[[nodiscard]]
+		static ServerCertificateConfig FromStoreThumbprint(const std::wstring& inStoreName, const std::wstring& inThumbprint)
+		{
+			ServerCertificateConfig config;
+			config.storeName = inStoreName;
+			config.certThumbprint = inThumbprint;
+			return config;
+		}
+
+		[[nodiscard]]
 		static ServerCertificateConfig FromPfxFile(const std::wstring& inPfxFilePath, const std::wstring& inPfxPassword)
 		{
 			ServerCertificateConfig config;
@@ -64,6 +75,14 @@ namespace TLSHelper
 			config.pfxPassword = inPfxPassword;
 			return config;
 		}
+	};
+
+	struct ProtocolVersionReceiveResult
+	{
+		const char* reason{ "not-started" };
+		std::optional<uint32_t> receivedVersion;
+		size_t plainBytes{};
+		int socketError{};
 	};
 
 	class TLSHelperBase
@@ -91,6 +110,14 @@ namespace TLSHelper
 		bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
 		bool SendProtocolVersion(SOCKET socket, uint32_t version);
 		bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion, const std::stop_token& stopToken);
+		[[nodiscard]] const ProtocolVersionReceiveResult& GetProtocolVersionResult() const { return protocolVersionResult; }
+		// Connection-thread only: transfer trailing handshake bytes to the first application receive.
+		[[nodiscard]] std::vector<char> TakePendingHandshakeData()
+		{
+			auto data = std::move(pendingHandshakeData);
+			pendingHandshakeData.clear();
+			return data;
+		}
 
 	protected:
 		[[nodiscard]]
@@ -108,6 +135,8 @@ namespace TLSHelper
 
 		bool handshakeCompleted = false;
 		SecPkgContext_StreamSizes streamSizes{};
+		std::vector<char> pendingHandshakeData;
+		ProtocolVersionReceiveResult protocolVersionResult;
 	};
 
 	class TLSHelperClient : public TLSHelperBase
@@ -118,6 +147,8 @@ namespace TLSHelper
 	public:
 		[[nodiscard]]
 		bool Initialize() override;
+		// Set on the connection worker before starting a handshake; never during I/O.
+		void SetServerName(std::wstring inServerName) { serverName = std::move(inServerName); }
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 		[[nodiscard]]
@@ -125,6 +156,7 @@ namespace TLSHelper
 		bool Handshake(SOCKET socket, const std::stop_token& inStopToken);
 
 	private:
+		[[nodiscard]] bool VerifyServerCertificate();
 		std::wstring serverName{};
 	};
 

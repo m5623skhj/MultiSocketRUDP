@@ -2,6 +2,9 @@
 #include "TLSHelper.h"
 #include <vector>
 #include <chrono>
+#include <ws2tcpip.h>
+#include <wincrypt.h>
+#include <memory>
 
 namespace TLSHelper
 {
@@ -41,6 +44,19 @@ namespace TLSHelper
     bool TLSHelperClient::Handshake(const SOCKET socket, const std::stop_token& inStopToken)
     {
         handshakeCompleted = false;
+        pendingHandshakeData.clear();
+        // Legacy callers did not provide a name. Verify their connected IP instead
+        // of silently retaining the former no-validation behavior.
+        if (serverName.empty())
+        {
+            sockaddr_in peer{};
+            int size = sizeof(peer);
+            wchar_t address[INET_ADDRSTRLEN]{};
+            if (getpeername(socket, reinterpret_cast<sockaddr*>(&peer), &size) != 0 ||
+                peer.sin_family != AF_INET || !InetNtopW(AF_INET, &peer.sin_addr, address, INET_ADDRSTRLEN))
+            { lastStatus = SEC_E_WRONG_PRINCIPAL; return false; }
+            serverName = address;
+        }
         CtxtHandle* context = nullptr;
         std::vector<char> recvBuffer;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
@@ -91,7 +107,7 @@ namespace TLSHelper
             lastStatus = InitializeSecurityContext(
                 &credHandle,
                 context,
-                nullptr,
+                serverName.data(),
                 ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_REQ_STREAM | ISC_REQ_ALLOCATE_MEMORY,
                 0,
                 SECURITY_NATIVE_DREP,
@@ -110,7 +126,10 @@ namespace TLSHelper
 
             if (lastStatus == SEC_E_OK)
             {
-                return FinalizeHandshake();
+                if (not VerifyServerCertificate() || not FinalizeHandshake()) return false;
+                PreserveExtraHandshakeData(recvBuffer, inBuffers[1]);
+                pendingHandshakeData = std::move(recvBuffer);
+                return true;
             }
 
             if (lastStatus == SEC_E_INCOMPLETE_MESSAGE)
@@ -145,4 +164,44 @@ namespace TLSHelper
             context = &ctxtHandle;
         }
     }
+    /** Verify Windows trust, validity, server EKU and the requested DNS/IP name.
+     * No unknown-CA, name-mismatch or expiry exceptions are permitted.
+     * Revocation retrieval is not requested (private test CAs have no CRL).
+     */
+    bool TLSHelperClient::VerifyServerCertificate()
+    {
+        PCCERT_CONTEXT rawCertificate{};
+        lastStatus = QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_REMOTE_CERT_CONTEXT, &rawCertificate);
+        if (lastStatus != SEC_E_OK) return false;
+        const auto freeCertificate = [](PCCERT_CONTEXT value) { CertFreeCertificateContext(value); };
+        std::unique_ptr<const CERT_CONTEXT, decltype(freeCertificate)> certificate(rawCertificate, freeCertificate);
+        CERT_CHAIN_PARA chainParameters{};
+        chainParameters.cbSize = sizeof(chainParameters);
+        LPSTR usage = const_cast<LPSTR>(szOID_PKIX_KP_SERVER_AUTH);
+        chainParameters.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
+        chainParameters.RequestedUsage.Usage.cUsageIdentifier = 1;
+        chainParameters.RequestedUsage.Usage.rgpszUsageIdentifier = &usage;
+        PCCERT_CHAIN_CONTEXT rawChain{};
+        if (!rawCertificate || !CertGetCertificateChain(nullptr, rawCertificate, nullptr,
+            rawCertificate->hCertStore, &chainParameters, CERT_CHAIN_CACHE_ONLY_URL_RETRIEVAL, nullptr, &rawChain))
+        { lastStatus = SEC_E_UNTRUSTED_ROOT; return false; }
+        const auto freeChain = [](PCCERT_CHAIN_CONTEXT value) { CertFreeCertificateChain(value); };
+        std::unique_ptr<const CERT_CHAIN_CONTEXT, decltype(freeChain)> chain(rawChain, freeChain);
+        SSL_EXTRA_CERT_CHAIN_POLICY_PARA ssl{};
+        ssl.cbSize = sizeof(ssl);
+        ssl.dwAuthType = AUTHTYPE_SERVER;
+        ssl.pwszServerName = serverName.data();
+        CERT_CHAIN_POLICY_PARA policy{};
+        policy.cbSize = sizeof(policy);
+        policy.pvExtraPolicyPara = &ssl;
+        CERT_CHAIN_POLICY_STATUS status{};
+        status.cbSize = sizeof(status);
+        if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL, rawChain, &policy, &status) || status.dwError)
+        {
+            lastStatus = status.dwError ? static_cast<SECURITY_STATUS>(status.dwError) : SEC_E_CERT_UNKNOWN;
+            return false;
+        }
+        return true;
+    }
+
 }

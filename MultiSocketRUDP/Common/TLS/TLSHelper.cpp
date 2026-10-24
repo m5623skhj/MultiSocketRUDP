@@ -24,39 +24,60 @@ namespace TLSHelper
 
 	bool TLSHelperBase::ReceiveProtocolVersion(const SOCKET socket, const uint32_t expectedVersion, const std::stop_token& stopToken)
 	{
+		protocolVersionResult = {};
+		const auto fail = [&](const char* inReason, int inSocketError = 0)
+		{
+			protocolVersionResult.reason = inReason;
+			protocolVersionResult.socketError = inSocketError;
+			return false;
+		};
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-		std::vector<char> encrypted;
+		auto encrypted = TakePendingHandshakeData();
 		std::vector<char> plain;
 		constexpr size_t MAX_VERSION_STREAM = 65536;
 		std::vector<char> decoded(MAX_VERSION_STREAM);
-		size_t totalEncrypted{};
+		size_t totalEncrypted = encrypted.size();
+		if (totalEncrypted > MAX_VERSION_STREAM) return fail("version-stream-too-large");
 		while (not stopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 		{
+			// The final handshake recv may already contain all or part of the version record.
+			// Consume it before polling the socket; an incomplete record remains for the next recv.
+			if (not encrypted.empty())
+			{
+				size_t size{};
+				const auto result = DecryptDataStream(encrypted, decoded.data(), size);
+				if (result == TlsDecryptResult::Error) return fail("tls-decrypt-failed");
+				if (result == TlsDecryptResult::CloseNotify) return fail("tls-peer-closed");
+				protocolVersionResult.plainBytes = plain.size() + size;
+				if (protocolVersionResult.plainBytes > 4) return fail("invalid-version-length");
+				plain.insert(plain.end(), decoded.begin(), decoded.begin() + size);
+				if (plain.size() == 4)
+				{
+					uint32_t version{};
+					for (const unsigned char value : plain) version = (version << 8) | value;
+					protocolVersionResult.receivedVersion = version;
+					if (version != expectedVersion) return fail("version-mismatch");
+					if (not encrypted.empty()) return fail("unexpected-data-after-version");
+					protocolVersionResult.reason = "succeeded";
+					return true;
+				}
+			}
 			fd_set readable{};
 			FD_SET(socket, &readable);
 			timeval timeout{ 0, 100000 };
 			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
-			if (ready == SOCKET_ERROR) return false;
+			if (ready == SOCKET_ERROR) return fail("socket-select-failed", WSAGetLastError());
 			if (ready == 0) continue;
 			char bytes[4096];
 			const int received = recv(socket, bytes, sizeof(bytes), 0);
-			if (received <= 0) return false;
-			totalEncrypted += received;
-			if (totalEncrypted > MAX_VERSION_STREAM) return false;
+			if (received == 0) return fail("peer-closed");
+			if (received < 0) return fail("socket-receive-failed", WSAGetLastError());
+			totalEncrypted += static_cast<size_t>(received);
+			if (totalEncrypted > MAX_VERSION_STREAM) return fail("version-stream-too-large");
 			encrypted.insert(encrypted.end(), bytes, bytes + received);
-			size_t size{};
-			const auto result = DecryptDataStream(encrypted, decoded.data(), size);
-			if (result == TlsDecryptResult::Error || result == TlsDecryptResult::CloseNotify) return false;
-			if (plain.size() + size > 4) return false;
-			plain.insert(plain.end(), decoded.begin(), decoded.begin() + size);
-			if (plain.size() == 4)
-			{
-				uint32_t version{};
-				for (const unsigned char value : plain) version = (version << 8) | value;
-				return version == expectedVersion && encrypted.empty();
-			}
 		}
-		return false;
+		return fail(stopToken.stop_requested() ? "cancelled"
+			: plain.empty() ? "version-not-received" : "version-incomplete");
 	}
 
     namespace
@@ -359,14 +380,15 @@ namespace TLSHelper
 
     void TLSHelperBase::PreserveExtraHandshakeData(std::vector<char>& recvBuffer, const SecBuffer& extraBuffer)
     {
-        if (extraBuffer.BufferType != SECBUFFER_EXTRA || extraBuffer.cbBuffer == 0)
+        if (extraBuffer.BufferType != SECBUFFER_EXTRA || extraBuffer.cbBuffer == 0
+            || extraBuffer.cbBuffer > recvBuffer.size())
         {
             recvBuffer.clear();
             return;
         }
 
-        const auto* extraDataBegin = static_cast<const char*>(extraBuffer.pvBuffer);
-        std::vector<char> extraData(extraDataBegin, extraDataBegin + extraBuffer.cbBuffer);
+        // EXTRA identifies the unconsumed tail of this receive buffer.
+        std::vector<char> extraData(recvBuffer.end() - extraBuffer.cbBuffer, recvBuffer.end());
         recvBuffer = std::move(extraData);
     }
 

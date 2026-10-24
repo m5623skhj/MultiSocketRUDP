@@ -1017,3 +1017,40 @@ namespace
 		EXPECT_EQ(result.exitCode, 0u) << result.output;
 	}
 }
+
+namespace
+{
+    class TlsHandshakeBufferProbe final : public TLSHelper::TLSHelperClient
+    {
+    public:
+        void PreserveCompletedReceive(std::vector<char> inReceived, unsigned long inExtraBytes)
+        {
+            SecBuffer extra{};
+            extra.BufferType = inExtraBytes ? SECBUFFER_EXTRA : SECBUFFER_EMPTY;
+            extra.cbBuffer = inExtraBytes;
+            // EXTRA is a byte count: retaining it must not require a returned data pointer.
+            PreserveExtraHandshakeData(inReceived, extra);
+            pendingHandshakeData = std::move(inReceived);
+        }
+    };
+
+    TEST(TlsHandshakeBuffer, FullAndPartialVersionRecordsSurviveHandshakeCompletion)
+    {
+        const std::vector<char> received{'H', 'S', 0, 0, 0, 2};
+        for (const unsigned long extraBytes : {2UL, 4UL})
+        {
+            TlsHandshakeBufferProbe helper;
+            helper.PreserveCompletedReceive(received, extraBytes);
+            const std::vector<char> expected(received.end() - extraBytes, received.end());
+            EXPECT_EQ(helper.TakePendingHandshakeData(), expected);
+            EXPECT_TRUE(helper.TakePendingHandshakeData().empty());
+        }
+    }
+
+    TEST(TlsHandshakeBuffer, AReceiveConsumedByHandshakeLeavesNoApplicationPayload)
+    {
+        TlsHandshakeBufferProbe helper;
+        helper.PreserveCompletedReceive({'H', 'S'}, 0);
+        EXPECT_TRUE(helper.TakePendingHandshakeData().empty());
+    }
+}

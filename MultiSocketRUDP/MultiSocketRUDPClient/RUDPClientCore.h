@@ -177,7 +177,7 @@ private:
 	bool TrySetTargetSessionInfo(const std::stop_token& inStopToken);
 
 private:
-	WCHAR sessionBrokerIP[16]{};
+	WCHAR sessionBrokerIP[254]{};
 	PortType sessionBrokerPort{};
 
 	SOCKET sessionBrokerSocket{ INVALID_SOCKET };

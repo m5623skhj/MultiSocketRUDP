@@ -214,7 +214,11 @@ void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::s
 	}
 	if (not localTlsHelper.ReceiveProtocolVersion(clientSocket, RUDP_PROTOCOL_VERSION, stopToken))
 	{
-		LOG_ERROR("Unsupported or missing RUDP protocol version");
+		const auto& result = localTlsHelper.GetProtocolVersionResult();
+		LOG_ERROR(std::format("RUDP protocol negotiation failed; reason={}; expected_version={}; received_version={}; plain_bytes={}; socket_error={}",
+			result.reason, RUDP_PROTOCOL_VERSION,
+			result.receivedVersion ? std::to_string(*result.receivedVersion) : "unavailable",
+			result.plainBytes, result.socketError));
 		return;
 	}
 	NetBuffer sendBuffer;

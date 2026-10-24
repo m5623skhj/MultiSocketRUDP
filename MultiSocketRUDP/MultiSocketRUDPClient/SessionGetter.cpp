@@ -5,6 +5,7 @@
 #include "../Common/Crypto/CryptoHelper.h"
 #include "ClientOptionFile.h"
 #include <chrono>
+#include <algorithm>
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -49,6 +50,7 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 #else
 bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken)
 {
+	tlsHelper.SetServerName(sessionBrokerIP);
 	if (not tlsHelper.Initialize())
 	{
 		LOG_ERROR(std::format(
@@ -73,9 +75,10 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	const auto ip = options.GetValue(L"SESSION_BROKER", L"IP");
 	if (not ip || ip->size() < 3 || ip->front() != L'"' || ip->back() != L'"') return false;
 	const auto address = ip->substr(1, ip->size() - 2);
-	IN_ADDR parsedAddress{};
-	if (address.size() >= std::size(sessionBrokerIP) ||
-		InetPtonW(AF_INET, address.c_str(), &parsedAddress) != 1) return false;
+	if (address.empty() || address.size() >= std::size(sessionBrokerIP) ||
+		!std::all_of(address.begin(), address.end(), [](wchar_t c) {
+			return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') ||
+				(c >= L'0' && c <= L'9') || c == L'.' || c == L'-'; })) return false;
 	unsigned int brokerPort{}, packetCode{}, packetKey{};
 	if (not options.GetNumber(L"SESSION_BROKER", L"PORT", 1, 65535, brokerPort) ||
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_CODE", 0, 255, packetCode) ||
@@ -143,7 +146,45 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 	sockaddr_in sessionGetterAddr{};
 	sessionGetterAddr.sin_family = AF_INET;
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
-	InetPton(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr);
+	if (InetPtonW(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr) != 1)
+	{
+		// Async DNS shares startup cancellation; its result storage remains alive
+		// until cancellation has completed. The wire's game endpoint stays IPv4.
+		ADDRINFOEXW hints{};
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		PADDRINFOEXW result{};
+		OVERLAPPED pending{};
+		pending.hEvent = WSACreateEvent();
+		if (pending.hEvent == WSA_INVALID_EVENT) return false;
+		HANDLE lookup{};
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+		int status = GetAddrInfoExW(sessionBrokerIP, nullptr, NS_DNS, nullptr, &hints,
+			&result, nullptr, &pending, nullptr, &lookup);
+		if (status == WSA_IO_PENDING)
+		{
+			DWORD waited = WAIT_TIMEOUT;
+			while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
+			{
+				waited = WaitForSingleObject(pending.hEvent, 100);
+				if (waited != WAIT_TIMEOUT) break;
+			}
+			if (waited != WAIT_OBJECT_0)
+			{
+				GetAddrInfoExCancel(&lookup);
+				// The OS must stop referencing pending/result before these locals die.
+				WaitForSingleObject(pending.hEvent, INFINITE);
+			}
+			status = GetAddrInfoExOverlappedResult(&pending);
+		}
+		const bool resolved = status == 0 && result && result->ai_addr &&
+			result->ai_addrlen >= sizeof(sockaddr_in) && !inStopToken.stop_requested() &&
+			std::chrono::steady_clock::now() < deadline;
+		if (resolved) sessionGetterAddr.sin_addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
+		if (result) FreeAddrInfoExW(result);
+		WSACloseEvent(pending.hEvent);
+		if (!resolved) return false;
+	}
 
 	u_long nonblocking = 1;
 	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR) return false;
@@ -185,7 +226,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 	recvBuffer.m_iWrite = 0;
 
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
-	std::vector<char> encryptedStream;
+	auto encryptedStream = tlsHelper.TakePendingHandshakeData();
+	bool processBufferedData = not encryptedStream.empty();
 
 	int totalPlainReceived{};
 	BYTE code{};
@@ -196,31 +238,35 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 
 	while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 	{
-		fd_set readable{};
-		FD_SET(sessionBrokerSocket, &readable);
-		timeval timeout{ 0, 100000 };
-		const int ready = select(0, &readable, nullptr, nullptr, &timeout);
-		if (ready == SOCKET_ERROR) break;
-		if (ready == 0) continue;
-		char tlsRecvBuffer[maxTlsPacketSize];
-		const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
-		if (bytesReceived <= 0)
+		if (not processBufferedData)
 		{
-			const int error = WSAGetLastError();
-			if (bytesReceived == 0 || error == WSAETIMEDOUT)
+			fd_set readable{};
+			FD_SET(sessionBrokerSocket, &readable);
+			timeval timeout{ 0, 100000 };
+			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
+			if (ready == SOCKET_ERROR) break;
+			if (ready == 0) continue;
+			char tlsRecvBuffer[maxTlsPacketSize];
+			const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
+			if (bytesReceived <= 0)
 			{
-				break;
+				const int error = WSAGetLastError();
+				if (bytesReceived == 0 || error == WSAETIMEDOUT)
+				{
+					break;
+				}
+
+				LOG_ERROR(std::format("recv() failed in TrySetTargetSessionInfo() with error code {}", error));
+				closesocket(sessionBrokerSocket);
+				sessionBrokerSocket = INVALID_SOCKET;
+				NetBuffer::Free(&recvBuffer);
+
+				return false;
 			}
 
-			LOG_ERROR(std::format("recv() failed in TrySetTargetSessionInfo() with error code {}", error));
-			closesocket(sessionBrokerSocket);
-			sessionBrokerSocket = INVALID_SOCKET;
-			NetBuffer::Free(&recvBuffer);
-
-			return false;
+			encryptedStream.insert(encryptedStream.end(), tlsRecvBuffer, tlsRecvBuffer + bytesReceived);
 		}
-
-		encryptedStream.insert(encryptedStream.end(), tlsRecvBuffer, tlsRecvBuffer + bytesReceived);
+		processBufferedData = false;
 		char plainBuffer[maxTlsPacketSize];
 		size_t plainSize = 0;
 

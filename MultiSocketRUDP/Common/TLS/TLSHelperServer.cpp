@@ -1,6 +1,7 @@
 #include "PreCompile.h"
 #include "TLSHelper.h"
 #include <fstream>
+#include <array>
 #include <utility>
 #include <vector>
 #include <chrono>
@@ -66,17 +67,55 @@ namespace TLSHelper
             return false;
         }
 
+        // A profile pin avoids subject-order selection when legacy certificates share a name.
+        std::array<BYTE, 20> thumbprintBytes{};
+        CRYPT_HASH_BLOB thumbprint{};
+        DWORD findType = CERT_FIND_SUBJECT_STR;
+        const void* findValue = certificateConfig.certSubjectName.c_str();
+        if (not certificateConfig.certThumbprint.empty())
+        {
+            const auto& value = certificateConfig.certThumbprint;
+            const auto digit = [](wchar_t inCharacter)
+            {
+                if (inCharacter >= L'0' && inCharacter <= L'9') return inCharacter - L'0';
+                if (inCharacter >= L'a' && inCharacter <= L'f') return inCharacter - L'a' + 10;
+                if (inCharacter >= L'A' && inCharacter <= L'F') return inCharacter - L'A' + 10;
+                return -1;
+            };
+            if (value.size() != thumbprintBytes.size() * 2)
+            {
+                lastStatus = SEC_E_INVALID_TOKEN;
+                CertCloseStore(hStore, 0);
+                return false;
+            }
+            for (size_t index = 0; index < thumbprintBytes.size(); ++index)
+            {
+                const int high = digit(value[index * 2]), low = digit(value[index * 2 + 1]);
+                if (high < 0 || low < 0)
+                {
+                    lastStatus = SEC_E_INVALID_TOKEN;
+                    CertCloseStore(hStore, 0);
+                    return false;
+                }
+                thumbprintBytes[index] = static_cast<BYTE>((high << 4) | low);
+            }
+            thumbprint.cbData = static_cast<DWORD>(thumbprintBytes.size());
+            thumbprint.pbData = thumbprintBytes.data();
+            findType = CERT_FIND_HASH;
+            findValue = &thumbprint;
+        }
         PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
             hStore,
             X509_ASN_ENCODING,
             0,
-            CERT_FIND_SUBJECT_STR,
-            certificateConfig.certSubjectName.c_str(),
+            findType,
+            findValue,
             nullptr
         );
 
         if (nullptr == pCertContext)
         {
+            lastStatus = SEC_E_CERT_UNKNOWN;
             CertCloseStore(hStore, 0);
             return false;
         }
@@ -160,6 +199,7 @@ namespace TLSHelper
         }
 
         handshakeCompleted = false;
+        pendingHandshakeData.clear();
         CtxtHandle* context = nullptr;
         std::vector<char> recvBuffer;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -231,7 +271,10 @@ namespace TLSHelper
 
             if (lastStatus == SEC_E_OK)
             {
-                return FinalizeHandshake();
+                if (not FinalizeHandshake()) return false;
+                PreserveExtraHandshakeData(recvBuffer, inBuffers[1]);
+                pendingHandshakeData = std::move(recvBuffer);
+                return true;
             }
 
             if (lastStatus == SEC_E_INCOMPLETE_MESSAGE)
