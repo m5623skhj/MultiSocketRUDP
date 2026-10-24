@@ -236,6 +236,17 @@ unsigned int GetRetransmissionTimeoutMs() const noexcept;
 
 ---
 
+## 송신 크기와 재전송 종료 경합
+
+- 암호화된 프레임의 상한은 `MAX_WIRE_PACKET_SIZE = 1024`바이트다. 헤더 5 + 타입 1 + 시퀀스 8 + 패킷 ID 4 + GCM 태그 16을 포함하므로 콘텐츠 본문은 최대 990바이트이며, 문자열 길이 필드 등도 본문에 포함한다.
+- reliable/unreliable 공개 송신 API는 직렬화 뒤, 시퀀스 발급과 큐 등록 전에 크기를 검사한다. 초과하면 `false`와 크기 로그를 남기고 해당 호출 자체는 세션을 종료하지 않는다. 자동 분할하지 않으므로 큰 콘텐츠는 애플리케이션이 페이지로 나눠야 한다.
+- CommonCode의 NetBuffer는 실제 할당 용량을 확인해 최대 16KB까지 확장한다. 이 저장 용량은 RUDP 전송 허용 크기와 다르다. 음수·용량 초과 쓰기는 메모리 쓰기 전에 거절한다.
+- `MoveWritePosThisPos`는 이미 쓴 범위 안의 임시 커서 이동만 허용한다. 공간 예약에는 `MoveWritePos`를 사용한다. `Resize`는 저장된 복귀 커서 범위도 보존하며 임시 되감기 중 재할당해도 뒤쪽 본문을 잃지 않는다.
+- 서버의 여러 프레임 묶음도 UDP 데이터그램당 1024바이트 이하로 제한한다. 넘치는 다음 프레임은 기존 reserved 슬롯에 보존하고 RIO 완료 후 보낸다. 32KB 송신 버퍼는 할당 용량일 뿐 전송 크기 상한이 아니다.
+- ACK와 재전송 횟수 초과는 `SendPacketInfo::completion`의 `Pending -> Acknowledged/RetryLimit` CAS로 한 번만 확정한다. ACK가 먼저 확정되면 실패 종료를 취소하고, 실패 확정 뒤의 ACK는 추적 참조만 정리한다. scheduler lock을 잡은 채 세션 종료를 호출하지 않는다. 기존 generation·진행 중 송신·참조 계수로 세션과 버퍼 수명을 보호한다.
+- `retry_limit` 로그는 `wireBytes`, 완료 상태(`0=Pending, 1=Acknowledged, 2=RetryLimit`), 첫/최근 송신 경과 시간과 ACK 관측값을 포함한다. 수신 크기 거절 로그는 누적 건수 1, 2, 4, 8…에서만 출력하며 본문은 기록하지 않는다. 이 값만으로 유실 원인을 단정하지 않는다.
+- 기존 프로토콜 버전·암호화·ACK 형식은 유지한다. 수정 회귀 테스트는 CoreTest의 NetBufferContainer/CryptoHelper/RUDPSession/RUDPIOHandler 테스트에 포함하며 이번 작업에서는 빌드·실행하지 않았다.
+
 ## 관련 문서
 
 - [[GettingStarted]] - 최소 서버 구축

@@ -1,4 +1,4 @@
-#include "PreCompile.h"
+﻿#include "PreCompile.h"
 #include "RUDPIOHandler.h"
 #include "RIOManager.h"
 #include "RUDPSession.h"
@@ -10,6 +10,7 @@
 #include "MultiSocketRUDPCoreFunctionDelegate.h"
 #include "SendPacketInfo.h"
 #include "../Common/etc/UtilFunc.h"
+#include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
 RUDPIOHandler::RUDPIOHandler(IRIOManager& inRioManager
 	, ISessionDelegate& inSessionDelegate
@@ -273,6 +274,13 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 		return DoRecv(*contextResult->session);
 	}
 	
+	// Client datagrams carry one frame. Reject before copying into the pooled allocation.
+	if (transferred > MAX_WIRE_PACKET_SIZE || transferred < df_HEADER_SIZE)
+	{
+		PacketCryptoHelper::TraceRejectedReceiveSize(-1, static_cast<int>(transferred));
+		ReleaseRecvContext(contextResult);
+		return DoRecv(*contextResult->session);
+	}
 	const auto buffer = NetBuffer::Alloc();
 	if (buffer == nullptr)
 	{
@@ -282,7 +290,7 @@ bool RUDPIOHandler::RecvIOCompleted(OUT IOContext* contextResult, const ULONG tr
 		return false;
 	}
 	
-	if (memcpy_s(buffer->m_pSerializeBuffer, RECV_BUFFER_SIZE, contextResult->recvDataBuffer, transferred) != 0)
+	if (memcpy_s(buffer->m_pSerializeBuffer, buffer->m_iSize, contextResult->recvDataBuffer, transferred) != 0)
 	{
 		NetBuffer::Free(buffer);
 		ReleaseRecvContext(contextResult);
@@ -461,9 +469,9 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::ReservedSendPacketInfoToStream(
 	}
 
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
-	if (useSize >= MAX_SEND_BUFFER_SIZE)
+	if (useSize > MAX_WIRE_PACKET_SIZE || useSize == 0)
 	{
-		LOG_ERROR(std::format("MakeSendStream() : useSize must be less than MAX_SEND_BUFFER_SIZE. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
+		LOG_ERROR(std::format("MakeSendStream() : invalid frame size {} (limit {})", useSize, MAX_WIRE_PACKET_SIZE));
 		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
@@ -502,16 +510,17 @@ SEND_PACKET_INFO_TO_STREAM_RETURN RUDPIOHandler::StoredSendPacketInfoToStream(RU
 	}
 
 	const unsigned int useSize = sendPacketInfo->buffer->GetAllUseSize();
-	if (useSize > MAX_SEND_BUFFER_SIZE || useSize == 0)
+	if (useSize > MAX_WIRE_PACKET_SIZE || useSize == 0)
 	{
-		LOG_ERROR(std::format("MakeSendStream() : useSize is invalid. useSize: {}, MAX_SEND_BUFFER_SIZE: {}", useSize, MAX_SEND_BUFFER_SIZE));
+		LOG_ERROR(std::format("MakeSendStream() : invalid frame size {} (limit {})", useSize, MAX_WIRE_PACKET_SIZE));
 		session.DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 		SendPacketInfo::Free(sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::OCCURED_ERROR;
 	}
 
 	const unsigned int beforeSendSize = totalSendSize;
-	if (beforeSendSize + useSize > MAX_SEND_BUFFER_SIZE)
+	// Bound the complete UDP datagram too, not just each encrypted frame.
+	if (beforeSendSize + useSize > MAX_WIRE_PACKET_SIZE)
 	{
 		sessionDelegate.SetReservedSendPacketInfo(session, sendPacketInfo);
 		return SEND_PACKET_INFO_TO_STREAM_RETURN::STREAM_IS_FULL;

@@ -94,6 +94,23 @@ try {
     }
     Write-Host 'ASan detection probe passed (the intentional memory error was detected).'
 
+    # A new process is essential: the full suite may initialize the pool earlier.
+    $poolXmlPath = Join-Path $runRoot 'NetBufferPool.xml'
+    $poolExit = Invoke-TestProcess (Join-Path $bin 'CoreTest.exe') @(
+        '--gtest_filter=NetBufferPoolTest.ConcurrentFirstAccessGrowsBuffersAndReturnsAcrossThreads',
+        "--gtest_output=xml:$poolXmlPath") 'NetBufferPool' 60
+    if ($poolExit -ne 0) { throw "ASan NetBuffer first-access test failed (exit $poolExit); see NetBufferPool logs." }
+    $poolLogs = (Get-Content (Join-Path $runRoot 'NetBufferPool.stdout.log') -Raw) +
+        (Get-Content (Join-Path $runRoot 'NetBufferPool.stderr.log') -Raw)
+    if ($poolLogs -match 'ERROR: AddressSanitizer|SUMMARY: AddressSanitizer') { throw 'ASan reported a NetBuffer pool error.' }
+    [xml]$poolReport = Get-Content -LiteralPath $poolXmlPath -Raw
+    $poolCases = @($poolReport.SelectNodes('/testsuites/testsuite/testcase'))
+    if ($poolCases.Count -ne 1 -or $poolReport.SelectNodes('//failure | //error | //skipped').Count -gt 0 -or
+        $poolCases[0].status -ne 'run' -or $poolCases[0].result -ne 'completed') {
+        throw 'NetBuffer first-access test did not complete successfully.'
+    }
+    Write-Host 'NetBuffer concurrent first-access and buffer growth test passed in a fresh process.'
+
     $xmlPath = Join-Path $runRoot 'CoreTest.xml'
     $testExit = Invoke-TestProcess (Join-Path $bin 'CoreTest.exe') @("--gtest_output=xml:$xmlPath") 'CoreTest' 900
     if ($testExit -ne 0) { throw "ASan CoreTest failed (exit $testExit); see CoreTest logs." }

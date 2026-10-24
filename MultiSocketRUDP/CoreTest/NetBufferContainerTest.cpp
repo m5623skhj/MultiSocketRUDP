@@ -1,6 +1,12 @@
 #include "PreCompile.h"
 #include <gtest/gtest.h>
 #include "NetServerSerializeBuffer.h"
+#include <stdexcept>
+#include <array>
+#include <barrier>
+#include <exception>
+#include <memory>
+#include <thread>
 
 namespace
 {
@@ -14,6 +20,50 @@ namespace
         EXPECT_EQ(result, source);
         EXPECT_EQ(buffer.GetUseSize(), 0);
     }
+}
+
+// The ASan runner also executes this test alone in a fresh process, before any
+// pool statistics or allocations can initialize the pool on the main thread.
+TEST(NetBufferPoolTest, ConcurrentFirstAccessGrowsBuffersAndReturnsAcrossThreads)
+{
+    constexpr int THREAD_COUNT = 8;
+    using ScopedBuffer = std::unique_ptr<NetBuffer, decltype([](NetBuffer* buffer) { NetBuffer::Free(buffer); })>;
+    std::array<ScopedBuffer, THREAD_COUNT> buffers;
+    std::array<std::exception_ptr, THREAD_COUNT> errors{};
+    std::array<bool, THREAD_COUNT> restoredCorrectly{};
+    std::barrier startGate(THREAD_COUNT);
+    std::vector<std::jthread> workers;
+    workers.reserve(THREAD_COUNT);
+    for (int index = 0; index < THREAD_COUNT; ++index)
+    {
+        workers.emplace_back([&, index]
+        {
+            startGate.arrive_and_wait();
+            try
+            {
+                buffers[index].reset(NetBuffer::Alloc());
+                const std::string payload(4096, static_cast<char>('a' + index));
+                *buffers[index] << payload;
+                std::string restored;
+                *buffers[index] >> restored;
+                restoredCorrectly[index] = restored == payload;
+            }
+            catch (...) { errors[index] = std::current_exception(); }
+        });
+    }
+    workers.clear(); // Join all workers before inspecting results or returning their buffers.
+    std::set<NetBuffer*> addresses;
+    for (int index = 0; index < THREAD_COUNT; ++index)
+    {
+        EXPECT_EQ(errors[index], nullptr);
+        EXPECT_TRUE(restoredCorrectly[index]);
+        EXPECT_NE(buffers[index], nullptr);
+        addresses.insert(buffers[index].get());
+    }
+    EXPECT_EQ(addresses.size(), THREAD_COUNT);
+    EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), THREAD_COUNT);
+    for (auto& buffer : buffers) buffer.reset();
+    EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), 0);
 }
 
 TEST(NetBufferContainerTest, AllContainersRoundTripIncludingNestedValues)
@@ -129,6 +179,56 @@ TEST(NetBufferContainerTest, GrowsStorageAndEnforcesPacketCapacity)
     EXPECT_EQ(buffer.GetBufferError(), 2);
     buffer.Init();
     EXPECT_THROW(buffer << std::vector<std::string>{std::string(65536, 'x')}, std::runtime_error);
+}
+
+TEST(NetBufferContainerTest, ScalarAndStringWritesGrowActualAllocation)
+{
+    NetBuffer buffer;
+    const std::string text(2000, 'x');
+    buffer << text;
+    std::string restored;
+    buffer >> restored;
+    EXPECT_EQ(restored, text);
+    buffer.Init();
+    for (int i = 0; i < 1000; ++i) buffer << i;
+    for (int i = 0; i < 1000; ++i)
+    {
+        int value{};
+        buffer >> value;
+        EXPECT_EQ(value, i);
+    }
+}
+
+TEST(NetBufferContainerTest, RawWritesRejectOverflowBeforeChangingCursor)
+{
+    NetBuffer buffer;
+    std::string bytes(BUFFFER_MAX - df_HEADER_SIZE, 'x');
+    buffer.WriteBuffer(bytes.data(), static_cast<int>(bytes.size()));
+    const int size = buffer.GetUseSize();
+    EXPECT_THROW(buffer << char{'y'}, std::length_error);
+    EXPECT_THROW(buffer.WriteBuffer(bytes.data(), -1), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), size);
+    buffer.Init();
+    EXPECT_THROW(buffer << std::string(65536, 'x'), std::length_error);
+    EXPECT_THROW(buffer << std::wstring(32768, L'x'), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), 0);
+}
+
+TEST(NetBufferContainerTest, RewriteCursorRejectsUnallocatedPositionsAndResizePreservesSavedPayload)
+{
+    NetBuffer buffer;
+    const std::string text(800, 'x');
+    buffer << text;
+    const int size = buffer.GetUseSize();
+    EXPECT_THROW(buffer.MoveWritePosThisPos(2000), std::length_error);
+    EXPECT_THROW(buffer.MoveWritePosThisPos(-1), std::length_error);
+    EXPECT_EQ(buffer.GetUseSize(), size);
+    buffer.MoveWritePosThisPos(0);
+    buffer.Resize(2048);
+    buffer.MoveWritePosBeforeCallThisPos();
+    std::string restored;
+    buffer >> restored;
+    EXPECT_EQ(restored, text);
 }
 
 TEST(NetBufferContainerTest, PreservesUnorderedPolicyAndLegacyListFormat)

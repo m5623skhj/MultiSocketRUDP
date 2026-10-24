@@ -2,6 +2,8 @@
 #include <cstdint>
 
 constexpr uint32_t RUDP_PROTOCOL_VERSION = 2;
+// Complete encrypted frame, including framing, sequence, packet ID and authentication tag.
+constexpr int MAX_WIRE_PACKET_SIZE = 1024;
 constexpr unsigned int DEFAULT_UNRELIABLE_QUEUE_CAPACITY = 64;
 
 constexpr unsigned short MAX_RIO_RESULT = 1024;

@@ -27,6 +27,8 @@ class IPacket;
 // ----------------------------------------
 struct SendPacketInfo
 {
+	enum class Completion : uint8_t { Pending, Acknowledged, RetryLimit };
+	std::atomic<Completion> completion{ Completion::Pending };
 	NetBuffer* buffer{};
 	PacketRetransmissionCount retransmissionCount{};
 	PacketSequence sendPacketSequence{};
@@ -39,6 +41,7 @@ struct SendPacketInfo
 	// ----------------------------------------
 	void Initialize(NetBuffer* inBuffer, const PacketSequence inSendPacketSequence)
 	{
+		completion.store(Completion::Pending, std::memory_order_relaxed);
 		buffer = inBuffer;
 		sendPacketSequence = inSendPacketSequence;
 		retransmissionCount = {};

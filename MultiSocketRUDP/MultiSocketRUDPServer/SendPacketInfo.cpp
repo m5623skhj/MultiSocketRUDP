@@ -12,6 +12,9 @@ SendPacketInfo::~SendPacketInfo()
 	ownerGeneration = {};
 	retransmissionCount = {};
 	sendPacketSequence = {};
+	packetType = PACKET_TYPE::INVALID_TYPE;
+	packetId = {};
+	firstSendTime = {};
 	scheduleVersion = {};
 	isErasedPacketInfo = {};
 	lastSendTime = {};
@@ -27,9 +30,14 @@ void SendPacketInfo::Initialize(RUDPSession* inOwner
 	, const bool inIsReplyType)
 {
 	owner = inOwner;
+	completion.store(Completion::Pending, std::memory_order_relaxed);
 	ownerGeneration = inOwnerGeneration;
 	buffer = inBuffer;
+	wireBytes = 0;
 	sendPacketSequence = inSendPacketSequence;
+	packetType = PACKET_TYPE::INVALID_TYPE;
+	packetId = {};
+	firstSendTime = {};
 	isReplyType = inIsReplyType;
 	isUnreliable = false;
 
@@ -64,6 +72,7 @@ void SendPacketInfo::MarkSentForRttSample(const std::chrono::steady_clock::time_
 	}
 
 	std::scoped_lock lock(rttSampleLock);
+	if (firstSendTime.time_since_epoch().count() == 0) firstSendTime = now;
 	lastSendTime = now;
 }
 

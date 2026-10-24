@@ -236,14 +236,14 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 → 특히 빠른 연속 전송 시 효과적
 ```
 
-**32KB 한계:**
+**전송 크기 한계:**
 
 ```
-MAX_SEND_BUFFER_SIZE = 32768 bytes
+MAX_SEND_BUFFER_SIZE = 32768 bytes (할당 용량)
+MAX_WIRE_PACKET_SIZE = 1024 bytes (프레임 및 묶음 UDP 데이터그램 상한)
 일반 패킷 크기 ≈ 100~500 bytes
-→ 한 배치에 최대 65~327개 패킷
-
-대부분의 경우 1~10개 패킷 → 32KB 한계 도달 거의 없음
+→ 1024바이트 안에 들어가는 완전한 프레임만 묶음
+→ 다음 프레임은 reserved 슬롯에 보존하고 송신 완료 후 전송
 ```
 
 ---
