@@ -70,6 +70,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath,
 
 bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFilePath)
 {
+	hostLoopback = false;
 	ClientOptionFile options;
 	if (not options.Load(optionFilePath)) return false;
 	const auto ip = options.GetValue(L"SESSION_BROKER", L"IP");
@@ -83,6 +84,10 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	if (not options.GetNumber(L"SESSION_BROKER", L"PORT", 1, 65535, brokerPort) ||
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_CODE", 0, 255, packetCode) ||
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_KEY", 0, 255, packetKey)) return false;
+	unsigned int loopback{};
+	if (options.GetValue(L"SESSION_BROKER", L"HOST_LOOPBACK") &&
+		not options.GetNumber(L"SESSION_BROKER", L"HOST_LOOPBACK", 0, 1, loopback)) return false;
+	hostLoopback = loopback != 0;
 	wcscpy_s(sessionBrokerIP, address.c_str());
 	sessionBrokerPort = static_cast<PortType>(brokerPort);
 	NetBuffer::m_byHeaderCode = static_cast<BYTE>(packetCode);
@@ -107,6 +112,22 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
+	}
+
+	// A host-only override must never redirect a remotely reached broker's UDP endpoint.
+	// Check the connected peer before closing this socket; TLS name/chain checks still follow.
+	if (hostLoopback)
+	{
+		sockaddr_in brokerPeer{};
+		int peerSize = sizeof(brokerPeer);
+		if (getpeername(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&brokerPeer), &peerSize) == SOCKET_ERROR ||
+			brokerPeer.sin_family != AF_INET || (ntohl(brokerPeer.sin_addr.s_addr) >> 24) != 127)
+		{
+			LOG_ERROR("HOST_LOOPBACK requires an IPv4 loopback session broker connection");
+			closesocket(sessionBrokerSocket);
+			sessionBrokerSocket = INVALID_SOCKET;
+			return false;
+		}
 	}
 
 	// Bound sends as well as reads before the TLS handshake starts.
@@ -344,6 +365,8 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	}
 
 	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
+	// Port, session credentials and the wire layout remain the broker's authenticated values.
+	if (hostLoopback) serverIp = "127.0.0.1";
 
 	if (keyObjectBuffer == nullptr)
 	{

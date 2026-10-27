@@ -182,6 +182,8 @@ private:
 private:
 	WCHAR sessionBrokerIP[254]{};
 	PortType sessionBrokerPort{};
+	// Startup owner only; enabled explicitly for a verified loopback broker connection.
+	bool hostLoopback{};
 
 	SOCKET sessionBrokerSocket{ INVALID_SOCKET };
 

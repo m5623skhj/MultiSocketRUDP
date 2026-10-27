@@ -810,6 +810,8 @@ void TryFlushPendingQueue()
 
 위 값은 현재 샘플 옵션 파일의 기본값이다. `PACKET_CODE`와 `PACKET_KEY`는 서버 설정과 동일해야 한다.
 
+호스트 PC에서만 사용하는 선택 항목 `SESSION_BROKER.HOST_LOOPBACK = 1`은 실제 TCP 브로커 peer가 IPv4 loopback(127/8)일 때만 허용한다. TLS 이름·체인과 버전·close_notify 검증은 유지하며, 인증된 세션 응답에서 UDP 목적지 IP만 127.0.0.1로 사용한다. 포트·세션 ID·키·솔트·wire version은 바꾸지 않는다. 생략 또는 0이면 기존 응답 IP를 사용한다. 옵션은 Start의 시작/종료 잠금 소유자가 작업 스레드 생성 전에 읽으며 다음 Start마다 초기화한다. 원격 peer에서 이 옵션을 사용하면 연결 준비를 실패 처리한다.
+
 `UNRELIABLE_QUEUE_CAPACITY`는 송신 deque와 수신 deque 각각의 상한으로 사용한다. 생략 시 `64`, 허용 범위는 `1..65535`다.
 
 ---
