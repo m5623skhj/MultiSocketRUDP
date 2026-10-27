@@ -2,64 +2,64 @@
 <rect width="100%" height="100%" fill="#0d1117" rx="12"/>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#c9d1d9}.axis{font-size:12px}.label{font-size:11px}.title{font-size:22px;font-weight:600}.subtitle{font-size:13px}.legend{font-size:13px;font-weight:600}.table-header{font-size:12px;font-weight:600}.table-row{font-size:12px}</style>
 <text x="28" y="38" class="title">RTT trend — packet loss 0%</text>
-<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 -37.53%, P99 -35.60%</text>
+<text x="28" y="65" class="subtitle">Latest vs previous 5 measurements median: P95 +27.34%, P99 +28.26%</text>
 <line x1="730" y1="36" x2="760" y2="36" stroke="#58a6ff" stroke-width="3"/><text x="768" y="41" class="legend">P95</text>
 <line x1="830" y1="36" x2="860" y2="36" stroke="#f85149" stroke-width="3"/><text x="868" y="41" class="legend">P99</text>
 <line x1="78" y1="340.00" x2="930" y2="340.00" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="344.00" text-anchor="end" class="axis">112.0</text>
+<text x="68" y="344.00" text-anchor="end" class="axis">110.6</text>
 <line x1="78" y1="294.40" x2="930" y2="294.40" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="298.40" text-anchor="end" class="axis">144.7</text>
+<text x="68" y="298.40" text-anchor="end" class="axis">145.3</text>
 <line x1="78" y1="248.80" x2="930" y2="248.80" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="252.80" text-anchor="end" class="axis">177.4</text>
+<text x="68" y="252.80" text-anchor="end" class="axis">180.1</text>
 <line x1="78" y1="203.20" x2="930" y2="203.20" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="207.20" text-anchor="end" class="axis">210.2</text>
+<text x="68" y="207.20" text-anchor="end" class="axis">214.9</text>
 <line x1="78" y1="157.60" x2="930" y2="157.60" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="161.60" text-anchor="end" class="axis">242.9</text>
+<text x="68" y="161.60" text-anchor="end" class="axis">249.7</text>
 <line x1="78" y1="112.00" x2="930" y2="112.00" stroke="#30363d" stroke-width="1"/>
-<text x="68" y="116.00" text-anchor="end" class="axis">275.6</text>
+<text x="68" y="116.00" text-anchor="end" class="axis">284.4</text>
 <text x="18" y="226.00" transform="rotate(-90 18 226.00)" text-anchor="middle" class="axis">RTT (µs)</text>
-<text x="78.00" y="367" text-anchor="middle" class="label">48b1829</text>
-<text x="78.00" y="384" text-anchor="middle" class="label">09-20</text>
-<text x="172.67" y="367" text-anchor="middle" class="label">4fbb027</text>
-<text x="172.67" y="384" text-anchor="middle" class="label">09-21</text>
-<text x="267.33" y="367" text-anchor="middle" class="label">fc496f9</text>
-<text x="267.33" y="384" text-anchor="middle" class="label">10-01</text>
-<text x="362.00" y="367" text-anchor="middle" class="label">26e1e6c</text>
-<text x="362.00" y="384" text-anchor="middle" class="label">10-02</text>
-<text x="456.67" y="367" text-anchor="middle" class="label">37cc2df</text>
-<text x="456.67" y="384" text-anchor="middle" class="label">10-04</text>
-<text x="551.33" y="367" text-anchor="middle" class="label">622f8a0</text>
-<text x="551.33" y="384" text-anchor="middle" class="label">10-09</text>
-<text x="646.00" y="367" text-anchor="middle" class="label">caf723f</text>
-<text x="646.00" y="384" text-anchor="middle" class="label">10-20</text>
-<text x="740.67" y="367" text-anchor="middle" class="label">0b8ab0d</text>
-<text x="740.67" y="384" text-anchor="middle" class="label">10-21</text>
-<text x="835.33" y="367" text-anchor="middle" class="label">fa51ffb</text>
-<text x="835.33" y="384" text-anchor="middle" class="label">10-22</text>
-<text x="930.00" y="367" text-anchor="middle" class="label">bb59568</text>
-<text x="930.00" y="384" text-anchor="middle" class="label">10-24</text>
-<polyline points="78.00,299.62 172.67,270.20 267.33,307.43 362.00,183.61 456.67,181.52 551.33,181.10 646.00,169.53 740.67,258.07 835.33,264.20 930.00,299.62" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="299.62" r="4" fill="#58a6ff"><title>141.000 µs</title></circle>
-<circle cx="172.67" cy="270.20" r="4" fill="#58a6ff"><title>162.100 µs</title></circle>
-<circle cx="267.33" cy="307.43" r="4" fill="#58a6ff"><title>135.400 µs</title></circle>
-<circle cx="362.00" cy="183.61" r="4" fill="#58a6ff"><title>224.200 µs</title></circle>
-<circle cx="456.67" cy="181.52" r="4" fill="#58a6ff"><title>225.700 µs</title></circle>
-<circle cx="551.33" cy="181.10" r="4" fill="#58a6ff"><title>226.000 µs</title></circle>
-<circle cx="646.00" cy="169.53" r="4" fill="#58a6ff"><title>234.300 µs</title></circle>
-<circle cx="740.67" cy="258.07" r="4" fill="#58a6ff"><title>170.800 µs</title></circle>
-<circle cx="835.33" cy="264.20" r="4" fill="#58a6ff"><title>166.400 µs</title></circle>
-<circle cx="930.00" cy="299.62" r="4" fill="#58a6ff"><title>141.000 µs</title></circle>
-<polyline points="78.00,226.28 172.67,215.54 267.33,278.84 362.00,144.85 456.67,153.77 551.33,153.91 646.00,144.57 740.67,214.01 835.33,234.64 930.00,275.78" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="78.00" cy="226.28" r="4" fill="#f85149"><title>193.600 µs</title></circle>
-<circle cx="172.67" cy="215.54" r="4" fill="#f85149"><title>201.300 µs</title></circle>
-<circle cx="267.33" cy="278.84" r="4" fill="#f85149"><title>155.900 µs</title></circle>
-<circle cx="362.00" cy="144.85" r="4" fill="#f85149"><title>252.000 µs</title></circle>
-<circle cx="456.67" cy="153.77" r="4" fill="#f85149"><title>245.600 µs</title></circle>
-<circle cx="551.33" cy="153.91" r="4" fill="#f85149"><title>245.500 µs</title></circle>
-<circle cx="646.00" cy="144.57" r="4" fill="#f85149"><title>252.200 µs</title></circle>
-<circle cx="740.67" cy="214.01" r="4" fill="#f85149"><title>202.400 µs</title></circle>
-<circle cx="835.33" cy="234.64" r="4" fill="#f85149"><title>187.600 µs</title></circle>
-<circle cx="930.00" cy="275.78" r="4" fill="#f85149"><title>158.100 µs</title></circle>
+<text x="78.00" y="367" text-anchor="middle" class="label">4fbb027</text>
+<text x="78.00" y="384" text-anchor="middle" class="label">09-21</text>
+<text x="172.67" y="367" text-anchor="middle" class="label">fc496f9</text>
+<text x="172.67" y="384" text-anchor="middle" class="label">10-01</text>
+<text x="267.33" y="367" text-anchor="middle" class="label">26e1e6c</text>
+<text x="267.33" y="384" text-anchor="middle" class="label">10-02</text>
+<text x="362.00" y="367" text-anchor="middle" class="label">37cc2df</text>
+<text x="362.00" y="384" text-anchor="middle" class="label">10-04</text>
+<text x="456.67" y="367" text-anchor="middle" class="label">622f8a0</text>
+<text x="456.67" y="384" text-anchor="middle" class="label">10-09</text>
+<text x="551.33" y="367" text-anchor="middle" class="label">caf723f</text>
+<text x="551.33" y="384" text-anchor="middle" class="label">10-20</text>
+<text x="646.00" y="367" text-anchor="middle" class="label">0b8ab0d</text>
+<text x="646.00" y="384" text-anchor="middle" class="label">10-21</text>
+<text x="740.67" y="367" text-anchor="middle" class="label">fa51ffb</text>
+<text x="740.67" y="384" text-anchor="middle" class="label">10-22</text>
+<text x="835.33" y="367" text-anchor="middle" class="label">bb59568</text>
+<text x="835.33" y="384" text-anchor="middle" class="label">10-24</text>
+<text x="930.00" y="367" text-anchor="middle" class="label">ce5083e</text>
+<text x="930.00" y="384" text-anchor="middle" class="label">10-27</text>
+<polyline points="78.00,272.42 172.67,307.43 267.33,190.99 362.00,189.02 456.67,188.63 551.33,177.75 646.00,261.01 740.67,266.78 835.33,300.09 930.00,199.78" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="272.42" r="4" fill="#58a6ff"><title>162.100 µs</title></circle>
+<circle cx="172.67" cy="307.43" r="4" fill="#58a6ff"><title>135.400 µs</title></circle>
+<circle cx="267.33" cy="190.99" r="4" fill="#58a6ff"><title>224.200 µs</title></circle>
+<circle cx="362.00" cy="189.02" r="4" fill="#58a6ff"><title>225.700 µs</title></circle>
+<circle cx="456.67" cy="188.63" r="4" fill="#58a6ff"><title>226.000 µs</title></circle>
+<circle cx="551.33" cy="177.75" r="4" fill="#58a6ff"><title>234.300 µs</title></circle>
+<circle cx="646.00" cy="261.01" r="4" fill="#58a6ff"><title>170.800 µs</title></circle>
+<circle cx="740.67" cy="266.78" r="4" fill="#58a6ff"><title>166.400 µs</title></circle>
+<circle cx="835.33" cy="300.09" r="4" fill="#58a6ff"><title>141.000 µs</title></circle>
+<circle cx="930.00" cy="199.78" r="4" fill="#58a6ff"><title>217.500 µs</title></circle>
+<polyline points="78.00,221.02 172.67,280.55 267.33,154.54 362.00,162.93 456.67,163.06 551.33,154.27 646.00,219.57 740.67,238.98 835.33,277.66 930.00,144.57" fill="none" stroke="#f85149" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="78.00" cy="221.02" r="4" fill="#f85149"><title>201.300 µs</title></circle>
+<circle cx="172.67" cy="280.55" r="4" fill="#f85149"><title>155.900 µs</title></circle>
+<circle cx="267.33" cy="154.54" r="4" fill="#f85149"><title>252.000 µs</title></circle>
+<circle cx="362.00" cy="162.93" r="4" fill="#f85149"><title>245.600 µs</title></circle>
+<circle cx="456.67" cy="163.06" r="4" fill="#f85149"><title>245.500 µs</title></circle>
+<circle cx="551.33" cy="154.27" r="4" fill="#f85149"><title>252.200 µs</title></circle>
+<circle cx="646.00" cy="219.57" r="4" fill="#f85149"><title>202.400 µs</title></circle>
+<circle cx="740.67" cy="238.98" r="4" fill="#f85149"><title>187.600 µs</title></circle>
+<circle cx="835.33" cy="277.66" r="4" fill="#f85149"><title>158.100 µs</title></circle>
+<circle cx="930.00" cy="144.57" r="4" fill="#f85149"><title>259.600 µs</title></circle>
 <text x="930" y="405" text-anchor="end" class="label">Latest 10 official main measurements · adjusted Y axis</text>
 <line x1="28" y1="426" x2="932" y2="426" stroke="#30363d" stroke-width="1"/>
 <text x="28" y="447" class="table-header">Date (UTC)</text>
@@ -68,54 +68,54 @@
 <text x="815" y="447" text-anchor="end" class="table-header">P95</text>
 <text x="930" y="447" text-anchor="end" class="table-header">P99</text>
 <line x1="28" y1="456" x2="932" y2="456" stroke="#30363d" stroke-width="1"/>
-<text x="28" y="478" class="table-row">2026-09-20</text>
-<text x="122" y="478" class="table-row">48b1829</text>
-<text x="210" y="478" class="table-row">* 클라이언트 reliable 송신 대기 큐의 ACK 경합으로 인한 정체 수정   * 콘텐츠 송신을 pending 큐…</text>
-<text x="815" y="478" text-anchor="end" class="table-row">0.141 ms</text>
-<text x="930" y="478" text-anchor="end" class="table-row">0.194 ms</text>
-<text x="28" y="499" class="table-row">2026-09-21</text>
-<text x="122" y="499" class="table-row">4fbb027</text>
-<text x="210" y="499" class="table-row">* 클라이언트 종료·재시작 동시성 및 설정 검증 문제 수정   * reliable 송신의 연결 세대 검증과 버퍼 수명…</text>
-<text x="815" y="499" text-anchor="end" class="table-row">0.162 ms</text>
-<text x="930" y="499" text-anchor="end" class="table-row">0.201 ms</text>
-<text x="28" y="520" class="table-row">2026-10-01</text>
-<text x="122" y="520" class="table-row">fc496f9</text>
-<text x="210" y="520" class="table-row">* 서버 종료 시 대기 중인 브로커 소켓 정리 지연 개선   * 전체 워커 중지 요청 후 큐 소켓을 먼저 닫고 워커 …</text>
-<text x="815" y="520" text-anchor="end" class="table-row">0.135 ms</text>
-<text x="930" y="520" text-anchor="end" class="table-row">0.156 ms</text>
-<text x="28" y="541" class="table-row">2026-10-02</text>
-<text x="122" y="541" class="table-row">26e1e6c</text>
-<text x="210" y="541" class="table-row">* 수신 패킷 복호화 후 인증 태그가 읽기 범위에 남는 버그 수정   * 인증 성공 시 버퍼 끝 위치를 인증 태그 앞…</text>
-<text x="815" y="541" text-anchor="end" class="table-row">0.224 ms</text>
-<text x="930" y="541" text-anchor="end" class="table-row">0.252 ms</text>
-<text x="28" y="562" class="table-row">2026-10-04</text>
-<text x="122" y="562" class="table-row">37cc2df</text>
-<text x="210" y="562" class="table-row">* 클라이언트 코어 종료 시 연결·송수신 대기와 로그 스레드 정리 개선</text>
+<text x="28" y="478" class="table-row">2026-09-21</text>
+<text x="122" y="478" class="table-row">4fbb027</text>
+<text x="210" y="478" class="table-row">* 클라이언트 종료·재시작 동시성 및 설정 검증 문제 수정   * reliable 송신의 연결 세대 검증과 버퍼 수명…</text>
+<text x="815" y="478" text-anchor="end" class="table-row">0.162 ms</text>
+<text x="930" y="478" text-anchor="end" class="table-row">0.201 ms</text>
+<text x="28" y="499" class="table-row">2026-10-01</text>
+<text x="122" y="499" class="table-row">fc496f9</text>
+<text x="210" y="499" class="table-row">* 서버 종료 시 대기 중인 브로커 소켓 정리 지연 개선   * 전체 워커 중지 요청 후 큐 소켓을 먼저 닫고 워커 …</text>
+<text x="815" y="499" text-anchor="end" class="table-row">0.135 ms</text>
+<text x="930" y="499" text-anchor="end" class="table-row">0.156 ms</text>
+<text x="28" y="520" class="table-row">2026-10-02</text>
+<text x="122" y="520" class="table-row">26e1e6c</text>
+<text x="210" y="520" class="table-row">* 수신 패킷 복호화 후 인증 태그가 읽기 범위에 남는 버그 수정   * 인증 성공 시 버퍼 끝 위치를 인증 태그 앞…</text>
+<text x="815" y="520" text-anchor="end" class="table-row">0.224 ms</text>
+<text x="930" y="520" text-anchor="end" class="table-row">0.252 ms</text>
+<text x="28" y="541" class="table-row">2026-10-04</text>
+<text x="122" y="541" class="table-row">37cc2df</text>
+<text x="210" y="541" class="table-row">* 클라이언트 코어 종료 시 연결·송수신 대기와 로그 스레드 정리 개선</text>
+<text x="815" y="541" text-anchor="end" class="table-row">0.226 ms</text>
+<text x="930" y="541" text-anchor="end" class="table-row">0.246 ms</text>
+<text x="28" y="562" class="table-row">2026-10-09</text>
+<text x="122" y="562" class="table-row">622f8a0</text>
+<text x="210" y="562" class="table-row">* 코드 정리</text>
 <text x="815" y="562" text-anchor="end" class="table-row">0.226 ms</text>
-<text x="930" y="562" text-anchor="end" class="table-row">0.246 ms</text>
-<text x="28" y="583" class="table-row">2026-10-09</text>
-<text x="122" y="583" class="table-row">622f8a0</text>
-<text x="210" y="583" class="table-row">* 코드 정리</text>
-<text x="815" y="583" text-anchor="end" class="table-row">0.226 ms</text>
-<text x="930" y="583" text-anchor="end" class="table-row">0.245 ms</text>
-<text x="28" y="604" class="table-row">2026-10-20</text>
-<text x="122" y="604" class="table-row">caf723f</text>
-<text x="210" y="604" class="table-row">* 클라이언트 응답 훅 경고 및 공통 코드 참조 정리</text>
-<text x="815" y="604" text-anchor="end" class="table-row">0.234 ms</text>
-<text x="930" y="604" text-anchor="end" class="table-row">0.252 ms</text>
-<text x="28" y="625" class="table-row">2026-10-21</text>
-<text x="122" y="625" class="table-row">0b8ab0d</text>
-<text x="210" y="625" class="table-row">* RUDP 진단 로그 조건문 범위와 소스 인코딩 수정</text>
-<text x="815" y="625" text-anchor="end" class="table-row">0.171 ms</text>
-<text x="930" y="625" text-anchor="end" class="table-row">0.202 ms</text>
-<text x="28" y="646" class="table-row">2026-10-22</text>
-<text x="122" y="646" class="table-row">fa51ffb</text>
-<text x="210" y="646" class="table-row">* NetBuffer 지연 초기화 연동과 ASan 회귀 검증 보완</text>
-<text x="815" y="646" text-anchor="end" class="table-row">0.166 ms</text>
-<text x="930" y="646" text-anchor="end" class="table-row">0.188 ms</text>
-<text x="28" y="667" class="table-row">2026-10-24</text>
-<text x="122" y="667" class="table-row">bb59568</text>
-<text x="210" y="667" class="table-row">* 원격 RUDP 버퍼 및 ACK 종료 경합 수정 통합</text>
-<text x="815" y="667" text-anchor="end" class="table-row">0.141 ms</text>
-<text x="930" y="667" text-anchor="end" class="table-row">0.158 ms</text>
+<text x="930" y="562" text-anchor="end" class="table-row">0.245 ms</text>
+<text x="28" y="583" class="table-row">2026-10-20</text>
+<text x="122" y="583" class="table-row">caf723f</text>
+<text x="210" y="583" class="table-row">* 클라이언트 응답 훅 경고 및 공통 코드 참조 정리</text>
+<text x="815" y="583" text-anchor="end" class="table-row">0.234 ms</text>
+<text x="930" y="583" text-anchor="end" class="table-row">0.252 ms</text>
+<text x="28" y="604" class="table-row">2026-10-21</text>
+<text x="122" y="604" class="table-row">0b8ab0d</text>
+<text x="210" y="604" class="table-row">* RUDP 진단 로그 조건문 범위와 소스 인코딩 수정</text>
+<text x="815" y="604" text-anchor="end" class="table-row">0.171 ms</text>
+<text x="930" y="604" text-anchor="end" class="table-row">0.202 ms</text>
+<text x="28" y="625" class="table-row">2026-10-22</text>
+<text x="122" y="625" class="table-row">fa51ffb</text>
+<text x="210" y="625" class="table-row">* NetBuffer 지연 초기화 연동과 ASan 회귀 검증 보완</text>
+<text x="815" y="625" text-anchor="end" class="table-row">0.166 ms</text>
+<text x="930" y="625" text-anchor="end" class="table-row">0.188 ms</text>
+<text x="28" y="646" class="table-row">2026-10-24</text>
+<text x="122" y="646" class="table-row">bb59568</text>
+<text x="210" y="646" class="table-row">* 원격 RUDP 버퍼 및 ACK 종료 경합 수정 통합</text>
+<text x="815" y="646" text-anchor="end" class="table-row">0.141 ms</text>
+<text x="930" y="646" text-anchor="end" class="table-row">0.158 ms</text>
+<text x="28" y="667" class="table-row">2026-10-27</text>
+<text x="122" y="667" class="table-row">ce5083e</text>
+<text x="210" y="667" class="table-row">* 호스트 로컬 RUDP 세션 접속 옵션 지원</text>
+<text x="815" y="667" text-anchor="end" class="table-row">0.217 ms</text>
+<text x="930" y="667" text-anchor="end" class="table-row">0.260 ms</text>
 </svg>
