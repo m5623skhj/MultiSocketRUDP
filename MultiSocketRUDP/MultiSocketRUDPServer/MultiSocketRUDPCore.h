@@ -243,6 +243,9 @@ private:
 	ServerFatalErrorHandler fatalErrorHandler;
 	std::optional<ServerFatalError> fatalError;
 	unsigned short numOfSockets{};
+	// Immutable after startup; zero preserves the legacy OS-selected UDP port.
+	unsigned short udpPortStart{};
+	unsigned short udpPortEnd{};
 	PortType sessionBrokerPort{};
 	std::string coreServerIp{};
 

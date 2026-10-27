@@ -134,6 +134,8 @@ public:
 
 	static BYTE GetWorkerThreadCount(const MultiSocketRUDPCore& core) { return core.numOfWorkerThread; }
 	static unsigned short GetSocketCount(const MultiSocketRUDPCore& core) { return core.numOfSockets; }
+	static unsigned short GetUdpPortStart(const MultiSocketRUDPCore& core) { return core.udpPortStart; }
+	static unsigned short GetUdpPortEnd(const MultiSocketRUDPCore& core) { return core.udpPortEnd; }
 	static PacketRetransmissionCount GetMaxRetransmissionCount(const MultiSocketRUDPCore& core)
 	{
 		return core.maxPacketRetransmissionCount;

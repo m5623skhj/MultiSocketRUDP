@@ -284,3 +284,38 @@ TEST_F(CoreOptionParserTest, EmptyAndOverlongServerIpAreRejected)
 	EXPECT_FALSE(Parse(emptyIpCore, MakeCoreOptions(), MakeBrokerOptions(L"")));
 	EXPECT_FALSE(Parse(overlongIpCore, MakeCoreOptions(), MakeBrokerOptions(L"1234567890123456")));
 }
+
+// The legacy profile has no range; an explicit range must cover every stable pool slot.
+TEST_F(CoreOptionParserTest, FixedUdpRangeIsOptionalAndCoversAllSlots)
+{
+	MultiSocketRUDPCore core{ L"", L"" };
+	ASSERT_TRUE(Parse(core, MakeCoreOptions(), MakeBrokerOptions()));
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetUdpPortStart(core), 0);
+	auto options = MakeCoreOptions();
+	options.insert(options.find(L'{') + 1, L"\n UDP_PORT_START = 65528\n UDP_PORT_END = 65535\n");
+	ASSERT_TRUE(Parse(core, options, MakeBrokerOptions()));
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetUdpPortStart(core), 65528);
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetUdpPortEnd(core), 65535);
+	// Reusing the parser for a local profile cannot retain an external range.
+	ASSERT_TRUE(Parse(core, MakeCoreOptions(), MakeBrokerOptions()));
+	EXPECT_EQ(MultiSocketRUDPCoreTestAccess::GetUdpPortEnd(core), 0);
+}
+
+TEST_F(CoreOptionParserTest, InvalidFixedUdpRangesNeverFallBackToEphemeral)
+{
+	for (const auto* range : {
+		L"UDP_PORT_START = 20000\n", // half specified
+		L"UDP_PORT_START = 0\n UDP_PORT_END = 20063\n",
+		L"UDP_PORT_START = -1\n UDP_PORT_END = 20063\n",
+		L"UDP_PORT_START = 65536\n UDP_PORT_END = 65543\n", // narrowing overflow
+		L"UDP_PORT_START = 20063\n UDP_PORT_END = 20000\n",
+		L"UDP_PORT_START = 20000\n UDP_PORT_END = 20006\n", // eight slots, seven ports
+		L"UDP_PORT_START = 20000x\n UDP_PORT_END = 20063\n",
+		L"UDP_PORT_START = 20000\n UDP_PORT_START = bad\n UDP_PORT_END = 20063\n" })
+	{
+		MultiSocketRUDPCore core{ L"", L"" };
+		auto options = MakeCoreOptions();
+		options.insert(options.find(L'{') + 1, L"\n" + std::wstring(range));
+		EXPECT_FALSE(Parse(core, options, MakeBrokerOptions()));
+	}
+}

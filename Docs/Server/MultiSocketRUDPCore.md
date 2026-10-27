@@ -727,3 +727,31 @@ callback은 worker thread에서 호출된다. callback 안에서 `StopServer()`�
 - [[GettingStarted]] — 처음부터 서버 구축하기
 - [[Troubleshooting]] — 자주 발생하는 문제와 해결
 - [[FatalErrorHandling]] — 치명 오류 callback과 프로세스 재시작 연동
+
+
+### Optional fixed UDP ports for NAT hosting
+
+`CORE` accepts `UDP_PORT_START` and `UDP_PORT_END` together. Omit both to preserve
+OS-selected ephemeral UDP ports. Explicit zero, overflow, malformed/duplicate keys,
+reversed ranges and a range smaller than `NUM_OF_SOCKET` are rejected. Example:
+
+```text
+:CORE
+{
+    UDP_PORT_START = 20000
+    UDP_PORT_END = 20063
+    NUM_OF_SOCKET = 64
+    // Retain the other required core settings.
+}
+```
+
+A reservation for pool slot N exclusively binds `UDP_PORT_START + N`; there is no
+fallback to another or ephemeral port. Bind failures include the port and WSA error
+in logs. The unchanged broker session packet advertises the actual bound UDP port
+with `CORE_IP` (the externally reachable IPv4, not the bind interface).
+Forward the same external/internal UDP numbers. Sockets still bind INADDR_ANY.
+The existing close / pending I/O drain / RIO cleanup / pool return order controls
+reuse. Range settings are immutable while running and need no shared allocator.
+Two Room processes must use disjoint ranges. Fixed ports do not weaken session
+keys/salts or the existing authenticated UDP protocol. The protocol version and
+packet byte layout are unchanged; clients must rebuild for the TLS/DNS changes.

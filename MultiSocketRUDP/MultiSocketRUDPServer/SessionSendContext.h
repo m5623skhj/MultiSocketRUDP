@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <queue>
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <set>
@@ -66,6 +67,9 @@ public:
 	// ----------------------------------------
 	[[nodiscard]]
 	size_t GetSendPacketInfoQueueSize();
+	// Value snapshot under the queue mutex; counts local evictions, not network loss.
+	struct UnreliableQueueStats { size_t queued{},capacity{};std::uint64_t dropped{}; };
+	[[nodiscard]] UnreliableQueueStats GetUnreliableQueueStats();
 	// ----------------------------------------
 	// @brief 송신 패킷 정보를 큐에 추가합니다.
 	// @param info 추가할 SendPacketInfo 포인터
@@ -228,6 +232,7 @@ private:
 	std::queue<SendPacketInfo*> sendPacketInfoQueue;
 	std::deque<SendPacketInfo*> unreliableQueue;
 	size_t unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
+	std::uint64_t unreliableDropped{}; // sendPacketInfoQueueLock-owned; reset for each session.
 	bool preferUnreliable{};
 
 	std::atomic<PacketSequence> lastSendPacketSequence{};

@@ -1,11 +1,36 @@
 #include "PreCompile.h"
 #include "MultiSocketRUDPCore.h"
 #include <Windows.h>
+#include <regex>
 
 bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath, const std::wstring& sessionBrokerOptionFilePath)
 {
-	WCHAR buffer[BUFFER_MAX];
-	LoadParsingText(buffer, coreOptionFilePath.c_str(), BUFFER_MAX);
+	WCHAR buffer[BUFFER_MAX]{};
+	if (!LoadParsingText(buffer, coreOptionFilePath.c_str(), BUFFER_MAX)) return false;
+
+	// Optional fixed UDP range. Validate text before narrowing; malformed or half
+	// specified ranges must never silently fall back to ephemeral ports.
+	udpPortStart = udpPortEnd = 0;
+	const std::wstring coreText(buffer);
+	const auto readPort = [&](const wchar_t* key, unsigned short& result)
+	{
+		const std::wregex keyPattern(std::wstring(L"(^|[\r\n])\\s*") + key + L"\\b");
+		const std::wregex valuePattern(std::wstring(L"(^|[\r\n])[ \t]*") + key +
+			L"[ \t]*=[ \t]*([0-9]{1,5})[ \t]*(?=[\r\n]|$)");
+		std::wsregex_iterator keys(coreText.begin(), coreText.end(), keyPattern), noKeys;
+		if (keys == noKeys) return 0;
+		if (++keys != noKeys) return -1;
+		std::wsregex_iterator it(coreText.begin(), coreText.end(), valuePattern), end;
+		if (it == end) return -1;
+		const auto value = std::stoul((*it)[2].str());
+		if (++it != end || value == 0 || value > 65535) return -1;
+		result = static_cast<unsigned short>(value);
+		return 1;
+	};
+	const int hasStart = readPort(L"UDP_PORT_START", udpPortStart);
+	const int hasEnd = readPort(L"UDP_PORT_END", udpPortEnd);
+	if (hasStart < 0 || hasEnd < 0 || hasStart != hasEnd ||
+		(hasStart == 1 && udpPortStart > udpPortEnd)) return false;
 
 	// core
 	if (g_Paser.GetValue_Byte(buffer, L"CORE", L"THREAD_COUNT", &numOfWorkerThread) == false)
@@ -16,6 +41,8 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	{
 		return false;
 	}
+	if (numOfSockets == 0 || (udpPortStart != 0 &&
+		static_cast<unsigned int>(udpPortEnd) - udpPortStart + 1 < numOfSockets)) return false;
 	if (g_Paser.GetValue_Short(buffer, L"CORE", L"MAX_PACKET_RETRANSMISSION_COUNT", reinterpret_cast<short*>(&maxPacketRetransmissionCount)) == false)
 	{
 		return false;
@@ -82,7 +109,7 @@ bool MultiSocketRUDPCore::ReadOptionFile(const std::wstring& coreOptionFilePath,
 	}
 
 	ZeroMemory(buffer, BUFFER_MAX * sizeof(WCHAR));
-	LoadParsingText(buffer, sessionBrokerOptionFilePath.c_str(), BUFFER_MAX);
+	if (!LoadParsingText(buffer, sessionBrokerOptionFilePath.c_str(), BUFFER_MAX)) return false;
 
 	// session broker
 	WCHAR targetIP[64];

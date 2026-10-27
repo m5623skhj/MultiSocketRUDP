@@ -20,7 +20,7 @@
 
 namespace
 {
-	SOCKET CreateRUDPSocket()
+	SOCKET CreateRUDPSocket(const PortType inPort)
 	{
 		const SOCKET sock = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_REGISTERED_IO);
 		if (sock == INVALID_SOCKET)
@@ -32,12 +32,25 @@ namespace
 		sockaddr_in serverAddr = {};
 		serverAddr.sin_family = AF_INET;
 		serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-		serverAddr.sin_port = 0;
+		serverAddr.sin_port = htons(inPort);
+
+		// Never share a fixed game port with a second process/socket.
+		const BOOL exclusive = TRUE;
+		if (inPort != 0 && setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+			reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR)
+		{
+			const auto error = WSAGetLastError();
+			closesocket(sock);
+			WSASetLastError(error);
+			return INVALID_SOCKET;
+		}
 
 		if (bind(sock, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			LOG_ERROR(std::format("Bind failed with error code {}", WSAGetLastError()));
+			const auto error = WSAGetLastError();
+			LOG_ERROR(std::format("UDP bind failed: port={}, error={}", inPort, error));
 			closesocket(sock);
+			WSASetLastError(error);
 			return INVALID_SOCKET;
 		}
 
@@ -714,7 +727,13 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		session.AbortReservedSession();
 	});
 
-	session.socketContext.SetSocket(CreateRUDPSocket());
+	// Pool slots are returned only after CloseSocket and the RIO completion drain.
+	// A stable slot-to-port mapping needs no shared allocator or new lock.
+	const unsigned int port = udpPortStart == 0 ? 0 :
+		static_cast<unsigned int>(udpPortStart) + session.GetSessionId();
+	if (udpPortStart != 0 && (session.GetSessionId() >= numOfSockets || port > udpPortEnd))
+		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
+	session.socketContext.SetSocket(CreateRUDPSocket(static_cast<PortType>(port)));
 	const SOCKET sock = session.GetSocket();
 	if (sock == INVALID_SOCKET)
 	{
@@ -724,7 +743,12 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 
 	sockaddr_in serverAddr;
 	socklen_t len = sizeof(serverAddr);
-	getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len);
+	if (getsockname(sock, reinterpret_cast<sockaddr*>(&serverAddr), &len) == SOCKET_ERROR
+		|| (port != 0 && ntohs(serverAddr.sin_port) != port))
+	{
+		LOG_ERROR("Unable to verify the bound UDP port; reservation cancelled.");
+		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
+	}
 	session.socketContext.SetServerPort(ntohs(serverAddr.sin_port));
 
 	if (not rioManager->InitializeSessionRIO(session, session.GetThreadId()))

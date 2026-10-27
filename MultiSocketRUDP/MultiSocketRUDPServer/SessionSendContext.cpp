@@ -54,6 +54,7 @@ void SessionSendContext::Reset()
 		}
 		for (auto* info : unreliableQueue) SendPacketInfo::Free(info);
 		unreliableQueue.clear();
+		unreliableDropped = 0;
 		preferUnreliable = false;
 	}
 
@@ -88,17 +89,26 @@ void SessionSendContext::PushSendPacketInfo(SendPacketInfo* info)
 			{
 				SendPacketInfo::Free(reservedSendPacketInfo);
 				reservedSendPacketInfo = nullptr;
+				++unreliableDropped;
 			}
 			else if (not unreliableQueue.empty())
 			{
 				SendPacketInfo::Free(unreliableQueue.front());
 				unreliableQueue.pop_front();
+				++unreliableDropped;
 			}
 		}
 		unreliableQueue.push_back(info);
 		return;
 	}
 	sendPacketInfoQueue.push(info);
+}
+
+SessionSendContext::UnreliableQueueStats SessionSendContext::GetUnreliableQueueStats()
+{
+	std::scoped_lock lock(sendPacketInfoQueueLock);
+	const bool reserved = reservedSendPacketInfo != nullptr && reservedSendPacketInfo->isUnreliable;
+	return {unreliableQueue.size() + (reserved ? 1 : 0),unreliableQueueCapacity,unreliableDropped};
 }
 
 SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
@@ -147,6 +157,7 @@ void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 	// Producers may have filled the queue while this packet was being assembled.
 	if (info->isUnreliable && unreliableQueue.size() >= unreliableQueueCapacity)
 	{
+		++unreliableDropped;
 		SendPacketInfo::Free(info);
 		return;
 	}

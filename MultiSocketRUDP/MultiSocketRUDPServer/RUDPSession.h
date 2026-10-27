@@ -57,6 +57,7 @@ public:
 	bool SendPacket(IPacket& packet);
 	// True means accepted locally, including replacement of the oldest unsent packet.
 	bool SendUnreliablePacket(IPacket& packet);
+	[[nodiscard]] SessionSendContext::UnreliableQueueStats GetUnreliableQueueStats();
 	bool OnUnreliablePacket(NetBuffer& packet);
 
 	ThreadIdType GetThreadId() const;

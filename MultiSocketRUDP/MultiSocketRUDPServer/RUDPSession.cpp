@@ -186,6 +186,11 @@ bool RUDPSession::TryBeginSendOperation()
 	return true;
 }
 
+SessionSendContext::UnreliableQueueStats RUDPSession::GetUnreliableQueueStats()
+{
+	return rioContext.GetSendContext().GetUnreliableQueueStats();
+}
+
 bool RUDPSession::SendUnreliablePacket(IPacket& packet)
 {
 	if (not TryBeginSendOperation()) return false;

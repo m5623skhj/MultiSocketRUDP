@@ -632,3 +632,54 @@ virtual bool Handshake(SOCKET socket) = 0;
 
 - 현재 `TlsDecryptResult` 값은 `None`, `PlainData`, `CloseNotify`, `Error`다.
 - 예전 문서에 있던 `TLSHelperServer(storeName, subjectName)`와 `Initialize(storeName, subjectName)` 시그니처는 현재 코드와 맞지 않는다.
+
+
+## Client broker identity validation (external hosting)
+
+`TLSHelperClient::SetServerName` supplies the requested DNS/IP identity before a
+handshake. SessionGetter sets it from the broker address, now up to 253 ASCII
+DNS characters or an IPv4 literal. DNS lookup is asynchronous and observes the
+connection stop token; cancelled lookup storage is kept alive until OS completion.
+Legacy direct TLS callers without a name verify the connected IPv4 address.
+
+After the Schannel handshake and before exposing session keys, the client requires
+Windows trusted-chain / validity / server-auth EKU and SSL name-policy success.
+Unknown roots, name mismatch and expiry are rejected; no ignore flags are used.
+Intermediates must be supplied by the server or already cached: AIA network fetch
+and CRL/OCSP network retrieval are not requested by this test-hosting policy.
+Private test roots must be trusted by the client Windows user separately; no trust
+store is modified by the library. Existing local CA-signed localhost/IP SAN
+certificates remain usable. Untrusted self-signed sample certificates now require
+explicit trust preparation; handshake encryption alone is not authentication.
+
+Server certificate selection continues to support `ServerCertificateConfig` store
+and PFX sources. The ActionRPG external host selects its configured PFX instead of
+changing or replacing the local DevServerCert. There is no new wire field/version.
+
+## Coalesced handshake and application data
+
+A successful client/server handshake retains the trailing `SECBUFFER_EXTRA`
+bytes from its receive buffer. The connection thread transfers these bytes once
+through `TakePendingHandshakeData()`; the broker version reader and the client
+session-info reader process them before waiting for another socket receive.
+Incomplete TLS records remain buffered and are completed by subsequent reads.
+Starting another handshake clears the previous pending bytes. Existing version
+2 validation, stream size limits, cancellation and deadlines remain enforced.
+
+Broker rejection logs include `reason`, `expected_version`,
+`received_version` (or `unavailable`), `plain_bytes`, and `socket_error`.
+For example, `version-mismatch` identifies an actually decoded wrong version;
+`version-not-received`, `version-incomplete`, `peer-closed` and TLS/socket
+errors identify failures to receive it. No session keys or received payloads are
+logged. Buffered data and diagnostic fields belong to the connection thread.
+
+## Explicit local broker certificate selection
+
+`ServerCertificateConfig::FromStoreThumbprint(storeName, thumbprint)` selects one
+CurrentUser certificate by its 40-digit certificate thumbprint using
+`CERT_FIND_HASH`. Invalid thumbprints and missing certificates fail initialization;
+subject-name selection is not used as a fallback for a configured thumbprint.
+The local ActionRPG launcher validates Windows trust, server-auth EKU and both
+localhost/127.0.0.1 SSL names before supplying the selected thumbprint to the room
+server. Client certificate verification remains mandatory. Existing PFX-based
+external hosting remains a separate configuration.
