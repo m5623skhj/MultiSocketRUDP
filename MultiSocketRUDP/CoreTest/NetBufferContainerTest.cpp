@@ -2,6 +2,11 @@
 #include <gtest/gtest.h>
 #include "NetServerSerializeBuffer.h"
 #include <stdexcept>
+#include <array>
+#include <barrier>
+#include <exception>
+#include <memory>
+#include <thread>
 
 namespace
 {
@@ -15,6 +20,50 @@ namespace
         EXPECT_EQ(result, source);
         EXPECT_EQ(buffer.GetUseSize(), 0);
     }
+}
+
+// The ASan runner also executes this test alone in a fresh process, before any
+// pool statistics or allocations can initialize the pool on the main thread.
+TEST(NetBufferPoolTest, ConcurrentFirstAccessGrowsBuffersAndReturnsAcrossThreads)
+{
+    constexpr int THREAD_COUNT = 8;
+    using ScopedBuffer = std::unique_ptr<NetBuffer, decltype([](NetBuffer* buffer) { NetBuffer::Free(buffer); })>;
+    std::array<ScopedBuffer, THREAD_COUNT> buffers;
+    std::array<std::exception_ptr, THREAD_COUNT> errors{};
+    std::array<bool, THREAD_COUNT> restoredCorrectly{};
+    std::barrier startGate(THREAD_COUNT);
+    std::vector<std::jthread> workers;
+    workers.reserve(THREAD_COUNT);
+    for (int index = 0; index < THREAD_COUNT; ++index)
+    {
+        workers.emplace_back([&, index]
+        {
+            startGate.arrive_and_wait();
+            try
+            {
+                buffers[index].reset(NetBuffer::Alloc());
+                const std::string payload(4096, static_cast<char>('a' + index));
+                *buffers[index] << payload;
+                std::string restored;
+                *buffers[index] >> restored;
+                restoredCorrectly[index] = restored == payload;
+            }
+            catch (...) { errors[index] = std::current_exception(); }
+        });
+    }
+    workers.clear(); // Join all workers before inspecting results or returning their buffers.
+    std::set<NetBuffer*> addresses;
+    for (int index = 0; index < THREAD_COUNT; ++index)
+    {
+        EXPECT_EQ(errors[index], nullptr);
+        EXPECT_TRUE(restoredCorrectly[index]);
+        EXPECT_NE(buffers[index], nullptr);
+        addresses.insert(buffers[index].get());
+    }
+    EXPECT_EQ(addresses.size(), THREAD_COUNT);
+    EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), THREAD_COUNT);
+    for (auto& buffer : buffers) buffer.reset();
+    EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), 0);
 }
 
 TEST(NetBufferContainerTest, AllContainersRoundTripIncludingNestedValues)

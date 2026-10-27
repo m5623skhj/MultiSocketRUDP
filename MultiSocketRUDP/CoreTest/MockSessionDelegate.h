@@ -60,7 +60,11 @@ public:
         isNothingToSendReturn = queuedSendPacketInfos.empty() && tryGetFrontReturn == nullptr;
         return info;
     }
-    void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override { reservedSendReturn = info; }
+    void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override
+    {
+        reservedSendReturn = info;
+        isNothingToSendReturn = queuedSendPacketInfos.empty() && tryGetFrontReturn == nullptr && reservedSendReturn == nullptr;
+    }
     [[nodiscard]]
     size_t GetSendPacketInfoQueueSize(RUDPSession&) override
     {
