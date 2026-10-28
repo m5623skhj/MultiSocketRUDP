@@ -1,685 +1,173 @@
 # TLSHelper
 
-> **Windows SChannel(Schannel SSP)을 이용한 TLS 핸드셰이크 및 스트림 암복호화 모듈.**
-> `RUDPSessionBroker`(서버)와 `RUDPClientCore`(클라이언트)가 세션 정보를 안전하게 교환하는 채널을 제공한다.  
-> AES-GCM과 달리 표준 X.509 인증서를 사용하고, 스트림 방식으로 동작한다.
-> 서버와 클라이언트 credential은 모두 TLS 1.2로 제한한다.
-
----
+> Windows Schannel을 사용해 브로커의 TLS 1.2 핸드셰이크와 스트림 암복호화를 수행한다.
+> 구현은 `MultiSocketRUDP/Common/TLS/TLSHelper.h`, `TLSHelper.cpp`, `TLSHelperClient.cpp`, `TLSHelperServer.cpp`에 있다.
 
 ## 목차
 
-1. [클래스 계층 구조](#1-클래스-계층-구조)
-2. [서버 초기화 — `TLSHelperServer::Initialize`](#2-서버-초기화-tlshelperserverinitialize)
-3. [클라이언트 초기화 — `TLSHelperClient::Initialize`](#3-클라이언트-초기화-tlshelperclientinitialize)
-4. [서버 핸드셰이크 — `AcceptSecurityContext` 루프](#4-서버-핸드셰이크-acceptsecuritycontext-루프)
-5. [클라이언트 핸드셰이크 — `InitializeSecurityContext` 루프](#5-클라이언트-핸드셰이크-initializesecuritycontext-루프)
-6. [데이터 암호화 — `EncryptData`](#6-데이터-암호화-encryptdata)
-7. [데이터 복호화 — `DecryptDataStream`](#7-데이터-복호화-decryptdatastream)
-8. [close_notify 전송 — `EncryptCloseNotify`](#8-close_notify-전송-encryptclosenotify)
-9. [TlsDecryptResult 열거형](#9-tlsdecryptresult-열거형)
-10. [인증서 관리](#10-인증서-관리)
-11. [개발 환경 자체 서명 인증서 설정](#11-개발-환경-자체-서명-인증서-설정)
-12. [SChannel 내부 구조 메모](#12-schannel-내부-구조-메모)
+1. [구성과 소유권](#구성과-소유권)
+2. [서버 인증서 설정](#서버-인증서-설정)
+3. [클라이언트 인증 정책](#클라이언트-인증-정책)
+4. [핸드셰이크와 잔여 데이터](#핸드셰이크와-잔여-데이터)
+5. [스트림 암복호화와 종료](#스트림-암복호화와-종료)
+6. [프로토콜 버전 확인과 진단](#프로토콜-버전-확인과-진단)
+7. [개발·테스트 인증서](#개발테스트-인증서)
 
----
+## 구성과 소유권
 
-## 1. 클래스 계층 구조
+`TLSHelperBase`가 Schannel credential·context·스트림 크기·핸드셰이크 잔여 데이터를 소유하고, `TLSHelperClient`와 `TLSHelperServer`가 역할별 초기화·핸드셰이크를 구현한다. 소멸 시 context와 credential을 해제한다. 서버 브로커는 연결마다 별도 helper를 생성한다.
 
-```
-TLSHelperBase
- ├── credHandle          (CredHandle)
- ├── ctxtHandle          (CtxtHandle)
- ├── streamSizes         (SecPkgContext_StreamSizes)
- │    ├── cbHeader       TLS 레코드 헤더 크기 (보통 5 bytes)
- │    ├── cbTrailer      TLS 레코드 트레일러 크기 (MAC + 패딩)
- │    └── cbMaximumMessage  최대 페이로드 크기
- ├── handshakeCompleted  (bool)
- │
- ├── EncryptData(plainData, size → encryptedBuffer, outSize)
- ├── DecryptData(encryptedData, encryptedSize, outPlain, outPlainSize)
- ├── DecryptDataStream(encryptedStream, outPlain, outPlainSize) → TlsDecryptResult
- ├── EncryptCloseNotify(buffer, bufferSize, encryptedSize)
- ├── SendProtocolVersion(socket, version)
- └── ReceiveProtocolVersion(socket, expectedVersion, stopToken)
+helper는 내부 잠금으로 병렬 I/O를 직렬화하지 않는다. 연결 담당 스레드에서 설정·핸드셰이크·복호화·잔여 데이터 이동을 수행해야 하며, I/O 도중 `SetServerName()`을 호출하면 안 된다.
 
-TLSHelperServer : TLSHelperBase
- ├── certificateConfig (ServerCertificateConfig)
- ├── Initialize() → bool
- ├── InitializeFromStore() → bool
- ├── InitializeFromPfxFile() → bool
- └── Handshake(socket) → bool
-
-TLSHelperClient : TLSHelperBase
- ├── Initialize() → bool
- └── Handshake(socket) → bool
-```
-
----
-
-## 2. 서버 초기화 — `TLSHelperServer::Initialize`
-
-현재 서버 TLS 설정은 `ServerCertificateConfig`를 통해 전달한다.
+## 서버 인증서 설정
 
 ```cpp
-TLSHelperServer tlsHelperServer(
-    TLSHelper::ServerCertificateConfig::FromStore(L"MY", L"DevServerCert"));
+enum class ServerCertificateSource : unsigned char { Store, PfxFile };
 
-bool initialized = tlsHelperServer.Initialize();
+[[nodiscard]]
+static ServerCertificateConfig FromStore(
+    const std::wstring& inStoreName, const std::wstring& inCertSubjectName);
+[[nodiscard]]
+static ServerCertificateConfig FromStoreThumbprint(
+    const std::wstring& inStoreName, const std::wstring& inThumbprint);
+[[nodiscard]]
+static ServerCertificateConfig FromPfxFile(
+    const std::wstring& inPfxFilePath, const std::wstring& inPfxPassword);
 ```
 
-PFX 파일을 직접 사용하는 경우:
+위 정적 팩토리는 `TLSHelper::ServerCertificateConfig`의 멤버다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 ```cpp
-TLSHelperServer tlsHelperServer(
-    TLSHelper::ServerCertificateConfig::FromPfxFile(L"server.pfx", L"password"));
-
-bool initialized = tlsHelperServer.Initialize();
-```
-
-```
-Store 경로 Step 1. 인증서 저장소 열기
-  certStore = CertOpenStore(
-      CERT_STORE_PROV_SYSTEM,
-      X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-      nullptr,
-      CERT_SYSTEM_STORE_CURRENT_USER,   // 현재 사용자 저장소
-      storeName.c_str()
-  )
-  실패 → 별도 로그 없이 return false
-
-Store 경로 Step 2. 인증서 검색 (Subject Name 기준)
-  certContext = CertFindCertificateInStore(
-      certStore,
-      X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-      0,
-      CERT_FIND_SUBJECT_STR,   // Subject Name 문자열 검색
-      subjectName.c_str(),
-      nullptr
-  )
-  실패 → 저장소를 닫고 별도 로그 없이 return false
-
-Step 3. SChannel 자격 증명 설정
-  SCHANNEL_CRED cred = {};
-  cred.dwVersion = SCHANNEL_CRED_VERSION;
-  cred.cCreds = 1;
-  cred.paCred = &certContext;           ← 서버 인증서
-  cred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER;
-  cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
-
-  AcquireCredentialsHandle(
-      nullptr, UNISP_NAME, SECPKG_CRED_INBOUND,
-      nullptr, &cred, nullptr, nullptr,
-      &credHandle, nullptr
-  )
-  실패 → return false
-```
-
-### 인증서 저장소 이름 상수
-
-```cpp
-namespace TLSHelper::StoreNames {
-    constexpr wchar_t* MY       = L"MY";        // 개인 인증서
-    constexpr wchar_t* ROOT     = L"ROOT";      // 신뢰할 수 있는 루트 CA
-    constexpr wchar_t* CA       = L"CA";
-    constexpr wchar_t* TRUST    = L"TRUST";
-    constexpr wchar_t* AuthRoot = L"AuthRoot";  // 타사 루트 CA
+auto config = TLSHelper::ServerCertificateConfig::FromStore(L"MY", L"DevServerCert");
+TLSHelper::TLSHelperServer server(std::move(config));
+if (!server.Initialize())
+{
+    // 인증서 선택·키 접근·credential 초기화 실패 처리
 }
 ```
 
-**`CERT_SYSTEM_STORE_LOCAL_MACHINE` vs `CERT_SYSTEM_STORE_CURRENT_USER`:**
+| 설정 | 현재 동작 |
+|---|---|
+| 저장소·subject | `CurrentUser` 저장소의 `CERT_FIND_SUBJECT_STR` 검색 |
+| 저장소·지문 | 40자리 16진 지문을 20바이트로 바꿔 `CERT_FIND_HASH` 검색 |
+| PFX | 파일 읽기 → `PFXImportCertStore` → 개인 키가 있는 인증서 선택 |
 
-| 저장소 | 기본값 | 용도 |
-|--------|--------|------|
-| `LOCAL_MACHINE` | - | 서비스, 공유 인증서 |
-| `CURRENT_USER` | 현재 코드 사용 | 사용자별 인증서 |
+지문이 잘못됐거나 일치하는 인증서가 없으면 실패하며 subject 검색으로 대체하지 않는다. 같은 subject의 인증서가 여럿이면 subject만으로 원하는 인증서가 선택된다고 보장할 수 없다. PFX 경로·암호·개인 키는 배포 환경에서 관리한다.
 
----
+`StoreNames`는 `MY`, `ROOT`, `CA`, `TRUST`, `AuthRoot` 문자열 상수를 제공한다. 서버 저장소 조회는 `CurrentUser`이며 `LocalMachine`을 자동으로 함께 조회하지 않는다.
 
-## 3. 클라이언트 초기화 — `TLSHelperClient::Initialize`
+이 저장소 밖의 ActionRPG 실행기에서 수행하는 인증서 사전 점검은 이 라이브러리의 보장 범위에 포함하지 않는다.
 
-```cpp
-bool TLSHelperClient::Initialize()
-```
-
-```
-SCHANNEL_CRED cred = {};
-cred.dwVersion = SCHANNEL_CRED_VERSION;
-cred.grbitEnabledProtocols = 0;  // OS Schannel 기본 프로토콜 정책 사용
-cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION;  // ← 핵심
-
-AcquireCredentialsHandle(
-    nullptr, UNISP_NAME, SECPKG_CRED_OUTBOUND,
-    nullptr, &cred, nullptr, nullptr,
-    &credHandle, nullptr
-)
-```
-
-**`SCH_CRED_MANUAL_CRED_VALIDATION` 의미:**
-
-이 플래그가 있으면 SChannel이 서버 인증서를 자동으로 검증하지 않는다.  
-개발 환경의 자체 서명 인증서가 신뢰할 수 없는 CA에서 발급된 경우에도 연결이 성공한다.
-
-> ⚠️ **운영 환경에서는 이 플래그를 제거하고 CA 발급 인증서를 사용해야 한다.**  
-> 플래그 없이 자체 서명 인증서를 사용하면 `SEC_E_UNTRUSTED_ROOT` 오류 발생.
-
----
-
-## 4. 서버 핸드셰이크 — `AcceptSecurityContext` 루프
+## 클라이언트 인증 정책
 
 ```cpp
-bool TLSHelperServer::Handshake(SOCKET clientSocket)
+void SetServerName(std::wstring inServerName);
+[[nodiscard]]
+bool Initialize() override;
+[[nodiscard]]
+bool Handshake(SOCKET socket) override;
+[[nodiscard]]
+bool Handshake(SOCKET socket, const std::stop_token& inStopToken);
 ```
 
-```
-상태: ACCEPT 루프
-  inputBuffer:  클라이언트로부터 수신한 TLS 레코드
-  outputBuffer: 서버가 전송할 TLS 레코드
+클라이언트 credential은 `SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS`를 사용한다. 수동 검증 플래그는 검증 생략을 뜻하지 않는다. 핸드셰이크 후 `VerifyServerCertificate()`가 다음을 검사하며 모두 성공해야 세션 정보를 사용한다.
 
-while true:
-  InBuf[2] = {
-    {SECBUFFER_TOKEN, receivedBytes, receiveBuffer},
-    {SECBUFFER_EMPTY, 0, nullptr}
-  }
-  OutBuf[1] = {
-    {SECBUFFER_TOKEN, 0, nullptr}
-  }
+- Windows 신뢰 체인과 유효 기간
+- 서버 인증 EKU
+- 요청한 DNS 또는 IP의 SSL 이름 정책
 
-  status = AcceptSecurityContext(
-      &credHandle,
-      pContext,      ← 첫 호출은 nullptr
-      &InBufDesc,
-      ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT |
-      ASC_REQ_CONFIDENTIALITY | ASC_REQ_ALLOCATE_MEMORY |
-      ASC_REQ_STREAM,
-      0,
-      &ctxtHandle,
-      &OutBufDesc,
-      &contextAttributes,
-      nullptr
-  )
+신뢰하지 않는 루트·이름 불일치·만료를 허용하는 예외 플래그는 없다. 이름을 지정하지 않은 직접 호출은 연결된 peer의 IPv4 주소를 검증 대상으로 사용한다. SessionGetter는 옵션에 입력한 브로커 이름을 전달하므로 DNS 해석 결과 IP로 인증서 이름을 바꾸지 않는다.
 
-  if OutBuf[0].cbBuffer > 0:
-    send(clientSocket, OutBuf[0].pvBuffer, OutBuf[0].cbBuffer, 0)
-    FreeContextBuffer(OutBuf[0].pvBuffer)
+체인 구성에는 `CERT_CHAIN_CACHE_ONLY_URL_RETRIEVAL`을 사용한다. 중간 인증서는 서버가 제공하거나 이미 캐시에 있어야 하며 AIA·CRL·OCSP 네트워크 조회를 요청하지 않는다. 따라서 온라인 폐기 상태 확인을 보장하는 정책으로 설명하면 안 된다. 라이브러리는 신뢰 저장소를 변경하지 않는다.
 
-  switch status:
-    SEC_E_OK:
-      QueryContextAttributes(SECPKG_ATTR_STREAM_SIZES)
-      handshakeCompleted = true
-      break
+> C# BotTester의 `SessionGetter`는 별도 구현이다. 현재 지문이 없으면 인증서를 허용하고, 지문이 있으면 해시만 비교한다. 이 C++ 검증 정책과 동일하지 않다. [[SessionGetter_CS]]를 참고한다.
 
-    SEC_I_CONTINUE_NEEDED:
-      recv(clientSocket, ...) → 더 받기
-      continue
+## 핸드셰이크와 잔여 데이터
 
-    SEC_E_INCOMPLETE_MESSAGE:
-      recv(clientSocket, ...) → 불완전한 레코드 → 더 받기
-      continue
-
-    else:
-      별도 로그 없이 return false
-```
-
-**핸드셰이크 메시지 흐름:**
-
-```
-클라이언트              서버
-    │── ClientHello ──────►│
-    │◄─ ServerHello ───────│
-    │◄─ Certificate ───────│
-    │◄─ ServerHelloDone ───│
-    │── ClientKeyExchange ─►│
-    │── ChangeCipherSpec ──►│
-    │── Finished ──────────►│
-    │◄─ ChangeCipherSpec ───│
-    │◄─ Finished ───────────│
-    핸드셰이크 완료
-```
-
----
-
-## 5. 클라이언트 핸드셰이크 — `InitializeSecurityContext` 루프
+서버는 `AcceptSecurityContext`, 클라이언트는 `InitializeSecurityContext` 반복으로 핸드셰이크한다. `SEC_E_INCOMPLETE_MESSAGE`는 기존 토큰을 보존하고 추가 수신하며, `SEC_I_CONTINUE_NEEDED`는 후속 토큰을 처리한다. 성공 후 스트림 크기를 조회한다.
 
 ```cpp
-bool TLSHelperClient::Handshake(SOCKET serverSocket)
+[[nodiscard]]
+bool TLSHelperServer::Handshake(SOCKET socket, const std::stop_token& stopToken);
+[[nodiscard]]
+std::vector<char> TakePendingHandshakeData();
 ```
 
-```
-while true:
-  status = InitializeSecurityContext(
-      &credHandle,
-      pContext,
-      nullptr,    ← 서버 이름 (nullptr = 검증 안 함)
-      ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
-      ISC_REQ_CONFIDENTIALITY | ISC_REQ_ALLOCATE_MEMORY |
-      ISC_REQ_STREAM,
-      ...
-      &OutBufDesc, &contextAttributes, nullptr
-  )
+서버 수신 대기는 하나의 5초 기준 제한, 클라이언트는 6초 기준 제한과 시작 취소를 관찰한다. 준비 상태는 100ms 단위로 확인한다. 이 시간은 각 수신 대기의 기준이며 DNS·TCP·TLS 전체가 하나의 6초 안에 끝난다는 뜻은 아니다. 소켓 송신 제한은 호출자가 설정하며 브로커와 C++ SessionGetter가 각각 적용한다.
 
-  if OutBuf[0].cbBuffer > 0:
-    send(serverSocket, ...) → 클라이언트 레코드 전송
+성공한 핸드셰이크와 첫 애플리케이션 레코드가 같은 TCP 수신에 들어올 수 있다. 양쪽 helper는 `SECBUFFER_EXTRA`를 `pendingHandshakeData`에 보존한다. 연결 스레드는 `TakePendingHandshakeData()`로 한 번 이동해 버전 또는 세션 정보 수신기에 전달하고, 새 `recv()`보다 먼저 처리한다. 일부 레코드만 남았으면 다음 수신으로 완성한다. 새 핸드셰이크는 이전 잔여 데이터를 비운다.
 
-  switch status:
-    SEC_E_OK: handshakeCompleted = true; break
-    SEC_I_CONTINUE_NEEDED / SEC_E_INCOMPLETE_MESSAGE: recv(...); continue
-    else: return false
-```
-
----
-
-## 6. 데이터 암호화 — `EncryptData`
-
-핸드셰이크 완료 후 세션 정보 전송 시 사용.
+## 스트림 암복호화와 종료
 
 ```cpp
-bool TLSHelperBase::EncryptData(
-    const char* plainData,
-    size_t plainDataSize,
-    OUT char* encryptedBuffer,
-    OUT size_t& encryptedSize
-)
+[[nodiscard]]
+bool EncryptData(const char* plainData, size_t plainSize,
+    char* encryptedBuffer, size_t& encryptedSize);
+[[nodiscard]]
+bool DecryptData(const char* encryptedData, size_t encryptedSize,
+    char* plainBuffer, size_t& plainSize);
+[[nodiscard]]
+TlsDecryptResult DecryptDataStream(std::vector<char>& encryptedStream,
+    char* plainBuffer, size_t& plainSize);
+[[nodiscard]]
+bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
 ```
 
-```
-① 암호화 버퍼 구성
-  필요 크기 = cbHeader + plainDataSize + cbTrailer
+반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
-② 데이터 복사
-  memcpy(encryptedBuffer + cbHeader, plainData, plainDataSize)
+`EncryptData()`는 Schannel의 헤더·본문·후미 공간에 TLS 레코드를 작성한다. `DecryptData()`는 단일 호출 결과를 처리하며 TCP 누적 수신에는 `DecryptDataStream()`을 사용한다. 후자는 현재 스트림의 완전한 레코드를 처리하고 미완성 데이터는 남긴다.
 
-③ SecBuffer 4개 설정
-  buffers[0] = {SECBUFFER_STREAM_HEADER,  cbHeader, encryptedBuffer}
-  buffers[1] = {SECBUFFER_DATA,           plainDataSize, encryptedBuffer + cbHeader}
-  buffers[2] = {SECBUFFER_STREAM_TRAILER, cbTrailer, encryptedBuffer + cbHeader + plainDataSize}
-  buffers[3] = {SECBUFFER_EMPTY, 0, nullptr}
+| `TlsDecryptResult` | 의미 |
+|---|---|
+| `None` | 추가 데이터가 필요하거나 평문이 없음 |
+| `PlainData` | 평문을 얻음 |
+| `CloseNotify` | TLS 종료 알림을 확인함 |
+| `Error` | 복호화 오류 |
 
-④ EncryptMessage(&ctxtHandle, 0, &bufDesc, 0)
-   → SChannel이 제자리(in-place)로 암호화
+`CloseNotify`와 평문이 같은 호출에서 나올 수 있으므로 결과 코드뿐 아니라 `plainSize`도 확인한다. 복호화 API에는 출력 용량 파라미터가 없다. 호출자는 한 번에 복호화할 누적 평문 전체를 담을 수 있는 공간을 제공해야 한다. helper의 한도 검사만으로 임의 크기 출력 버퍼가 안전해지지 않는다.
 
-⑤ encryptedSize = cbHeader + plainDataSize + cbTrailer
-```
+브로커 송신은 헤더 작성 → 세션 정보 암호화·전체 송신 → `EncryptCloseNotify()`·전체 송신 → `shutdown(SD_SEND)` → 제한된 FIN 수신 순서다. `EncryptCloseNotify()`의 출력 버퍼는 호출자 소유다.
 
----
-
-## 7. 데이터 복호화 — `DecryptDataStream`
-
-스트림 방식: TCP는 레코드 경계가 보장되지 않으므로 누적 버퍼로 처리.
+## 프로토콜 버전 확인과 진단
 
 ```cpp
-TlsDecryptResult TLSHelperBase::DecryptDataStream(
-    std::vector<char>& encryptedStream,
-    OUT char* plainBuffer,
-    OUT size_t& plainSize
-)
+bool SendProtocolVersion(SOCKET socket, uint32_t version);
+bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion,
+    const std::stop_token& stopToken);
+[[nodiscard]]
+const ProtocolVersionReceiveResult& GetProtocolVersionResult() const;
+[[nodiscard]]
+SECURITY_STATUS GetLastStatus() const;
 ```
 
-```
-① 상태 확인
-  handshakeCompleted가 아니면 return Error
+버전 요청은 TLS로 보호한 정확히 4바이트 big-endian 값이다. 현재 버전은 `2`다. 서버는 5초 기준 제한과 중지 요청을 확인하며 추가 평문·불완전 버전·값 불일치를 실패 처리한다. 세션 예약은 검증 성공 후에 수행한다. 응답 안의 4바이트 버전은 `NetBuffer`의 little-endian 형식이다.
 
-② SecBuffer 4개 설정
-  buffers[0] = {SECBUFFER_DATA, streamSize, streamData}
-  buffers[1..3] = {SECBUFFER_EMPTY, 0, nullptr}
+`ProtocolVersionReceiveResult`는 `reason`, 선택적 `receivedVersion`, `plainBytes`, `socketError`를 보관한다. 브로커 거절 로그에는 `expected_version`, `received_version` 또는 `unavailable`, `plain_bytes`, `socket_error`도 포함된다.
 
-③ DecryptMessage(&ctxtHandle, &bufDesc, 0, nullptr)
+| 진단 | 해석 |
+|---|---|
+| `version-mismatch` | 실제로 읽은 버전이 기대값과 다름 |
+| `version-not-received`, `version-incomplete` | 버전 미수신 또는 일부만 수신 |
+| `peer-closed`·TLS/소켓 오류 | 버전을 얻기 전 연결·복호화·송수신 실패 |
 
-  switch 결과:
-    SEC_E_OK:
-      SECBUFFER_DATA를 찾아 plainBuffer + plainSize에 이어 붙임
-      SECBUFFER_EXTRA를 찾으면 encryptedStream으로 교체한 뒤
-      같은 호출 안에서 다음 완전한 레코드 복호화를 계속함
+`GetLastStatus()`는 credential·핸드셰이크·인증서 검증에서 저장한 마지막 상태다. 모든 소켓·파일·저장소 실패가 이 값을 새로 설정하는 것은 아니므로, 모든 `false` 원인을 대표하는 값으로 단정하지 않는다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
-      memcpy(plainBuffer + plainSize, dataBuffer, dataSize)
-      plainSize += dataSize
+진단 필드와 잔여 데이터는 연결 스레드 소유다. 키·솔트·수신 평문을 진단에 추가하지 않는다.
 
-      if extraBuffer가 있음:
-        encryptedStream = extraBuffer
-        continue
-      else:
-        encryptedStream.clear()
+## 개발·테스트 인증서
 
-      완전한 레코드를 모두 소비한 뒤 PlainData 또는 None 반환
+`CreateDevTLSCert.bat`는 `CurrentUser\My`에 DNS 이름 `DevServerCert`인 자체 서명 인증서를 만든다. `CreateDevTLSPfx.bat`도 같은 이름의 인증서를 PFX로 내보낸 뒤 저장소 원본을 지운다. 두 스크립트 모두 클라이언트의 신뢰 루트나 `localhost`·`127.0.0.1` SAN을 자동으로 준비하지 않는다.
 
-    SEC_E_INCOMPLETE_MESSAGE:
-      return None
+> 현재 C++ 클라이언트로 루프백 접속하려면 Windows에서 신뢰되고 접속 DNS/IP와 SAN이 일치하는 인증서가 필요하다. 기존 스크립트 실행만으로 C++ 샘플·통합 테스트 연결 성공을 보장할 수 없다. 해당 테스트 환경의 신뢰·이름 구성을 별도로 준비해야 한다.
 
-    SEC_I_CONTEXT_EXPIRED (close_notify):
-      return CloseNotify
-
-    else:
-      return Error
-```
-
-> `DecryptDataStream`은 한 번의 호출에서 현재 스트림에 들어 있는 모든 완전한
-> TLS 레코드의 평문을 `plainBuffer`에 연속으로 기록한다. API에 출력 capacity
-> 인자가 없으므로 호출자는 누적 평문 전체를 담을 수 있는 버퍼를 제공해야 한다.
-
-**왜 SECBUFFER_EXTRA를 처리하는가:**
-
-```
-TCP recv로 받은 데이터:
-  [TLS Record 1 완전] [TLS Record 2 일부]
-                       ↑ SECBUFFER_EXTRA: 아직 복호화 못한 부분
-  
-  → 완전한 다음 레코드가 있으면 현재 호출에서 계속 처리하고,
-    불완전한 레코드만 남으면 다음 recv까지 보존
-```
-
----
-
-## 8. close_notify 전송 — `EncryptCloseNotify`
-
-TLS 연결을 정상적으로 종료할 때 전송하는 Alert 레코드.
-
-```cpp
-bool TLSHelperBase::EncryptCloseNotify(
-    char* buffer,
-    const size_t bufferSize,
-    OUT size_t& encryptedSize
-)
-```
-
-```
-ApplyControlToken(&ctxtHandle, SCHANNEL_SHUTDOWN)
-
-SecBuffer shutdownToken = {
-  SECBUFFER_TOKEN,
-  bufferSize,
-  buffer               // 호출자가 소유한 출력 버퍼
-}
-EncryptMessage(&ctxtHandle, 0, &shutdownTokenDesc, 0)
-
-encryptedSize = shutdownToken.cbBuffer
-```
-
-이 함수는 Schannel이 별도로 할당한 토큰을 반환하지 않는다. 전달한 `buffer`의
-소유권은 호출자에게 계속 있으며, 구현에는 별도의 `FreeContextBuffer` 호출이 없다.
-
-**SessionBroker 세션 종료 순서:**
-
-```cpp
-// RUDPSessionBroker::SendSessionInfoToClient
-TlsHelper.EncryptData(sendBuffer → encryptedBuffer)
-send(clientSocket, encryptedBuffer, ...)
-
-TlsHelper.EncryptCloseNotify(closeNotify, sizeof(closeNotify), closeSize)
-send(clientSocket, closeNotify, closeSize, 0)
-
-shutdown(clientSocket, SD_SEND)   ← TCP FIN 전송
-recv(clientSocket, ...) loop      ← 클라이언트 FIN 대기
-```
-
----
-
-## 9. TlsDecryptResult 열거형
-
-```cpp
-enum class TlsDecryptResult : uint8_t {
-    None = 0,       // 복호화된 plaintext가 아직 없음, recv 더 필요
-    PlainData,      // 복호화 성공, plainBuffer에 데이터 있음
-    CloseNotify,    // 원격 측이 close_notify 전송 → 정상 종료
-    Error           // 오류 (인증 실패, 프로토콜 오류 등)
-};
-```
-
-**`RUDPClientCore::TrySetTargetSessionInfo`에서의 처리:**
-
-```cpp
-while (true) {
-    int bytes = recv(socket, buffer, MAX_TLS_PACKET_SIZE, 0);
-    if (bytes <= 0) break;
-    encryptedStream.insert(encryptedStream.end(), buffer, buffer + bytes);
-
-    size_t plainSize = 0;
-    auto result = tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
-
-    if (result == TlsDecryptResult::Error) return false;
-    if (result == TlsDecryptResult::None) continue;
-    if (result == TlsDecryptResult::PlainData) {
-        // 복호화된 페이로드 처리 (세션 정보 파싱)
-        totalReceived += plainSize;
-    }
-    if (result == TlsDecryptResult::CloseNotify && payloadComplete) break;
-}
-```
-
----
-
-## 10. 인증서 관리
-
-### 운영 환경 인증서 흐름
-
-```
-1. CA에서 발급한 인증서를 PFX 파일로 받음
-
-2. Windows 인증서 저장소에 설치
-   certmgr.msc → 컴퓨터 계정 → 개인 → 인증서 → 가져오기
-
-3. 서버 코드
-   TLSHelperServer(ServerCertificateConfig::FromStore(L"MY", L"your.domain.com"))
-     .Initialize()
-
-4. 클라이언트 코드 (운영)
-   SCH_CRED_MANUAL_CRED_VALIDATION 플래그 제거
-   → SChannel이 자동으로 신뢰 체인 검증
-```
-
-### 인증서 만료 확인
-
-```cpp
-// 인증서 만료일 확인 (선택적으로 추가 가능)
-FILETIME now;
-GetSystemTimeAsFileTime(&now);
-
-if (CompareFileTime(&now, &certContext->pCertInfo->NotAfter) > 0) {
-    LOG_ERROR("Server certificate has expired");
-    return false;
-}
-```
-
----
-
-## 11. 개발 환경 자체 서명 인증서 설정
-
-### `CreateDevTLSCert.bat`
-
-```batch
-@echo off
-:: PowerShell로 자체 서명 인증서 생성
-powershell -Command "& { ^
-    $cert = New-SelfSignedCertificate ^
-        -Subject 'CN=DevServerCert' ^
-        -CertStoreLocation 'Cert:\CurrentUser\MY' ^
-        -KeyExportPolicy Exportable ^
-        -KeySpec Signature ^
-        -KeyLength 2048 ^
-        -HashAlgorithm SHA256 ^
-        -NotAfter (Get-Date).AddYears(5); ^
-    Write-Host ('Created: ' + $cert.Thumbprint) ^
-}"
-```
-
-**생성 확인:**
-```
-certmgr.msc → 현재 사용자 → 개인 → 인증서
-→ "DevServerCert" 확인
-```
-
-### `RemoveDevTLSCert.bat`
-
-```batch
-powershell -Command "& { ^
-    $cert = Get-ChildItem -Path 'Cert:\CurrentUser\MY' ^
-        | Where-Object { $_.Subject -like '*DevServerCert*' }; ^
-    if ($cert) { Remove-Item -Path $cert.PSPath; Write-Host 'Removed' } ^
-    else { Write-Host 'Not found' } ^
-}"
-```
-
-### 관리자 권한 요구사항
-
-현재 구현은 `CurrentUser` 저장소를 읽으므로 개발 인증서도
-`Cert:\CurrentUser\MY`에 설치해야 한다. `LocalMachine` 저장소를 사용하도록
-코드를 변경하는 경우에는 관리자 권한이 필요하다.
-
----
-
-## 12. SChannel 내부 구조 메모
-
-**cbHeader / cbMaximumMessage / cbTrailer 의미:**
-
-```
-QueryContextAttributes(SECPKG_ATTR_STREAM_SIZES)
-→ SecPkgContext_StreamSizes {
-    cbHeader     : 5   (TLS 레코드 헤더: ContentType 1B + Version 2B + Length 2B)
-    cbTrailer    : 32  (TLS 1.2 AES-256-GCM AEAD 태그 + IV 등)
-    cbMaximumMessage: 16384  (최대 TLS 레코드 페이로드 크기)
-    ...
-}
-```
-
-**암호화 버퍼 레이아웃:**
-
-```
-[cbHeader bytes][plaintext][cbTrailer bytes]
-     5B              N B        32B         (TLS 1.2 AES-GCM 예)
-```
-
-SChannel이 `EncryptMessage` 호출 시 이 레이아웃을 in-place로 채운다.
-
----
+인증서 삭제·신뢰 저장소 변경·운영 PFX 교체는 문서 점검 과정에서 실행하지 않는다. 실제 인증서 준비 절차는 배포 환경의 신뢰 정책에 맞춘다.
 
 ## 관련 문서
-- [[Server/RUDPSessionBroker]] — TLSHelperServer 사용처
-- [[RUDPClientCore]] — TLSHelperClient 사용처
-- [[CryptoSystem]] — 패킷 암호화 (TLS 이후 UDP 레벨)
-- [[Troubleshooting]] — TLS 핸드셰이크 실패 해결
----
 
-## 현재 코드 기준 함수 설명 및 정정
-
-### `TLSHelperBase`
-
-#### `SECURITY_STATUS GetLastStatus() const`
-- credential 획득 시 저장된 마지막 Schannel 상태를 반환한다.
-- 인증서 저장소 탐색, socket 송수신, handshake의 지역 `status` 실패는 모두
-  `lastStatus`에 저장되지 않으므로 모든 `false` 반환의 원인을 대표하지 않는다.
-
-#### `bool EncryptData(const char* plainData, size_t plainSize, char* encryptedBuffer, size_t& encryptedSize)`
-- 핸드셰이크 완료 후 평문을 TLS 레코드로 암호화한다.
-
-#### `bool DecryptData(const char* encryptedData, size_t encryptedSize, char* plainBuffer, size_t& plainSize)`
-- 단일 TLS 레코드 단위 복호화를 수행한다.
-
-#### `TlsDecryptResult DecryptDataStream(std::vector<char>& encryptedStream, char* plainBuffer, size_t& plainSize)`
-- 누적된 TLS 바이트 스트림에서 완성된 레코드만 복호화한다.
-
-#### `bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize)`
-- TLS `close_notify` 경고 레코드를 생성한다.
-
-#### `bool SendProtocolVersion(SOCKET socket, uint32_t version)`
-- 버전을 4바이트 big-endian 평문으로 구성해 TLS 레코드 하나로 전송한다.
-
-#### `bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion, const std::stop_token& stopToken)`
-- TLS 스트림에서 정확히 4바이트 버전을 복호화해 비교한다.
-- 전체 수신은 5초 deadline과 `stopToken`을 함께 관찰하며 추가 평문이 있거나 값이 다르면 실패한다.
-
-### 실패 진단 범위
-
-- 인증서 저장소 열기·검색과 handshake 실패 경로는 현재 별도 로그 없이 `false`를 반환한다.
-- `GetLastStatus()`는 credential 획득 결과 확인에만 사용하고, 일반적인 handshake 오류
-  진단 API로 간주하지 않는다.
-
-### `TLSHelperClient`
-
-#### `bool Initialize()`
-- 클라이언트용 Schannel 자격 증명을 초기화한다.
-
-### `Handshake`
-
-```cpp
-virtual bool Handshake(SOCKET socket) = 0;
-```
-
-`InitializeSecurityContext` 기반 TLS 핸드셰이크를 수행한다.
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `socket` | `SOCKET` | 핸드셰이크를 수행할 소켓 핸들 |
-
-| 반환값 | 조건 |
-|--------|------|
-| `true` | 핸드셰이크 성공 |
-| `false` | 핸드셰이크 실패 |
-### `TLSHelperServer`
-
-#### `TLSHelperServer(ServerCertificateConfig inCertificateConfig)`
-- 인증서 저장소 또는 PFX 파일 설정을 받아 서버용 TLS 도우미를 구성한다.
-
-#### `bool Initialize()`
-- 생성자에서 받은 인증서 정보를 사용해 서버용 Schannel 자격 증명을 초기화한다.
-
-### `Handshake`
-
-```cpp
-virtual bool Handshake(SOCKET socket) = 0;
-```
-
-`AcceptSecurityContext` 기반 서버 TLS 핸드셰이크를 수행한다.
-### 정정 메모
-
-- 현재 `TlsDecryptResult` 값은 `None`, `PlainData`, `CloseNotify`, `Error`다.
-- 예전 문서에 있던 `TLSHelperServer(storeName, subjectName)`와 `Initialize(storeName, subjectName)` 시그니처는 현재 코드와 맞지 않는다.
-
-
-## Client broker identity validation (external hosting)
-
-`TLSHelperClient::SetServerName` supplies the requested DNS/IP identity before a
-handshake. SessionGetter sets it from the broker address, now up to 253 ASCII
-DNS characters or an IPv4 literal. DNS lookup is asynchronous and observes the
-connection stop token; cancelled lookup storage is kept alive until OS completion.
-Legacy direct TLS callers without a name verify the connected IPv4 address.
-
-After the Schannel handshake and before exposing session keys, the client requires
-Windows trusted-chain / validity / server-auth EKU and SSL name-policy success.
-Unknown roots, name mismatch and expiry are rejected; no ignore flags are used.
-Intermediates must be supplied by the server or already cached: AIA network fetch
-and CRL/OCSP network retrieval are not requested by this test-hosting policy.
-Private test roots must be trusted by the client Windows user separately; no trust
-store is modified by the library. Existing local CA-signed localhost/IP SAN
-certificates remain usable. Untrusted self-signed sample certificates now require
-explicit trust preparation; handshake encryption alone is not authentication.
-
-Server certificate selection continues to support `ServerCertificateConfig` store
-and PFX sources. The ActionRPG external host selects its configured PFX instead of
-changing or replacing the local DevServerCert. There is no new wire field/version.
-
-## Coalesced handshake and application data
-
-A successful client/server handshake retains the trailing `SECBUFFER_EXTRA`
-bytes from its receive buffer. The connection thread transfers these bytes once
-through `TakePendingHandshakeData()`; the broker version reader and the client
-session-info reader process them before waiting for another socket receive.
-Incomplete TLS records remain buffered and are completed by subsequent reads.
-Starting another handshake clears the previous pending bytes. Existing version
-2 validation, stream size limits, cancellation and deadlines remain enforced.
-
-Broker rejection logs include `reason`, `expected_version`,
-`received_version` (or `unavailable`), `plain_bytes`, and `socket_error`.
-For example, `version-mismatch` identifies an actually decoded wrong version;
-`version-not-received`, `version-incomplete`, `peer-closed` and TLS/socket
-errors identify failures to receive it. No session keys or received payloads are
-logged. Buffered data and diagnostic fields belong to the connection thread.
-
-## Explicit local broker certificate selection
-
-`ServerCertificateConfig::FromStoreThumbprint(storeName, thumbprint)` selects one
-CurrentUser certificate by its 40-digit certificate thumbprint using
-`CERT_FIND_HASH`. Invalid thumbprints and missing certificates fail initialization;
-subject-name selection is not used as a fallback for a configured thumbprint.
-The local ActionRPG launcher validates Windows trust, server-auth EKU and both
-localhost/127.0.0.1 SSL names before supplying the selected thumbprint to the room
-server. Client certificate verification remains mandatory. Existing PFX-based
-external hosting remains a separate configuration.
+- [[Server/RUDPSessionBroker]] — 연결별 helper와 버전 검증
+- [[Client/RUDPSessionBroker]] — 응답 파싱
+- [[RUDPClientCore]] — DNS·시작 취소·세션 수신
+- [[SessionGetter_CS]] — C# 인증 정책
+- [[CryptoSystem]] — UDP 패킷 암호화
+- [[DevelopmentScripts]] — 인증서 배치 파일
+- [[Troubleshooting]] — TLS 실패 진단

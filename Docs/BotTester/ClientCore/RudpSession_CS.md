@@ -106,7 +106,7 @@ public bool SendUnreliablePacket(NetBuffer packetBuffer, PacketId packetId)
 분리된 패킷은 `ProcessReceivedPacketAsync()`를 거쳐 복호화 및 타입 식별이 수행된다. 이후 패킷 타입에 따라 신뢰성(Reliable) 또는 비신뢰성(Unreliable) 채널로 분류되어 처리 대기열에 적재되며, `PacketProcessorAsync()`가 이를 비동기적으로 순차 처리한다.
 
 - `UnreliableSendType`(7): `ServerToClientUnreliable` 방향으로 인증 및 수신 처리한다. ACK 및 신뢰성 순서 대기를 거치지 않으며, 비신뢰성 콜백 대기열이 가득 차면 오래된 대기열을 제거한다.
-- 신뢰성 패킷: `ServerToClient` 및 `ServerToClientReply` 타입이 해당하며, 정해진 순서 보장 로직에 따라 처리된다.
+- 신뢰성 패킷: `SendType`, `HeartbeatType`, `SendReplyType` 등을 방향값과 구분해 처리하며, 정해진 순서 보장 로직에 따라 처리된다.
 
 `PacketProcessorAsync()`는 내부적으로 두 채널(`recvProcessingChannel`, `unreliableProcessingChannel`)의 데이터를 각각 읽어와 사용자 정의 콜백(ExecuteReceivedAction)을 번갈아 호출한다. 이를 통해 비신뢰성 트래픽이 연결 콜백이나 신뢰성 처리를 지연시키지 않도록 설계되었다.
 
@@ -116,11 +116,11 @@ public bool SendUnreliablePacket(NetBuffer packetBuffer, PacketId packetId)
 현재 구현 기준 값은 아래다.
 
 - `RetransmissionWakeUpMs = 16`
-- `BufferStore.RetransmissionTimeoutMs = 20`
-- `BufferStore.RetransmissionMaxCount = 16`
+- 일반 세션 기본 `retransmissionTimeoutMs = 20` (패킷별 SendPacketInfo에 전달)
+- 일반 세션 기본 `retransmissionMaxCount = 16`
 - 서버 생존 확인 주기 `15초`
 
-예전 문서의 `30ms`, `32ms`, `50ms` 설명은 현재 코드와 맞지 않는다.
+`ConfigureRetransmission(int, int)`은 양수인 제한 시간·횟수를 설정한다. RTT 부하 경로의 기본값은 100ms/16회이며 일반 세션 기본값과 구분한다.
 
 ---
 
@@ -140,7 +140,7 @@ ACK sequence 0을 받으면:
 
 - C# 구현은 `remoteAdvertisedWindow` 기반 단순 전송 창 모델을 그대로 쓰지 않는다.
 - ACK 이후 정리는 `BufferStore` 중심으로 이뤄진다.
-- 수신 후속 처리는 `recvProcessingChannel`(Unbounded)과 `unreliableProcessingChannel`(Bounded)을 통해 처리되며, 모두 단일 reader/writer 구조로 운영된다.
+- 수신 후속 처리는 `recvProcessingChannel`(Unbounded)과 `unreliableProcessingChannel`(Bounded)을 통해 처리되며, 큐별 설정에 따라 소비 작업이 처리한다. 송신 `UnreliablePacketQueue`는 `SingleReader=true`, `SingleWriter=false`로 복수 생산자를 허용한다.
 ## 관련 문서
 
 ---
@@ -178,7 +178,7 @@ public bool Enqueue(ReadOnlyMemory<byte> packet)
 |----------|------|------|
 | `packet` | `ReadOnlyMemory<byte>` | 큐에 추가할 패킷 데이터 |
 
-**반환값**: `true` 반환. (항상 성공)
+**반환값**: 쓰기 가능한 큐가 새 패킷을 수용하면 `true`다. 가득 차면 가장 오래된 항목을 교체하며, `Complete()` 이후 쓰기는 `false`다.
 
 ---
 

@@ -31,7 +31,9 @@
 
 - 인증서 저장소/subject가 실제 설정과 맞는지 확인
 - 현재 TLS 문서는 `TLSHelperServer(ServerCertificateConfig)` 기준으로 읽어야 한다
-- 개발 환경이면 `CreateDevTLSCert.bat` 실행 여부 확인
+- 현재 C++ 클라이언트는 Windows 신뢰 체인·만료·서버 인증 용도·요청 DNS/IP 이름을 검사한다. 자체 서명 `DevServerCert` 생성만으로 루프백 이름과 신뢰가 준비되지는 않는다.
+- 중간 인증서는 서버 또는 Windows 캐시에 있어야 한다. 라이브러리는 AIA·CRL·OCSP 온라인 조회를 요청하지 않는다.
+- C# BotTester는 기본 지문 없는 경로에서 검증을 생략하므로, C# 접속 성공만으로 C++ 인증 설정이 올바르다고 판단하지 않는다.
 
 ---
 
@@ -39,7 +41,9 @@
 
 - 브로커에서 받은 `sessionId`를 그대로 CONNECT에 넣는지 확인
 - CONNECT 시퀀스가 0인지 확인
-- 동일 세션으로 중복 CONNECT를 보내는 테스트 코드가 없는지 확인
+- CONNECT ACK 유실 시 동일 주소·포트의 유효한 중복 CONNECT에는 ACK를 다시 보낸다. 연결 통계·훅은 최초에만 수행하므로 중복 CONNECT 자체를 오류로 단정하지 않는다.
+- 외부 접속에서는 브로커 TCP 포트와 실제 세션 UDP 포트를 각각 확인한다. `CORE_IP`는 광고 주소이며 bind 인터페이스가 아니다.
+- 고정 UDP 범위를 사용하면 내부·외부 포트 번호를 같게 전달한다. `HOST_LOOPBACK=1`은 실제 브로커 peer가 127/8인 C++ 호스트 로컬 접속에만 사용한다.
 
 ---
 

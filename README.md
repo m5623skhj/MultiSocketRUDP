@@ -7,7 +7,7 @@
    1. [서버](#21-서버)
    2. [클라이언트](#22-클라이언트)
    3. [공통](#23-공통)
-3. [Tools](#3-tools)
+3. [도구](#3-도구)
 4. [문서](#4-문서)
 5. [테스트](#5-테스트)
 6. [GitHub Actions 자동화](#6-github-actions-자동화)
@@ -48,6 +48,7 @@
 | `IntegrationTest` | 실제 서버-클라이언트 흐름을 기준으로 연결, 요청/응답, 재전송 동작을 검증하는 통합 테스트 프로젝트입니다. |
 | `IntegrationClientHarness` | 통합 테스트에서 클라이언트 동작을 별도 실행 대상으로 분리하기 위한 테스트 하네스입니다. |
 | `MultiSocketRUDPBotTester` | WPF 기반 행동 그래프 편집기와 C# RUDP 부하 테스트 클라이언트입니다. |
+| `MultiSocketRUDPBotTester.RttBenchmark` | 단일·다중 클라이언트 및 채널별 RTT를 수집하는 콘솔 측정 도구다. |
 | `MultiSocketRUDPBotTester.UnitTests` | BotTester 저장소, 암호화, 그래프, 실행 정책을 검증하는 xUnit 프로젝트입니다. |
 | `ProtocolInteropTest` | C++/C# AES-GCM 패킷 형식이 공용 vector와 일치하는지 검증하는 실행형 테스트입니다. |
 
@@ -130,7 +131,7 @@
 
 ---
 
-## 3. Tools
+## 3. 도구
    1. PacketGenerator
       * PacketGenerate.bat 파일을 실행하면 PacketDefine.yml 파일을 참조하여 아래 파일들을 생성 혹은 수정합니다.
         * PlayerPacketHandler.cpp
@@ -148,6 +149,7 @@
       * `Structs`에 함수 없는 사용자 정의 데이터 구조체를 선언하고 패킷 필드에서 사용할 수 있습니다.
       * 패킷과 구조체 필드에는 `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map` 및 이들의 중첩 타입을 사용할 수 있습니다.
       * `unordered_set`과 `unordered_map`은 데이터만 복원하며 삽입 순서, 순회 순서, bucket 배치를 보존하지 않습니다.
+      * BotTester의 `Generated/*.g.cs`, 실제 핸들러 연결과 생성 바이트 테스트도 함께 갱신한다.
       * 자세한 YAML 문법과 지원 제한은 [PacketGenerator](./Docs/Tools/PacketGenerator.md), wire 형식은 [NetBuffer 컨테이너 직렬화](./Docs/Server/ContainerSerialization.md)를 참고합니다.
    2. RunDebug
       * 간단하게 디버그 모드의 Contents Client와 Contents Server(테스트 용 프로젝트)를 구동하기 위해 제공되는 배치 파일입니다.
@@ -175,7 +177,7 @@
 
 ## 4. 문서
 
-처음 보는 경우 [문서 읽기 가이드](./Docs/ReadingGuide.md)에서 역할과 목적에 맞는 순서를 선택합니다. 전체 목록은 [Docs](./Docs/README.md)에서 확인합니다.
+처음 보는 경우 [문서 읽기 가이드](./Docs/ReadingGuide.md)에서 역할과 목적에 맞는 순서를 선택합니다. 전체 목록은 [Docs](./Docs/README.md)에서 확인한다. [문서 대조 기록](./Docs/DocumentationAudit.md)에는 검토 범위와 구현상 제한을 정리한다.
 
 ---
 
@@ -200,6 +202,7 @@ GitHub Actions는 PR 병합을 검증하는 CI와 코드 리뷰, 문서 유지�
 | PR CI | [Native GTest](./.github/workflows/GoogleTest.yml) | PR CI에서 C++ 관련 변경 시 호출 | C++ Debug x64 빌드, GoogleTest 유닛·통합 테스트, 실패 테스트 재시도와 커버리지 측정을 수행합니다. |
 | PR CI | [BotTester Protocol Interop](./.github/workflows/BotTester.yml) | PR CI에서 BotTester 관련 변경 시 호출 | .NET 9 빌드, xUnit 테스트와 C# protocol vector 검증을 수행합니다. 공용 vector 변경 시에는 PR CI가 Native GTest도 함께 호출합니다. |
 | 성능 추세 | [RTT Benchmark](./.github/workflows/RttBenchmark.yml) | 관련 PR, `main` 병합, 수동 실행 | 서버와 BotTester를 Release 최적화로 빌드해 유실률 0%·10% RTT와 신뢰성·비신뢰성 혼합 채널 RTT/응답률을 측정합니다. `main` 측정만 공식 이력과 그래프에 자동 반영합니다. |
+| 메모리 검사 | [AddressSanitizer](./.github/workflows/AddressSanitizer.yml) | 매일 04:30 KST, 수동 실행 | 일반 빌드와 분리해 ASan 검출 확인과 CoreTest를 수행한다. |
 | 안정성 | [Native Stability](./.github/workflows/Stability.yml) | 매일 03:30 KST, 수동 실행 | 동시 송수신·연결 해제·세션 풀 재사용 통합 테스트를 독립 프로세스로 반복하고 최초 실패 자료를 보존합니다. |
 | 리뷰 보조 | [Gemini PR Comment Bot](./.github/workflows/GeminiPRCommoentBot.yml) | PR 생성, 갱신, 재오픈 | 코드 diff를 분석해 AI 리뷰 주석을 남깁니다. 병합 필수 체크로 사용하지 않습니다. |
 | 문서 자동화 | [docs-bot](./.github/workflows/docs-bot.yml) | 매일, `docs-review` 라벨, 수동 실행 | 병합된 코드의 인터페이스 변경을 분석해 문서 최신화 PR을 제안합니다. |
@@ -217,7 +220,7 @@ PR CI의 변경 경로 분류, 테스트 과정과 필수 체크 구성은 [Test
 
 아래 그래프는 `main`에 기록된 최근 10회 공식 측정의 반복 중앙값을 보여주며, 그래프 아래 표에는 측정 날짜(UTC), 커밋 로그, P95/P99 RTT(ms)가 함께 표시됩니다.
 
-> 자동 측정은 공개 저장소용 [GitHub-hosted `windows-latest` runner](https://docs.github.com/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)(x64, 4 vCPU, 16 GB RAM, 14 GB SSD)에서 수행됩니다. 실제 CPU 모델과 runner 이미지는 실행 시점에 따라 달라질 수 있으므로, 결과는 특정 PC의 절대 성능보다 동일한 CI 조건에서의 커밋 간 RTT 변화 추세를 비교하는 용도로 해석해야 합니다.
+> 자동 측정은 workflow가 지정한 `windows-latest` 실행기에서 수행한다. CPU·메모리·이미지 등 실제 환경은 해당 실행의 기록을 기준으로 확인한다. 실제 CPU 모델과 runner 이미지는 실행 시점에 따라 달라질 수 있으므로, 결과는 특정 PC의 절대 성능보다 동일한 CI 조건에서의 커밋 간 RTT 변화 추세를 비교하는 용도로 해석해야 합니다.
 
 ### 패킷 유실률 0%
 

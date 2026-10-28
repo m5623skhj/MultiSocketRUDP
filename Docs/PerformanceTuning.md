@@ -25,7 +25,7 @@
 #define USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME USE_WORKER_THREAD_SLEEP_ZERO
 ```
 
-즉 이 값은 단순 0/1 스위치가 아니라 3단계 모드다.
+위 코드는 모드 값과 기본 선택의 요약이다. 기본은 `Sleep(0)`, `RUDP_RTT_BENCHMARK_BUILD`는 sleep 없음, 명시적 `USE_WORKER_THREAD_SLEEP_FOR_FRAME`는 잔여 프레임 대기다. `WORKER_THREAD_ONE_FRAME_MS`는 마지막 모드에서만 반영된다.
 
 ---
 
@@ -51,7 +51,7 @@
 
 특히 핸들러가 오래 블로킹되면 advertise window가 줄어들고, 결국 전송 측 throughput도 떨어진다.
 
-신뢰성 채널의 pending queue와 비신뢰성 채널의 큐 한도는 서로 다른 설정이다. `UNRELIABLE_QUEUE_CAPACITY`는 서버와 C++ 클라이언트에서 각각 미송신·미소비 비신뢰성 패킷의 개수를 제한하며 기본값은 64, 허용 범위는 1~65,535다. 한도를 낮추면 지연된 최신 데이터가 오래 머무는 것을 줄일 수 있지만 burst 중 교체되는 패킷 수가 늘어난다.
+신뢰성 채널의 pending queue와 비신뢰성 채널의 큐 한도는 서로 다른 설정이다. `UNRELIABLE_QUEUE_CAPACITY`는 서버에서는 미송신 항목(예약 항목 포함), C++ 클라이언트에서는 송신·수신 큐 각각의 개수를 제한하며 기본값은 64, 허용 범위는 1~65,535다. 한도를 낮추면 지연된 최신 데이터가 오래 머무는 것을 줄일 수 있지만 burst 중 교체되는 패킷 수가 늘어난다.
 
 ---
 
@@ -69,6 +69,8 @@ GetUnusedSessionCount()
 예전 문서처럼 `GetUnusedSessionCount()`를 "추가 구현 필요"로 보면 안 된다.
 
 ---
+
+`RUDPSession::GetUnreliableQueueStats()`의 `queued`·`capacity`·`dropped`로 서버 로컬 큐 포화를 구분할 수 있다. `dropped`는 미송신 교체 누계이며 네트워크 손실률이 아니다.
 
 ## 운영 팁
 

@@ -17,13 +17,19 @@
 ## 1. `SendPacketInfo`
 
 ```csharp
-public class SendPacketInfo(NetBuffer inSentBuffer, PacketSequence inPacketSequence)
+public class SendPacketInfo(
+    NetBuffer inSentBuffer,
+    PacketSequence inPacketSequence,
+    long inRetransmissionTimeoutMs = 20,
+    long inRetransmissionMaxCount = 16)
 ```
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
 | `inSentBuffer` | `NetBuffer` | ACK 전까지 보관하고 재전송할 인코딩된 패킷 |
 | `inPacketSequence` | `PacketSequence` | 저장소 키와 ACK 매칭에 사용하는 시퀀스 |
+| `inRetransmissionTimeoutMs` | `long` | 양수인 재전송 제한 시간. 기본 20ms |
+| `inRetransmissionMaxCount` | `long` | 양수인 재전송 횟수 상한. 기본 16 |
 
 주요 상태는 아래와 같다.
 
@@ -67,16 +73,16 @@ void Clear();
 
 ## 3. 재전송 판정
 
-현재 코드 상수는 아래와 같다.
+`SendPacketInfo` 생성자의 기본값은 아래와 같다. `BufferStore`의 고정 상수가 아니며 세션이 패킷 생성 시 값을 전달한다.
 
 ```text
 RetransmissionTimeoutMs = 20
 RetransmissionMaxCount  = 16
 ```
 
-`IsRetransmissionTime(now)`는 `now - 최근 송신 시각 >= 20ms`일 때 `true`를 반환한다. `IsExceedMaxRetransmissionCount()`는 재전송 횟수가 16 이상일 때 `true`를 반환한다.
+`IsRetransmissionTime(now)`는 최근 송신 이후 생성자에 지정한 제한 시간이 지나면 `true`다. `IsExceedMaxRetransmissionCount()`는 지정한 횟수 이상이면 `true`다. 0 이하 설정은 `ArgumentOutOfRangeException`으로 거부한다. 일반 세션 기본값은 20ms/16회이며 RTT 부하 경로는 100ms/16회를 사용한다.
 
-> **전제 조건:** 시간값은 같은 단조 증가 밀리초 clock에서 가져오고, timeout 판정 전에 `InitializeSendTimestamp()`를 호출해야 한다.
+> **시간 기준:** 송신 시각과 timeout 판정에는 같은 밀리초 기준을 사용하고, 판정 전에 `InitializeSendTimestamp()`를 호출한다. 현재 세션은 두 경로 모두 `CommonFunc.GetNowMs()`의 UTC Unix 밀리초를 사용한다. 이는 단조 시계가 아니므로 시스템 시각 보정의 영향을 받을 수 있다. 단조 시계로 바꿀 때는 기록·판정 양쪽을 함께 변경해야 한다.
 
 ---
 

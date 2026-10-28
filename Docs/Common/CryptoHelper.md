@@ -13,7 +13,7 @@
 1. [인스턴스 획득 (thread_local)](#1-인스턴스-획득-thread_local)
 2. [BCrypt 초기화 흐름](#2-bcrypt-초기화-흐름)
 3. [키 핸들 생성/파괴](#3-키-핸들-생성파괴)
-4. [난수 생성 — GenerateSecureRandomBytes](#4-난수-생성--generatesecurerandombytest)
+4. [난수 생성 — GenerateSecureRandomBytes](#4-난수-생성--generatesecurerandombytes)
 5. [Nonce 생성 — FillNonce](#5-nonce-생성--fillnonce)
 6. [암호화 — EncryptAESGCM](#6-암호화--encryptaesgcm)
 7. [복호화 — DecryptAESGCM](#7-복호화--decryptaesgcm)
@@ -187,8 +187,7 @@ CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
 ```
 
 **`BCRYPT_USE_SYSTEM_PREFERRED_RNG`:**  
-Windows Vista 이상에서 `BCryptGenRandom`은 OS가 선택한 가장 안전한 CSPRNG을 사용한다.  
-Intel CPU에서는 RDRAND 명령어를 통한 하드웨어 엔트로피를 포함한다.
+구현은 `BCryptGenRandom`에 시스템 기본 난수 생성기 사용을 요청한다. 특정 CPU 명령어·엔트로피 소스의 사용을 이 코드가 지정하거나 보장하지는 않는다.
 
 **`std::optional` 반환 이유:**  
 예외 대신 optional로 실패를 명시. 호출자가 `if (!result) return false;`로 처리.

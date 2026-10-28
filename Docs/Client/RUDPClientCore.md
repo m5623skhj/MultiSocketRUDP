@@ -1,788 +1,176 @@
 # RUDPClientCore
 
-> **C++ 클라이언트 측 RUDP 코어.**  
-> TLS로 세션 정보를 수신하고, UDP 소켓을 생성해 서버에 연결한다.  
-> 재전송·순서 보장 신뢰 채널과 최신성 우선 신뢰성 없는 채널, 서버 생존 확인, 흐름 제어를 클라이언트 관점에서 처리한다.
-
----
+> C++ 클라이언트 코어다. TLS 세션 발급, UDP 연결, 신뢰성·비신뢰성 송수신, 재전송과 생존 검사를 담당한다.
+> 구현은 `MultiSocketRUDP/MultiSocketRUDPClient/RUDPClientCore.*`, `SessionGetter.cpp`, `ClientOptionFile.h`에 있다.
 
 ## 목차
 
-1. [전체 연결 흐름](#1-전체-연결-흐름)
-2. [시작 — `Start`](#2-시작-start)
-3. [종료 — `Stop`](#3-종료-stop)
-4. [TLS 세션 정보 수신](#4-tls-세션-정보-수신)
-5. [CONNECT 패킷 전송](#5-connect-패킷-전송)
-6. [데이터 송신 — `SendPacket`](#6-데이터-송신-sendpacket)
-7. [데이터 수신 — `GetReceivedPacket`](#7-데이터-수신-getreceivedpacket)
-8. [수신 스레드 — `recvThread`](#8-수신-스레드-recvthread)
-9. [수신 처리 — `ProcessRecvPacket`](#9-수신-처리-processrecvpacket)
-10. [ACK 수신 — `OnSendReply`](#10-ack-수신-onsendreply)
-11. [송신 스레드 — `sendThread`](#11-송신-스레드-sendthread)
-12. [재전송 스레드 — `RunRetransmissionThread`](#12-재전송-스레드-runretransmissionthread)
-13. [흐름 제어 — `TryFlushPendingQueue`](#13-흐름-제어-tryflushpendingqueue)
-14. [옵션 파일 설정값](#14-옵션-파일-설정값)
-15. [주요 멤버 변수](#15-주요-멤버-변수)
-16. [스레드 구조 요약](#16-스레드-구조-요약)
-17. [주의사항](#17-주의사항)
+1. [시작과 공개 API](#시작과-공개-api)
+2. [브로커 연결과 TLS](#브로커-연결과-tls)
+3. [송수신 계약](#송수신-계약)
+4. [ACK와 재전송](#ack와-재전송)
+5. [종료와 재시작](#종료와-재시작)
+6. [스레드와 공유 상태](#스레드와-공유-상태)
+7. [옵션](#옵션)
+8. [패킷 크기와 검증](#패킷-크기와-검증)
 
----
+## 시작과 공개 API
 
-## 1. 전체 연결 흐름
-
-```
-[클라이언트]                           [서버]
-
-Start() 호출
- │
- ├─[1] TLS TCP 연결 ──────────────────► RUDPSessionBroker (TCP Port)
- │       TLSHelperClient::Handshake
- │       RUDP_PROTOCOL_VERSION(2) ──────►│
- │       ◄─────── {version, result,       │
- │                 serverIp, port,        │
- │                 sessionId,             │  (AcquireSession → RESERVED)
- │                 sessionKey,            │  CreateRUDPSocket(port=X)
- │                 sessionSalt} ──────────┘
- │       TLS close_notify 수신
- │       closesocket (TLS 소켓)
- │
- ├─[2] UDP 소켓 생성
- │       socket(SOCK_DGRAM) + bind(port=0)
- │       serverAddr = {serverIp, port=X}
- │
- ├─[3] 스레드 시작
- │       recvThread           (recvfrom 블로킹)
- │       sendThread           (Semaphore 대기 → sendto)
- │       retransmissionThread (타임아웃 체크)
- │
- └─[4] CONNECT 패킷 전송 ────────────► RUDPSession (Port X)
-         CONNECT_TYPE | seq=0 | sessionId
-         (AES-GCM, CLIENT_TO_SERVER)
-                                        TryConnect() 성공
-                                        OnConnected() 호출
-                                        SEND_REPLY_TYPE | seq=0 ◄──
- recvThread: OnSendReply(seq=0)
-   isConnected = true
-   ServerAliveChecker 시작
-```
-
----
-
-## 2. 시작 — `Start`
+`Start()`와 `Stop()`은 `protected`다. 상속한 클라이언트에서 사용하거나 공개 래퍼를 제공한다.
 
 ```cpp
-bool RUDPClientCore::Start(
-    const std::wstring& clientCoreOptionFile,
+virtual bool Start(const std::wstring& clientCoreOptionFile,
+    const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole);
+bool Start(const std::wstring& clientCoreOptionFile,
     const std::wstring& sessionGetterOptionFilePath,
-    bool printLogToConsole
-)
+    bool printLogToConsole, const std::stop_token& inStopToken);
+virtual void Stop();
 ```
 
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `clientCoreOptionFile` | `const wstring&` | 재전송/생존 확인 설정 INI |
-| `sessionGetterOptionFilePath` | `const wstring&` | SessionBroker IP/Port/헤더코드 설정 INI |
-| `printLogToConsole` | `bool` | 콘솔 출력 여부 |
+| 파라미터 | 설명 |
+|---|---|
+| `clientCoreOptionFile` | `:CORE { ... }` 형식의 코어 옵션 파일 |
+| `sessionGetterOptionFilePath` | 브로커 주소·포트·헤더 코드 옵션 파일 |
+| `printLogToConsole` | 파일 로그와 함께 콘솔 출력 요청 |
+| `inStopToken` | 브로커 연결 준비를 취소하는 토큰. 실행 중인 UDP 연결의 종료는 별도 API로 요청한다. |
 
-**내부 실행 순서:**
-
-```
-1. Logger::GetInstance().RunLoggerThread(printLogToConsole)
-
-2. ReadOptionFile(clientCoreOptionFile, sessionGetterOptionFilePath)
-   → maxPacketRetransmissionCount, retransmissionMs, serverAliveCheckMs
-   → unreliableQueueCapacity (기본 64, 범위 1..65535)
-   → sessionBrokerIp, sessionBrokerPort
-   → NetBuffer::m_byHeaderCode, m_byXORCode
-
-3. 프로세스 전역 Winsock 참조 획득
-
-4. RunGetSessionFromServer(sessionGetterOptionFilePath)
-   → TLS TCP 연결 → 프로토콜 버전 2 전송 → 세션 정보 수신
-   → 응답 버전 검증 → 파싱 → BCrypt 키 핸들 생성
-   (실패 → return false)
-
-5. CreateRUDPSocket()
-   → socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-   → bind(INADDR_ANY, port=0)
-   → serverAddr 초기화 {serverIp, serverPort}
-
-6. RunThreads()
-   → sendEventHandles[0] = CreateSemaphore(0, LONG_MAX)  ← 패킷 대기
-   → sendEventHandles[1] = CreateEvent(manual, FALSE)     ← 종료 신호
-
-   → recvThread = thread([this] { RunRecvThread(); })
-   → sendThread = thread([this] { RunSendThread(); })
-   → retransmissionThread = thread([this] { RunRetransmissionThread(); })
-
-7. Sleep(1000)으로 송수신 스레드 초기화 대기
-
-8. ShouldSendConnectPacketOnStart()가 true이면 SendConnectPacket()
-   → CONNECT_TYPE | seq=0 | sessionId
-   → EncodePacket(CLIENT_TO_SERVER, isCorePacket=true)
-   → SendPacket(..., isCorePacket=true) 경로를 통해 send 큐에 등록
-
-9. return true
+```text
+startStopLock 획득 → 중지 상태·취소 확인 → 이전 정리 스레드 join
+  → 연결·시퀀스·윈도우 초기화 → Logger 시작
+  → 옵션 검증 → 프로세스 Winsock 참조 확보
+  → TLS 브로커에서 세션 발급 → UDP 소켓 생성
+  → 수신·송신·재전송 스레드 및 종료 담당 스레드 생성
+  → CONNECT 송신 → true 반환
 ```
 
----
-
-## 3. 종료 — `Stop`
+`true`는 초기화와 연결 요청 송신 경로가 준비됐다는 뜻이다. CONNECT ACK까지 기다리는 API가 아니므로 실제 연결은 `IsConnected()`로 확인한다. 초기화 실패는 `false`를 반환하며 시작 소유자가 공통 종료 경로로 부분 자원을 정리한다. 일부 하위 연산의 예외까지 모두 `false`로 변환하는 계약은 아니다.
 
 ```cpp
-void RUDPClientCore::Stop()
+bool IsStopped() const;
+bool IsConnected() const;
+unsigned int GetRemainPacketSize();
+NetBuffer* GetReceivedPacket();
+NetBuffer* GetReceivedUnreliablePacket();
+void SendPacket(OUT IPacket& packet);
+bool SendUnreliablePacket(IPacket& packet);
+void Disconnect();
 ```
 
-```
-1. closesocket(sessionBrokerSocket)   ← TLS 연결 정리 (이미 닫혔으면 no-op)
+`GetRemainPacketSize()`는 신뢰성 보류 큐의 항목 수다. 시퀀스 누락으로 아직 꺼낼 수 없는 항목도 포함하며 비신뢰성 큐는 포함하지 않는다.
 
-2. threadStopFlag = true              ← 모든 스레드 루프 종료 신호
+기본 연결·응답 훅과 테스트에서의 재정의는 [[Client/RUDPClientCoreHooks]]를 참고한다.
 
-3. SetEvent(sendEventHandles[1])      ← sendThread 깨우기 (종료 이벤트)
+## 브로커 연결과 TLS
 
-4. JoinThreads()
-   ├─ serverAliveChecker.StopServerAliveCheck()
-   │    → 자기 자신이면 detach(), 아니면 join()
-   ├─ retransmissionThread.join()
-   ├─ sendThread.join()
-   └─ recvThread.join()
-       (recvThread: threadStopFlag 확인 or closesocket으로 recvfrom 에러 유발)
+기본 빌드는 `USE_IOCP_SESSION_GETTER=0`이다. `SessionGetter.cpp`의 직접 TCP/TLS 경로를 사용한다. IOCP 분기의 콜백은 구현이 비어 있는 골격이므로 동일 기능을 제공하는 완성된 대체 경로로 취급하지 않는다.
 
-5. 자원 정리
-   ├─ closesocket(rudpSocket)
-   ├─ CloseHandle(sendEventHandles[0,1])
-   ├─ sendPacketInfoMap 전체 Free()
-   ├─ pendingPacketQueue 전체 Free()
-   ├─ recvPacketHoldingQueue 전체 Free()
-   ├─ sendBufferQueue 전체 Free()
-   ├─ CryptoHelper::DestroySymmetricKeyHandle(sessionKeyHandle)
-   └─ delete[] keyObjectBuffer
+1. `sessionBrokerIP`의 DNS 이름 또는 IPv4 문자열을 `TLSHelperClient::SetServerName()`에 전달하고 credential을 초기화한다.
+2. IPv4 문자열이 아니면 비동기 `GetAddrInfoExW`로 IPv4 주소를 해석한다. DNS와 TCP 연결은 각각 6초 기준 제한과 시작 취소를 관찰한다. 취소한 DNS 작업은 운영체제가 결과 저장소 사용을 끝낼 때까지 기다린다.
+3. 비블로킹 TCP 연결을 100ms 간격으로 확인한다. 현재 구현은 DNS 결과의 첫 IPv4 주소를 사용한다.
+4. 브로커 소켓 송수신 제한을 각각 6초로 설정하고 TLS 1.2 핸드셰이크를 수행한다. 클라이언트 핸드셰이크 수신 대기에도 6초 기준 제한과 취소를 적용한다.
+5. Windows 신뢰 체인, 유효 기간, 서버 인증 용도, 요청한 DNS/IP 이름 검증을 통과해야 한다.
+6. 버전 `2`를 4바이트 big-endian 값으로 TLS 전송한다.
+7. `TakePendingHandshakeData()`의 잔여 TLS 데이터를 먼저 복호화하고 이후 소켓 데이터를 누적한다. 여러 TLS 레코드에 나뉜 세션 헤더도 누적한다.
+8. 전체 페이로드와 `close_notify`를 확인하면 수신 루프를 끝낸다. 현재 코드는 6초 기준 제한에 도달해도 전체 페이로드가 있으면 파싱을 진행하므로 `close_notify`가 항상 필수인 것은 아니다.
+9. 응답 버전·결과 코드를 확인하고 UDP 목적지·포트·세션 ID·키·솔트를 설정한다.
 
-6. Logger::GetInstance().StopLoggerThread()
-
-7. WSACleanup()
+```text
+브로커 응답:
+헤더 5B
+  + 버전 4B (little-endian)
+  + 결과 코드 1B
+  + 서버 IP 문자열 (길이 2B + 문자열)
+  + 서버 포트 2B + 세션 ID 2B
+  + 키 16B + 솔트 16B
 ```
 
-**`recvThread` 종료 방법:**  
-`recvfrom()`은 블로킹 호출이다. `closesocket(rudpSocket)` 시 `recvfrom`이  
-`WSAENOTSOCK` 에러와 함께 즉시 반환된다. 이후 `threadStopFlag` 확인으로 루프 종료.
+구체적인 인증 정책과 진단 한계는 [[TLSHelper]], 응답 형식은 [[Client/RUDPSessionBroker]]를 참고한다.
 
----
+### 호스트 로컬 접속
 
-## 4. TLS 세션 정보 수신
+`SESSION_BROKER.HOST_LOOPBACK=1`은 실제 TCP peer가 IPv4 127/8일 때만 허용한다. 인증·버전 검증은 유지하고 응답의 UDP 목적지 IP만 `127.0.0.1`로 바꾼다. 포트·세션 ID·키·솔트는 그대로다. 원격 브로커 peer면 시작에 실패한다. 생략 또는 0이면 브로커가 알린 IP를 사용하며 매 시작 시 기본값으로 초기화한다.
 
-### `RunGetSessionFromServer`
+## 송수신 계약
 
-```cpp
-bool RunGetSessionFromServer(const std::wstring& optionFilePath)
+### 신뢰성 송신
+
+`SendPacket(OUT IPacket&)`은 콘텐츠를 내부 버퍼로 직렬화한다. 송신 전 연결 세대를 기록하고, 직렬화 후 `lifecycleLock`에서 연결·중지·세대를 재검증한 뒤 시퀀스를 발급하고 암호화한다. 중지 중이거나 크기가 초과하면 로그 또는 조기 반환으로 거절한다. 반환형이 `void`이므로 전달 성공 여부를 제공하지 않는다.
+
+콘텐츠는 모두 `pendingPacketQueue`에 시퀀스 순서로 넣고 즉시 `TryFlushPendingQueue()`를 호출한다. 해당 함수는 pending 잠금을 유지한 채 ACK 대기 맵의 항목 수와 `remoteAdvertisedWindow`를 비교하고 허용량만 등록한다. 큐 삽입 직전에 마지막 ACK가 도착했어도 송신을 재시도한다. CONNECT 같은 코어 패킷은 이 흐름 제어 큐를 우회한다.
+
+### 비신뢰성 송신
+
+`SendUnreliablePacket()`은 독립 64비트 번호와 `CLIENT_TO_SERVER_UNREL` nonce 방향을 사용한다. ACK 맵·재전송·원격 광고 윈도우를 사용하지 않는다.
+
+| 반환값 | 의미 |
+|---|---|
+| `true` | 로컬 송신 큐가 수용함. 가득 차면 가장 오래된 미송신 항목을 교체함 |
+| `false` | 중지·미연결, 직렬화 실패, 크기 초과, 연결 세대 변경 또는 암호화 실패 |
+
+`true`는 원격 전달 보장이 아니다. 송신 스레드는 두 큐에 데이터가 있으면 번갈아 선택한다.
+
+### 수신과 버퍼 소유권
+
+`OnRecvStream()`이 헤더 코드·길이·프레임 한도를 검사해 데이터그램의 각 프레임을 분리한다. `ProcessRecvPacket()`은 인증·타입 분기를 수행하고 필요한 큐가 버퍼 참조를 추가한다. 호출자는 자신의 원래 참조를 처리 후 해제한다.
+
+신뢰성 수신은 최소 시퀀스 우선 큐에서 `nextRecvPacketSequence`와 일치하는 콘텐츠만 반환한다. `DrainReceivedControlPackets()`는 중복과 순서가 맞는 하트비트를 내부 해제하며 콘텐츠와 누락 번호를 건너뛰지 않는다. 비신뢰성 수신은 최초 인증 번호를 수용한 뒤 더 큰 번호만 받으며 별도 큐에서 반환한다.
+
+두 수신 API 모두 읽기 위치가 `PacketId` 앞이고 인증 태그는 읽기 범위에서 제외된다. 반환 버퍼는 호출자가 `NetBuffer::Free()`해야 한다. 큐가 비거나 신뢰성 시퀀스가 누락됐으면 `nullptr`이다. 비신뢰성 수신 큐가 가득 차면 가장 오래된 미소비 항목을 해제한다.
+
+## ACK와 재전송
+
+`OnSendReply()`는 발급한 번호보다 큰 ACK를 무시한다. 추적 맵에 항목이 있을 때만 `SendPacketInfo::completion`을 `Pending → Acknowledged`로 CAS하고 맵 참조를 제거한다. CAS 성공 후 원격 윈도우·ACK 번호를 반영한다. 최초 시퀀스 0 ACK는 `lifecycleLock`에서 연결을 확정하고 생존 검사를 시작한다. 중복 ACK나 종료 중 ACK는 연결을 다시 시작하지 않는다.
+
+클라이언트 재전송 스레드는 맵을 잠가 만료 후보의 참조를 확보한 뒤 잠금을 해제하고 처리한다. 한도 초과는 `Pending → RetryLimit` CAS가 성공한 경우에만 `RequestStop()`을 호출한다. ACK가 먼저 확정되면 실패 종료를 건너뛴다. 종료 요청은 맵 잠금 밖에서 수행한다.
+
+| 구분 | 서버 | C++ 클라이언트 |
+|---|---|---|
+| 만료 관리 | 스레드별 힙·타이머 | 맵 순회·주기 대기 |
+| 시간 설정 | 세션 RTT 기반 동적 RTO | `RETRANSMISSION_MS`를 대기·재전송 기준으로 사용 |
+| 한도 초과 | 세션 `BY_RETRANSMISSION` 해제 요청 | 코어 `RequestStop()` |
+| 수명 | 맵·큐·힙 참조 계수 | 맵·후보 객체 참조 및 버퍼 참조 계수 |
+
+## 종료와 재시작
+
+```text
+작업 스레드·감시기 → RequestStop()
+  → lifecycleLock에서 송신 세대 증가·연결 해제·ACK 수락 차단
+  → 브로커/UDP 소켓 닫기·송신 종료 이벤트 설정·정리 스레드 통지
+
+shutdownThread → CleanupStoppedSession()
+  → 재전송·송신·수신 스레드 join
+  → 생존 검사기 중단·join → Logger 사용 참조 반환
+  → 송수신·pending·추적 큐 정리
+  → 이벤트·Winsock 참조·키 핸들·키 버퍼 해제
+  → 시퀀스·윈도우 초기화 → isStopped=true
+
+외부 Stop() → startStopLock → RequestStop() → shutdownThread join
 ```
 
-```
-TryConnectToSessionBroker() — 최대 5회, 1초 간격 재시도
-  → connect(sessionBrokerSocket, {sessionBrokerIp, sessionBrokerPort})
-  → 실패 시 Sleep(1000) 후 재시도
-  → 5회 모두 실패 → return false
+UDP 소켓 송수신 제한은 200ms다. 종료를 소켓 닫기의 특정 오류 코드 하나에 의존해 설명하지 않는다. `Stop()`은 정리 완료를 기다리며, 작업 스레드는 자신을 join하지 않도록 `RequestStop()`만 호출한다. `Disconnect()`도 연결 해제 패킷 송신 경로와 종료 요청을 수행하므로 객체 파괴·재사용 전에 외부 `Stop()`으로 완료를 기다린다.
 
-TLSHelperClient::Initialize()
-  → SCHANNEL_CRED.grbitEnabledProtocols = 0 (Windows 기본 프로토콜 정책)
-  → SCHANNEL_CRED.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION
-  → AcquireCredentialsHandle(SECPKG_CRED_OUTBOUND)
+`Start()`·`Stop()`은 `startStopLock`으로 직렬화된다. 시작 중 취소에는 토큰을 사용한다. `Stop()` 호출만으로 다른 스레드가 이미 소유한 시작 잠금을 즉시 취소하지 않는다. 직렬화 중이던 이전 송신은 세대 재검증으로 재시작한 연결에 등록되지 않는다.
 
-TLSHelperClient::Handshake(sessionBrokerSocket)
-  → InitializeSecurityContext 루프
-  → ClientHello / ServerHello / Certificate / Finished 교환
+## 스레드와 공유 상태
 
-TrySetTargetSessionInfo()
-  → recv 루프 + DecryptDataStream
-  → payload 완료와 close_notify 확인
-  → SetTargetSessionInfo(recvBuffer)
-```
+| 상태 | 보호 수단 |
+|---|---|
+| 외부 시작·종료와 정리 스레드 소유권 | `startStopLock` |
+| 송신 수락·세대·종료 요청·CONNECT ACK | `lifecycleLock` |
+| 실제 송신 큐와 비신뢰성 송신 큐 | `sendBufferQueueLock` |
+| ACK 대기 맵 | `sendPacketInfoMapLock` |
+| 신뢰성 pending 큐와 등록 순서 | `pendingPacketQueueLock` |
+| 두 수신 큐·기대 번호·최신 번호 | `recvPacketHoldingQueueLock` |
+| 프로세스 Winsock 참조 | `clientCountInThisProcessLock` |
+| 연결·중지·인증 수신 횟수·UDP 핸들 | atomic |
 
-### `TrySetTargetSessionInfo` — TLS 스트림 수신 루프
+송신 스레드는 세마포어와 종료 이벤트를 기다리고 깨어나 큐를 비운다. 큐가 작업의 기준이며 세마포어 신호 개수와 실제 큐 길이를 항상 같다고 가정하지 않는다. 콜백·입력 패킷 객체의 수명과 외부 동시 변경은 호출자가 별도로 관리한다.
 
-```cpp
-bool TrySetTargetSessionInfo()
-{
-    auto& recvBuffer = *NetBuffer::Alloc();
-    std::vector<char> encryptedStream;
-    char plainBuffer[MAX_TLS_PACKET_SIZE];
-    int totalPlainReceived = 0;
-    BYTE code = 0;
-    WORD payloadLength = 0;
-    bool payloadComplete = false;
+## 옵션
 
-    while (true) {
-        char tlsRecvBuf[MAX_TLS_PACKET_SIZE];
-        int bytes = recv(sessionBrokerSocket, tlsRecvBuf, MAX_TLS_PACKET_SIZE, 0);
-        if (bytes <= 0) break;
+`ClientOptionFile`은 기존 섹션 형식을 읽고 파일 길이 2,047자, 주석·따옴표·숫자 범위를 검사한다. INI의 `[SECTION]` 문법이 아니다.
 
-        // 암호화 스트림에 누적
-        encryptedStream.insert(encryptedStream.end(),
-                               tlsRecvBuf, tlsRecvBuf + bytes);
-
-        size_t plainSize = 0;
-        auto result = tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
-        if (result == TLSHelper::TlsDecryptResult::Error) {
-            return false;
-        }
-
-        if (plainSize > 0) {
-            recvBuffer.m_iWrite = 0;
-            recvBuffer.WriteBuffer(plainBuffer, static_cast<int>(plainSize));
-            totalPlainReceived += static_cast<int>(plainSize);
-        }
-
-        if (totalPlainReceived < df_HEADER_SIZE) continue;
-
-        if (payloadLength == 0) {
-            recvBuffer >> code >> payloadLength;
-        }
-
-        if (totalPlainReceived >= payloadLength + df_HEADER_SIZE) {
-            payloadComplete = true;
-        }
-
-        if (payloadComplete && result == TLSHelper::TlsDecryptResult::CloseNotify) {
-            break;
-        }
-    }
-
-    shutdown(sessionBrokerSocket, SD_BOTH);
-    closesocket(sessionBrokerSocket);
-    sessionBrokerSocket = INVALID_SOCKET;
-
-    if (!payloadComplete) {
-        NetBuffer::Free(&recvBuffer);
-        return false;
-    }
-
-    recvBuffer.m_iRead = df_HEADER_SIZE;
-    const bool result = SetTargetSessionInfo(recvBuffer);
-    NetBuffer::Free(&recvBuffer);
-    return result;
-}
-```
-
-### `SetTargetSessionInfo` — 세션 정보 파싱
-
-```cpp
-bool SetTargetSessionInfo(NetBuffer& receivedBuffer)
-{
-    uint32_t version;
-    receivedBuffer >> version;
-    if (version != RUDP_PROTOCOL_VERSION) {
-        LOG_ERROR("Unsupported RUDP server protocol version");
-        return false;
-    }
-
-    char connectResultCode;
-    receivedBuffer >> connectResultCode;
-
-    if (connectResultCode != 0) {
-        LOG_ERROR("Session broker returned error");
-        return false;
-    }
-
-    // 서버 UDP 주소, 세션 식별 정보, 암호화 키/솔트
-    receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
-
-    if (keyObjectBuffer == nullptr) {
-        keyObjectBuffer = new unsigned char[
-            CryptoHelper::GetTLSInstance().GetKeyObjectSize()];
-    }
-
-    if (sessionKeyHandle != nullptr) {
-        CryptoHelper::DestroySymmetricKeyHandle(sessionKeyHandle);
-        sessionKeyHandle = nullptr;
-    }
-
-    sessionKeyHandle = CryptoHelper::GetTLSInstance()
-        .GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
-    return sessionKeyHandle != nullptr;
-}
-```
-
-**수신되는 세션 정보 페이로드 구조:**
-
-```
-[HeaderCode 1B][PayloadLen 2B][Reserved 2B]
-[RUDP_PROTOCOL_VERSION 4B, little-endian]
-[CONNECT_RESULT_CODE 1B]
-[serverIp string (len 2B + bytes)]
-[serverUdpPort 2B]
-[sessionId 2B]
-[sessionKey 16B]
-[sessionSalt 16B]
-```
-
----
-
-## 5. CONNECT 패킷 전송
-
-```cpp
-void SendConnectPacket()
-{
-    NetBuffer& connectPacket = *NetBuffer::Alloc();
-
-    auto type = PACKET_TYPE::CONNECT_TYPE;
-    PacketSequence seq = LOGIN_PACKET_SEQUENCE;  // = 0
-
-    connectPacket << type << seq << sessionId;
-    // Total payload: Type(1) + Seq(8) + SessionId(2) = 11 bytes
-
-    SendPacket(connectPacket, seq, true);
-}
-```
-
-스레드 종료 뒤에는 신뢰성 없는 송신·수신 deque, 신뢰 수신 홀딩 큐, ACK 대기 map, pending queue를 각각의 mutex 아래에서 비우고 시퀀스 상태를 초기화한다. `lifecycleLock`과 `unreliableSendGeneration`은 `Stop()` 도중 직렬화 중이던 신뢰성 없는 송신이 파괴된 키나 이벤트 핸들을 사용하지 못하게 한다.
-
-CONNECT 패킷은 현재 구현에서 일반 콘텐츠 패킷처럼 흐름 제어 대상은 아니지만,
-`SendPacket(connectPacket, 0, true)`를 통해 암호화, 재전송 등록, send 큐 삽입 경로를 사용한다.
-
----
-
-## 6. 데이터 송신 — `SendPacket`
-
-### 외부 API
-
-```cpp
-void RUDPClientCore::SendPacket(OUT IPacket& packet)
-bool RUDPClientCore::SendUnreliablePacket(IPacket& packet)
-```
-
-**콘텐츠 레이어에서 사용하는 주 API.** (BotTester ActionNode 등에서 호출)
-
-```cpp
-{
-    // ① 시퀀스 번호 증가
-    PacketSequence seq = ++lastSendPacketSequence;
-
-    // ② 직렬화
-    NetBuffer* buffer = NetBuffer::Alloc();
-    auto type = PACKET_TYPE::SEND_TYPE;
-    *buffer << type << seq << packet.GetPacketId();
-    packet.PacketToBuffer(*buffer);
-
-    // ③ 내부 전송 경로
-    SendPacket(*buffer, seq, /*isCorePacket=*/false);
-}
-```
-
-`SendUnreliablePacket()`은 별도 64비트 시퀀스와 `CLIENT_TO_SERVER_UNREL` nonce 방향을 사용한다. ACK map, remote advertised window, pending queue, 재전송 스레드를 우회한다. 큐가 가득 차면 가장 오래된 항목을 버리고 최신 항목을 넣으며, 반환값 `true`는 원격 전달이 아닌 로컬 큐 수락을 뜻한다. 중지·미연결·직렬화 도중 세대 변경·암호화 실패 시 `false`다.
-
-### 내부 `SendPacket(NetBuffer&, PacketSequence, bool)`
-
-```cpp
-void SendPacket(NetBuffer& buffer, PacketSequence seq, bool isCorePacket)
-{
-    // ① AES-GCM 암호화
-    PacketCryptoHelper::EncodePacket(
-        buffer, seq,
-        PACKET_DIRECTION::CLIENT_TO_SERVER,
-        sessionSalt, SESSION_SALT_SIZE,
-        sessionKeyHandle, isCorePacket
-    );
-
-    // ② 흐름 제어 확인
-    const BYTE window = remoteAdvertisedWindow.load(std::memory_order_relaxed);
-    if (window == 0) {
-        std::scoped_lock lock(pendingPacketQueueLock);
-        pendingPacketQueue.push({ seq, &buffer });
-        return;
-    }
-
-    BYTE outstanding;
-    {
-        std::scoped_lock lock(sendPacketInfoMapLock);
-        outstanding = static_cast<BYTE>(sendPacketInfoMap.size());
-    }
-
-    if (outstanding >= window) {
-        std::scoped_lock lock(pendingPacketQueueLock);
-        pendingPacketQueue.push({ seq, &buffer });
-        return;
-    }
-
-    // ③ 재전송 등록 + 송신 큐에 삽입
-    RegisterSendPacketInfo(buffer, seq);
-}
-```
-
-### `RegisterSendPacketInfo`
-
-```cpp
-void RegisterSendPacketInfo(NetBuffer& buf, PacketSequence seq)
-{
-    // ① SendPacketInfo 할당
-    auto* info = sendPacketInfoPool->Alloc();
-    info->Initialize(&buf, seq);
-    info->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
-
-    // ② 재전송 맵에 등록
-    {
-        std::unique_lock lock(sendPacketInfoMapLock);
-        sendPacketInfoMap.insert({ seq, info });
-    }
-
-    // ③ send 큐에 삽입
-    sendBufferQueue.Enqueue(&buf);
-
-    // ④ send 스레드 깨우기
-    ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
-}
-```
-
----
-
-## 7. 데이터 수신 — `GetReceivedPacket`
-
-```cpp
-NetBuffer* RUDPClientCore::GetReceivedPacket()
-```
-
-`recvPacketHoldingQueue`(min-heap, 시퀀스 오름차순)에서  
-`nextRecvPacketSequence` 순서로 패킷을 꺼낸다.
-
-```cpp
-{
-    std::scoped_lock lock(recvPacketHoldingQueueLock);
-    DrainReceivedControlPackets();
-    if (recvPacketHoldingQueue.empty()
-        || recvPacketHoldingQueue.top().packetSequence != nextRecvPacketSequence)
-        return nullptr;
-
-    auto* buffer = recvPacketHoldingQueue.top().buffer;
-    recvPacketHoldingQueue.pop();
-    ++nextRecvPacketSequence;
-    DrainReceivedControlPackets();
-    return buffer;  // 호출자가 NetBuffer::Free() 책임
-}
-```
-
-`DrainReceivedControlPackets()`는 앞선 중복과 현재 순번의 heartbeat를 내부에서 소비한다. 따라서 애플리케이션이 추가 수신 호출을 하지 않아도 콘텐츠 패킷 뒤에 연속된 heartbeat가 다음 콘텐츠 시퀀스를 막지 않는다.
-
-**사용 예시 (폴링 방식):**
-
-```cpp
-// BotActionGraph 실행 루프 예시
-while (client.IsConnected() && !stopFlag) {
-    NetBuffer* buf = client.GetReceivedPacket();
-    if (buf == nullptr) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        continue;
-    }
-
-    PacketId packetId;
-    *buf >> packetId;
-
-    switch (static_cast<PACKET_ID>(packetId)) {
-    case PACKET_ID::PONG:
-        HandlePong(*buf);
-        break;
-    case PACKET_ID::MOVE_RES:
-        HandleMoveRes(*buf);
-        break;
-    }
-
-    NetBuffer::Free(buf);  // ← 반드시 호출
-}
-```
-
-> ⚠️ `GetReceivedPacket`으로 받은 `NetBuffer`는 **반드시 `NetBuffer::Free()`** 해야 한다.  
-> 해제하지 않으면 메모리 풀 고갈이 발생한다.
-
-### `GetReceivedUnreliablePacket`
-
-```cpp
-NetBuffer* RUDPClientCore::GetReceivedUnreliablePacket();
-```
-
-인증과 최신 시퀀스 검사를 통과한 신뢰성 없는 패킷을 수신 순서대로 하나 반환한다. 반환 버퍼의 read 위치는 `PacketId` 앞이며, `GetReceivedPacket()`과 마찬가지로 호출자가 `NetBuffer::Free()` 해야 한다. 큐가 비어 있으면 `nullptr`을 반환한다. 수신 큐가 가득 차면 가장 오래된 미소비 패킷을 제거한다.
-
----
-
-## 8. 수신 스레드 — `recvThread`
-
-```cpp
-void RunRecvThread()
-{
-    char recvBuffer[RECV_BUFFER_SIZE];
-    sockaddr_in fromAddr;
-    int fromLen = sizeof(fromAddr);
-
-    while (!threadStopFlag) {
-        int bytes = recvfrom(
-            rudpSocket,
-            recvBuffer, RECV_BUFFER_SIZE,
-            0,
-            reinterpret_cast<sockaddr*>(&fromAddr),
-            &fromLen
-        );
-
-        if (bytes == SOCKET_ERROR) {
-            int err = WSAGetLastError();
-            if (err == WSAENOTSOCK || err == WSAEINTR) break;  // 소켓 닫힘
-            LOG_ERROR(std::format("recvfrom error: {}", err));
-            continue;
-        }
-
-        if (bytes == 0) continue;
-
-        // 서버 주소 확인 (스푸핑 방지)
-        if (fromAddr.sin_addr.S_un.S_addr != serverAddr.sin_addr.S_un.S_addr
-         || fromAddr.sin_port             != serverAddr.sin_port) {
-            LOG_ERROR("Unknown sender address");
-            continue;
-        }
-
-        // NetBuffer에 복사 후 처리
-        NetBuffer* buf = NetBuffer::Alloc();
-        memcpy(buf->m_pSerializeBuffer, recvBuffer, bytes);
-        buf->m_iWrite = static_cast<WORD>(bytes);
-
-        ProcessRecvPacket(*buf);
-    }
-}
-```
-
----
-
-## 9. 수신 처리 — `ProcessRecvPacket`
-
-```cpp
-void ProcessRecvPacket(NetBuffer& recvBuffer)
-{
-    PACKET_TYPE packetType;
-    PacketSequence packetSequence;
-    recvBuffer >> packetType;
-
-    switch (packetType) {
-
-    case PACKET_TYPE::UNRELIABLE_SEND_TYPE:
-    {
-        if (!isConnected || threadStopFlag) return;
-        if (!PacketCryptoHelper::DecodePacket(
-                recvBuffer, sessionSalt, SESSION_SALT_SIZE,
-                sessionKeyHandle, false,
-                PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL)) return;
-
-        authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
-        recvBuffer >> packetSequence;
-        std::scoped_lock lock(recvPacketHoldingQueueLock);
-        if (!unreliableReceiveState.Accept(packetSequence)) return;
-        if (unreliableReceivedPackets.size() >= unreliableQueueCapacity) {
-            NetBuffer::Free(unreliableReceivedPackets.front());
-            unreliableReceivedPackets.pop_front();
-        }
-        NetBuffer::AddRefCount(&recvBuffer);
-        unreliableReceivedPackets.push_back(&recvBuffer);
-        return;
-    }
-
-    case PACKET_TYPE::SEND_TYPE:
-    case PACKET_TYPE::HEARTBEAT_TYPE:
-    {
-        const bool isCorePacket = packetType == PACKET_TYPE::HEARTBEAT_TYPE;
-        if (!PacketCryptoHelper::DecodePacket(
-                recvBuffer, sessionSalt, SESSION_SALT_SIZE,
-                sessionKeyHandle, isCorePacket,
-                PACKET_DIRECTION::SERVER_TO_CLIENT)) break;
-
-        authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
-        recvBuffer >> packetSequence;
-        unsigned int packetId = 0;
-        if (packetType == PACKET_TYPE::SEND_TYPE) {
-            const WORD originalRead = recvBuffer.m_iRead;
-            recvBuffer >> packetId;
-            recvBuffer.m_iRead = originalRead;
-        }
-        NetBuffer::AddRefCount(&recvBuffer);
-        {
-            std::scoped_lock lock(recvPacketHoldingQueueLock);
-            recvPacketHoldingQueue.emplace(&recvBuffer, packetSequence, packetType);
-            DrainReceivedControlPackets();
-        }
-        if (ShouldSendReplyToServer(packetSequence, packetId)) {
-            SendReplyToServer(packetSequence,
-                isCorePacket ? PACKET_TYPE::HEARTBEAT_REPLY_TYPE
-                             : PACKET_TYPE::SEND_REPLY_TYPE);
-        }
-        break;
-    }
-
-    case PACKET_TYPE::SEND_REPLY_TYPE:
-    {
-        if (!PacketCryptoHelper::DecodePacket(
-                recvBuffer, sessionSalt, SESSION_SALT_SIZE,
-                sessionKeyHandle, true,
-                PACKET_DIRECTION::SERVER_TO_CLIENT_REPLY)) break;
-
-        authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
-        recvBuffer >> packetSequence;
-        OnSendReply(recvBuffer, packetSequence);
-        break;
-    }
-
-    default:
-        LOG_ERROR(std::format("Unknown packet type: {}", packetType));
-        break;
-    }
-
-}
-```
-
-`OnRecvStream()`이 데이터그램을 분해해 각 `NetBuffer`의 header code와 payload 길이를 먼저 검증한다. `ProcessRecvPacket()`은 참조가 필요한 큐에 넣을 때만 `AddRefCount()`하며, 호출자인 `OnRecvStream()`은 처리 후 자신의 원래 참조를 항상 해제한다.
-
-### `SendReplyToServer` — ACK 전송
-
-```cpp
-void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
-```
-
-ACK는 PendingQueue나 SendPacketInfo 등록 없이 직접 전송한다. 서버와 같은 논리: ACK는 손실 시 원본 패킷 재전송으로 자연스럽게 재요청된다.
-
-복호화에 성공한 `SEND_TYPE`, `HEARTBEAT_TYPE`, `SEND_REPLY_TYPE`, `UNRELIABLE_SEND_TYPE`은 모두 `authenticatedReceiveCount`를 증가시킨다. `ServerAliveChecker`는 신뢰 패킷 시퀀스가 아니라 이 카운터의 진행 여부로 서버 생존을 판단한다.
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `inRecvPacketSequence` | `PacketSequence` | 응답할 패킷의 시퀀스 번호 |
-| `packetType` | `PACKET_TYPE` | 전송할 패킷 타입. 기본값은 `PACKET_TYPE::SEND_REPLY_TYPE` |
-## 10. ACK 수신 — `OnSendReply`
-
-```cpp
-void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence);
-```
-
-상대방으로부터 수신된 ACK 패킷을 처리하여 윈도우 크기를 갱신하고, 재전송 맵에서 해당 패킷을 제거한다.
-
-마지막 송신 시퀀스보다 큰 ACK는 즉시 무시한다.
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `recvPacket` | `NetBuffer&` | 수신된 ACK 패킷 버퍼 |
-| `packetSequence` | `PacketSequence` | 확인 응답된 패킷 시퀀스 |
-
-### 내부 동작
-1. `recvPacket`에서 `advertiseWindow` 정보를 추출하여 `remoteAdvertisedWindow`를 갱신한다.
-2. `lastAckedSequence`를 수신된 `packetSequence`로 갱신한다.
-3. 시퀀스가 `LOGIN_PACKET_SEQUENCE`이고 연결 전이라면 `isConnected`를 활성화하고 서버 생존 확인을 시작한다.
-4. 재전송 맵(`sendPacketInfoMap`)에서 해당 시퀀스의 패킷 정보를 찾아 해제한다.
-5. `TryFlushPendingQueue`를 호출하여 보류 중인 패킷 전송을 시도한다.
-## 11. 송신 스레드 — `sendThread`
-
-```cpp
-void RunSendThread()
-{
-    while (true) {
-        const DWORD result = WaitForMultipleObjects(
-            2, sendEventHandles, FALSE, INFINITE);
-
-        if (result == WAIT_OBJECT_0) {
-            DoSend();       // 두 큐를 번갈아 선택하며 모두 drain
-            continue;
-        }
-        if (result == WAIT_OBJECT_0 + 1) {
-            DoSend();       // 중지 전에 이미 수락한 로컬 항목 정리
-            break;
-        }
-        LOG_ERROR("invalid send wait result");
-        break;
-    }
-}
-```
-
-**Semaphore 방식 이유:**  
-`ManualResetEvent`는 단일 신호만 기억하므로, 짧은 시간에 패킷이 여러 개 쌓이면  
-일부를 처리하지 못할 수 있다. `Semaphore`는 `Release` 횟수를 누적한다.
-
-신뢰·신뢰성 없는 큐에 모두 데이터가 있으면 `preferUnreliableSend`를 토글해 번갈아 꺼낸다. send thread는 깨어날 때 선택된 큐를 모두 drain한다.
-
----
-
-## 12. 재전송 스레드 — `RunRetransmissionThread`
-
-```cpp
-void RunRetransmissionThread()
-{
-    TickSet tickSet;
-
-    while (!threadStopFlag) {
-        tickSet.UpdateTick();
-
-        {
-            std::scoped_lock lock(sendPacketInfoMapLock);
-
-            for (auto& [seq, info] : sendPacketInfoMap) {
-                if (info->retransmissionTimeStamp > tickSet.nowTick) continue;
-
-                // 재전송 횟수 초과 → 연결 종료
-                if (++info->retransmissionCount >= maxPacketRetransmissionCount) {
-                    LOG_ERROR(std::format(
-                        "Max retransmission exceeded. SessionId={}. Stopping.", sessionId));
-                    isConnected = false;
-                    threadStopFlag = true;
-                    SetEvent(sendEventHandles[1]);  // sendThread 종료
-                    return;
-                }
-
-                // 재전송: 이미 암호화된 버퍼 그대로 재사용
-                sendBufferQueue.Enqueue(info->buffer);
-                ReleaseSemaphore(sendEventHandles[0], 1, nullptr);
-
-                // 다음 재전송 시각 갱신
-                info->retransmissionTimeStamp = GetTickCount64() + retransmissionMs;
-            }
-        }
-
-        SleepRemainingFrameTime(tickSet, retransmissionMs);
-    }
-}
-```
-
-**서버 재전송 스레드와의 차이점:**
-
-| 속성 | 서버 | 클라이언트 |
-|------|------|-----------|
-| sendPacketInfoMap 보호 | `shared_mutex` (복수 스레드 접근) | `mutex` (단일 스레드 주로 접근) |
-| 재전송 시 행동 | `core.SendPacket(info)` | `sendBufferQueue.Enqueue` |
-| 횟수 초과 시 | `session->DoDisconnect()` | `isConnected=false` + `threadStopFlag=true` |
-| RefCount 패턴 | 복잡한 다중 참조자 | 단순 (소유자 1명) |
-## 13. 흐름 제어 — `TryFlushPendingQueue`
-
-```cpp
-void TryFlushPendingQueue()
-{
-    BYTE window = remoteAdvertisedWindow.load(std::memory_order_acquire);
-    if (window == 0) return;
-
-    std::scoped_lock pendingLock(pendingPacketQueueLock);
-
-    while (!pendingPacketQueue.empty()) {
-        {
-            std::scoped_lock infoLock(sendPacketInfoMapLock);
-            // outstanding >= window → 전송 불가
-            if (sendPacketInfoMap.size() >= static_cast<size_t>(window)) break;
-        }
-
-        auto [seq, buf] = pendingPacketQueue.top();
-        pendingPacketQueue.pop();
-
-        // 재전송 등록 + 송신 큐
-        RegisterSendPacketInfo(*buf, seq);
-    }
-}
-```
-
-**`pendingPacketQueue`는 `priority_queue<tuple<seq, buf>>`** — 시퀀스 오름차순.  
-낮은 시퀀스부터 전송해야 서버의 순서 보장 로직이 정상 작동한다.
-
----
-
-## 14. 옵션 파일 설정값
-
-### clientCoreOptionFile (`ClientOptionFile/CoreOption.txt`)
-
-```ini
+```text
 :CORE
 {
     UNRELIABLE_QUEUE_CAPACITY = 64
@@ -792,15 +180,12 @@ void TryFlushPendingQueue()
 }
 ```
 
-### sessionGetterOptionFilePath (`ClientOptionFile/SessionGetterOption.txt`)
-
-```ini
+```text
 :SESSION_BROKER
 {
     IP = "127.0.0.1"
     PORT = 11011
 }
-
 :SERIALIZEBUF
 {
     PACKET_CODE = 119
@@ -808,228 +193,24 @@ void TryFlushPendingQueue()
 }
 ```
 
-위 값은 현재 샘플 옵션 파일의 기본값이다. `PACKET_CODE`와 `PACKET_KEY`는 서버 설정과 동일해야 한다.
+`IP`는 최대 253자의 ASCII 영문자·숫자·점·하이픈을 허용한다. IPv6 문자열은 지원하지 않는다. `PORT`는 1~65,535, 코드·키는 0~255다. 큐 용량은 생략 시 64, 허용 범위는 1~65,535이며 송수신 deque 각각에 적용한다. 옵션 로더가 음수·오버플로·읽기 실패를 거부한다.
 
-호스트 PC에서만 사용하는 선택 항목 `SESSION_BROKER.HOST_LOOPBACK = 1`은 실제 TCP 브로커 peer가 IPv4 loopback(127/8)일 때만 허용한다. TLS 이름·체인과 버전·close_notify 검증은 유지하며, 인증된 세션 응답에서 UDP 목적지 IP만 127.0.0.1로 사용한다. 포트·세션 ID·키·솔트·wire version은 바꾸지 않는다. 생략 또는 0이면 기존 응답 IP를 사용한다. 옵션은 Start의 시작/종료 잠금 소유자가 작업 스레드 생성 전에 읽으며 다음 Start마다 초기화한다. 원격 peer에서 이 옵션을 사용하면 연결 준비를 실패 처리한다.
+## 패킷 크기와 검증
 
-`UNRELIABLE_QUEUE_CAPACITY`는 송신 deque와 수신 deque 각각의 상한으로 사용한다. 생략 시 `64`, 허용 범위는 `1..65535`다.
+C++ 최종 프레임은 `MAX_WIRE_PACKET_SIZE=1024`바이트다. 헤더 5 + 타입 1 + 번호 8 + ID 4 + 태그 16을 제외한 본문은 최대 990바이트다. 문자열·컨테이너 길이 필드도 본문에 포함한다. 송신은 번호 발급 전에 검사하며 자동 분할하지 않는다. 저장 버퍼의 최대 16KiB와 전송 한도는 다르다.
 
----
+수신 초과·잘린 프레임은 인증·ACK 전에 거절하고 크기 진단은 누적 1·2·4·8…건에서만 남긴다. 회귀 검증은 `IntegrationClientHarness/UnreliableClientChecks.cpp`, `IntegrationTest.cpp`의 재시작·CONNECT 재전송 종료 시나리오와 관련 CoreTest에서 확인한다.
 
-## 15. 주요 멤버 변수
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| `sessionId` | `SessionIdType` | 서버 발급 세션 ID |
-| `sessionKey[16]` | `unsigned char[]` | AES 암호화 키 |
-| `sessionSalt[16]` | `unsigned char[]` | Nonce 생성용 솔트 |
-| `sessionKeyHandle` | `BCRYPT_KEY_HANDLE` | BCrypt 키 핸들 |
-| `keyObjectBuffer` | `unsigned char*` | BCrypt 키 오브젝트 버퍼 |
-| `rudpSocket` | `SOCKET` | UDP 소켓 |
-| `serverAddr` | `sockaddr_in` | 서버 UDP 주소 |
-| `authenticatedReceiveCount` | `atomic<uint64_t>` | 인증에 성공한 서버 패킷 누계. 생존 검사 기준 |
-| `lastSendPacketSequence` | `PacketSequence` | 마지막 전송 시퀀스 (atomic) |
-| `nextRecvPacketSequence` | `PacketSequence` | 다음 기대 수신 시퀀스 |
-| `lastAckedSequence` | `atomic<PacketSequence>` | 서버로부터 마지막 ACK |
-| `remoteAdvertisedWindow` | `atomic<BYTE>` | 서버 수신 윈도우 크기 |
-| `isConnected` | `bool` | sequence=0 ACK 수신 후 true |
-| `threadStopFlag` | `bool` | 전체 스레드 종료 플래그 |
-| `sendPacketInfoMap` | `map<seq, info*>` | 재전송 추적 맵 |
-| `sendPacketInfoMapLock` | `mutex` | sendPacketInfoMap 보호 |
-| `pendingPacketQueue` | `priority_queue<seq, buf>` | 흐름 제어 보류 큐 |
-| `pendingPacketQueueLock` | `mutex` | pendingPacketQueue 보호 |
-| `recvPacketHoldingQueue` | `priority_queue<seq, type, buf>` | 순서 보장 홀딩 큐 |
-| `recvPacketHoldingQueueLock` | `mutex` | recvPacketHoldingQueue 보호 |
-| `sendBufferQueue` | `CListBaseQueue<NetBuffer*>` | sendThread에 전달할 버퍼 큐 |
-| `unreliableSendQueue` | `deque<NetBuffer*>` | 최신 항목 교체가 가능한 신뢰성 없는 송신 큐 |
-| `unreliableReceivedPackets` | `deque<NetBuffer*>` | 최신 시퀀스를 통과한 신뢰성 없는 수신 큐 |
-| `unreliableReceiveState` | `LatestPacketSequence` | 최초 임의 번호 및 이후 단조 증가 검사 |
-| `sendEventHandles[2]` | `HANDLE[]` | [0]=Semaphore, [1]=종료이벤트 |
-| `serverAliveChecker` | `ServerAliveChecker` | 서버 생존 감시 |
-
----
-
-## 16. 스레드 구조 요약
-
-```
-[메인 스레드]
-  Start() → Stop()
-
-[recvThread]
-  recvfrom() 블로킹
-  → ProcessRecvPacket()
-  → recvPacketHoldingQueue.push
-  → unreliableReceivedPackets.push
-  → OnSendReply() → TryFlushPendingQueue
-
-[sendThread]
-  WaitForMultipleObjects([Semaphore, StopEvent])
-  → 신뢰 queue / 신뢰성 없는 deque 교대 선택
-  → sendto()
-
-[retransmissionThread]
-  sleep(retransmissionMs)
-  → sendPacketInfoMap 순회
-  → 타임아웃 시 sendBufferQueue.Enqueue + Semaphore.Release
-  → 횟수 초과 시 threadStopFlag=true
-
-[serverAliveCheckThread] (isConnected=true 이후 시작)
-  sleep(serverAliveCheckMs)
-  → authenticatedReceiveCount 변화 없으면 Stop() 호출
-
-[콘텐츠 스레드 / BotTester]
-  GetReceivedPacket() 폴링
-  GetReceivedUnreliablePacket() 폴링
-  SendPacket(packet)
-  SendUnreliablePacket(packet)
-```
-
----
-
-## 17. 주의사항
-
-```
-□ GetReceivedPacket()이 반환한 NetBuffer는 반드시 NetBuffer::Free() 호출
-□ GetReceivedUnreliablePacket()이 반환한 NetBuffer도 반드시 NetBuffer::Free() 호출
-□ Stop() 후에는 SendPacket() 호출 금지 (threadStopFlag=true)
-□ SESSION_BROKER.IP가 클라이언트에서 도달 가능한 주소인지 확인
-□ PACKET_CODE / PACKET_KEY 서버-클라이언트 일치 확인
-□ SERVER_ALIVE_CHECK_MS > 서버 HEARTBEAT_THREAD_SLEEP_MS × 2 이상
-□ 재전송 횟수 초과로 Stop()이 호출되면 다시 Start() 호출 가능
-```
-
----
+> 현재 일반 패킷의 `packetId`는 평문이며 AAD에도 포함되지 않는다. 암호화·인증 범위의 보안 한계는 [[PacketCryptoHelper]]와 [[CryptoSystem]]을 함께 확인한다.
 
 ## 관련 문서
-- [[ServerAliveChecker]] — 서버 생존 감시 상세
-- [[Client/RUDPClientCoreHooks]] — 기본 hook과 테스트 override 차이
-- [[TLSHelper]] — TLS 세션 수신 채널
-- [[CryptoSystem]] — AES-GCM 암호화
-- [[Common/PacketFormat]] — 서버와 클라이언트가 공유하는 패킷 구조
-- [[FlowController]] — advertiseWindow 기반 흐름 제어 이론
-- [[Server/RUDPSessionBroker]] — 서버 측 세션 발급
-- [[Troubleshooting]] — 연결 오류 해결
-- [[UnreliableChannel]] — 신뢰성 없는 채널의 보장 범위와 큐 정책
----
 
-## 현재 코드 기준 함수 설명
-
-### 공개 함수
-
-#### `bool IsStopped() const`
-- 클라이언트 코어가 완전히 중지되었는지 반환한다.
-
-#### `bool IsConnected() const`
-- UDP RUDP 연결이 `CONNECT` ACK까지 끝난 상태인지 반환한다.
-
-#### `unsigned int GetRemainPacketSize()`
-- 애플리케이션이 아직 꺼내지 않은 수신 패킷 수를 반환한다.
-
-#### `NetBuffer* GetReceivedPacket()`
-- 정렬과 복호화가 끝난 패킷 하나를 반환한다.
-- 반환된 `NetBuffer`는 호출 측에서 해제해야 한다.
-
-#### `NetBuffer* GetReceivedUnreliablePacket()`
-- 최신 시퀀스 검사를 통과한 신뢰성 없는 패킷을 반환한다.
-- 반환된 `NetBuffer`는 호출 측에서 해제해야 한다.
-
-#### `void SendPacket(IPacket& packet)`
-- 일반 콘텐츠 패킷 송신 진입점이다.
-- 내부에서 시퀀스 부여, 암호화, 재전송 추적 등록까지 이어진다.
-
-### `SendUnreliablePacket`
-
-```cpp
-bool SendUnreliablePacket(IPacket& packet);
-```
-
-최신성 우선 채널 송신 진입점이다. 로컬 bounded queue 수락 여부를 반환하며 ACK와 재전송을 제공하지 않는다.
-
-| 반환값 | 의미 |
-|--------|------|
-| `true` | 송신 요청 성공 |
-| `false` | 로컬 큐가 가득 차서 송신 실패 |
-#### `void Disconnect()`
-- 연결 해제 코어 패킷을 보낸 뒤 종료 흐름으로 들어간다.
-
-### 내부 핵심 함수
-
-#### `bool Start(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath, bool printLogToConsole)`
-- 옵션 로드, Logger 시작, SessionBroker TLS 연결, UDP 소켓 생성, 송수신 스레드 시작, CONNECT 패킷 송신까지 초기화를 담당한다.
-
-#### `void Stop()`
-- SessionBroker 소켓, RUDP 소켓, 송수신 스레드, 재전송 큐, 보류 큐, 암호화 핸들을 정리한다.
-
-#### `void JoinThreads()`
-- `recvThread`, `sendThread`, `retransmissionThread`, `serverAliveChecker` 종료를 조율한다.
-
-#### `bool CreateRUDPSocket()`
-- 클라이언트 UDP 소켓을 생성하고 `serverAddr`를 준비한다.
-
-#### `void SendConnectPacket()`
-- `LOGIN_PACKET_SEQUENCE`를 사용하는 코어 CONNECT 패킷을 전송한다.
-
-#### `bool RunGetSessionFromServer(const std::wstring& optionFilePath)`
-#### `bool GetSessionFromServer()`
-#### `bool TryConnectToSessionBroker() const`
-#### `bool TrySetTargetSessionInfo()`
-#### `bool SetTargetSessionInfo(NetBuffer& receivedBuffer)`
-- SessionBroker TLS 연결, 세션 정보 수신, 세션 키와 포트 파싱을 담당한다.
-
-#### `bool RunThreads()`
-#### `void RunRecvThread()`
-#### `void RunSendThread()`
-#### `void RunRetransmissionThread()`
-- `RunThreads()`는 recv/send/retransmission 스레드와 송신 이벤트 초기화 성공 여부를 반환한다.
-- 나머지 함수는 각 스레드의 실행 진입점이다.
-
-#### `void OnRecvStream(NetBuffer& recvBuffer, int recvSize)`
-#### `void ProcessRecvPacket(NetBuffer& receivedBuffer)`
-#### `void OnSendReply(NetBuffer& recvPacket, PacketSequence packetSequence)`
-### `SendReplyToServer`
-
-```cpp
-void SendReplyToServer(PacketSequence inRecvPacketSequence, PACKET_TYPE packetType = PACKET_TYPE::SEND_REPLY_TYPE);
-```
-
-수신 패킷 분해, ACK 처리, 서버 reply 전송을 담당한다.
-
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `inRecvPacketSequence` | `PacketSequence` | 수신한 패킷의 시퀀스 |
-| `packetType` | `PACKET_TYPE` | 전송할 패킷의 타입. 기본값은 `PACKET_TYPE::SEND_REPLY_TYPE` |
-#### `void DoSend()`
-#### `void SendPacket(NetBuffer& buffer, PacketSequence inSendPacketSequence, bool isCorePacket)`
-#### `void SendPacket(const SendPacketInfo& sendPacketInfo)`
-#### `void RegisterSendPacketInfo(NetBuffer& buffer, PacketSequence inSendPacketSequence)`
-#### `void TryFlushPendingQueue()`
-- 실제 UDP 송신, 재전송 추적, 흐름 제어 해소 후 보류 큐 재송신을 담당한다.
-
-#### `static inline WORD GetPayloadLength(const NetBuffer& buffer)`
-- 패킷 헤더에서 payload 길이를 읽는다.
-
-#### `bool ReadOptionFile(const std::wstring& clientCoreOptionFile, const std::wstring& sessionGetterOptionFilePath)`
-#### `bool ReadClientCoreOptionFile(const std::wstring& optionFilePath)`
-#### `bool ReadSessionGetterOptionFile(const std::wstring& optionFilePath)`
-- 클라이언트 코어와 SessionBroker 접속 설정을 읽는다.
-
-### 패킷 크기 제한
-
-`MAX_WIRE_PACKET_SIZE`는 암호화 헤더와 태그를 포함한 1024바이트다. `SendPacket(IPacket&)`와 `SendUnreliablePacket`은 직렬화 후 시퀀스 발급 전에 검사하므로 거절된 큰 패킷이 reliable 수신 순서에 빈 번호를 만들지 않는다. reliable API는 기존 `void`를 유지하며 로그를 남기고 반환하고, unreliable API는 `false`를 반환한다. 자동 분할은 하지 않는다. 본문 최대 990바이트에는 문자열 길이·컨테이너 개수 필드도 포함한다.
-
-수신 시 같은 프레임 상한을 검사하며 초과/잘린 프레임은 인증·ACK 전에 거절한다. 수신 거절 로그는 누적 건수의 2의 거듭제곱마다 남긴다. 서버의 묶음 UDP 송신도 1024바이트로 제한되므로 16KB 수신 버퍼 초과를 방지한다. 패킷 필드와 프로토콜 버전은 변하지 않으며 서버와 클라이언트 모두 갱신해야 송신 선행 검사가 양쪽에 적용된다.
-
-클라이언트도 `SendPacketInfo::completion`의 CAS로 ACK와 재전송 한도 초과를 한 번만 확정한다. ACK가 먼저 승리하면 종료를 건너뛰고, 실패가 먼저 승리하면 늦은 ACK는 맵 참조만 정리하며 연결·송신 윈도우를 갱신하지 않는다. 맵 잠금은 lifecycle 잠금이나 `RequestStop()` 호출 전에 해제한다. 종료 담당 스레드는 기존처럼 재전송/수신 스레드 종료를 기다린 후 풀과 버퍼를 정리한다.
-
-### SessionGetter 분기
-
-`USE_IOCP_SESSION_GETTER` 빌드에서는 중첩 `SessionGetter` 클래스가 TLS 세션 조회를 담당한다.
-
-#### `bool SessionGetter::Start(const std::wstring& optionFilePath)`
-#### `void OnConnectionComplete()`
-#### `void OnRecv(CNetServerSerializationBuf* recvBuffer)`
-#### `void OnSend(int sendsize)`
-#### `void OnWorkerThreadBegin()`
-#### `void OnWorkerThreadEnd()`
-#### `void OnError(st_Error* error)`
-- IOCP 기반 SessionBroker 조회 수명주기 훅이다.
+- [[ServerAliveChecker]] — 검사기 종료와 수명
+- [[Client/RUDPClientCoreHooks]] — 기본 훅과 테스트 재정의
+- [[TLSHelper]] — TLS 인증과 누적 스트림
+- [[Client/RUDPSessionBroker]] — 브로커 응답
+- [[Common/PacketFormat]] — 공통 프레임
+- [[FlowController]] — 흐름 제어
+- [[UnreliableChannel]] — 큐·순서 보장 범위
+- [[Testing]] — 검증 절차
+- [[Troubleshooting]] — 장애 조사

@@ -47,6 +47,8 @@
 
 ## 테스트와 CI
 
+Windows의 .NET 9 SDK가 필요하다. 아래 명령은 `MultiSocketRUDPBotTester` 디렉터리에서 실행한다.
+
 BotTester 로컬 빌드:
 
 ```powershell
@@ -89,7 +91,7 @@ PR에서 `MultiSocketRUDPBotTester/**`가 변경되면 `.github/workflows/BotTes
 
 ## 프로토콜 v2 / 비신뢰성 전송
 
-봇 테스터는 프로토콜 v2 서버에 접속합니다. 구버전 서버와는 호환되지 않습니다.
+봇 테스터는 프로토콜 v2 서버에 접속한다. 구버전 서버와는 호환되지 않는다. C# `SessionGetter`의 기본 호출은 인증서 검증을 생략하며 지문 선택 시에도 해시만 비교한다. C++ 클라이언트의 체인·접속 이름 검증과 다르므로 [인증 정책](../Docs/BotTester/ClientCore/SessionGetter_CS.md)을 확인한다.
 
 송신 노드 설정에서 **비신뢰성 전송 (ACK·재전송 없음)**을 선택하면 독립된 번호와 nonce 방향을 사용하는 비신뢰성 채널로 전송합니다. 기존 그래프는 신뢰성 전송을 유지합니다. 송신·수신 대기열은 각각 64개이며, 가득 차면 가장 오래된 대기 패킷을 버립니다. 송신 성공은 큐 수용을 의미하며 전달을 보장하지 않습니다.
 

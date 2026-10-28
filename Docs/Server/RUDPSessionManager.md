@@ -2,27 +2,27 @@
 
 > **고정 크기 세션 풀 관리자.**  
 > 서버 시작 시 `numOfSockets`개의 세션을 미리 생성하고,  
-> O(1) 할당/반환/조회로 런타임 동적 할당을 완전히 제거한다.
+> 세션 객체를 재사용해 연결마다 세션 객체를 다시 할당하지 않는다. 목록·해시 집합과 세션 하위 자원에서는 런타임 할당이 발생할 수 있다.
 
 ---
 
 ## 목차
 
-1. [설계 목적 — 풀 패턴](#1-설계-목적-풀-패턴)
-2. [초기화 — `Initialize`](#2-초기화-initialize)
-3. [세션 할당 — `AcquireSession`](#3-세션-할당-acquiresession)
-4. [세션 반환 — `ReleaseSession`](#4-세션-반환-releasesession)
+1. [설계 목적 — 풀 패턴](#1-설계-목적--풀-패턴)
+2. [초기화 — `Initialize`](#2-초기화--initialize)
+3. [세션 할당 — `AcquireSession`](#3-세션-할당--acquiresession)
+4. [세션 반환 — `ReleaseSession`](#4-세션-반환--releasesession)
 5. [함수 설명](#5-함수-설명)
 6. [세션 조회](#6-세션-조회)
 7. [연결 수 카운터](#7-연결-수-카운터)
-8. [종료 순서 — 세 단계 안전 정리](#8-종료-순서-세-단계-안전-정리)
-9. [이중 반환 방지 — `unusedSessionIdSet`](#9-이중-반환-방지-unusedsessionidset)
+8. [종료 순서 — 세 단계 안전 정리](#8-종료-순서--세-단계-안전-정리)
+9. [이중 반환 방지 — `unusedSessionIdSet`](#9-이중-반환-방지--unusedsessionidset)
 
 ---
 
 ## 1. 설계 목적 — 풀 패턴
 
-**런타임 `new`/`delete` 없음:**
+**세션 객체의 할당·해제 경계:**
 
 ```
 서버 시작 시:
@@ -44,7 +44,7 @@
 | 연산 | 시간복잡도 | 동기화 |
 |------|-----------|--------|
 | `AcquireSession()` | O(1) | `mutex` |
-| `ReleaseSession()` | O(1) | `mutex` |
+| `ReleaseSession()` | 컨테이너 조작은 평균 O(1), 세션 초기화 비용 별도 | `mutex` |
 | `GetUsingSession(id)` | O(1) | 없음 |
 | `GetReleasingSession(id)` | O(1) | 없음 |
 
@@ -141,53 +141,16 @@ list:   pop_front() → O(1), push_back() → O(1)
 ## 4. 세션 반환 — `ReleaseSession`
 
 ```cpp
-bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId)
+bool RUDPSessionManager::ReleaseSession(SessionIdType sessionId);
 ```
 
-```cpp
-{
-    std::scoped_lock lock(unusedSessionIdListLock);
+1. ID 범위와 세션 포인터를 검사한다.
+2. 상태가 `RELEASING` 또는 `RELEASING_BY_ABORT_RESERVED`인지 확인하고 종료 사유를 보관한다.
+3. `unusedSessionIdListLock` 안에서 `unusedSessionIdSet.contains()`로 이중 반환을 거부한다.
+4. `InitializeSession()`으로 세션을 초기화한 뒤 목록과 집합에 ID를 추가한다.
+5. 원래 상태가 `RELEASING`인 연결 세션만 `DecrementConnectedCount()`로 통계를 갱신한다. 예약 중단은 연결 해제 통계에서 제외한다.
 
-    // 이중 반환 방지: 이미 unusedSessionIdSet에 있으면 반환
-    if (!unusedSessionIdSet.insert(sessionId).second) {
-        LOG_ERROR(std::format(
-            "Session {} already in unused pool (double release attempt)", sessionId));
-        return false;
-    }
-
-    unusedSessionIdList.push_back(sessionId);
-
-    // 연결 카운터 감소
-    if (connectedUserCount > 0) {
-        --connectedUserCount;
-    }
-
-    return true;
-}
-```
-
-**이중 반환이 발생할 수 있는 상황:**
-
-```
-1. DoDisconnect()가 두 스레드에서 동시에 호출됨
-   → TryTransitionToReleasing CAS로 하나만 성공
-   → 그러나 만약 둘 다 성공한다면 ReleaseSession이 두 번 호출될 수 있음
-
-2. AbortReservedSession과 DoDisconnect가 경쟁
-   → TryAbortReserved vs TryTransitionToReleasing CAS 경쟁
-   → 하나만 성공하지만 방어 코드로 이중 반환을 막음
-```
-
-**`unusedSessionIdSet`의 역할:**
-
-```
-unusedSessionIdList: FIFO 반환 순서 유지 (list)
-unusedSessionIdSet:  O(1) 중복 검사 (unordered_set)
-
-두 자료구조를 동기화해서 유지:
-  AcquireSession: list.pop_front() + set.erase()
-  ReleaseSession: set.insert() 성공 시 list.push_back()
-```
+수명 정리·I/O 완료 대기는 이 함수 전에 release worker가 끝내야 한다. 목록 잠금만으로 사용 중인 세션을 안전하게 반환할 수 있는 것은 아니다.
 
 ---
 
@@ -381,36 +344,9 @@ ClearAllSessions();
 
 ## 9. 이중 반환 방지 — `unusedSessionIdSet`
 
-```cpp
-// 이중 반환 시도 시나리오:
-// 두 스레드가 동시에 ReleaseSession(5)를 호출
+목록과 집합은 같은 mutex 아래에서 갱신한다. `AcquireSession()`은 목록 앞에서 ID를 꺼내 집합에서 지우고, `ReleaseSession()`은 집합에 이미 있는 ID를 거부한 뒤 초기화·목록 추가·집합 추가를 수행한다. 실제 호출은 단일 release worker의 수명 계약을 따른다. 상태 검사와 객체 사용 사이까지 mutex 하나로 보호한다고 가정하지 않는다.
 
-[스레드 A]                      [스레드 B]
-scoped_lock lock                 scoped_lock lock (대기)
-  set.insert(5) → {5} → 성공
-  list.push_back(5)
-unlock
-
-                                 lock 획득
-                                   set.insert(5) → 이미 있음 → 실패
-                                   LOG_ERROR("double release")
-                                   return false
-                                 unlock
-
-결과: id=5가 list에 1번만 들어감
-```
-
-**`set.insert()` 반환값 활용:**
-
-```cpp
-auto [it, inserted] = unusedSessionIdSet.insert(sessionId);
-if (!inserted) {
-    // 이미 set에 있음 = 이미 반환된 세션
-    return false;
-}
-// insert 성공 → list에도 추가
-unusedSessionIdList.push_back(sessionId);
-```
+조회는 비소유 세션 포인터를 반환한다. 서버 종료와 재사용을 막는 별도 수명 보장이 필요하며 `IsUsingSession()` 조회만으로 포인터의 이후 수명이 고정되지 않는다.
 
 ---
 

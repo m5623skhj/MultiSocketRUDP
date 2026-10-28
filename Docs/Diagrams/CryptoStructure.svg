@@ -11,100 +11,100 @@
   <rect width="860" height="460" fill="#0f172a" rx="12"/>
   <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#f1f5f9">패킷 구조 및 AES-GCM 암호화</text>
 
-  <!-- Packet Layout Section -->
+
   <text x="40" y="65" font-size="12" font-weight="700" fill="#94a3b8">SEND_TYPE / UNRELIABLE_SEND_TYPE 패킷 레이아웃</text>
 
-  <!-- Packet bytes layout -->
+
   <rect x="40" y="75" width="60" height="50" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="70" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">Header</text>
-  <text x="70" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">5 bytes</text>
+  <text x="70" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">헤더</text>
+  <text x="70" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">5바이트</text>
   <text x="70" y="120" text-anchor="middle" font-size="8" fill="#93c5fd">code+len</text>
 
   <rect x="104" y="75" width="50" height="50" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="129" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">Type</text>
-  <text x="129" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">1 byte</text>
+  <text x="129" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">타입</text>
+  <text x="129" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">1바이트</text>
   <text x="129" y="120" text-anchor="middle" font-size="8" fill="#93c5fd">0x03</text>
 
   <rect x="158" y="75" width="90" height="50" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="203" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">Sequence</text>
-  <text x="203" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">8 bytes</text>
+  <text x="203" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">번호</text>
+  <text x="203" y="110" text-anchor="middle" font-size="9" fill="#bfdbfe">8바이트</text>
   <text x="203" y="120" text-anchor="middle" font-size="8" fill="#93c5fd">uint64 단조증가</text>
 
-  <rect x="252" y="75" width="70" height="50" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="252" y="75" width="70" height="50" rx="4" fill="#78350f" stroke="#f59e0b" stroke-width="1.5"/>
   <text x="287" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">PacketId</text>
-  <text x="287" y="110" text-anchor="middle" font-size="9" fill="#86efac">4 bytes</text>
-  <text x="287" y="120" text-anchor="middle" font-size="8" fill="#4ade80">uint32</text>
+  <text x="287" y="110" text-anchor="middle" font-size="9" fill="#86efac">4바이트</text>
+  <text x="287" y="120" text-anchor="middle" font-size="8" fill="#fbbf24">평문·인증 제외</text>
 
   <rect x="326" y="75" width="160" height="50" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
-  <text x="406" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">Payload</text>
-  <text x="406" y="110" text-anchor="middle" font-size="9" fill="#86efac">N bytes</text>
+  <text x="406" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">본문</text>
+  <text x="406" y="110" text-anchor="middle" font-size="9" fill="#86efac">N바이트</text>
   <text x="406" y="120" text-anchor="middle" font-size="8" fill="#4ade80">직렬화된 데이터</text>
 
   <rect x="490" y="75" width="90" height="50" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
-  <text x="535" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">AuthTag</text>
-  <text x="535" y="110" text-anchor="middle" font-size="9" fill="#fca5a5">16 bytes</text>
-  <text x="535" y="120" text-anchor="middle" font-size="8" fill="#f87171">GCM Tag</text>
+  <text x="535" y="95" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">인증 태그</text>
+  <text x="535" y="110" text-anchor="middle" font-size="9" fill="#fca5a5">16바이트</text>
+  <text x="535" y="120" text-anchor="middle" font-size="8" fill="#f87171">GCM 태그</text>
 
-  <!-- AAD brace (8px below packet boxes) -->
+
   <line x1="40" y1="140" x2="248" y2="140" stroke="#fbbf24" stroke-width="1.5"/>
   <line x1="40" y1="136" x2="40" y2="144" stroke="#fbbf24" stroke-width="1.5"/>
   <line x1="248" y1="136" x2="248" y2="144" stroke="#fbbf24" stroke-width="1.5"/>
   <line x1="144" y1="144" x2="144" y2="155" stroke="#fbbf24" stroke-width="1.5"/>
   <rect x="72" y="156" width="148" height="22" rx="4" fill="#1a1500"/>
-  <text x="146" y="170" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="600">AAD = 14 bytes (위변조 감지)</text>
+  <text x="146" y="170" text-anchor="middle" font-size="9" fill="#fbbf24" font-weight="600">AAD 14바이트 (변조 감지)</text>
 
-  <!-- Encrypted range brace -->
-  <line x1="252" y1="140" x2="580" y2="140" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,2"/>
-  <line x1="252" y1="136" x2="252" y2="144" stroke="#22c55e" stroke-width="1.5"/>
-  <line x1="580" y1="136" x2="580" y2="144" stroke="#22c55e" stroke-width="1.5"/>
+
+  <line x1="326" y1="140" x2="486" y2="140" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <line x1="326" y1="136" x2="326" y2="144" stroke="#22c55e" stroke-width="1.5"/>
+  <line x1="486" y1="136" x2="486" y2="144" stroke="#22c55e" stroke-width="1.5"/>
   <line x1="416" y1="144" x2="416" y2="155" stroke="#22c55e" stroke-width="1.5"/>
   <rect x="328" y="156" width="178" height="22" rx="4" fill="#0a1f14"/>
-  <text x="417" y="170" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">AES-GCM 암호화 범위</text>
+  <text x="417" y="170" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600">본문만 암호화 (태그 제외)</text>
 
-  <!-- CORE packet variant -->
+
   <text x="40" y="203" font-size="11" font-weight="700" fill="#94a3b8">코어 패킷 (isCorePacket=true, PacketId 없음)</text>
   <rect x="40" y="213" width="60" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="70" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Header</text>
-  <text x="70" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">3B</text>
+  <text x="70" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">헤더</text>
+  <text x="70" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">5B</text>
   <rect x="104" y="213" width="50" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="129" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Type</text>
+  <text x="129" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">타입</text>
   <text x="129" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">1B</text>
   <rect x="158" y="213" width="90" height="40" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
-  <text x="203" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">Sequence</text>
+  <text x="203" y="230" text-anchor="middle" font-size="9" fill="#bfdbfe">번호</text>
   <text x="203" y="243" text-anchor="middle" font-size="8" fill="#93c5fd">8B</text>
   <rect x="252" y="213" width="110" height="40" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="1"/>
-  <text x="307" y="230" text-anchor="middle" font-size="9" fill="#86efac">Payload</text>
-  <text x="307" y="243" text-anchor="middle" font-size="8" fill="#4ade80">N bytes</text>
+  <text x="307" y="230" text-anchor="middle" font-size="9" fill="#86efac">본문</text>
+  <text x="307" y="243" text-anchor="middle" font-size="8" fill="#4ade80">N바이트</text>
   <rect x="366" y="213" width="90" height="40" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1"/>
-  <text x="411" y="230" text-anchor="middle" font-size="9" fill="#fca5a5">AuthTag</text>
+  <text x="411" y="230" text-anchor="middle" font-size="9" fill="#fca5a5">인증 태그</text>
   <text x="411" y="243" text-anchor="middle" font-size="8" fill="#f87171">16B</text>
   <text x="510" y="236" font-size="9" fill="#64748b">예: CONNECT, HEARTBEAT, SEND_REPLY, DISCONNECT</text>
 
-  <!-- Nonce construction -->
-  <text x="40" y="265" font-size="12" font-weight="700" fill="#94a3b8">Nonce 구조 (12 bytes)</text>
+
+  <text x="40" y="265" font-size="12" font-weight="700" fill="#94a3b8">Nonce 구조 (12바이트)</text>
 
   <rect x="40" y="275" width="90" height="50" rx="4" fill="#4c1d95" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="85" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#ddd6fe">Byte 0</text>
+  <text x="85" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#ddd6fe">바이트 0</text>
   <text x="85" y="308" text-anchor="middle" font-size="8" fill="#c4b5fd">[dir(3)] | salt[0](5)</text>
   <text x="85" y="320" text-anchor="middle" font-size="8" fill="#a78bfa">방향 + 솔트</text>
 
   <rect x="134" y="275" width="80" height="50" rx="4" fill="#4c1d95" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="174" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#ddd6fe">Byte 1-3</text>
+  <text x="174" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#ddd6fe">바이트 1~3</text>
   <text x="174" y="308" text-anchor="middle" font-size="8" fill="#c4b5fd">sessionSalt[1..3]</text>
   <text x="174" y="320" text-anchor="middle" font-size="8" fill="#a78bfa">솔트 (3바이트)</text>
 
   <rect x="218" y="275" width="220" height="50" rx="4" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
-  <text x="328" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#bfdbfe">Byte 4-11</text>
+  <text x="328" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#bfdbfe">바이트 4~11</text>
   <text x="328" y="308" text-anchor="middle" font-size="8" fill="#93c5fd">packetSequence (8B, big-endian)</text>
-  <text x="328" y="320" text-anchor="middle" font-size="8" fill="#60a5fa">단조 증가 → Nonce 재사용 없음</text>
+  <text x="328" y="320" text-anchor="middle" font-size="8" fill="#60a5fa">번호 소진 전에 세션 키 교체</text>
 
-  <!-- Direction bits -->
+
   <rect x="460" y="275" width="380" height="50" rx="4" fill="#1e1030" stroke="#8b5cf6" stroke-width="1"/>
   <text x="650" y="293" text-anchor="middle" font-size="9" font-weight="700" fill="#a78bfa">direction 비트 (Byte 0 상위 3비트)</text>
   <text x="480" y="310" font-size="8" fill="#c4b5fd">000=C→S  001=C→S_REPLY  010=S→C  011=S→C_REPLY</text>
   <text x="480" y="322" font-size="8" fill="#c4b5fd">100=C→S_UNREL  101=S→C_UNREL</text>
 
-  <!-- AES-GCM flow -->
+
   <text x="40" y="358" font-size="12" font-weight="700" fill="#94a3b8">AES-128-GCM 처리 흐름</text>
 
   <rect x="40" y="368" width="120" height="72" rx="6" fill="#1a2744"/>
@@ -112,7 +112,7 @@
   <text x="100" y="400" text-anchor="middle" font-size="8" fill="#60a5fa">• sessionKey (16B)</text>
   <text x="100" y="413" text-anchor="middle" font-size="8" fill="#60a5fa">• nonce (12B)</text>
   <text x="100" y="426" text-anchor="middle" font-size="8" fill="#60a5fa">• AAD (14B)</text>
-  <text x="100" y="439" text-anchor="middle" font-size="8" fill="#60a5fa">• plaintext (NB)</text>
+  <text x="100" y="439" text-anchor="middle" font-size="8" fill="#60a5fa">• 평문 (N바이트)</text>
 
   <line x1="162" y1="404" x2="182" y2="404" stroke="#6b7280" stroke-width="2" marker-end="url(#arr)"/>
 
@@ -127,12 +127,12 @@
 
   <rect x="368" y="368" width="120" height="72" rx="6" fill="#1a2744"/>
   <text x="428" y="386" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">출력</text>
-  <text x="428" y="400" text-anchor="middle" font-size="8" fill="#60a5fa">• ciphertext (NB)</text>
-  <text x="428" y="413" text-anchor="middle" font-size="8" fill="#60a5fa">  (in-place 가능)</text>
+  <text x="428" y="400" text-anchor="middle" font-size="8" fill="#60a5fa">• 암호문 (N바이트)</text>
+  <text x="428" y="413" text-anchor="middle" font-size="8" fill="#60a5fa">  (제자리 암호화 가능)</text>
   <text x="428" y="426" text-anchor="middle" font-size="8" fill="#60a5fa">• authTag (16B)</text>
   <text x="428" y="439" text-anchor="middle" font-size="8" fill="#60a5fa">  → 버퍼 끝에 추가</text>
 
-  <!-- Thread-local note -->
+
   <rect x="530" y="368" width="300" height="72" rx="6" fill="#1e1730" stroke="#7c3aed" stroke-width="1.5"/>
   <text x="680" y="386" text-anchor="middle" font-size="9" font-weight="700" fill="#a78bfa">스레드 안전성</text>
   <text x="548" y="402" font-size="8" fill="#c4b5fd">• CryptoHelper: thread_local 인스턴스</text>

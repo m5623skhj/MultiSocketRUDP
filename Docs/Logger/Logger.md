@@ -59,16 +59,16 @@ WriteLog(logObject)
 
 Worker()
   WaitForMultipleObjects(2 handles, INFINITE)
-  case 0 (LOG_HANDLE):
+  case 0 (STOP_HANDLE):
     큐를 copyQueue로 swap
-    WriteLogImpl(copyQueue)   ← JSON 직렬화 → 파일 쓰기
-  case 1 (STOP_HANDLE):
-    Sleep(10초)
-    WriteLogImpl(copyQueue)   ← stop event 직후 swap한 snapshot 기록
-    return
+    WriteLogImpl(copyQueue)
+    logFileStream.flush() 후 종료
+  case 1 (LOG_HANDLE):
+    큐를 copyQueue로 swap
+    WriteLogImpl(copyQueue)
 ```
 
-stop event를 받은 뒤 10초 동안 새로 들어온 로그는 위 snapshot에 포함되지 않는다. 이후 `Logger` 소멸자가 대기 큐를 다시 swap해 남은 로그를 기록한다.
+대기 핸들은 종료 이벤트를 먼저 배치한다. 종료와 로그가 함께 신호 상태면 종료를 우선하며 큐를 기록·flush한 뒤 반환한다. 10초 고정 sleep은 없다. 큐 교체 이후 추가된 로그는 종료 스냅샷에 포함되지 않으며 소멸자가 남은 큐를 다시 기록한다.
 
 ---
 
@@ -77,8 +77,8 @@ stop event를 받은 뒤 10초 동안 새로 들어온 로그는 위 snapshot에
 파일명: `Log Folder/log_2025-01-15_14.txt`
 
 ```json
-{"LogTime":"2025-01-15 14:30:45.123","GetLastErrorCode":0,"Log":{"logString":"Server started"}}
-{"LogTime":"2025-01-15 14:30:45.456","GetLastErrorCode":0,"Log":{"logString":"Client connected"}}
+{"LogTime":"2025-01-15 14:30:45.123","GetLastErrorCode":0,"Log":{"logString":"서버 시작"}}
+{"LogTime":"2025-01-15 14:30:45.456","GetLastErrorCode":0,"Log":{"logString":"클라이언트 연결"}}
 ```
 
 ---
@@ -90,7 +90,7 @@ RunLoggerThread()
   if currentConnectedClientCount++ > 0 → 이미 실행 중, 건너뜀
 
 StopLoggerThread()
-  if --currentConnectedClientCount != 1 → 아직 사용자 있음, 건너뜀
+  if currentConnectedClientCount.fetch_sub(1)의 이전 값 != 1 → 종료 생략
   SetEvent(stopHandle) → Worker 종료
 ```
 
@@ -129,7 +129,7 @@ StopLoggerThread()
 - 전역 Logger 싱글톤을 반환한다.
 
 #### `static bool IsAlive()`
-- Logger 스레드가 살아 있는지 반환한다.
+- Logger 인스턴스가 생성되고 아직 소멸되지 않았는지 반환한다. worker 실행 여부를 뜻하지 않는다.
 
 #### `void RunLoggerThread(const bool isAlsoPrintToConsole)`
 - 로거 스레드를 시작하고 콘솔 출력 여부를 설정한다.

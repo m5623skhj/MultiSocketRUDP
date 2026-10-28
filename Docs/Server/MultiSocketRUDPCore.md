@@ -3,23 +3,24 @@
 > **서버의 최상위 오케스트레이터.**  
 > WSAStartup부터 세션 풀 구성, RIO 초기화, 스레드 시작, 세션 브로커 실행까지  
 > 서버 전체 생명주기를 단일 클래스에서 관리한다.  
-> 콘텐츠 개발자는 이 클래스의 API를 통해 세션 조회, 연결 수 확인, TPS 측정 등을 수행한다.
+> 콘텐츠 개발자는 공개 API로 서버 수명주기, 연결 수 확인, TPS 측정을 수행한다. 세션 조회 함수는 내부 API다.
 
 ---
 
 ## 목차
 
-1. [서버 시작 — `StartServer`](#1-서버-시작-startserver)
-2. [서버 종료 — `StopServer`](#2-서버-종료-stopserver)
+1. [서버 시작 — `StartServer`](#1-서버-시작--startserver)
+2. [서버 종료 — `StopServer`](#2-서버-종료--stopserver)
 3. [함수 설명](#3-함수-설명)
 4. [콘텐츠 서버 API](#4-콘텐츠-서버-api)
-5. [내부 동작 — 패킷 전송 경로](#5-내부-동작-패킷-전송-경로)
-6. [내부 동작 — 세션 해제 경로](#6-내부-동작-세션-해제-경로)
-7. [내부 동작 — `InitReserveSession`](#7-내부-동작-initreservesession)
+5. [내부 동작 — 패킷 전송 경로](#5-내부-동작--패킷-전송-경로)
+6. [내부 동작 — 세션 해제 경로](#6-내부-동작--세션-해제-경로)
+7. [내부 동작 — `InitReserveSession`](#7-내부-동작--initreservesession)
 8. [옵션 파일 설정값 전체](#8-옵션-파일-설정값-전체)
 9. [멀티소켓 구조의 의미](#9-멀티소켓-구조의-의미)
 10. [의존 컴포넌트](#10-의존-컴포넌트)
 11. [치명 오류 통지 API](#11-치명-오류-통지-api)
+12. [NAT 환경의 고정 UDP 포트](#12-nat-환경의-고정-udp-포트)
 
 ---
 
@@ -38,8 +39,8 @@ bool StartServer(
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `coreOptionFilePath` | `const wstring&` | 서버 코어 설정 INI 파일 (스레드 수, 소켓 수, 재전송 등) |
-| `sessionBrokerOptionFilePath` | `const wstring&` | 세션 브로커 설정 INI 파일 (포트, 서버 IP) |
+| `coreOptionFilePath` | `const wstring&` | 서버 코어 설정 파일 (`:SECTION { ... }` 형식) (스레드 수, 소켓 수, 재전송 등) |
+| `sessionBrokerOptionFilePath` | `const wstring&` | 세션 브로커 설정 파일 (`:SESSION_BROKER { ... }` 형식) |
 | `factoryFunc` | `SessionFactoryFunc&&` | `RUDPSession*` 을 반환하는 팩토리 람다. **콘텐츠 개발자가 구현** |
 | `printLogToConsole` | `bool` | `true`이면 Logger가 파일과 콘솔 동시 출력 |
 
@@ -55,8 +56,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
 | `true` | 모든 초기화 완료, 클라이언트 수락 시작 |
 | `false` | 옵션 파일 읽기 실패, WSAStartup 실패, RIO 초기화 실패, SessionBroker 시작 실패 등 |
 
-> **false 반환 시 정리:** 부분 초기화된 자원이 있을 수 있으므로, `false` 반환 후에도  
-> `StopServer()`를 호출해야 완전히 정리된다.
+> **실패 정리:** 옵션 읽기 실패는 로거 사용 참조를 반환한다. 이후 초기화 실패 분기는 내부에서 `StopServer()`를 호출한 뒤 `false`를 반환한다. 모든 하위 예외를 `false`로 변환하는 계약은 아니다.
 
 ### 내부 실행 순서 (전체)
 
@@ -117,9 +117,7 @@ using SessionFactoryFunc = std::function<RUDPSession*(MultiSocketRUDPCore&)>;
          TLS 워커 스레드 4개 시작
 ```
 
-> **Sleep(1000)의 이유**: IO Worker와 RecvLogic Worker가 완전히 준비되기 전에  
-> SessionBroker가 클라이언트를 수락하면, 세션에 DoRecv()가 등록되기 전에  
-> 패킷이 도착해 유실될 수 있다. 1초 대기로 이를 방지한다.
+> `StartSessionBroker()`는 worker 생성 뒤 `Sleep(1000)`을 수행한다. 이는 고정 지연이며 worker 준비 완료를 검증하는 동기화 장벽은 아니다. 세션별 `DoRecv()` 등록은 이후 예약 과정에서 수행한다.
 
 ### 사용 예시 (전체)
 
@@ -146,12 +144,12 @@ int main() {
     );
 
     if (!ok) {
-        std::cerr << "Server start failed\n";
+        std::cerr << "서버 시작 실패\n";
         core.StopServer();
         return -1;
     }
 
-    std::cout << "Server started. Press Enter to stop.\n";
+    std::cout << "서버 시작. Enter로 종료.\n";
     std::cin.get();
 
     core.StopServer();
@@ -173,7 +171,8 @@ void StopServer();
 1. sessionBroker->Stop()
    ├─ closesocket(sessionBrokerListenSocket)   ← accept() 에러 발생 → accept 루프 종료
    ├─ sessionBrokerThread.request_stop() + join()
-   └─ 워커 스레드 4개 request_stop() + join() (condition_variable 신호)
+   └─ 워커 4개 모두 request_stop() → 큐의 미처리 소켓 닫기 → worker join
+      condition_variable은 stop callback으로 깨우며 진행 중 TLS 수신은 중지 토큰을 확인
 
 2. CloseAllSessions()
    └─ for each active session: session.DoDisconnect(NORMAL)
@@ -322,7 +321,7 @@ unsigned int GetMaxRetransmissionMs() const;
 unsigned int GetUnreliableQueueCapacity() const;
 ```
 
-- heartbeat 주기, 초기/최소/최대 재전송 timeout(RTO), 세션별 신뢰성 없는 송신 큐 용량을 반환한다.
+- heartbeat 주기, 초기/최소/최대 재전송 timeout(RTO), 세션별 비신뢰성 송신 큐 용량을 반환한다.
 
 ### 비공개 함수
 
@@ -465,7 +464,7 @@ RIO_EXTENSION_FUNCTION_TABLE GetRIOFunctionTable() const;
 [IO 핸들러] RUDPIOHandler::DoSend(session, threadId)
     ↓ IO_SENDING CAS 획득
 [스트림] RUDPIOHandler::MakeSendStream(session, threadId)
-    ↓ 복수 패킷을 32KB 버퍼에 배치
+    ↓ 32KB 할당 버퍼에 최대 1024바이트의 완전한 프레임만 배치
 [RIO] rioManager.RIOSendEx(rioRQ, context, ...)
     ↓ 완료 큐에 등록
 [IO Worker] RIODequeueCompletion → IOCompleted → SendIOCompleted
@@ -517,7 +516,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 
 2. CreateRUDPSocket()
    ├─ WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, WSA_FLAG_REGISTERED_IO)
-   ├─ bind(INADDR_ANY, port=0)     ← OS가 자동으로 포트 할당
+   ├─ bind(INADDR_ANY, port)       ← 기본 0, 고정 범위면 시작 포트+세션 ID
    └─ getsockname() → session.socketContext.SetServerPort(ntohs(addr.sin_port))
 
    실패 → CREATE_SOCKET_FAILED 반환
@@ -612,7 +611,7 @@ RIOCreateRequestQueue(
 
 `UNRELIABLE_QUEUE_CAPACITY`는 세션별 최신성 우선 송신 큐의 최대 미송신 항목 수이며 기본값은 `64`, 허용 범위는 `1..65535`다. 큐가 가득 차면 가장 오래된 미송신 항목이 새 항목으로 교체된다.
 
-> **`WORKER_THREAD_ONE_FRAME_MS` 제한:** 현재 `BuildConfig.h`의 `USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME`은 `USE_WORKER_THREAD_SLEEP_ZERO`로 고정돼 IO Worker가 항상 `Sleep(0)`을 호출한다. 이 빌드에서는 옵션 파일의 `WORKER_THREAD_ONE_FRAME_MS` 값이 실행 동작에 반영되지 않는다. `USE_WORKER_THREAD_SLEEP_FOR_FRAME`로 다시 빌드한 경우에만 이 값으로 frame 잔여 시간을 sleep한다.
+> **`WORKER_THREAD_ONE_FRAME_MS` 제한:** 현재 `BuildConfig.h`의 `USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME`은 `USE_WORKER_THREAD_SLEEP_ZERO`가 기본이라 IO Worker가 항상 `Sleep(0)`을 호출한다. 벤치마크 빌드는 `RUDP_RTT_BENCHMARK_BUILD`로 sleep을 비활성화한다. 두 모드에서는 옵션 파일의 `WORKER_THREAD_ONE_FRAME_MS` 값이 실행 동작에 반영되지 않는다. `USE_WORKER_THREAD_SLEEP_FOR_FRAME`로 다시 빌드한 경우에만 이 값으로 frame 잔여 시간을 sleep한다.
 
 | 시나리오 | 권장 설정 |
 |----------|-----------|
@@ -649,8 +648,7 @@ MultiSocketRUDP:
 - OS 소켓 자원 소비 증가 (파일 디스크립터 1개/세션)
 - 포트 자원 소비 (OS가 임시 포트 할당)
 
-> **실제 포트 범위**: `bind(port=0)`으로 OS에게 포트 할당 위임.  
-> Linux 기본 임시 포트 범위: 32768~60999.  
+> **실제 포트 범위**: 기본은 `bind(port=0)`, 고정 범위를 설정하면 해당 범위를 사용한다.
 > Windows: `netsh int ipv4 show dynamicport udp`으로 확인 가능.
 
 ---
@@ -718,6 +716,23 @@ callback은 worker thread에서 호출된다. callback 안에서 `StopServer()`�
 
 ---
 
+## 12. NAT 환경의 고정 UDP 포트
+
+`CORE`의 `UDP_PORT_START`와 `UDP_PORT_END`는 함께 지정한다. 모두 생략하면 운영체제가 임시 UDP 포트를 선택한다. 명시적 0, 범위 초과, 잘못된 값·중복 키, 역순 범위, `NUM_OF_SOCKET`보다 작은 범위는 거부한다.
+
+```text
+:CORE
+{
+    // 기존 필수 옵션과 함께 지정한다.
+    UDP_PORT_START = 20000
+    UDP_PORT_END = 21099
+}
+```
+
+풀 슬롯 N은 `UDP_PORT_START + N`에 독점 바인딩하며 실패해도 다른 포트로 대체하지 않는다. 실패 로그에는 포트와 WSA 오류를 남긴다. 브로커는 실제 바인딩된 UDP 포트와 `CORE_IP`를 응답한다. `CORE_IP`는 클라이언트가 접근할 IPv4 광고 주소이며 소켓은 `INADDR_ANY`에 바인딩한다.
+
+NAT는 외부·내부 UDP 번호를 같게 전달하고, 여러 서버 프로세스는 겹치지 않는 범위를 사용한다. TCP 브로커 포트도 별도로 열어야 한다. 범위는 실행 중 변경하지 않으며 기존 소켓 닫기·I/O 완료 대기·RIO 정리·풀 반환 순서에 따라 포트를 재사용한다. 프로토콜 버전과 패킷 형식은 바뀌지 않는다.
+
 ## 관련 문서
 - [[RUDPSession]] — 세션 상속 및 API 사용법
 - [[Server/RUDPSessionBroker]] — TLS 세션 발급 상세
@@ -727,31 +742,3 @@ callback은 worker thread에서 호출된다. callback 안에서 `StopServer()`�
 - [[GettingStarted]] — 처음부터 서버 구축하기
 - [[Troubleshooting]] — 자주 발생하는 문제와 해결
 - [[FatalErrorHandling]] — 치명 오류 callback과 프로세스 재시작 연동
-
-
-### Optional fixed UDP ports for NAT hosting
-
-`CORE` accepts `UDP_PORT_START` and `UDP_PORT_END` together. Omit both to preserve
-OS-selected ephemeral UDP ports. Explicit zero, overflow, malformed/duplicate keys,
-reversed ranges and a range smaller than `NUM_OF_SOCKET` are rejected. Example:
-
-```text
-:CORE
-{
-    UDP_PORT_START = 20000
-    UDP_PORT_END = 20063
-    NUM_OF_SOCKET = 64
-    // Retain the other required core settings.
-}
-```
-
-A reservation for pool slot N exclusively binds `UDP_PORT_START + N`; there is no
-fallback to another or ephemeral port. Bind failures include the port and WSA error
-in logs. The unchanged broker session packet advertises the actual bound UDP port
-with `CORE_IP` (the externally reachable IPv4, not the bind interface).
-Forward the same external/internal UDP numbers. Sockets still bind INADDR_ANY.
-The existing close / pending I/O drain / RIO cleanup / pool return order controls
-reuse. Range settings are immutable while running and need no shared allocator.
-Two Room processes must use disjoint ranges. Fixed ports do not weaken session
-keys/salts or the existing authenticated UDP protocol. The protocol version and
-packet byte layout are unchanged; clients must rebuild for the TLS/DNS changes.

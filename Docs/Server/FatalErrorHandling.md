@@ -189,10 +189,10 @@ callback은 worker thread에서 실행된다. 다음 작업만 수행한다.
 
 권장되는 재시작 주체는 현재 코어와 주소 공간을 공유하지 않는 관리 계층이다.
 
-- Windows Service Control Manager와 recovery action
-- container restart policy
-- Kubernetes liveness failure와 pod replacement
-- 별도 watchdog 또는 process supervisor
+- Windows Service Control Manager와 복구 동작
+- 컨테이너 재시작 정책
+- Kubernetes 생존 검사 실패와 파드 교체
+- 별도 감시기 또는 프로세스 관리자
 
 CQ 손상이나 event 불변식 붕괴 이후에는 동일 프로세스에서 코어 객체만 재생성하는 방식보다 프로세스 전체 교체를 우선한다. 메모리 손상이나 handle table 손상 가능성을 현재 주소 공간에서 배제할 수 없기 때문이다.
 

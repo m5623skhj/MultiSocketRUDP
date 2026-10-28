@@ -4,6 +4,10 @@
 
 ---
 
+## 빌드 전제
+
+저장소 루트에서 재귀 서브모듈을 준비하고 Visual Studio C++ 도구 집합 `v145`로 `MultiSocketRUDP/MultiSocketRUDP.sln`을 빌드한다. BotTester는 .NET 9와 Windows WPF가 필요하다. 배치 파일을 호출할 때의 저장소 경로는 `MultiSocketRUDP/Tool/`이며, 실행 파일의 옵션 경로는 각 프로젝트의 작업 디렉터리를 기준으로 한다.
+
 ## 서버 측
 
 ### 1. 패킷 정의
@@ -11,30 +15,20 @@
 `Tool/PacketDefine.yml`에 패킷을 추가한 뒤 `Tool/PacketGenerate.bat`를 실행한다.
 
 ```yaml
-Structs:
-  - Name: ItemData
-    Items:
-      - Type: std::int32_t
-        Name: dataId
-      - Type: std::int64_t
-        Name: itemId
-
 Packet:
   - Type: RequestPacket
     PacketName: MyRequest
     Items:
-      - Type: ItemData
-        Name: target
-      - Type: std::vector<ItemData>
-        Name: items
+      - Type: int
+        Name: value
   - Type: ReplyPacket
     PacketName: MyResponse
     Items:
-      - Type: std::unordered_map<int, ItemData>
-        Name: itemsById
+      - Type: int
+        Name: result
 ```
 
-생성 결과물은 `Protocol.*`, `PacketIdType.h`, `Player.h`, `PlayerPacketHandler.cpp`, `PlayerPacketHandlerRegister.*`에 반영된다. `ContentsPacketRegister`는 `PlayerPacketHandlerRegister.*` 안에 선언된 namespace다.
+생성 결과물은 양쪽 C++의 `Protocol.*`, `PacketIdType.h`, 서버의 `Player.h`, `PlayerPacketHandler.cpp`, `PlayerPacketHandlerRegister.cpp`, `PacketHandlerRegister.cpp`와 BotTester의 `Generated/*.g.cs` 등에 반영된다. 생성 파일·수동 코드의 경계는 [[PacketGenerator]]를 확인한다. `ContentsPacketRegister`는 `PlayerPacketHandlerRegister.*` 안에 선언된 namespace다.
 
 `Structs`의 선언 순서는 자유롭다. 생성기가 구조체 의존성을 정렬하고 각 필드를 YAML 순서대로 재귀 직렬화한다. `vector`, `list`, `set`, `map`, `unordered_set`, `unordered_map`을 구조체 또는 패킷 필드로 사용할 수 있다. `unordered_set`과 `unordered_map`은 원소와 key/value만 복원하며 기존 삽입 순서나 순회 순서를 보장하지 않는다. 송수신 측은 같은 YAML에서 생성된 `Protocol.*`을 사용해야 한다.
 
@@ -190,7 +184,7 @@ Tool\ForTLS\CreateDevTLSCert.bat
 Tool\ForTLS\RemoveDevTLSCert.bat
 ```
 
-기본 예시는 `CN=DevServerCert`, 저장소 이름 `MY`를 사용한다.
+기본 서버 선택 예시는 `CN=DevServerCert`, 저장소 이름 `MY`다. 다만 생성 스크립트는 신뢰 루트 등록과 루프백 이름 SAN을 준비하지 않는다. 현재 C++ 클라이언트는 인증서 체인·만료·서버 인증 용도·접속 DNS/IP 이름을 검증하므로, `127.0.0.1` 또는 DNS 이름에 맞는 신뢰된 인증서를 먼저 준비해야 한다. 스크립트 실행만으로 연결 준비가 끝나는 것은 아니다. [[TLSHelper]]의 개발·테스트 인증서 절을 참고한다.
 
 ---
 
@@ -223,7 +217,7 @@ ClientOptionFile/SessionGetterOption.txt
 ### 실행
 
 BotTester는 SessionBroker에서 세션 정보를 받은 뒤 UDP 세션을 연다.  
-Host/Port에는 SessionBroker 주소를 넣는다.
+Host/Port에는 SessionBroker 주소를 넣는다. C++ 브로커 주소는 IPv4와 최대 253자의 ASCII DNS 이름을 받으며 IPv6는 지원하지 않는다. 호스트 PC에서 브로커 응답의 외부 UDP 주소를 루프백으로 바꾸려면 C++ 옵션의 `HOST_LOOPBACK=1`을 사용한다. 실제 브로커 TCP peer가 127/8이어야 한다. C# BotTester에는 이 옵션이 없다.
 
 ### 변수 확장
 

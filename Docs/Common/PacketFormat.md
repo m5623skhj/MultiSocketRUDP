@@ -29,14 +29,14 @@ Offset  Size  Field          암호화  설명
   0      5B   Header         ─ AAD  HeaderCode + PayloadLength + Reserved
   5      1B   PacketType     ─ AAD  SEND_TYPE(0x03) 또는 UNRELIABLE_SEND_TYPE(0x07)
   6      8B   Sequence       ─ AAD  uint64, 단조 증가. Nonce 생성에도 사용.
- 14      4B   PacketId       ← ENC  uint32. PACKET_ID enum 값.
+ 14      4B   PacketId       평문     uint32. PACKET_ID enum 값.
  18      NB   Payload        ← ENC  IPacket::PacketToBuffer()로 직렬화된 데이터.
  18+N   16B   AuthTag        (후미)  AES-GCM 인증 태그. 암호화 성공 시 버퍼 끝에 추가.
 ─────────────────────────────────────────────────────────────────────
 
 AAD (Additional Authenticated Data) = Offset 0 ~ 13 (14 bytes)
   → 암호화되지 않지만 AuthTag 계산에 포함 → 위변조 감지
-ENC (Encrypted) = Offset 14 ~ 18+N-1 (PacketId + Payload)
+ENC (Encrypted) = Offset 18 ~ 18+N-1 (본문)
   → AES-128-GCM으로 in-place 암호화
 ```
 
@@ -62,13 +62,16 @@ Offset  Size  Field          암호화  설명
 
 ## 패킷 타입별 페이로드
 
+아래의 본문 오프셋은 코어 패킷의 암호화 시작 위치인 전체 오프셋 14를 기준으로 한다. `Sequence`는 전체 오프셋 6의 공통 필드이며 본문에 다시 쓰지 않는다.
+
 ### CONNECT_TYPE (0x01) — 클라이언트→서버
 
-```
-Offset(페이로드 내)  Size  Field
+`Sequence`는 `LOGIN_PACKET_SEQUENCE = 0`이다.
+
+```text
+Offset(본문 내)  Size  Field
 ───────────────────────────────
-  0                   8B   Sequence (= LOGIN_PACKET_SEQUENCE = 0)
-  8                   2B   SessionId (서버에서 발급받은 값)
+  0               2B   SessionId (서버에서 발급받은 값)
 ───────────────────────────────
 ```
 
@@ -81,38 +84,37 @@ Payload 없음 (헤더 + PacketType + Sequence + AuthTag만 존재)
 ### SEND_TYPE (0x03) — 양방향 데이터
 
 ```
-(위 일반 데이터 패킷 참조 — PacketId + Payload 포함)
+(위 일반 데이터 패킷 참조 — 평문 PacketId + 암호화 본문 포함)
 ```
 
 ### UNRELIABLE_SEND_TYPE (0x07) — 양방향 비신뢰성 데이터
 
 ```text
-SEND_TYPE과 같은 PacketId + Payload 레이아웃을 사용한다.
+SEND_TYPE과 같은 평문 PacketId + 암호화 본문 레이아웃을 사용한다.
 ACK, 재전송, 신뢰성 수신 윈도우와 누락 번호 대기를 사용하지 않는다.
 ```
 
 ### SEND_REPLY_TYPE (0x04) — ACK
 
-```
-Offset(페이로드 내)  Size  Field
-───────────────────────────────
-  0                   8B   AckedSequence (ACK할 시퀀스 번호)
-  8                   1B   AdvertiseWindow (수신 윈도우 남은 공간)
-───────────────────────────────
-```
+공통 `Sequence` 필드에 ACK 대상 번호를 기록한다. 암호화 본문은 방향에 따라 다르다.
+
+| 방향 | 본문 | 헤더·인증 태그를 포함한 전체 크기 |
+|---|---|---|
+| 서버→클라이언트 | `AdvertiseWindow` 1바이트: 서버 수신 윈도우의 남은 공간 | 31바이트 |
+| 클라이언트→서버 | 없음 | 30바이트 |
+
+`AdvertiseWindow`의 전체 오프셋은 14이며 서버→클라이언트에서만 사용한다. 클라이언트 ACK를 읽을 때 이 바이트를 요구하면 안 된다.
 
 ### HEARTBEAT_TYPE (0x05) — 서버→클라이언트
 
-```
-(SEND_TYPE과 동일 구조, isCorePacket=true이므로 PacketId 없음)
-Payload: 없음 (Sequence만 있으면 충분)
+```text
+코어 패킷 구조이며 PacketId와 암호화 본문이 없다.
+공통 Sequence 필드에 생존 확인 대상 번호를 기록한다.
 ```
 
 ### HEARTBEAT_REPLY_TYPE (0x06) — 클라이언트→서버
 
-```
-(SEND_REPLY_TYPE과 동일 구조로 처리)
-```
+공통 `Sequence`에 하트비트 번호를 기록하며 암호화 본문과 `AdvertiseWindow`는 없다. 전체 크기는 30바이트다. 서버는 `OnSendReply()`로 처리한다. C++ 클라이언트는 `HEARTBEAT_REPLY_TYPE`, C# BotTester는 같은 번호의 `SEND_REPLY_TYPE`으로 응답한다.
 
 ---
 
@@ -222,10 +224,10 @@ PacketCryptoHelper::EncodePacket(
 ### 클라이언트 측 (C#)
 
 ```csharp
-// NetBuffer.InsertXxx 메서드들이 역순 삽입 (Array.Copy로 앞에 끼워넣기)
-buffer.InsertPacketType(PacketType.SendType);     // 앞에 1B 삽입
-buffer.InsertPacketSequence(sequence);            // 앞에 8B 삽입
-buffer.InsertPacketId(packetId);                  // 앞에 4B 삽입
+// 각 Insert 메서드가 헤더 뒤의 타입·번호·ID 위치에 필드를 삽입한다.
+buffer.InsertPacketType(PacketType.SendType);     // 타입 위치에 1B 삽입
+buffer.InsertPacketSequence(sequence);            // 타입 뒤에 8B 삽입
+buffer.InsertPacketId(packetId);                  // 번호 뒤에 4B 삽입
 NetBuffer.EncodePacket(aesGcm, buffer, sequence, direction, salt, false);
 ```
 
@@ -254,13 +256,15 @@ Offset  Hex   설명
   3-4   00 00 (AAD - Reserved)
   5     03    (AAD - 평문)
   6-13  01 00 00 00 00 00 00 00  (AAD - 평문)
- 14-17  XX XX XX XX  (암호화된 PacketId)
+ 14-17  01 00 00 00  (평문 PacketId, AAD 제외)
  18-33  XX...XX  (AuthTag 16B)
 
 총 크기: 5 + 1 + 8 + 4 + 16 = 34 bytes
 ```
 
 ---
+
+> **현재 구현의 보안 한계:** 일반 콘텐츠 패킷의 `PacketId` 4바이트는 암호화와 AAD 인증 범위에서 모두 제외된다. 본문 인증 성공만으로 패킷 ID의 무결성을 보장할 수 없다. C++ `PacketCryptoHelper.h`와 C# `NetBuffer.cs`가 같은 범위를 사용한다. 프로토콜 개선 시 양쪽 구현과 공용 벡터를 함께 검토해야 한다.
 
 ## 관련 문서
 - [[CryptoSystem]] — Nonce 생성, AES-GCM 암호화

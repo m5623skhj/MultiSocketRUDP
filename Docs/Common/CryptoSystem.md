@@ -105,8 +105,7 @@ CryptoHelper::GenerateSecureRandomBytes(unsigned short length)
 }
 ```
 
-> `BCRYPT_USE_SYSTEM_PREFERRED_RNG`는 Windows Vista 이상에서  
-> 하드웨어 엔트로피 소스(RDRAND 등)를 사용하는 CSPRNG에 위임한다.
+> 구현은 `BCRYPT_USE_SYSTEM_PREFERRED_RNG`로 시스템 기본 난수 생성기를 요청한다. 특정 하드웨어 엔트로피 소스는 지정하지 않는다.
 
 ### 키/솔트 전달 경로
 
@@ -207,7 +206,9 @@ bool CryptoHelper::FillNonce(
 
 ```
 같은 세션 내에서:
-  packetSequence는 단조 증가 → 같은 sequence 두 번 없음
+  새 패킷에는 단조 증가 sequence 사용
+  재전송은 이미 암호화된 바이트 재사용
+  64비트 번호 순환 방어는 없으므로 소진 전에 키를 교체해야 함
 
 다른 세션 간:
   nonce에 반영되는 salt는 29비트
@@ -233,11 +234,11 @@ bool CryptoHelper::FillNonce(
               │5B │     │1B │   8 B    │   4 B    │  N B   │  16 B    │
               └───┴─────┴────┴──────────┴──────────┴────────┴──────────┘
               ←────── AAD (14 bytes) ──────→
-                                           ←── AES-GCM 암호화 ──────→
+                                                      ← 본문만 암호화 →
 ```
 
 - **AAD 범위**: `[0..13]` = Header(5B) + PacketType(1B) + Sequence(8B)
-- **암호화 범위**: `[18..]` = PacketId(4B) + Payload(NB) → 결과는 제자리(in-place)
+- **암호화 범위**: `[18..18+N-1]` = 본문(NB), PacketId는 제외 → 결과는 제자리(in-place)
 - **AuthTag**: 암호화 완료 후 버퍼 끝에 추가 (16B)
 
 ### 코어 패킷 (`isCorePacket = true`)
@@ -457,7 +458,7 @@ Step 8. 인증 태그를 읽기 범위에서 제외
 → 항상 다름
 ```
 
-**4방향 분리 이유:**
+**신뢰성 네 방향과 비신뢰성 두 방향:**
 
 | 방향 | 사용 상황 |
 |------|-----------|
@@ -465,6 +466,8 @@ Step 8. 인증 태그를 읽기 범위에서 제외
 | `CLIENT_TO_SERVER_REPLY (1)` | 클라이언트 → 서버 ACK (SEND_REPLY_TYPE) |
 | `SERVER_TO_CLIENT (2)` | 서버 → 클라이언트 데이터/하트비트 |
 | `SERVER_TO_CLIENT_REPLY (3)` | 서버 → 클라이언트 ACK |
+| `CLIENT_TO_SERVER_UNREL (4)` | 클라이언트 → 서버 비신뢰성 콘텐츠 |
+| `SERVER_TO_CLIENT_UNREL (5)` | 서버 → 클라이언트 비신뢰성 콘텐츠 |
 
 ACK와 데이터도 분리하는 이유: 같은 시퀀스로 ACK와 데이터가 동시에 존재 가능.  
 (예: 서버가 sequence=5 데이터를 보내고, 클라이언트 sequence=5에 대한 ACK도 전송)
@@ -476,9 +479,9 @@ ACK와 데이터도 분리하는 이유: 같은 시퀀스로 ACK와 데이터가
 | 속성 | `isCorePacket = false` | `isCorePacket = true` |
 |------|------------------------|----------------------|
 | PacketId 포함 | ✅ (4 bytes) | ❌ |
-| 암호화 시작 오프셋 | 18 bytes | 14 bytes |
-| 사용 패킷 | SEND_TYPE | CONNECT, DISCONNECT, HEARTBEAT, SEND_REPLY |
-| 재전송 추적 | ✅ | HEARTBEAT만 ✅ (REPLY류는 ❌) |
+| 암호화 시작 오프셋 | 18 bytes (PacketId 제외) | 14 bytes |
+| 사용 패킷 | SEND_TYPE, UNRELIABLE_SEND_TYPE | CONNECT, DISCONNECT, HEARTBEAT, SEND_REPLY |
+| 재전송 추적 | SEND_TYPE만 적용 | CONNECT·HEARTBEAT 등 송신 경로에 따라 적용, REPLY류는 제외 |
 
 ---
 
@@ -534,6 +537,8 @@ direction enum 값:
 → 불일치 시 `DecryptAESGCM`이 `false` 반환 → [[Troubleshooting]] `DecryptAESGCM 항상 false 반환` 참조
 
 ---
+
+> **현재 구현의 보안 한계:** 일반 콘텐츠 패킷의 `PacketId` 4바이트는 암호화와 AAD 인증 범위에서 모두 제외된다. 본문 인증 성공만으로 패킷 ID의 무결성을 보장할 수 없다. C++ `PacketCryptoHelper.h`와 C# `NetBuffer.cs`가 같은 범위를 사용한다. 프로토콜 개선 시 양쪽 구현과 공용 벡터를 함께 검토해야 한다.
 
 ## 관련 문서
 - [[CryptoHelper]] — BCrypt API 래퍼 상세

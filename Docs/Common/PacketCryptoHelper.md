@@ -22,11 +22,13 @@
 
 ### 일반 데이터 패킷
 
-일반 패킷은 `PacketId`와 payload를 암호화한다.
+일반 패킷은 오프셋 18부터 콘텐츠 본문만 암호화한다. `PacketId`(14~17)는 평문이며 AAD에도 포함되지 않는다.
 
 ```text
 [Header 5B][PacketType 1B][Sequence 8B][PacketId 4B][Payload N][AuthTag 16B]
-|<---------------- AAD 14B ---------------->|<------ encrypted ------>|
+인증 범위: 오프셋 0~13 (헤더·타입·시퀀스)
+ID 범위:   오프셋 14~17 (평문·인증 제외)
+암호화:    오프셋 18~18+N-1 (본문), 후미 태그는 별도 생성
 ```
 
 ### Core packet
@@ -35,12 +37,18 @@ CONNECT, DISCONNECT, SEND_REPLY, HEARTBEAT 계열 core packet에는 `PacketId`�
 
 ```text
 [Header 5B][PacketType 1B][Sequence 8B][Payload N][AuthTag 16B]
-|<---------------- AAD 14B ---------------->|<- encrypted ->|
+인증 범위: 오프셋 0~13
+암호화:    오프셋 14~14+N-1 (코어 본문), 후미 태그는 별도 생성
 ```
 
 ---
 
 ## 공개 함수
+
+### 크기 검사와 진단
+
+`FitsWireLimit(const NetBuffer&) noexcept`는 인코딩 전이면 태그 공간까지 포함해 `MAX_WIRE_PACKET_SIZE`를 검사한다. `TraceRejectedReceiveSize(int, int)`는 수신 크기 거절 누계를 atomic으로 증가시키고 1·2·4·8…건마다 크기와 한도를 기록한다. 본문은 출력하지 않는다.
+
 
 ### `EncodePacket`
 
@@ -64,7 +72,7 @@ static void EncodePacket(
 ```
 
 패킷이 이미 인코딩된 상태면 즉시 반환한다.
-그 외에는 nonce를 만들고, `SetHeader(packet, AUTH_TAG_SIZE)`로 AuthTag 공간을 반영한 뒤 body 영역을 in-place 암호화한다.
+그 외에는 `FitsWireLimit()`으로 태그 포함 1,024바이트 상한을 검사하고 태그 공간을 확보한다. 크기 초과 또는 nonce·암호화 실패 시 인코딩 완료 플래그를 설정하지 않는다. 이어서 nonce를 만들고, `SetHeader(packet, AUTH_TAG_SIZE)`로 AuthTag 공간을 반영한 뒤 body 영역을 in-place 암호화한다.
 
 암호화 성공 시 AuthTag를 버퍼 끝에 쓰고 `packet.m_bIsEncoded = true`로 설정한다.
 
@@ -182,7 +190,7 @@ public:
 
 > 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
-서버 패킷 프로세서는 이 인터페이스를 주입받아 테스트에서 암호화 성공·실패 경로를 독립적으로 제어한다. 운영 adapter의 `SetHeader()`는 `extraSize`를 받지 않고 기본값 `0`으로 호출한다.
+현재 `RUDPPacketProcessor` 생성자는 `RUDPSessionManager&`와 `ISessionDelegate&`만 받으며 정적 `PacketCryptoHelper`를 직접 호출한다. adapter는 별도 테스트용 추상화이며 프로세서에 주입되는 운영 경로가 아니다. adapter의 `SetHeader()`는 `extraSize`를 받지 않고 기본값 `0`으로 호출한다.
 
 ---
 
@@ -194,6 +202,8 @@ public:
 - AuthTag는 암호문 뒤 16B이며, payload length에도 포함된다.
 
 ---
+
+> **현재 구현의 보안 한계:** 일반 콘텐츠 패킷의 `PacketId` 4바이트는 암호화와 AAD 인증 범위에서 모두 제외된다. 본문 인증 성공만으로 패킷 ID의 무결성을 보장할 수 없다. C++ `PacketCryptoHelper.h`와 C# `NetBuffer.cs`가 같은 범위를 사용한다. 프로토콜 개선 시 양쪽 구현과 공용 벡터를 함께 검토해야 한다.
 
 ## 관련 문서
 

@@ -295,6 +295,10 @@ while (!stopToken.stop_requested()) {
 
 ---
 
+## 제어 스레드와 동시성
+
+`threadGroups`에 별도 mutex가 없다. 그룹 시작·중지·전체 중지는 하나의 제어 흐름에서 직렬 호출한다. worker가 자신의 그룹을 정리하면 자기 join이 발생할 수 있으므로 worker는 상위 제어 스레드에 종료를 전달한다. `stop_token`을 요청해도 Windows 이벤트·블로킹 호출을 자동으로 깨우지 않으므로 코어의 종료 이벤트 설정 순서를 함께 지켜야 한다.
+
 ## 관련 문서
 - [[ThreadModel]] — 각 스레드 그룹 동작 상세
 - [[MultiSocketRUDPCore]] — RunAllThreads / StopServer에서 사용

@@ -22,16 +22,26 @@ NodeStatsTracker (BotActionGraphWindow 멤버)
 
 ## 수집 시점
 
-`NodeExecutionHelper.ExecuteChainWithStats`에서 각 노드 실행 전후에 자동 기록:
+`NodeExecutionHelper.ExecuteChainWithStats`는 노드 진입부터 해당 호출의 동기 실행이 끝날 때까지 측정한다:
 
-```
+```text
 Stopwatch.Start()
-node.Execute(client, buffer)
-Stopwatch.Stop()
-→ statsTracker.RecordExecution(nodeName, elapsed, success, error?)
-→ ctx.IncrementExecutionCount(nodeName)
-→ ctx.RecordMetric("{nodeName}_time", elapsed)
+try:
+  ContextNodeBase → ExecuteWithContext(context, buffer)
+  그 외 → Execute(client, buffer)
+  다음 분기를 직접 관리하지 않는 노드 → NextNodes를 재귀 실행
+catch:
+  success = false, error 기록 후 예외 재전파
+finally:
+  Stopwatch.Stop()
+  statsTracker.RecordExecution(nodeName, elapsed, success, error?)
+  ctx.IncrementExecutionCount(nodeName)
+  ctx.RecordMetric("{nodeName}_time", elapsed)
 ```
+
+동기 후속 체인의 시간은 부모 노드에도 포함된다. 노드별 시간을 더하면 같은 실행 구간을 중복 합산할 수 있으므로 개별 노드 자체의 비용으로 해석하지 않는다.
+
+통계 키는 노드 객체가 아니라 `Name`이다. 이름이 같은 여러 노드의 실행은 같은 항목에 합산된다.
 
 ---
 
@@ -103,6 +113,14 @@ ActionNodeBase.SetStatsTracker(statsTracker);
 - 특정 노드 통계만 제거한다.
 
 ---
+
+## 동시성 및 측정 범위
+
+항목 사전은 `ConcurrentDictionary`, 단일 항목 갱신은 내부 `Lock`으로 보호한다. 조회는 같은 객체의 참조를 반환하며 여러 속성을 한 번에 고정한 스냅샷은 아니다. 병렬 기록 중 조회값들이 모두 같은 순간의 상태라고 가정하지 않는다.
+
+시간에는 측정 구간 안에서 동기 실행한 후속 노드가 포함된다. 분기를 직접 실행하는 노드도 호출이 반환하기 전에 수행한 자식 실행 시간은 포함하지만, `Task.Run` 등으로 시작한 비동기 작업 전체 완료 시간은 보장하지 않는다.
+
+성공은 해당 측정 호출에서 예외가 밖으로 전파되지 않았다는 뜻이다. 동기 후속 노드의 예외가 부모까지 전파되면 부모도 실패로 기록된다. 노드 내부에서 삼킨 예외나 반환 후 비동기 실패는 반영되지 않을 수 있으며, 이 값은 원격 패킷 전달 성공률과 다르다.
 
 ## 관련 문서
 - [[BotActionGraphWindow]] — 통계 창 표시 버튼

@@ -34,9 +34,9 @@
 | **SendPacketInfo** | 재전송 추적 구조체. 버퍼 포인터, 소유 세션, 타임스탬프, 참조 카운트 포함 |
 | **PendingQueue** | 흐름 제어로 인해 즉시 전송하지 못한 패킷 대기 큐 |
 | **HoldingQueue** | 순서가 맞지 않아 보관 중인 수신 패킷 큐 |
-| **TLS 인스턴스** | `thread_local`로 생성된 `CryptoHelper`. 스레드마다 독립적인 BCrypt 핸들 |
-| **advertiseWindow** | 수신 측이 현재 받을 수 있는 패킷 수. SEND_REPLY에 포함 |
-| **isCorePacket** | PacketId 필드 존재 여부. false이면 일반 데이터 패킷 |
+| **TLS 인스턴스** | 여기서는 Thread-Local Storage의 `CryptoHelper`를 뜻함. 알고리즘 핸들은 스레드별, 세션 키 핸들은 세션별이다. 네트워크 TLS와 구분 |
+| **advertiseWindow** | 서버가 현재 받을 수 있는 패킷 수. 서버→클라이언트 SEND_REPLY에만 포함 |
+| **isCorePacket** | 코어 패킷 여부. `true`는 PacketId 없이 14바이트부터, `false`는 평문 PacketId 뒤 18바이트부터 본문 암호화 |
 
 ---
 

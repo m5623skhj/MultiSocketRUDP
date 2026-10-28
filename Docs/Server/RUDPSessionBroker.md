@@ -87,7 +87,7 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 [sessionSalt 16B]
 ```
 
-공통 `NetBuffer` header는 총 5B다. `ReserveSession()`은 기본 write offset 5부터 결과 코드를 기록하고, `PacketCryptoHelper::SetHeader()`가 offset 0의 code와 offset 1~2의 payload length를 채운다. 결과 코드를 offset 3에서 읽으면 안 된다.
+공통 `NetBuffer` header는 총 5B다. `ReserveSession()`은 기본 write offset 5부터 버전 4바이트와 결과 코드 1바이트를 기록하고, `PacketCryptoHelper::SetHeader()`가 offset 0의 code와 offset 1~2의 payload length를 채운다. 결과 코드를 offset 3에서 읽으면 안 된다.
 
 예전 문서의 `CONNECT_RESULT_CODE 4B` 설명은 현재 코드와 맞지 않는다.
 
@@ -106,6 +106,12 @@ void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionI
 7. 짧은 `recv(...)` 루프로 FIN 정리
 
 ---
+
+## 브로커 종료와 진단
+
+`Stop()`은 listen 소켓을 닫고 accept 스레드를 중단·join한다. 이어서 모든 worker에 중지를 요청하고 `clientQueueLock` 안에서 대기 소켓을 먼저 닫은 뒤 worker들을 join한다. 대기 중 소켓을 현재 연결의 TLS 정리 완료 뒤까지 유지하지 않는다. 진행 중 핸드셰이크·버전 수신은 중지 토큰과 수신 제한을 관찰한다.
+
+버전 거절은 `reason`, `expected_version`, `received_version` 또는 `unavailable`, `plain_bytes`, `socket_error`를 기록한다. 잘못된 버전을 실제로 해석한 경우와 버전을 받지 못한 경우를 구분한다. 핸드셰이크에 함께 들어온 애플리케이션 레코드는 `TakePendingHandshakeData()`로 먼저 처리한다.
 
 ## 문서상 주의점
 

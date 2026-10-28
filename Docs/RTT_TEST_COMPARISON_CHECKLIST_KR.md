@@ -1,126 +1,61 @@
-# RTT Test Comparison Checklist
+# RTT 측정 비교 점검표
 
-## 목적
+> 현재 저장소의 RTT 측정 경로와 공정한 비교 조건을 정리한다.
+> 외부 라이브러리의 특정 예제·성능 순위는 해당 소스와 측정 원본이 이 저장소에 없어 현재 코드로 검증할 수 없다.
 
-이 문서는 `ENet`, `SLikeNet`, `GameNetworkingSockets`, `MultiSocketRUDP`의 현재 RTT/TPS 테스트가 얼마나 같은 조건인지 비교하고, `MultiSocketRUDP`를 비교군과 공정하게 맞추기 위해 무엇을 제거하거나 유지해야 하는지 정리한다.
+## 목차
 
-현재 `MultiSocketRUDP` 수치는 `raw transport RTT`라기보다 `bot/action graph + async wait + RUDP control path + server worker handoff`까지 포함한 `closed-loop RTT`로 해석해야 한다.
+1. [현재 측정 경로](#현재-측정-경로)
+2. [조건 통일 점검표](#조건-통일-점검표)
+3. [측정값 해석](#측정값-해석)
+4. [결과의 근거](#결과의-근거)
 
-또한 현재와 비교군의 기본 루프는 모두 `stop-and-wait` 계열이므로, 이 결과만으로 `최대 처리량`을 직접 결론내리면 안 된다.
+## 현재 측정 경로
 
-## 비교 표
+| 경로 | 구현 근거 | 측정 범위 |
+|---|---|---|
+| 행동 그래프 봇 테스트 | `Client.cs`, `NodeExecutionHelper.cs`, `VariableNodes.cs` | 송신 노드·비동기 패킷 대기·수신 처리·그래프 실행을 포함 |
+| 단일 클라이언트 RTT | `RttTestRunner.cs`, `RttBenchmarkExecutor.cs` | `EnableRttMode()` 이후 그래프 경로를 우회한 순차 Ping/Pong |
+| 다중 클라이언트 부하 | `RttStressTestRunner.cs`, `RttStressBenchmarkOptions.cs` | 모든 클라이언트 연결 후 클라이언트마다 요청 하나를 진행하는 폐루프 |
+| 채널 비교 | `ChannelRttBenchmark.cs` | 비신뢰성 단독·신뢰성 기준·혼합 전송의 RTT와 응답률 |
 
-| 항목 | ENet | SLikeNet | GameNetworkingSockets | MultiSocketRUDP |
-|---|---|---|---|---|
-| 기준 파일 | `enet-1.3.18/examples/enet_rtt.cpp` (외부 비교군) | `SLikeNet/Samples/Ping/Ping.cpp` (외부 비교군) | `GameNetworkingSockets/examples/example_rtt.cpp` (외부 비교군) | 런타임 생성 파일 `bin/BotActionGraph.botgraph.json`, [`Client.cs`](../MultiSocketRUDPBotTester/MultiSocketRUDPBotTester/Contents/Client/Client.cs), [`RUDPSession.cpp`](../MultiSocketRUDP/MultiSocketRUDPServer/RUDPSession.cpp) |
-| 측정 목표 | 라이브러리 raw RTT에 가깝게 단순화 | 라이브러리 raw RTT에 가깝게 단순화 | 라이브러리 RTT 비교, 단 내부 처리 포함 | bot + 앱 프로토콜 + 서버 구조 포함 closed-loop |
-| 기본 루프 구조 | `Ping -> Pong -> next Ping` | `Ping -> Pong -> next Ping` | `Ping -> Pong -> next Ping` | `SendPacketNode(Ping) -> WaitForPacketNode(Pong)` |
-| 클라이언트 루프 방식 | 코드에서 직접 다음 ping 전송 | 코드에서 직접 다음 ping 전송 | 코드에서 직접 다음 ping 전송 | action graph가 노드 체인 실행 |
-| 서버 응답 방식 | 수신 즉시 동일 payload echo | 수신 즉시 pong 전송 | 수신 즉시 pong 전송 후 flush | 수신 처리 후 `Pong` 전송 |
-| 클라이언트 대기 방식 | 라이브러리 event loop | `Receive()` polling loop | `ReceiveMessagesOnConnection()` | `TaskCompletionSource` 기반 `WaitForNextPacketAsync` |
-| 클라이언트 수신 후처리 | 거의 없음 | 거의 없음 | 거의 없음 | 패킷 핸들러 실행 + waiter 완료 + trigger dispatch |
-| bot / graph 런타임 | 없음 | 없음 | 없음 | 있음 |
-| 클라이언트 내부 큐/채널 | 거의 없음 | 거의 없음 | 거의 없음 | `ReceiveAsync -> Channel<Action> -> PacketProcessorAsync` |
-| 서버 스레드 handoff | 비교적 단순 | 비교적 단순 | 비교적 단순 | `IO worker -> recv logic worker` 분리 |
-| 앱 레벨 별도 ACK | 없음 | 없음 | 없음 | 있음, `SEND_REPLY_TYPE` |
-| reliable 처리 | ENet reliable packet | `IMMEDIATE_PRIORITY + RELIABLE` | `ReliableNoNagle` | 자체 RUDP reliable/ordering/flow control |
-| flush 제어 | `enet_host_flush()` | 라이브러리 send path | `FlushMessagesOnConnection()` 명시 | 내부 send queue / pending queue / send completion |
-| Nagle/지연 전송 영향 | 작음 | priority 설정 영향 큼 | 기본값 영향 큼, 튜닝 필요 | 내부 큐/ACK/worker hop 영향 큼 |
-| 암복호화 | 기본 없음 | 기본 없음 | 기본 포함 | 현재 포함 |
-| 패킷 1회 왕복의 실제 두께 | 얇음 | 얇음 | 중간 | 두꺼움 |
-| 측정값 해석 | raw RTT에 가까움 | raw RTT에 가까움 | 암복호화 포함 RTT | 애플리케이션 포함 end-to-end RTT |
-| 현재 수치와 직접 비교 공정성 | 높음 | 높음 | 부분적으로 높음 | 낮음, 조건이 다름 |
+C++ 서버 경로는 RIO 수신 → `NetBuffer` 복사 → IO/Logic 스레드 전달 → 콘텐츠 핸들러 → 송신 큐 → RIO 송신이다. 신뢰성 채널에는 ACK·순서 보장·재전송·흐름 제어 비용이 있고, 비신뢰성 채널에는 큐 교체와 최신 번호 거부가 있다. 모든 경로의 RTT를 같은 의미로 묶으면 안 된다.
 
-## 공정 비교 체크리스트
+## 조건 통일 점검표
 
-아래 체크리스트는 `MultiSocketRUDP`를 `ENet / SLikeNet / GameNetworkingSockets` RTT 예제와 최대한 같은 수준으로 맞추기 위한 기준이다.
+### 빌드와 실행 환경
 
-### 1. RTT 마이크로벤치로 맞출 때
+- [ ] 비교 대상의 커밋·라이브러리 버전·실행 명령·결과 원본을 보존한다.
+- [ ] Release 최적화, 디버그 로그, ASan 계측 여부를 맞춘다.
+- [ ] CPU·운영체제·실행 호스트·네트워크 경로·서버 스레드 수를 기록한다.
+- [ ] `RUDP_RTT_BENCHMARK_BUILD`와 IO sleep 모드를 기록한다.
+- [ ] 워밍업·측정 횟수·시간·반복 수·재전송·응답 제한 시간을 맞춘다.
+- [ ] 비교 프로세스를 같은 CPU에서 동시에 측정하지 않는다.
 
-- [ ] bot action graph를 우회하고, 전용 테스트 루프로 `Send Ping -> Wait Pong -> repeat`만 수행한다.
-- [ ] `TaskCompletionSource`, trigger dispatch, node execution 비용을 측정 경로에서 제거한다.
-- [ ] 클라이언트 수신 후처리를 최소화하고, `pong` 수신 직후 바로 다음 `ping`을 보낸다.
-- [ ] 서버도 contents 레이어 외 추가 후처리가 없는지 확인한다.
-- [ ] 서버 응답 직후 send path가 즉시 flush되는지 확인한다.
-- [ ] 측정값은 `elapsed / sample_count` 기준 평균 RTT로 통일한다.
-- [ ] 평균 RTT에서 `TPS = 1000 / RTT(ms)`를 계산하되, 이것이 `single outstanding request` 기준임을 명시한다.
+### 프로토콜과 부하
 
-### 2. 비교군과 다른 요소를 인정하고 유지할 때
+- [ ] 클라이언트 수와 클라이언트별 동시 진행 요청 수를 맞춘다.
+- [ ] 애플리케이션 본문 크기와 헤더·인증 태그·ACK를 구분한다.
+- [ ] 암복호화·핸드셰이크·인증·순서 보장·재전송 적용 여부를 기록한다.
+- [ ] 그래프·대기자·큐·스레드 간 전달 비용의 포함 범위를 명시한다.
+- [ ] 인위적 유실률을 송신·수신별로 기록하고 난수 seed를 보존한다.
+- [ ] 송신 수용 실패·시간 초과·중복·늦은 응답·로컬 큐 교체를 구분한다.
 
-- [ ] `bot/action graph` 비용이 포함된 테스트인지 명시한다.
-- [ ] 클라이언트 `Channel<Action>` 경유 비용이 포함된 테스트인지 명시한다.
-- [ ] 서버 `IO worker -> recv logic worker` handoff 비용이 포함된 테스트인지 명시한다.
-- [ ] `SEND_REPLY_TYPE` ACK 패킷 비용이 포함된 테스트인지 명시한다.
-- [ ] 암복호화 포함 여부를 라이브러리별로 분리 기재한다.
-- [ ] 이 경우 결과 이름을 `raw RTT`가 아니라 `closed-loop RTT` 또는 `end-to-end RTT`로 표기한다.
+## 측정값 해석
 
-### 3. 최대 처리량을 보려면 별도 테스트로 분리할 때
+단일 순차 요청의 `1000 / 평균 RTT(ms)`는 해당 폐루프의 초당 왕복 환산값이다. 서버 전체의 최대 처리량을 직접 나타내지 않는다. 다중 클라이언트 부하는 실제 완료 요청 수와 측정 시간을 사용하며 각 클라이언트에는 요청 하나만 진행 중이다.
 
-- [ ] `stop-and-wait` 테스트와 `windowed in-flight` 테스트를 분리한다.
-- [ ] `in-flight N개 유지` 모델을 사용한다.
-- [ ] `서버 수신 TPS`, `클라이언트 완료 TPS`, `평균 RTT`, `queue depth`를 분리 측정한다.
-- [ ] ACK 지연, pending queue, flow control, retransmission 영향이 지표에 어떻게 반영되는지 분리해서 본다.
-- [ ] 이 결과를 `최대 처리량` 해석에 사용하고, `stop-and-wait` 결과와 혼용하지 않는다.
+채널 RTT는 응답을 받은 요청만 표본에 포함한다. 미수신이 늘면 느린 응답이 제외돼 RTT가 낮아 보일 수 있으므로 응답률을 함께 확인한다. 서버 `GetTPS()`는 성공적으로 수신 처리 경로를 통과한 콘텐츠 카운터이며, 클라이언트 왕복 완료율과 같은 지표가 아니다.
 
-## MultiSocketRUDP 현재 테스트 해석 가이드
+현재 자동화는 평균·P95/P99·최댓값과 반복 중앙값을 구분해 기록한다. 대표값·집계 방식이 다른 수치를 직접 비교하지 않는다. GitHub 실행기의 스케줄링 변동이 있으므로 단일 결과로 성능 회귀나 라이브러리 순위를 확정하지 않는다.
 
-현재 `MultiSocketRUDP`의 `5500~7000 TPS`는 비교군보다 낮게 나와도 이상하지 않다. 그 이유는 다음 요소가 동시에 포함되기 때문이다.
+## 결과의 근거
 
-1. bot graph 실행 비용
-2. 클라이언트 비동기 대기 비용
-3. 클라이언트 수신 큐 비용
-4. 서버 스레드 handoff 비용
-5. 앱/프로토콜 ACK 비용
-6. 암복호화 비용
+과거 이 문서의 고정 RTT·TPS 수치와 외부 라이브러리 비교 표는 측정 커밋·환경·원본이 충분히 연결되지 않아 현재 기준선으로 사용하지 않는다. 공식 이력은 저장소 README에서 연결한 `benchmark-data` 브랜치의 JSON과 해당 실행 산출물을 기준으로 확인한다. 이 문서 갱신 중 성능을 다시 측정하지 않았다.
 
-즉, 현재 수치는 `서버 라이브러리 코어만의 한계`라기보다 `현재 테스트 경로 전체의 closed-loop 비용`으로 해석하는 것이 맞다.
+## 관련 문서
 
-## 권장 분리 기준
-
-실무적으로는 아래 세 가지를 분리해서 관리하는 것이 가장 깔끔하다.
-
-1. `RTT 마이크로벤치`
-   - `ENet / SLikeNet / GameNetworkingSockets` 예제와 같은 수준으로 단순화한 테스트
-2. `실사용 closed-loop`
-   - 현재처럼 `BotActionGraph`를 포함한 통합 테스트
-3. `최대 처리량`
-   - `in-flight N개 유지` 기반 테스트
-
-이 세 결과를 한 표에 넣더라도 해석 열을 따로 두는 것이 좋다. 특히 멀티스레드 환경에서는 worker handoff, queue depth, wakeup latency가 RTT에 직접 섞일 수 있으므로, `raw RTT`와 `integration RTT`를 같은 의미로 다루면 해석 오류가 생긴다.
-
----
-
-## 최신 RTT 기준선
-
-최신 `MultiSocketRUDP` 전용 RTT 테스트는 `bot 1`, `localhost`, `Release / O2`, `100,000 samples` 기준으로 반복 측정했다.
-
-### 측정 결과
-
-| 회차 | Avg RTT | Min RTT | Max RTT | Elapsed |
-|---|---:|---:|---:|---:|
-| 1 | 0.164 ms | 0.028 ms | 104.142 ms | 16.453 s |
-| 2 | 0.101 ms | 0.029 ms | 88.137 ms | 10.167 s |
-| 3 | 0.105 ms | 0.030 ms | 117.623 ms | 10.633 s |
-| 4 | 0.128 ms | 0.029 ms | 101.216 ms | 12.849 s |
-
-### 해석 기준
-
-- 1회차는 cold start / JIT / thread warm-up 영향이 섞인 outlier로 본다.
-- 2~4회차 평균을 실제 기준선으로 보는 편이 더 적절하다.
-
-### 현재 추천 기준선
-
-- warm runs 기준 평균 RTT: 약 `0.111 ms`
-- warm runs 기준 elapsed 평균: 약 `11.216 s`
-- 환산 TPS: 약 `8,916`
-
-### 비교군과의 최신 비교
-
-| 라이브러리 | Avg RTT | 비고 |
-|---|---:|---|
-| ENet | 0.040 ms | raw RTT에 가장 가까운 단순 예제 |
-| SLikeNet | 0.053 ms | `IMMEDIATE_PRIORITY + RELIABLE` 기준 |
-| GameNetworkingSockets | 0.616 ms | crypto와 send tuning 포함 |
-| MultiSocketRUDP | 0.111 ms | bot graph 제거 RTT, client fast path 일부 반영 |
-
-따라서 현재 `MultiSocketRUDP`는 최신 RTT 전용 경로 기준으로 `ENet / SLikeNet`보다는 느리지만, `GameNetworkingSockets`보다는 빠른 위치에 있다.
+- [성능 튜닝](PerformanceTuning.md)
+- [CI의 RTT 측정 조건](Testing/CI.md#rtt-성능-벤치마크)
+- [RTT 자동화 실행·결과](../Scripts/RTTBenchmark/README.md)
+- [BotTester 부하 실행](../MultiSocketRUDPBotTester/README.md)

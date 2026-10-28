@@ -88,12 +88,12 @@ private:
 ```cpp
 void Player::OnConnected()
 {
-    LOG_DEBUG(std::format("Session {} connected", GetSessionId()));
+    LOG_DEBUG(std::format("세션 {} 연결", GetSessionId()));
 }
 
 void Player::OnDisconnected()
 {
-    LOG_DEBUG(std::format("Session {} disconnect requested", GetSessionId()));
+    LOG_DEBUG(std::format("세션 {} 연결 해제 요청", GetSessionId()));
 }
 
 void Player::OnReleased()
@@ -151,9 +151,8 @@ DoDisconnect(DISCONNECT_REASON::BY_ERROR);
 ACK와 재전송 없이 최신 값을 우선해 보내려면 같은 콘텐츠 패킷 타입을 `SendUnreliablePacket()`에 전달한다.
 
 ```cpp
-PositionUpdate update;
-update.x = x;
-update.y = y;
+TestPacketRes update;
+update.order = 42;
 
 if (!SendUnreliablePacket(update))
 {
@@ -189,7 +188,7 @@ auto* session = core.GetUsingSession(sessionId); // 현재 콘텐츠 코드에�
 
 - `ContentsPacketRegister::Init()`는 `StartServer()` 이전에 호출한다.
 - `CoreOption.txt`와 `SessionBrokerOption.txt` 경로는 `ServerOptionFile/` 기준으로 맞춘다.
-- TLS 인증서 기본 예시는 `MY` / `DevServerCert`다.
+- TLS 인증서 선택 예시는 `MY` / `DevServerCert`다. C++ 클라이언트가 신뢰하고 접속 DNS/IP와 이름이 일치하는 인증서를 별도로 준비해야 한다.
 - `OnDisconnected()`에서는 정리 위주로 처리하고, 무거운 블로킹 작업은 피한다.
 - `OnReleased()`에서는 재사용 전 멤버 상태 초기화만 수행한다.
 

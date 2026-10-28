@@ -6,7 +6,7 @@
 
 ## 서버 측 핵심
 
-서버에서는 아래 두 구성요소가 핵심이다.
+서버에서는 아래 세 구성요소가 핵심이다.
 
 - `RUDPFlowController`: 송신 혼잡 윈도우(CWND) 관리
 - `RUDPReceiveWindow`: 수신 윈도우와 advertise window 관리

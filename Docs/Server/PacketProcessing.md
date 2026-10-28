@@ -9,14 +9,14 @@
 
 1. [전체 파이프라인 다이어그램](#1-전체-파이프라인-다이어그램)
 2. [단계 1: RIO 완료 큐 디큐 (IO Worker)](#2-단계-1-rio-완료-큐-디큐-io-worker)
-3. [단계 2: RecvIOCompleted — 버퍼 복사](#3-단계-2-recviocompletd--버퍼-복사)
+3. [단계 2: RecvIOCompleted — 버퍼 복사](#3-단계-2-recviocompleted--버퍼-복사)
 4. [단계 3: RecvLogic Worker 깨우기](#4-단계-3-recvlogic-worker-깨우기)
 5. [단계 4: 사전 유효성 검사](#5-단계-4-사전-유효성-검사)
 6. [단계 5: PacketType 분기](#6-단계-5-packettype-분기)
 7. [단계 6: AES-GCM 복호화](#7-단계-6-aes-gcm-복호화)
 8. [단계 7: 순서 보장 (SessionPacketOrderer)](#8-단계-7-순서-보장-sessionpacketorderer)
 9. [단계 8: ProcessPacket (역직렬화 + 핸들러)](#9-단계-8-processpacket-역직렬화--핸들러)
-10. [ACK 전송 (SendReplyToClient)](#10-ack-전송-sendreplytoeclient)
+10. [ACK 전송 (SendReplyToClient)](#10-ack-전송-sendreplytoclient)
 11. [이상 패킷 처리 매트릭스](#11-이상-패킷-처리-매트릭스)
 
 ---
@@ -252,7 +252,8 @@ case PACKET_TYPE::CONNECT_TYPE:
     // 복호화 (isCorePacket=true, direction=CLIENT_TO_SERVER)
     DECODE_PACKET()
 
-    // RESERVED → CONNECTED 전이 시도
+    // 최초 RESERVED → CONNECTED 전이만 true다.
+    // 같은 클라이언트의 중복 CONNECT는 내부에서 ACK만 재전송하고 false다.
     if (!session.TryConnect(recvPacket, clientAddr)) {
         LOG_ERROR("TryConnect failed");
         break;
@@ -374,10 +375,9 @@ break;
 **break로 조용히 폐기하는 이유:**  
 AES-GCM 인증 실패는 다음 중 하나를 의미한다:
 - 위변조된 패킷
-- 재전송 공격 (Nonce 재사용)
 - 네트워크 오류로 인한 데이터 깨짐
 
-어떤 경우든 세션을 즉시 종료할 이유는 없다. 해당 데이터그램만 폐기한다. 인증에 성공하면 신뢰·신뢰성 없는 데이터와 ACK를 포함해 마지막 수신 시각을 갱신한다.
+어떤 경우든 해당 인증 실패만으로 세션을 즉시 종료하지 않고 프레임을 폐기한다. 동일한 암호문 재전송은 GCM 인증을 다시 통과할 수 있으며, 중복 거부는 시퀀스 검사의 책임이다. 인증에 성공하면 신뢰·신뢰성 없는 데이터와 ACK를 포함해 마지막 수신 시각을 갱신한다.
 
 ### DecodePacket 내부 동작
 
@@ -477,38 +477,17 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 
 ### SessionPacketOrderer 내부 로직
 
-```cpp
-// enum class ON_RECV_RESULT : uint8_t { PROCESSED, DUPLICATED_RECV, PACKET_HELD, ERROR_OCCURED };
+`SessionPacketOrderer.cpp`는 `recvHoldingPackets`라는 시퀀스 키 `std::map`을 사용한다. C++ 클라이언트의 우선순위 큐와 다른 구조다.
 
-ON_RECV_RESULT SessionPacketOrderer::OnReceive(
-    PacketSequence sequence,
-    NetBuffer& buffer,                        // 포인터가 아닌 참조
-    const PacketProcessCallback& callback)    // std::function<bool(NetBuffer&, PacketSequence)>
-{
-    if (sequence == nextRecvPacketSequence) {
-        // ① 정상 순서 패킷 → 즉시 처리
-        if (!ProcessAndAdvance(buffer, sequence, callback)) return ON_RECV_RESULT::ERROR_OCCURED;
-
-        // ② HoldingQueue에서 연속으로 처리 가능한 패킷 처리
-        if (!ProcessHoldingPacket(callback)) return ON_RECV_RESULT::ERROR_OCCURED;
-        return ON_RECV_RESULT::PROCESSED;
-
-    } else if (SeqDiff(sequence, nextRecvPacketSequence) > 0) {
-        // ③ 미래 시퀀스 → HoldingQueue에 보관 (priority_queue, min-heap)
-        if (recvPacketHolderQueue.size() >= maxHoldingQueueSize) {
-            LOG_ERROR(std::format("Holding queue full. maxSize={}", maxHoldingQueueSize));
-            return ON_RECV_RESULT::ERROR_OCCURED;
-        }
-        recvPacketHolderQueue.emplace(&buffer, sequence);
-        recvHoldingPacketSequences.insert(sequence);
-        return ON_RECV_RESULT::PACKET_HELD;
-
-    } else {
-        // ④ 과거 시퀀스 → 중복 패킷
-        return ON_RECV_RESULT::DUPLICATED_RECV;
-    }
-}
+```text
+sequence - expected의 부호 있는 차이 비교
+  < 0: DUPLICATED_RECV
+  = 0: 기대 번호 증가 → 현재 콜백 → map에서 연속 번호 검색·처리
+  > 0: 같은 번호가 없으면 용량 확인 → 버퍼 참조 추가 → map에 보관
+       PACKET_HELD 반환
 ```
+
+보관된 중복 번호는 추가 참조를 만들지 않는다. 콜백 실패는 `ERROR_OCCURED`이며 호출자가 세션 해제를 요청한다. map은 수신 로직 스레드의 단일 소유 계약으로 사용하고 `Reset()`은 수신 작업 완료 후 수행한다.
 
 **구체적인 예시:**
 
@@ -578,23 +557,35 @@ bool RUDPSession::ProcessPacket(NetBuffer& recvPacket, PacketSequence recvPacket
 ## 10. ACK 전송 (SendReplyToClient)
 
 ```cpp
-void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
+void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 {
+    if (!TryBeginSendOperation()) {
+        return;
+    }
+    auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
+
     NetBuffer* replyBuffer = NetBuffer::Alloc();
+    if (replyBuffer == nullptr) {
+        LOG_ERROR("Buffer is nullptr in RUDPSession::SendReplyToClient()");
+        DoDisconnect(DISCONNECT_REASON::BY_ERROR);
+        return;
+    }
 
     auto packetType = PACKET_TYPE::SEND_REPLY_TYPE;
     BYTE advertiseWindow = flowManager.GetAdvertisableWindow();
     // → windowSize - usedCount (현재 비어 있는 수신 슬롯 수)
 
     *replyBuffer << packetType << recvPacketSequence << advertiseWindow;
-    // 총 1 + 8 + 1 = 10 bytes (헤더 제외)
+    // 인증 태그 추가 전 1 + 8 + 1 = 10바이트 (헤더 제외)
 
     // isReplyType=true → PendingQueue 우회, 재전송 추적 없음
-    if (!SendPacket(*replyBuffer, recvPacketSequence, true, true)) {
+    if (!SendPacketImmediate(*replyBuffer, recvPacketSequence, true, true)) {
         DoDisconnect(DISCONNECT_REASON::BY_ERROR);
     }
 }
 ```
+
+`SendPacketImmediate()`는 호출자가 송신 작업 진입을 유지한다는 전제다. 위 guard는 실패 정리까지 끝난 뒤 진입을 해제하여 세션 종료와의 경쟁을 막는다. 이 예제는 서버→클라이언트 ACK이며, 반대 방향의 ACK에는 `AdvertiseWindow`가 없다.
 
 **`advertiseWindow`의 역할:**  
 클라이언트가 이 값을 보고 전송 속도를 조절한다 (flow control 수신 측).  
@@ -606,10 +597,10 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 
 | 패킷 상황 | 처리 방식 | 세션 종료 여부 |
 |-----------|-----------|----------------|
-| 헤더 크기 불일치 | 폐기 + LOG_ERROR | ❌ |
+| 헤더 크기 불일치·프레임 상한 초과 | 폐기, 크기 오류는 누계 1·2·4·8…에서 진단 | ❌ |
 | 알 수 없는 PacketType | LOG_ERROR | ❌ |
 | CanProcessPacket 실패 (IP 불일치) | 조용히 폐기 | ❌ |
-| AES-GCM 인증 실패 | LOG_ERROR + 폐기 | ❌ |
+| AES-GCM 인증 실패 | 조용히 해당 프레임 폐기 | ❌ |
 | 알 수 없는 PacketId | LOG_ERROR | ✅ (`DoDisconnect`) |
 | BufferToPacket 실패 | LOG_ERROR | ✅ |
 | HoldingQueue 가득 참 | LOG_ERROR | ✅ |
@@ -620,6 +611,8 @@ void RUDPSession::SendReplyToClient(PacketSequence recvPacketSequence)
 | 그 외 RIO Status≠0 | `BY_ERROR` 사유로 세션 종료 | ✅ |
 
 ---
+
+> 일반 콘텐츠의 `PacketId`는 현재 암호화·AAD 범위 밖이다. 본문 인증 성공만으로 ID의 무결성을 보장하지 않는다. [[PacketCryptoHelper]]의 보안 한계를 확인한다.
 
 ## 관련 문서
 - [[RUDPSession]] — OnRecvPacket, ProcessPacket 구현 상세

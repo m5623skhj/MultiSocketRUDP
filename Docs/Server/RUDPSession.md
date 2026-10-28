@@ -52,8 +52,8 @@ bool SendUnreliablePacket(IPacket& packet);
 
 | 반환값 | 조건 |
 |--------|------|
-| `true` | 송신 작업 성공 |
-| `false` | 세션이 연결되지 않았거나 큐가 가득 참 |
+| `true` | 로컬 송신 경로에 수용됨. 원격 전달을 뜻하지 않음 |
+| `false` | 미연결·종료, 직렬화·암호화 실패, 크기 초과 또는 신뢰성 pending 큐 등록 실패 |
 
 `SendUnreliablePacket()`은 별도의 64비트 시퀀스와 `UNRELIABLE_SEND_TYPE`을 사용한다. ACK, CWND, 수신 재정렬, 재전송은 적용하지 않는다. 큐가 가득 찬 경우 가장 오래된 미송신 항목을 교체하므로 `true`는 원격 수신이 아니라 로컬 큐가 요청을 수락했다는 의미다.
 ### 연결 종료 요청
@@ -133,10 +133,10 @@ bool SendUnreliablePacket(IPacket& packet);
 
 | 반환값 | 조건 |
 |--------|------|
-| `true` | 패킷 전송 성공 |
+| `true` | 로컬 송신 경로 수용. 원격 전달 성공을 뜻하지 않음 |
 | `false` | 세션이 연결되지 않았거나 전송 실패 |
 
-신뢰성 없는 전송은 위치·조준·센서 값처럼 오래된 값보다 최신 값이 중요한 데이터에만 사용한다. 로그인, 결제, 인벤토리처럼 반드시 한 번 이상 도착해야 하는 데이터는 `SendPacket()`을 사용한다.
+신뢰성 없는 전송은 위치·조준·센서 값처럼 오래된 값보다 최신 값이 중요한 데이터에만 사용한다. 로그인·인벤토리처럼 유실을 허용하지 않는 데이터에는 `SendPacket()`과 애플리케이션의 응답·중복 처리 정책을 함께 사용한다. 재전송 한도나 연결 종료가 있으므로 무조건 도착하거나 정확히 한 번 실행된다는 보장은 아니다.
 
 ## 최소 예시
 
@@ -245,7 +245,16 @@ unsigned int GetRetransmissionTimeoutMs() const noexcept;
 - 서버의 여러 프레임 묶음도 UDP 데이터그램당 1024바이트 이하로 제한한다. 넘치는 다음 프레임은 기존 reserved 슬롯에 보존하고 RIO 완료 후 보낸다. 32KB 송신 버퍼는 할당 용량일 뿐 전송 크기 상한이 아니다.
 - ACK와 재전송 횟수 초과는 `SendPacketInfo::completion`의 `Pending -> Acknowledged/RetryLimit` CAS로 한 번만 확정한다. ACK가 먼저 확정되면 실패 종료를 취소하고, 실패 확정 뒤의 ACK는 추적 참조만 정리한다. scheduler lock을 잡은 채 세션 종료를 호출하지 않는다. 기존 generation·진행 중 송신·참조 계수로 세션과 버퍼 수명을 보호한다.
 - `retry_limit` 로그는 `wireBytes`, 완료 상태(`0=Pending, 1=Acknowledged, 2=RetryLimit`), 첫/최근 송신 경과 시간과 ACK 관측값을 포함한다. 수신 크기 거절 로그는 누적 건수 1, 2, 4, 8…에서만 출력하며 본문은 기록하지 않는다. 이 값만으로 유실 원인을 단정하지 않는다.
-- 기존 프로토콜 버전·암호화·ACK 형식은 유지한다. 수정 회귀 테스트는 CoreTest의 NetBufferContainer/CryptoHelper/RUDPSession/RUDPIOHandler 테스트에 포함하며 이번 작업에서는 빌드·실행하지 않았다.
+- 관련 회귀 테스트는 CoreTest의 NetBufferContainer/CryptoHelper/RUDPSession/RUDPIOHandler 검사에서 확인한다. 문서의 설명은 테스트 실행 결과를 대신하지 않는다.
+
+## 비신뢰성 송신 큐 진단
+
+```cpp
+[[nodiscard]]
+SessionSendContext::UnreliableQueueStats GetUnreliableQueueStats();
+```
+
+`queued`는 미송신 reserved 항목을 포함한 대기 수, `capacity`는 설정 용량, `dropped`는 세션의 로컬 교체 누계다. 반환값은 큐 mutex 아래에서 얻은 값 복사본이며 네트워크 유실률을 나타내지 않는다. 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
 
 ## 관련 문서
 

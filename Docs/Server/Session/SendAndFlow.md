@@ -26,6 +26,10 @@
 
 ---
 
+## 비신뢰성 큐 진단
+
+`SessionSendContext::GetUnreliableQueueStats()`와 `RUDPSession::GetUnreliableQueueStats()`는 `queued`, `capacity`, `dropped`의 값 복사본을 반환한다. 큐 mutex 아래에서 읽으며 `queued`에는 미송신 reserved 항목도 포함한다. `dropped`는 큐·예약 항목의 로컬 교체 누계이고 `Reset()`에서 0으로 초기화한다. 네트워크 유실이나 이미 송신한 데이터의 전달률을 뜻하지 않는다.
+
 ## ACK와 재전송 수명
 
 ```text
@@ -38,7 +42,7 @@ SendPacketInfo 생성
   → 마지막 참조가 Free
 ```
 
-ACK 수신과 timeout은 서로 다른 thread에서 경쟁할 수 있다. map 존재 여부, heap entry, 실제 객체 수명을 하나의 신호로 간주하지 않는다. schedule version, erased state, ref-count가 서로 일관돼야 한다.
+ACK 수신과 timeout은 서로 다른 thread에서 경쟁할 수 있다. map 존재 여부, heap entry, 실제 객체 수명을 하나의 신호로 간주하지 않는다. schedule version, erased state, ref-count와 `completion` 상태가 서로 일관돼야 한다. ACK와 재전송 한도 초과는 `Pending → Acknowledged/RetryLimit` CAS로 한 번만 확정한다.
 
 `SendPacketInfo::RequiresRetransmission()`은 reply와 신뢰성 없는 패킷에서 모두 `false`다. 이 항목들은 send completion 뒤 해제되며 ACK map이나 scheduler 참조를 만들지 않는다.
 

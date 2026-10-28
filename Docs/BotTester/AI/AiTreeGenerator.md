@@ -132,13 +132,23 @@ CreateFromJson(jsonNode, x, y, createdNodes, nodePath)
 | RandomDelayNode | `min_delay_ms`, `max_delay_ms` → `Properties` |
 | LogNode | `message` → `StringValue` |
 | DisconnectNode | `reason` → `StringValue` |
-| ConditionalNode | `condition` → `Properties["Left"]` (단순 조건) |
+| ConditionalNode | `condition` → 상수 `Left`. 연산자는 `==`, 비교 대상은 상수 `true` |
 | LoopNode | `max_iterations` → `Properties["LoopCount"]` |
 | RepeatTimerNode | `repeat_count`, `interval_ms` |
 | WaitForPacketNode | `expected_packet_id`, `timeout_ms` |
 | SetVariableNode | `variable_name`, `value_type`, `value` |
+| GetVariableNode | `variable_name` → `StringValue` |
 | AssertNode | `error_message`, `stop_on_failure` |
 | RetryNode | `max_retries`, `retry_delay_ms`, `exponential_backoff` |
+
+### 가져오기 제한
+
+- `condition`에 C# 식이나 `Context.Get(...)`를 적어도 실행하지 않는다. `ConditionalNode`는 문자열을 상수로 변환해 `true`와 비교한다. 동적 비교는 가져온 뒤 UI의 Getter / 연산자 / 우변으로 설정한다.
+- `LoopNode`는 `max_iterations`만 읽어 횟수 기반 조건을 만든다. JSON의 `condition`은 반영하지 않는다.
+- `AssertNode`의 `condition`과 `PacketParserNode`의 `setter_method`는 읽지 않는다. 가져온 뒤 UI에서 조건 또는 Setter를 지정한다. 타입 검증 통과가 실행 설정의 완성을 뜻하지 않는다.
+- `RandomChoiceNode`는 `KnownNodeTypes`에 없으며 `choices` 가져오기도 구현되지 않았다. UI 또는 코드로 구성한다.
+- 송신 노드는 `packet_id`만 읽는다. 필드값과 비신뢰성 채널 선택은 UI 또는 코드에서 지정한다. `RetryNode`의 `SuccessCondition`과 별도 `SuccessNodes`도 이 JSON 매핑에는 없다.
+- 이 형식은 캔버스 저장 파일 형식과 다르다. 저장·복원은 [[GraphFileStorage]]를 참고한다.
 
 ---
 

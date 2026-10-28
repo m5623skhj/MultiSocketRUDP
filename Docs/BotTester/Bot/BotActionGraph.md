@@ -82,6 +82,8 @@ var graph = new ActionGraphBuilder()
 
 ---
 
+노드·인덱스 컨테이너의 접근은 위 잠금으로 보호하지만 등록 전체가 하나의 트랜잭션은 아니다. 노드 객체·자식 목록·설정 자체의 동시 변경까지 보호하지 않으므로 그래프는 실행 전에 완성하고 실행 중에는 읽기 전용으로 공유한다.
+
 ## 함수 설명
 
 ### `ActionGraph`
@@ -98,8 +100,8 @@ var graph = new ActionGraphBuilder()
 - 특정 이벤트에 맞는 후보 노드를 찾아 실행 체인을 시작한다.
 - 실제 노드 실행은 `NodeExecutionHelper.ExecuteChainWithStats()`를 통해 통계와 함께 수행된다.
 
-#### `List<ActionNodeBase>? ResolveCandidates(TriggerType triggerType, PacketId? packetId)`
-- 트리거 종류와 패킷 ID에 맞는 후보 노드 목록을 선택한다.
+#### `List<ActionNodeBase> ResolveCandidates(TriggerType triggerType, PacketId? packetId)`
+- 트리거 종류와 패킷 ID에 맞는 후보의 새 목록을 선택한다. 매칭이 없으면 빈 목록이다. 패킷 ID 없는 수신 트리거는 모든 수신 ID의 후보에 포함한다.
 - 패킷 트리거는 `packetTriggerNodes`, 일반 트리거는 `triggerNodes`에서 검색한다.
 
 ### `ActionGraphBuilder`

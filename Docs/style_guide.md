@@ -28,7 +28,7 @@
 
 - **본문**: 한국어
 - **코드 식별자**: 원문 그대로 유지 (영문). 예: `SendPacket`, `RUDPSession`, `DISCONNECT_REASON`
-- **기술 용어**: 한국어 번역 없이 원문 사용. 예: "CWND", "ACK", "RIO", "worker thread"
+- **기술 용어**: `CWND`, `ACK`, `RIO`와 코드·UI 식별자는 유지하되 설명 문장은 한국어로 작성한다. 일반 명사는 스레드·큐·그래프처럼 아래 통일 규칙을 따른다.
 - **문체**: `~한다` / `~된다` **설명체** 사용. `~합니다` / `~됩니다` 금지
 
 ---
@@ -164,7 +164,7 @@ void DoDisconnect(const DISCONNECT_REASON disconnectReason);
 ```
 
 문서:
-```markdown
+````markdown
 ### `DoDisconnect`
 
 ```cpp
@@ -177,8 +177,8 @@ void DoDisconnect(const DISCONNECT_REASON disconnectReason);
 | `disconnectReason` | 의미 |
 |--------------------|------|
 | `BY_ERROR` | 내부 오류로 인한 강제 해제 |
-| `BY_CLIENT_REQUEST` | 클라이언트 요청에 의한 정상 해제 |
-```
+| `NORMAL` | 정상 해제 |
+````
 
 ### `[[nodiscard]]` 함수
 
@@ -207,7 +207,7 @@ class RUDPIOHandler : public IIOHandler { ... };
 
 ## 5. C# 코드 주석과 문서의 관계
 
-C# 코드는 XML 문서 주석(`///`) 없이 인라인 `//` 주석만 사용한다.  
+C# 코드는 XML 문서 주석(`///`)과 인라인 `//` 주석을 모두 사용한다.
 클래스·메서드 설명은 코드 구조와 구현에서 직접 파악해서 문서화한다.
 
 ### C# 특유 패턴 문서화
@@ -271,7 +271,7 @@ def extract_function_info(
 ```
 
 문서:
-```markdown
+````markdown
 ### `extract_function_info`
 
 ```python
@@ -289,7 +289,7 @@ def extract_function_info(
 | `file_content` | `str \| None` | 해당 파일의 최종 내용 |
 
 **반환값**: `FunctionInfo` 객체. `DELETED` 변경이거나 추출 실패 시 `None`.
-```
+````
 
 ---
 
@@ -354,7 +354,10 @@ def extract_function_info(
 | `disconnectReason` 값 | 의미 |
 |----------------------|------|
 | `BY_ERROR` | 내부 오류로 인한 강제 해제 |
-| `BY_CLIENT_REQUEST` | 클라이언트 요청에 의한 정상 해제 |
+| `NORMAL` | 정상 해제 |
+| `BY_ABORT_RESERVED` | 미연결 예약 중단 |
+| `BY_RETRANSMISSION` | 재전송 한도 초과 |
+| `NOT_DISCONNECTED` | 아직 해제되지 않은 상태 표시 |
 
 ### `OUT` 파라미터
 
@@ -466,7 +469,7 @@ def extract_function_info(
 
 ## 13. 금지 사항
 
-- **인터페이스(시그니처·파라미터·반환 의미)가 변경되지 않은 경우** 문서를 수정하지 않는다.
+- **DocsBot의 자동 갱신**은 인터페이스 변경을 중심으로 제한한다. 사용자가 요청한 수동 전체 대조에서는 동작·설정·보안·동시성·잘못된 예제·번역 누락도 수정한다.
 - **기술 상세 문서의 기존 위키링크(`[[...]]`, `![[...]]`)를 이유 없이 제거하거나 변환하지 않는다.** 진입점·카탈로그·허브의 GitHub 탐색성 개선은 예외다.
 - **`~합니다` / `~됩니다` 문체를 사용하지 않는다.**
 - **영문 동사를 그대로 한글화하지 않는다.** (`return한다` → `반환한다`)
@@ -539,6 +542,11 @@ def extract_function_info(
 ---
 
 ## 문서 유지보수 기준
+
+- 현재 구현과 설명이 다르면 의도·추정 대신 실제 코드의 보장 범위를 기록한다.
+- 문서 갱신에서 기능 테스트를 실행하지 않았다면 실행·통과했다고 적지 않는다.
+- 외부 제품·배포 저장소에서만 수행하는 작업을 이 저장소 코드의 보장으로 적지 않는다.
+- 과거 실행 로그와 외부 라이브러리·라이선스 원문은 출처와 재현성을 보존하고, 사용 설명·캡션은 한국어로 작성한다.
 
 - 함수 설명 섹션을 추가할 때는 현재 헤더 기준 시그니처를 그대로 적는다.
 - 생성자와 소멸자는 기본적으로 제외하고, 필수 인자가 있는 생성자만 예외적으로 문서화한다.

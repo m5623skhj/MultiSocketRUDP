@@ -19,7 +19,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 .\MultiSocketRUDP\Tool\BuildIntegrationTestAndRun.bat
 ```
 
-통합 테스트용 `MultiSocketRUDP/IntegrationTest/TestCert.pfx`는 커밋하지 않는다. 필요하면 `MultiSocketRUDP/Tool/ForTLS/CreateDevTLSPfx.bat`로 생성한다.
+통합 테스트용 `MultiSocketRUDP/IntegrationTest/TestCert.pfx`는 커밋하지 않는다. `CreateDevTLSPfx.bat`는 `DevServerCert` PFX만 생성한다. 현재 C++ TLS 이름·체인 검증에 필요한 신뢰와 접속 이름 SAN을 자동 준비하지 않으므로 [인증서 전제 조건](../Common/TLSHelper.md#개발테스트-인증서)을 확인한다.
 
 ---
 
@@ -40,6 +40,8 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 | `mixed-channels` | 신뢰성·비신뢰성 채널을 함께 사용할 때의 독립 순서와 응답 |
 | `unreliable-checks` | C++ 클라이언트의 큐 교체·번호·수신 API 자체 검사 |
 | `concurrent-echo-disconnect` | 복수 worker의 동시 송수신·연결 해제 경합 |
+
+추가 회귀 테스트는 클라이언트 재시작 중 이전 직렬화 거부·동시 Stop 완료 대기, CONNECT 재전송 한도 후 자동 정리, TLS 유휴·불완전 수신 제한과 핸드셰이크 잔여 데이터 보존을 다룬다. 현재 목록은 `IntegrationTest.exe --gtest_list_tests`로 확인한다.
 
 실패 재현에는 단일 filter를 우선 사용한다.
 

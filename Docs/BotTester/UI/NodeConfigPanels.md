@@ -97,8 +97,10 @@ bool CanConfigure(NodeVisual node);
 | `node` | `NodeVisual` | 설정 확인 대상 노드 |
 
 **반환값**
-- `true`: `node.NodeType`이 `SendPacketNode`인 경우
-- `false`: 그 외 모든 경우
+- `true`: 해당 패널이 담당하는 `node.NodeType`인 경우
+- `false`: 다른 타입인 경우
+
+`SendPacketConfigPanel`은 `SendPacketNode`를, 다른 패널은 각자의 노드 타입을 검사한다.
 #### `Build(StackPanel stack, NodeVisual node, Action<string> log, Action closeDialog)`
 - 전달받은 `StackPanel`에 WPF 설정 UI를 구성한다.
 - 저장 시 `NodeConfiguration`을 갱신하고 로그 기록 및 다이얼로그 종료 콜백을 호출한다.

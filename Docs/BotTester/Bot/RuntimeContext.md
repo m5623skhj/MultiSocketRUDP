@@ -8,7 +8,7 @@
 ## 구조
 
 ```csharp
-public class RuntimeContext(Client client, NetBuffer? packet)
+public class RuntimeContext
 {
     public Client Client { get; }                  // 소유 클라이언트
     private AsyncLocal<NetBuffer?> currentPacket;  // 비동기 실행 흐름별 현재 패킷
@@ -57,7 +57,7 @@ int AtomicIncrement(string key, int delta=1)  // 원자적 증가
 ## `RuntimeContext`
 
 ```csharp
-public class RuntimeContext(Client client, NetBuffer? packet)
+public RuntimeContext(Client client, NetBuffer? packet);
 ```
 
 클라이언트의 네트워크 컨텍스트를 관리하며, 패킷 데이터와 세션 변수를 유지한다.
@@ -128,7 +128,7 @@ GlobalContext.Set($"__received_{packetId}", buffer);
 GlobalContext.Set($"__received_{packetId}_timestamp", CommonFunc.GetNowMs());
 ```
 
-`WaitForPacketNode`는 이 키를 폴링(50ms 간격)해서 수신 여부를 확인한다.
+`WaitForPacketNode`는 `Client.WaitForNextPacketAsync()`로 다음 패킷 대기를 등록하고 `TaskCompletionSource` 완료를 기다린다. 예약 키를 50ms 간격으로 폴링하지 않는다. 성공하면 수신 버퍼를 현재 컨텍스트에 설정하고 다음 노드로 전달하며, 시간 초과는 `TimeoutNodes`를 실행한다.
 
 ---
 

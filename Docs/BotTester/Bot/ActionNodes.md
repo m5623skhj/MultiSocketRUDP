@@ -1,6 +1,8 @@
 # 노드 타입 레퍼런스 (Action Nodes)
 
-> [[BotActionGraph]]을 구성하는 모든 노드 타입의 설명, 설정값, JSON 스키마.
+> [[BotActionGraph]]을 구성하는 노드 타입의 동작, 설정값과 AI JSON 가져오기 범위를 정리한다. 기본값은 별도 표기가 없으면 런타임 노드 속성 기준이다.
+
+이 문서의 JSON은 [[AiTreeGenerator]]가 읽는 트리 형식이다. 캔버스 저장 파일 형식은 [[GraphFileStorage]]를 참고한다. 코드에서 설정할 수 있는 모든 속성을 AI JSON으로 가져올 수 있는 것은 아니며, 지원 제한은 각 노드에 명시한다.
 
 ---
 
@@ -18,13 +20,15 @@
 | **Condition** | DarkOrange | 입력 1개 + `true` / `false` 출력 |
 | **Loop** | DarkMagenta | 입력 1개 + `continue` / `exit` 출력 |
 
+`RandomChoiceNode`는 Action 카테고리지만 `choice_0`, `choice_1` 등의 동적 선택 포트도 사용한다.
+
 ---
 
 ## 비동기 노드
 
-다음 노드들은 **비동기로 실행**되므로 실행 후 다음 노드로 즉시 반환 (NextNodes를 직접 관리):
+다음 노드들은 다음 분기의 실행을 직접 관리하므로 공통 실행기가 `NextNodes`를 자동 순회하지 않는다. 이 분류의 모든 노드가 별도 스레드에서 비동기로 실행된다는 뜻은 아니다:
 
-`DelayNode` · `RandomDelayNode` · `RepeatTimerNode` · `WaitForPacketNode` · `RetryNode` · `ConditionalNode` · `LoopNode` · `AssertNode`
+`DelayNode` · `RandomDelayNode` · `RandomChoiceNode` · `RepeatTimerNode` · `WaitForPacketNode` · `RetryNode` · `ConditionalNode` · `LoopNode` · `AssertNode`
 
 ---
 
@@ -43,10 +47,11 @@
 
 ### 노드 구현 파일 구성
 
-- `SimpleActionNode.cs`: 송신, 로그, 변수 설정/조회처럼 단일 동작 위주의 노드들
+- `SimpleActionNode.cs`: 송신, 지연, 로그, 연결 해제, 사용자 정의 동작 노드
 - `ConditionalAndLoopNodes.cs`: 조건 분기와 루프 구조 노드들
-- `FlowControlNodes.cs`: 대기, 재시도, 타임아웃, assertion 같은 흐름 제어 노드들
-- `VariableNodes.cs`: 컨텍스트 변수와 패킷 수신 상태를 이용하는 노드들
+- `FlowControlNodes.cs`: 검증과 재시도 노드
+- `VariableNodes.cs`: 변수 설정/조회와 패킷 수신 대기 노드
+- `PacketParserNode.cs`, `RandomChoiceNode.cs`: 패킷 파서와 가중치 선택 노드
 
 ---
 
@@ -58,11 +63,15 @@
 | 설정 | 타입 | 설명 |
 |------|------|------|
 | `PacketId` | `PacketId` enum | 전송할 패킷 종류 |
-| `PacketBuilder` | `Func<Client, NetBuffer>` | 패킷 데이터 생성 함수 |
+| `PacketBuilder` | `Func<Client, NetBuffer>?` | 설정하면 사용하고, 없으면 `PacketSchema`와 `FieldValues`로 본문 생성 |
+| `FieldValues` | `Dictionary<string, object>` | 스키마 필드별 값. 생략한 필드는 스키마 기본값 사용 |
+| `Unreliable` | `bool` | 기본 `false`. `true`면 비신뢰성 송신 |
 
 ```json
 { "type": "SendPacketNode", "packet_id": "Ping" }
 ```
+
+AI 가져오기는 `packet_id`만 설정한다. 필드값과 `Unreliable`은 가져온 뒤 UI에서 설정하거나 코드로 지정한다.
 
 ---
 
@@ -71,7 +80,7 @@
 
 | 설정 | 타입 | 기본값 |
 |------|------|--------|
-| `DelayMilliseconds` | `int` | 1000 |
+| `DelayMilliseconds` | `int` | 0. 그래프 검증을 통과하려면 양수로 설정 |
 
 ```json
 { "type": "DelayNode", "delay_ms": 1000 }
@@ -101,7 +110,7 @@
 | `MessageBuilder` | `Func<Client, NetBuffer?, string>` | `{sessionId}`, `{isConnected}`, `{packetSize}` |
 
 ```json
-{ "type": "LogNode", "message": "Session {sessionId} connected" }
+{ "type": "LogNode", "message": "세션 {sessionId} 연결됨" }
 ```
 
 ---
@@ -110,13 +119,13 @@
 클라이언트를 서버로부터 정상 종료한다. **반드시 리프 노드**여야 한다.
 
 ```json
-{ "type": "DisconnectNode", "reason": "Test completed" }
+{ "type": "DisconnectNode", "reason": "테스트 완료" }
 ```
 
 ---
 
 ### CustomActionNode
-코드에서 직접 `ActionHandler`를 설정해 임의 동작 수행. UI에서 생성 시 no-op.
+코드에서 직접 `ActionHandler`를 설정해 임의 동작을 수행한다. UI 빌더는 사용자 동작 대신 실행 사실을 로그로 남기는 핸들러를 설정한다. AI JSON은 사용자 코드를 가져오지 않는다.
 
 ---
 
@@ -147,11 +156,12 @@
 ### PacketParserNode
 수신 패킷을 역직렬화해 `BotVariables`의 Setter 메서드를 통해 컨텍스트에 저장.
 
-```json
-{ "type": "PacketParserNode", "setter_method": "SetPlayerMoney" }
+```csharp
+// 아래 BotVariables 확장 예시의 Setter를 등록한 뒤 사용한다.
+var parser = new PacketParserNode { SetterMethodName = "SetPlayerMoney" };
 ```
 
-> `BotVariables` 클래스에 `[BotVariable]` 어트리뷰트로 등록된 메서드만 사용 가능
+`BotVariables` 클래스에 `[BotVariable]` 어트리뷰트로 등록된 Setter를 사용한다. AI 검증기는 이 노드 타입을 허용하지만 `AiNodeFactory`는 `setter_method`를 읽지 않는다. 가져온 뒤 UI에서 Setter를 지정해야 빌드할 수 있다.
 
 ---
 
@@ -168,13 +178,15 @@
 ```json
 {
   "type": "ConditionalNode",
-  "condition": "Context.Get('money') > 100",
-  "true_branch": { ... },
-  "false_branch": { ... }
+  "condition": "true",
+  "true_branch": { "type": "LogNode", "message": "조건 참" },
+  "false_branch": { "type": "LogNode", "message": "조건 거짓" }
 }
 ```
 
 **UI 설정:** Left / Operator / Right 3단 구성. Left 또는 Right에 `Getter Function`을 선택하면 `BotVariables` Getter 목록에서 선택 가능.
+
+AI 가져오기는 `condition` 문자열을 상수인 Left에 넣고 상수 `true`와 `==`로 비교한다. 위 예제는 항상 참이다. `Context.Get(...) > 100` 같은 식을 해석하는 기능은 없으므로 동적 비교는 UI에서 Getter와 비교 연산자를 설정하거나 코드의 `Condition` 델리게이트로 작성한다.
 
 ---
 
@@ -191,12 +203,13 @@
 ```json
 {
   "type": "LoopNode",
-  "condition": "Context.Get('count') < 10",
-  "max_iterations": 100,
-  "loop_body": { ... },
-  "exit_nodes": { ... }
+  "max_iterations": 10,
+  "loop_body": { "type": "LogNode", "message": "반복 실행" },
+  "exit_nodes": { "type": "LogNode", "message": "반복 종료" }
 }
 ```
+
+AI 가져오기와 UI 빌더는 `max_iterations`를 `LoopCount`로 매핑해 횟수 기반 조건을 만든다. JSON의 자유 형식 `condition`은 읽지 않는다. 코드에서 노드를 직접 구성할 때만 임의의 `ContinueCondition`을 지정할 수 있다.
 
 ---
 
@@ -210,7 +223,7 @@
 | `IntervalMilliseconds` | 1000 |
 
 ```json
-{ "type": "RepeatTimerNode", "repeat_count": 5, "interval_ms": 2000, "repeat_body": { ... } }
+{ "type": "RepeatTimerNode", "repeat_count": 5, "interval_ms": 2000, "repeat_body": { "type": "LogNode", "message": "주기 실행" } }
 ```
 
 ---
@@ -218,7 +231,7 @@
 ### WaitForPacketNode
 `ExpectedPacketId`의 패킷이 수신될 때까지 대기. 타임아웃 시 `TimeoutNodes` 실행.
 
-패킷 수신 여부를 `RuntimeContext` 키 `__received_{PacketId}`로 확인.
+`Client.WaitForNextPacketAsync()`의 대기 등록과 완료 통지를 사용한다. 성공한 수신 버퍼를 다음 노드에 전달하며 예약 키 폴링은 사용하지 않는다.
 
 | 설정 | 기본값 |
 |------|--------|
@@ -226,7 +239,7 @@
 | `TimeoutMilliseconds` | 5000 |
 
 ```json
-{ "type": "WaitForPacketNode", "expected_packet_id": "Pong", "timeout_ms": 5000, "timeout_nodes": { ... } }
+{ "type": "WaitForPacketNode", "expected_packet_id": "Pong", "timeout_ms": 5000, "timeout_nodes": { "type": "LogNode", "message": "수신 시간 초과" } }
 ```
 
 ---
@@ -234,15 +247,16 @@
 ### AssertNode
 조건이 false이면 `FailureNodes`를 실행하고 `StopOnFailure`가 true이면 `AssertionFailedException`을 던진다.
 
-```json
+```csharp
+var assertion = new AssertNode
 {
-  "type": "AssertNode",
-  "condition": "Context.Get('result') == true",
-  "error_message": "Expected result to be true",
-  "stop_on_failure": true,
-  "failure_nodes": { ... }
-}
+    Condition = ctx => ctx.GetOrDefault("result", false),
+    ErrorMessage = "결과가 참이어야 한다",
+    StopOnFailure = true
+};
 ```
+
+UI에서는 Left / Operator / Right로 조건을 지정한다. AI 가져오기는 `error_message`, `stop_on_failure`, `failure_nodes`를 반영하지만 `condition`은 읽지 않는다. 가져온 노드는 UI에서 조건을 다시 설정해야 한다. 미설정 상태를 의도한 검증으로 사용하면 안 된다.
 
 ---
 
@@ -256,10 +270,12 @@
   "max_retries": 3,
   "retry_delay_ms": 1000,
   "exponential_backoff": false,
-  "retry_body": { ... },
-  "failure_nodes": { ... }
+  "retry_body": { "type": "LogNode", "message": "재시도 본문" },
+  "failure_nodes": { "type": "LogNode", "message": "재시도 실패" }
 }
 ```
+
+위 JSON은 가져오기 구조 예시다. AI 가져오기는 `SuccessCondition`과 별도의 `SuccessNodes`를 설정하지 않으므로 응답 성공 여부를 자동 판정하는 예제로 해석하지 않는다.
 
 ---
 
@@ -267,15 +283,18 @@
 `Choices` 목록에서 가중치 기반으로 무작위 선택 후 해당 노드를 실행.
 UI에서 `choice_0`, `choice_1` ... 동적 포트로 연결.
 
-```json
+```csharp
+var choice = new RandomChoiceNode
 {
-  "type": "RandomChoiceNode",
-  "choices": [
-    { "name": "heavy", "weight": 1, "next": { ... } },
-    { "name": "light", "weight": 3, "next": { ... } }
-  ]
-}
+    Choices =
+    [
+        new ChoiceOption { Name = "적은 비중", Weight = 1, Node = new DelayNode { DelayMilliseconds = 100 } },
+        new ChoiceOption { Name = "큰 비중", Weight = 3, Node = new DelayNode { DelayMilliseconds = 300 } }
+    ]
+};
 ```
+
+이 노드는 UI 또는 코드로 구성한다. AI 검증기의 `KnownNodeTypes`에 없고 `AiNodeFactory`도 `choices`를 읽지 않으므로 AI 트리 JSON으로 가져올 수 없다. 그래프 검증을 위해 최소 2개 선택지에 연결 대상과 양수 가중치를 지정한다.
 
 ---
 
