@@ -14,54 +14,54 @@
 <text x="15" y="162.75">0.379</text>
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
 <text x="15" y="119.0">0.505</text>
-<circle cx="80.0" cy="228.40077605321508" r="4" fill="#58a6ff"><title>p95Ms: 0.178</title></circle>
-<line x1="80.0" y1="228.40077605321508" x2="171.11111111111111" y2="180.4171286031042" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="171.11111111111111" cy="180.4171286031042" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
-<line x1="171.11111111111111" y1="180.4171286031042" x2="262.22222222222223" y2="174.9431818181818" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="262.22222222222223" cy="174.9431818181818" r="4" fill="#58a6ff"><title>p95Ms: 0.332</title></circle>
-<line x1="262.22222222222223" y1="174.9431818181818" x2="353.3333333333333" y2="182.01080931263857" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="353.3333333333333" cy="182.01080931263857" r="4" fill="#58a6ff"><title>p95Ms: 0.312</title></circle>
-<line x1="353.3333333333333" y1="182.01080931263857" x2="444.44444444444446" y2="179.72422394678492" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="444.44444444444446" cy="179.72422394678492" r="4" fill="#58a6ff"><title>p95Ms: 0.318</title></circle>
-<line x1="444.44444444444446" y1="179.72422394678492" x2="535.5555555555555" y2="186.65327050997783" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="535.5555555555555" cy="186.65327050997783" r="4" fill="#58a6ff"><title>p95Ms: 0.298</title></circle>
-<line x1="535.5555555555555" y1="186.65327050997783" x2="626.6666666666666" y2="205.36169623059868" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="626.6666666666666" cy="205.36169623059868" r="4" fill="#58a6ff"><title>p95Ms: 0.244</title></circle>
-<line x1="626.6666666666666" y1="205.36169623059868" x2="717.7777777777778" y2="207.02466740576497" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="717.7777777777778" cy="207.02466740576497" r="4" fill="#58a6ff"><title>p95Ms: 0.239</title></circle>
-<line x1="717.7777777777778" y1="207.02466740576497" x2="808.8888888888889" y2="176.91796008869179" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="808.8888888888889" cy="176.91796008869179" r="4" fill="#58a6ff"><title>p95Ms: 0.326</title></circle>
-<line x1="808.8888888888889" y1="176.91796008869179" x2="900.0" y2="185.75249445676275" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="900.0" cy="185.75249445676275" r="4" fill="#58a6ff"><title>p95Ms: 0.301</title></circle>
-<circle cx="80.0" cy="204.80737250554324" r="4" fill="#f85149"><title>p99Ms: 0.246</title></circle>
-<line x1="80.0" y1="204.80737250554324" x2="171.11111111111111" y2="153.98281596452327" stroke="#f85149" stroke-width="2"/>
-<circle cx="171.11111111111111" cy="153.98281596452327" r="4" fill="#f85149"><title>p99Ms: 0.393</title></circle>
-<line x1="171.11111111111111" y1="153.98281596452327" x2="262.22222222222223" y2="140.88691796008868" stroke="#f85149" stroke-width="2"/>
-<circle cx="262.22222222222223" cy="140.88691796008868" r="4" fill="#f85149"><title>p99Ms: 0.430</title></circle>
-<line x1="262.22222222222223" y1="140.88691796008868" x2="353.3333333333333" y2="159.56069844789357" stroke="#f85149" stroke-width="2"/>
-<circle cx="353.3333333333333" cy="159.56069844789357" r="4" fill="#f85149"><title>p99Ms: 0.377</title></circle>
-<line x1="353.3333333333333" y1="159.56069844789357" x2="444.44444444444446" y2="140.47117516629712" stroke="#f85149" stroke-width="2"/>
-<circle cx="444.44444444444446" cy="140.47117516629712" r="4" fill="#f85149"><title>p99Ms: 0.432</title></circle>
-<line x1="444.44444444444446" y1="140.47117516629712" x2="535.5555555555555" y2="149.51358093126385" stroke="#f85149" stroke-width="2"/>
-<circle cx="535.5555555555555" cy="149.51358093126385" r="4" fill="#f85149"><title>p99Ms: 0.406</title></circle>
-<line x1="535.5555555555555" y1="149.51358093126385" x2="626.6666666666666" y2="185.2328159645233" stroke="#f85149" stroke-width="2"/>
-<circle cx="626.6666666666666" cy="185.2328159645233" r="4" fill="#f85149"><title>p99Ms: 0.302</title></circle>
-<line x1="626.6666666666666" y1="185.2328159645233" x2="717.7777777777778" y2="158.76385809312637" stroke="#f85149" stroke-width="2"/>
-<circle cx="717.7777777777778" cy="158.76385809312637" r="4" fill="#f85149"><title>p99Ms: 0.379</title></circle>
-<line x1="717.7777777777778" y1="158.76385809312637" x2="808.8888888888889" y2="130.9090909090909" stroke="#f85149" stroke-width="2"/>
-<circle cx="808.8888888888889" cy="130.9090909090909" r="4" fill="#f85149"><title>p99Ms: 0.459</title></circle>
-<line x1="808.8888888888889" y1="130.9090909090909" x2="900.0" y2="162.54018847006654" stroke="#f85149" stroke-width="2"/>
-<circle cx="900.0" cy="162.54018847006654" r="4" fill="#f85149"><title>p99Ms: 0.368</title></circle>
-<text x="55.0" y="312">fc496f9</text>
-<text x="146.11111111111111" y="312">26e1e6c</text>
-<text x="237.22222222222223" y="312">37cc2df</text>
-<text x="328.3333333333333" y="312">622f8a0</text>
-<text x="419.44444444444446" y="312">caf723f</text>
-<text x="510.55555555555554" y="312">0b8ab0d</text>
-<text x="601.6666666666666" y="312">fa51ffb</text>
-<text x="692.7777777777778" y="312">bb59568</text>
-<text x="783.8888888888889" y="312">ce5083e</text>
-<text x="875.0" y="312">0cfee60</text>
+<circle cx="80.0" cy="180.4171286031042" r="4" fill="#58a6ff"><title>p95Ms: 0.316</title></circle>
+<line x1="80.0" y1="180.4171286031042" x2="171.11111111111111" y2="174.9431818181818" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="174.9431818181818" r="4" fill="#58a6ff"><title>p95Ms: 0.332</title></circle>
+<line x1="171.11111111111111" y1="174.9431818181818" x2="262.22222222222223" y2="182.01080931263857" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="182.01080931263857" r="4" fill="#58a6ff"><title>p95Ms: 0.312</title></circle>
+<line x1="262.22222222222223" y1="182.01080931263857" x2="353.3333333333333" y2="179.72422394678492" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="353.3333333333333" cy="179.72422394678492" r="4" fill="#58a6ff"><title>p95Ms: 0.318</title></circle>
+<line x1="353.3333333333333" y1="179.72422394678492" x2="444.44444444444446" y2="186.65327050997783" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="186.65327050997783" r="4" fill="#58a6ff"><title>p95Ms: 0.298</title></circle>
+<line x1="444.44444444444446" y1="186.65327050997783" x2="535.5555555555555" y2="205.36169623059868" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="205.36169623059868" r="4" fill="#58a6ff"><title>p95Ms: 0.244</title></circle>
+<line x1="535.5555555555555" y1="205.36169623059868" x2="626.6666666666666" y2="207.02466740576497" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="207.02466740576497" r="4" fill="#58a6ff"><title>p95Ms: 0.239</title></circle>
+<line x1="626.6666666666666" y1="207.02466740576497" x2="717.7777777777778" y2="176.91796008869179" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="176.91796008869179" r="4" fill="#58a6ff"><title>p95Ms: 0.326</title></circle>
+<line x1="717.7777777777778" y1="176.91796008869179" x2="808.8888888888889" y2="185.75249445676275" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="185.75249445676275" r="4" fill="#58a6ff"><title>p95Ms: 0.301</title></circle>
+<line x1="808.8888888888889" y1="185.75249445676275" x2="900.0" y2="219.53159645232816" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="219.53159645232816" r="4" fill="#58a6ff"><title>p95Ms: 0.203</title></circle>
+<circle cx="80.0" cy="153.98281596452327" r="4" fill="#f85149"><title>p99Ms: 0.393</title></circle>
+<line x1="80.0" y1="153.98281596452327" x2="171.11111111111111" y2="140.88691796008868" stroke="#f85149" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="140.88691796008868" r="4" fill="#f85149"><title>p99Ms: 0.430</title></circle>
+<line x1="171.11111111111111" y1="140.88691796008868" x2="262.22222222222223" y2="159.56069844789357" stroke="#f85149" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="159.56069844789357" r="4" fill="#f85149"><title>p99Ms: 0.377</title></circle>
+<line x1="262.22222222222223" y1="159.56069844789357" x2="353.3333333333333" y2="140.47117516629712" stroke="#f85149" stroke-width="2"/>
+<circle cx="353.3333333333333" cy="140.47117516629712" r="4" fill="#f85149"><title>p99Ms: 0.432</title></circle>
+<line x1="353.3333333333333" y1="140.47117516629712" x2="444.44444444444446" y2="149.51358093126385" stroke="#f85149" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="149.51358093126385" r="4" fill="#f85149"><title>p99Ms: 0.406</title></circle>
+<line x1="444.44444444444446" y1="149.51358093126385" x2="535.5555555555555" y2="185.2328159645233" stroke="#f85149" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="185.2328159645233" r="4" fill="#f85149"><title>p99Ms: 0.302</title></circle>
+<line x1="535.5555555555555" y1="185.2328159645233" x2="626.6666666666666" y2="158.76385809312637" stroke="#f85149" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="158.76385809312637" r="4" fill="#f85149"><title>p99Ms: 0.379</title></circle>
+<line x1="626.6666666666666" y1="158.76385809312637" x2="717.7777777777778" y2="130.9090909090909" stroke="#f85149" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="130.9090909090909" r="4" fill="#f85149"><title>p99Ms: 0.459</title></circle>
+<line x1="717.7777777777778" y1="130.9090909090909" x2="808.8888888888889" y2="162.54018847006654" stroke="#f85149" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="162.54018847006654" r="4" fill="#f85149"><title>p99Ms: 0.368</title></circle>
+<line x1="808.8888888888889" y1="162.54018847006654" x2="900.0" y2="185.16352549889137" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="185.16352549889137" r="4" fill="#f85149"><title>p99Ms: 0.303</title></circle>
+<text x="55.0" y="312">26e1e6c</text>
+<text x="146.11111111111111" y="312">37cc2df</text>
+<text x="237.22222222222223" y="312">622f8a0</text>
+<text x="328.3333333333333" y="312">caf723f</text>
+<text x="419.44444444444446" y="312">0b8ab0d</text>
+<text x="510.55555555555554" y="312">fa51ffb</text>
+<text x="601.6666666666666" y="312">bb59568</text>
+<text x="692.7777777777778" y="312">ce5083e</text>
+<text x="783.8888888888889" y="312">0cfee60</text>
+<text x="875.0" y="312">f3da8b1</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -73,35 +73,35 @@
 <text x="15" y="400.25">75.000</text>
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
-<circle cx="80.0" cy="366.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.000</title></circle>
-<line x1="80.0" y1="366.25" x2="171.11111111111111" y2="365.25" stroke="#3fb950" stroke-width="2"/>
-<circle cx="171.11111111111111" cy="365.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.800</title></circle>
-<line x1="171.11111111111111" y1="365.25" x2="262.22222222222223" y2="365.125" stroke="#3fb950" stroke-width="2"/>
-<circle cx="262.22222222222223" cy="365.125" r="4" fill="#3fb950"><title>deliveryPercent: 99.900</title></circle>
-<line x1="262.22222222222223" y1="365.125" x2="353.3333333333333" y2="365.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="80.0" cy="365.25" r="4" fill="#3fb950"><title>deliveryPercent: 99.800</title></circle>
+<line x1="80.0" y1="365.25" x2="171.11111111111111" y2="365.125" stroke="#3fb950" stroke-width="2"/>
+<circle cx="171.11111111111111" cy="365.125" r="4" fill="#3fb950"><title>deliveryPercent: 99.900</title></circle>
+<line x1="171.11111111111111" y1="365.125" x2="262.22222222222223" y2="365.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="262.22222222222223" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
+<line x1="262.22222222222223" y1="365.375" x2="353.3333333333333" y2="365.375" stroke="#3fb950" stroke-width="2"/>
 <circle cx="353.3333333333333" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="353.3333333333333" y1="365.375" x2="444.44444444444446" y2="365.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="444.44444444444446" cy="365.375" r="4" fill="#3fb950"><title>deliveryPercent: 99.700</title></circle>
-<line x1="444.44444444444446" y1="365.375" x2="535.5555555555555" y2="366.5" stroke="#3fb950" stroke-width="2"/>
-<circle cx="535.5555555555555" cy="366.5" r="4" fill="#3fb950"><title>deliveryPercent: 98.800</title></circle>
-<line x1="535.5555555555555" y1="366.5" x2="626.6666666666666" y2="366.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="626.6666666666666" cy="366.375" r="4" fill="#3fb950"><title>deliveryPercent: 98.900</title></circle>
-<line x1="626.6666666666666" y1="366.375" x2="717.7777777777778" y2="366.125" stroke="#3fb950" stroke-width="2"/>
-<circle cx="717.7777777777778" cy="366.125" r="4" fill="#3fb950"><title>deliveryPercent: 99.100</title></circle>
-<line x1="717.7777777777778" y1="366.125" x2="808.8888888888889" y2="366.375" stroke="#3fb950" stroke-width="2"/>
-<circle cx="808.8888888888889" cy="366.375" r="4" fill="#3fb950"><title>deliveryPercent: 98.900</title></circle>
-<line x1="808.8888888888889" y1="366.375" x2="900.0" y2="365.75" stroke="#3fb950" stroke-width="2"/>
+<line x1="353.3333333333333" y1="365.375" x2="444.44444444444446" y2="366.5" stroke="#3fb950" stroke-width="2"/>
+<circle cx="444.44444444444446" cy="366.5" r="4" fill="#3fb950"><title>deliveryPercent: 98.800</title></circle>
+<line x1="444.44444444444446" y1="366.5" x2="535.5555555555555" y2="366.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="535.5555555555555" cy="366.375" r="4" fill="#3fb950"><title>deliveryPercent: 98.900</title></circle>
+<line x1="535.5555555555555" y1="366.375" x2="626.6666666666666" y2="366.125" stroke="#3fb950" stroke-width="2"/>
+<circle cx="626.6666666666666" cy="366.125" r="4" fill="#3fb950"><title>deliveryPercent: 99.100</title></circle>
+<line x1="626.6666666666666" y1="366.125" x2="717.7777777777778" y2="366.375" stroke="#3fb950" stroke-width="2"/>
+<circle cx="717.7777777777778" cy="366.375" r="4" fill="#3fb950"><title>deliveryPercent: 98.900</title></circle>
+<line x1="717.7777777777778" y1="366.375" x2="808.8888888888889" y2="365.75" stroke="#3fb950" stroke-width="2"/>
+<circle cx="808.8888888888889" cy="365.75" r="4" fill="#3fb950"><title>deliveryPercent: 99.400</title></circle>
+<line x1="808.8888888888889" y1="365.75" x2="900.0" y2="365.75" stroke="#3fb950" stroke-width="2"/>
 <circle cx="900.0" cy="365.75" r="4" fill="#3fb950"><title>deliveryPercent: 99.400</title></circle>
-<text x="55.0" y="512">fc496f9</text>
-<text x="146.11111111111111" y="512">26e1e6c</text>
-<text x="237.22222222222223" y="512">37cc2df</text>
-<text x="328.3333333333333" y="512">622f8a0</text>
-<text x="419.44444444444446" y="512">caf723f</text>
-<text x="510.55555555555554" y="512">0b8ab0d</text>
-<text x="601.6666666666666" y="512">fa51ffb</text>
-<text x="692.7777777777778" y="512">bb59568</text>
-<text x="783.8888888888889" y="512">ce5083e</text>
-<text x="875.0" y="512">0cfee60</text>
+<text x="55.0" y="512">26e1e6c</text>
+<text x="146.11111111111111" y="512">37cc2df</text>
+<text x="237.22222222222223" y="512">622f8a0</text>
+<text x="328.3333333333333" y="512">caf723f</text>
+<text x="419.44444444444446" y="512">0b8ab0d</text>
+<text x="510.55555555555554" y="512">fa51ffb</text>
+<text x="601.6666666666666" y="512">bb59568</text>
+<text x="692.7777777777778" y="512">ce5083e</text>
+<text x="783.8888888888889" y="512">0cfee60</text>
+<text x="875.0" y="512">f3da8b1</text>
 <text x="650" y="97">P95: blue · P99: red</text>
 <text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="585">Commit</text>
@@ -110,64 +110,64 @@
 <text x="480" y="585">Previous P95</text>
 <text x="650" y="585">Previous P99</text>
 <text x="820" y="585">Response %</text>
-<text x="28" y="615">fc496f9e4c58</text>
-<text x="180" y="615">0.178</text>
-<text x="480" y="615">-29.53%</text>
-<text x="330" y="615">0.246</text>
-<text x="650" y="615">-15.96%</text>
-<text x="820" y="615">99.000</text>
-<text x="28" y="639">26e1e6c2d27a</text>
-<text x="180" y="639">0.316</text>
-<text x="480" y="639">+77.90%</text>
-<text x="330" y="639">0.393</text>
-<text x="650" y="639">+59.66%</text>
-<text x="820" y="639">99.800</text>
-<text x="28" y="663">37cc2df9d603</text>
-<text x="180" y="663">0.332</text>
-<text x="480" y="663">+5.00%</text>
-<text x="330" y="663">0.430</text>
-<text x="650" y="663">+9.63%</text>
-<text x="820" y="663">99.900</text>
-<text x="28" y="687">622f8a081c0a</text>
-<text x="180" y="687">0.312</text>
-<text x="480" y="687">-6.14%</text>
-<text x="330" y="687">0.377</text>
-<text x="650" y="687">-12.52%</text>
+<text x="28" y="615">26e1e6c2d27a</text>
+<text x="180" y="615">0.316</text>
+<text x="480" y="615">+77.90%</text>
+<text x="330" y="615">0.393</text>
+<text x="650" y="615">+59.66%</text>
+<text x="820" y="615">99.800</text>
+<text x="28" y="639">37cc2df9d603</text>
+<text x="180" y="639">0.332</text>
+<text x="480" y="639">+5.00%</text>
+<text x="330" y="639">0.430</text>
+<text x="650" y="639">+9.63%</text>
+<text x="820" y="639">99.900</text>
+<text x="28" y="663">622f8a081c0a</text>
+<text x="180" y="663">0.312</text>
+<text x="480" y="663">-6.14%</text>
+<text x="330" y="663">0.377</text>
+<text x="650" y="663">-12.52%</text>
+<text x="820" y="663">99.700</text>
+<text x="28" y="687">caf723f66adc</text>
+<text x="180" y="687">0.318</text>
+<text x="480" y="687">+2.12%</text>
+<text x="330" y="687">0.432</text>
+<text x="650" y="687">+14.63%</text>
 <text x="820" y="687">99.700</text>
-<text x="28" y="711">caf723f66adc</text>
-<text x="180" y="711">0.318</text>
-<text x="480" y="711">+2.12%</text>
-<text x="330" y="711">0.432</text>
-<text x="650" y="711">+14.63%</text>
-<text x="820" y="711">99.700</text>
-<text x="28" y="735">0b8ab0de168f</text>
-<text x="180" y="735">0.298</text>
-<text x="480" y="735">-6.28%</text>
-<text x="330" y="735">0.406</text>
-<text x="650" y="735">-6.05%</text>
-<text x="820" y="735">98.800</text>
-<text x="28" y="759">fa51ffb56460</text>
-<text x="180" y="759">0.244</text>
-<text x="480" y="759">-18.10%</text>
-<text x="330" y="759">0.302</text>
-<text x="650" y="759">-25.43%</text>
-<text x="820" y="759">98.900</text>
-<text x="28" y="783">bb5956829f6a</text>
-<text x="180" y="783">0.239</text>
-<text x="480" y="783">-1.96%</text>
-<text x="330" y="783">0.379</text>
-<text x="650" y="783">+25.26%</text>
-<text x="820" y="783">99.100</text>
-<text x="28" y="807">ce5083e1732e</text>
-<text x="180" y="807">0.326</text>
-<text x="480" y="807">+36.28%</text>
-<text x="330" y="807">0.459</text>
-<text x="650" y="807">+21.22%</text>
-<text x="820" y="807">98.900</text>
-<text x="28" y="831">0cfee60e6729</text>
-<text x="180" y="831">0.301</text>
-<text x="480" y="831">-7.81%</text>
-<text x="330" y="831">0.368</text>
-<text x="650" y="831">-19.88%</text>
+<text x="28" y="711">0b8ab0de168f</text>
+<text x="180" y="711">0.298</text>
+<text x="480" y="711">-6.28%</text>
+<text x="330" y="711">0.406</text>
+<text x="650" y="711">-6.05%</text>
+<text x="820" y="711">98.800</text>
+<text x="28" y="735">fa51ffb56460</text>
+<text x="180" y="735">0.244</text>
+<text x="480" y="735">-18.10%</text>
+<text x="330" y="735">0.302</text>
+<text x="650" y="735">-25.43%</text>
+<text x="820" y="735">98.900</text>
+<text x="28" y="759">bb5956829f6a</text>
+<text x="180" y="759">0.239</text>
+<text x="480" y="759">-1.96%</text>
+<text x="330" y="759">0.379</text>
+<text x="650" y="759">+25.26%</text>
+<text x="820" y="759">99.100</text>
+<text x="28" y="783">ce5083e1732e</text>
+<text x="180" y="783">0.326</text>
+<text x="480" y="783">+36.28%</text>
+<text x="330" y="783">0.459</text>
+<text x="650" y="783">+21.22%</text>
+<text x="820" y="783">98.900</text>
+<text x="28" y="807">0cfee60e6729</text>
+<text x="180" y="807">0.301</text>
+<text x="480" y="807">-7.81%</text>
+<text x="330" y="807">0.368</text>
+<text x="650" y="807">-19.88%</text>
+<text x="820" y="807">99.400</text>
+<text x="28" y="831">f3da8b1550db</text>
+<text x="180" y="831">0.203</text>
+<text x="480" y="831">-32.40%</text>
+<text x="330" y="831">0.303</text>
+<text x="650" y="831">-17.75%</text>
 <text x="820" y="831">99.400</text>
 </svg>
