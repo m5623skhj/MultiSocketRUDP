@@ -568,9 +568,15 @@ void RUDPClientCore::ProcessRecvPacket(OUT NetBuffer& receivedBuffer)
 		if (not PacketCryptoHelper::DecodePacket(receivedBuffer, sessionSalt, SESSION_SALT_SIZE,
 			sessionKeyHandle, false, PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL)) return;
 		authenticatedReceiveCount.fetch_add(1, std::memory_order_relaxed);
+		if (receivedBuffer.GetUseSize() < static_cast<int>(sizeof(PacketSequence) + sizeof(PacketId))) return;
 		receivedBuffer >> packetSequence;
+		const auto packetIdOffset = receivedBuffer.m_iRead;
+		PacketId packetId{};
+		receivedBuffer >> packetId;
+		receivedBuffer.m_iRead = packetIdOffset;
+		const bool allowReordering = AllowsReorderedUnreliablePacket(packetId);
 		std::scoped_lock lock(recvPacketHoldingQueueLock);
-		if (not unreliableReceiveState.Accept(packetSequence)) return;
+		if (not unreliableReceiveState.Accept(packetSequence, allowReordering)) return;
 		if (unreliableReceivedPackets.size() >= unreliableQueueCapacity)
 		{
 			NetBuffer::Free(unreliableReceivedPackets.front());

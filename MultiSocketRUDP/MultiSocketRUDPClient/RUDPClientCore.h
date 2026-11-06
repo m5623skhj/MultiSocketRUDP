@@ -115,6 +115,8 @@ protected:
 	virtual bool ShouldSendConnectPacketOnStart() const { return true; }
 	[[nodiscard]]
 	virtual bool ShouldSendReplyToServer(PacketSequence, unsigned int) const { return true; }
+	// Only packet families with their own complete-frame ordering should opt in.
+	virtual bool AllowsReorderedUnreliablePacket(unsigned int) const noexcept { return false; }
 
 public:
 	bool IsStopped() const { return isStopped.load(std::memory_order_acquire); }
@@ -333,7 +335,7 @@ private:
 	PacketSequence lastUnreliableSendSequence{};
 	uint64_t unreliableSendGeneration{}; // Shared by both channels; invalidates paused serializers on Stop.
 	std::deque<NetBuffer*> unreliableReceivedPackets;
-	LatestPacketSequence unreliableReceiveState;
+	ReorderedUnreliablePacketSequence unreliableReceiveState;
 	unsigned int unreliableQueueCapacity = DEFAULT_UNRELIABLE_QUEUE_CAPACITY;
 
 	struct PendingPacketInfo
