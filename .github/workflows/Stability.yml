@@ -76,6 +76,11 @@ jobs:
           git submodule status --recursive | Set-Content stability-results/submodules.txt
           if ($LASTEXITCODE -ne 0) { throw 'Failed to record submodule revisions.' }
 
+      - name: Trust IntegrationTest certificate
+        id: test-cert-trust
+        shell: pwsh
+        run: ./MultiSocketRUDP/Tool/ForTLS/Add-IntegrationTestTrust.ps1
+
       - name: Repeat isolated stability cases
         shell: pwsh
         env:
@@ -91,6 +96,15 @@ jobs:
             -Iterations $iterations `
             -CaseTimeoutSeconds 180 -BudgetMinutes 40 `
             -OutputDirectory stability-results
+
+      - name: Remove IntegrationTest certificate trust
+        if: always() && steps.test-cert-trust.outputs.thumbprint != ''
+        shell: pwsh
+        env:
+          TEST_CERT_THUMBPRINT: ${{ steps.test-cert-trust.outputs.thumbprint }}
+        run: |
+          $certPath = "Cert:\CurrentUser\Root\$env:TEST_CERT_THUMBPRINT"
+          if (Test-Path -LiteralPath $certPath) { Remove-Item -LiteralPath $certPath }
 
       - name: Upload first failure and completed case results
         if: always()
