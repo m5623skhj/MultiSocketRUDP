@@ -106,6 +106,7 @@ Ping/Pong은 각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 
 - `channel-unreliable-only.svg`와 `channel-mixed.svg`는 조건이 같은 최근 공식 측정의 비신뢰성 P95/P99와 응답률을 표시한다.
 - `channel-comparison.svg`는 같은 커밋·조건의 버전 3 단독 측정만 짝지어 신뢰·비신뢰 P95/P99와 응답률을 표시한다. 양쪽 모두 응답 직후 다음 요청을 보내며, 비신뢰 유실은 1초 타임아웃 후 진행한다. 워밍업 100건·본 측정 1,000건·3회 실행이며, 기존 Ping/Pong 및 버전 1·2 추세와 분리한다.
 - `channel-history.json`은 최근 150개 채널 시나리오 결과를 보존한다.
+- 채널 SVG의 RTT 축·툴팁·하단 표와 채널 요약의 RTT는 µs로 표시한다. JSON의 `p50Ms`·`p95Ms`·`p99Ms`는 ms를 유지하고 표시할 때만 변환한다. 응답률·변화율은 %를 유지한다.
 - `rtt-loss-0.svg`와 `rtt-loss-10.svg`의 변화율은 현재 값과 이전 최대 5개 측정 중앙값을 비교한 백분율이다.
 - `channel-unreliable-only.svg`와 `channel-mixed.svg`의 변화율은 같은 commit을 제외한 직전 호환 측정값과 비교한 백분율이다. 이전 5개 중앙값을 사용하지 않는다. `channel-comparison.svg`는 변화율 대신 양쪽 RTT와 응답률을 표시한다. RTT 변화율이 양수면 지연이 증가한 것이다.
 - Job Summary와 PR 코멘트의 변화율은 직전 공식 측정과 비교한다.

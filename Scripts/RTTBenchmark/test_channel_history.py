@@ -50,8 +50,8 @@ class ChannelHistoryTests(unittest.TestCase):
                          [r['commitSha'] for r in comparison_entries(history)])
         svg = render_trend(history, None)
         ET.fromstring(svg)
-        self.assertIn('reliable p95Ms: 12.000', svg)
-        self.assertIn('unreliable p99Ms: 12.000', svg)
+        self.assertIn('reliable P95: 12000.0 µs', svg)
+        self.assertIn('unreliable P99: 12000.0 µs', svg)
         self.assertIn('R response %', svg)
         self.assertNotIn('legacy', svg)
         self.assertIn('Awaiting a complete pair', render_trend([], None))
@@ -85,6 +85,7 @@ class ChannelHistoryTests(unittest.TestCase):
             with patch('sys.argv', args):
                 main()
             self.assertEqual(3, len(json.loads((root / 'history.json').read_text())))
+            self.assertEqual(1, json.loads((root / 'history.json').read_text())[-1]['runs'][0]['unreliable']['p95Ms'])
             ET.fromstring((root / 'channel-comparison.svg').read_text(encoding='utf-8'))
 
     def test_trend_uses_latest_ten_matching_conditions_and_scenario(self):
@@ -108,6 +109,28 @@ class ChannelHistoryTests(unittest.TestCase):
         self.assertIn('deliveryPercent: 0.000', svg)
         self.assertIn('N/A', svg)
         self.assertNotIn('-100.00%', svg)
+
+    def test_microsecond_display_preserves_percentages_and_source_data(self):
+        history = [result('old', .2, 98), result('new', .395, 99.4)]
+        original = json.dumps(history)
+        for scenario in ('unreliable-only', 'mixed', None):
+            data = self.pair('new', .395) if scenario is None else json.loads(original)
+            if scenario == 'mixed':
+                for entry in data:
+                    entry['scenarioName'] = 'mixed'
+            svg = render_trend(data, scenario)
+            self.assertIn('RTT (µs)', svg)
+            self.assertIn('P95 µs', svg)
+            self.assertIn('P95: 395.0 µs', svg)
+            self.assertNotIn('RTT (ms)', svg)
+            ET.fromstring(svg)
+        self.assertIn('deliveryPercent: 99.400%', render_trend(history, 'unreliable-only'))
+        self.assertIn('+97.50%', render_trend(history, 'unreliable-only'))
+        report = render([history[-1]], [history[0]])
+        self.assertIn('p95 µs', report)
+        self.assertIn('395.0', report)
+        self.assertIn('+97.50%', report)
+        self.assertEqual(original, json.dumps(history))
 
     def test_single_empty_and_escaped_trends_are_valid_svg(self):
         for history in ([], [result('<&', None, 0)], [result('one', 0)]):

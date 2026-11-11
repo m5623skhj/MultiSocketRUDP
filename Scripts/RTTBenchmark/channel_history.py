@@ -18,6 +18,17 @@ def metric(result, channel, name):
     return statistics.median(values) if values else None
 
 
+def display_metric(value, name):
+    """Convert RTT only for display; history and comparison arithmetic stay in ms."""
+    return value * 1000 if value is not None and name.endswith('Ms') else value
+
+
+def format_metric(value, name):
+    if value is None:
+        return 'N/A'
+    return f'{display_metric(value, name):.1f}' if name.endswith('Ms') else f'{value:.3f}'
+
+
 def trend_entries(history, scenario):
     entries = [entry for entry in history if entry['scenarioName'] == scenario]
     return [entry for entry in entries if compatible(entry, entries[-1])][-10:] if entries else []
@@ -63,20 +74,20 @@ def render_trend(history, scenario):
         return 490 if len(entries) == 1 else 80 + 820 * index / max(1, len(entries) - 1)
 
     for top, bottom, names, colors, unit in (
-            (115, 290, ('p95Ms', 'p99Ms'), ('#58a6ff', '#f85149'), 'RTT (ms)'),
+            (115, 290, ('p95Ms', 'p99Ms'), ('#58a6ff', '#f85149'), 'RTT (µs)'),
             (365, 490, ('deliveryPercent',), ('#3fb950',), 'Responses / attempted (%)')):
         channels = ('reliable', 'unreliable') if comparison else ('unreliable',)
         specs = [(channel, name) for channel in channels for name in names]
         if comparison:
             colors = ('#58a6ff', '#79c0ff', '#f0883e', '#ffa657') if len(names) == 2 else ('#58a6ff', '#f0883e')
-        series = [[metric(entry, channel, name) for entry in entries] for channel, name in specs]
+        series = [[display_metric(metric(entry, channel, name), name) for entry in entries] for channel, name in specs]
         values = [value for values in series for value in values if value is not None]
-        maximum = 100 if len(names) == 1 else max(max(values, default=0) * 1.1, 0.001)
+        maximum = 100 if len(names) == 1 else max(max(values, default=0) * 1.1, 1.0)
         label(28, top - 18, unit)
         for i in range(5):
             y = bottom - (bottom - top) * i / 4
             svg.append(f'<line x1="80" y1="{y}" x2="900" y2="{y}" stroke="#30363d"/>')
-            label(15, y + 4, f'{maximum * i / 4:.3f}')
+            label(15, y + 4, f'{maximum * i / 4:.3f}' if len(names) == 1 else f'{maximum * i / 4:.1f}')
         for values, color, (channel, name) in zip(series, colors, specs):
             previous = None
             for index, value in enumerate(values):
@@ -88,7 +99,8 @@ def render_trend(history, scenario):
                 if previous is not None:
                     dash = ' stroke-dasharray="6 4"' if comparison and name == 'p99Ms' else ''
                     svg.append(f'<line x1="{previous[0]}" y1="{previous[1]}" x2="{point[0]}" y2="{point[1]}" stroke="{color}" stroke-width="2"{dash}/>')
-                svg.append(f'<circle cx="{point[0]}" cy="{point[1]}" r="4" fill="{color}"><title>{channel} {name}: {value:.3f}</title></circle>')
+                tooltip = f'{channel} {name[:-2].upper()}: {value:.1f} µs' if name.endswith('Ms') else f'{channel} {name}: {value:.3f}%'
+                svg.append(f'<circle cx="{point[0]}" cy="{point[1]}" r="4" fill="{color}"><title>{tooltip}</title></circle>')
                 previous = point
         for index, entry in enumerate(entries):
             label(x(index) - 25, bottom + 22, entry['commitSha'][:7])
@@ -103,7 +115,7 @@ def render_trend(history, scenario):
     else:
         label(650, 97, 'P95: blue · P99: red')
     label(28, 552 if comparison else 548, 'Missing responses are excluded from RTT. Read latency together with response rate.')
-    headers = ((28, 'Commit'), (180, 'R P95 ms'), (300, 'R P99 ms'), (420, 'U P95 ms'), (540, 'U P99 ms'), (670, 'R response %'), (820, 'U response %')) if comparison else ((28, 'Commit'), (180, 'P95 ms'), (330, 'P99 ms'), (480, 'Previous P95'), (650, 'Previous P99'), (820, 'Response %'))
+    headers = ((28, 'Commit'), (180, 'R P95 µs'), (300, 'R P99 µs'), (420, 'U P95 µs'), (540, 'U P99 µs'), (670, 'R response %'), (820, 'U response %')) if comparison else ((28, 'Commit'), (180, 'P95 µs'), (330, 'P99 µs'), (480, 'Previous P95'), (650, 'Previous P99'), (820, 'Response %'))
     for xpos, text in headers:
         label(xpos, 600 if comparison else 585, text)
     for index, entry in enumerate(entries):
@@ -114,14 +126,14 @@ def render_trend(history, scenario):
                                        ('unreliable', 'p95Ms', 420), ('unreliable', 'p99Ms', 540),
                                        ('reliable', 'deliveryPercent', 670), ('unreliable', 'deliveryPercent', 820)):
                 value = metric(entry, channel, name)
-                label(xpos, y, 'N/A' if value is None else f'{value:.3f}')
+                label(xpos, y, format_metric(value, name))
             continue
         for name, xpos, delta_x in (('p95Ms', 180, 480), ('p99Ms', 330, 650)):
             value = metric(entry, 'unreliable', name)
             previous = next((old for old in reversed(history[:history.index(entry)])
                              if old['commitSha'] != entry['commitSha'] and compatible(old, entry)), None)
             old_value = metric(previous, 'unreliable', name) if previous else None
-            label(xpos, y, 'N/A' if value is None else f'{value:.3f}')
+            label(xpos, y, format_metric(value, name))
             label(delta_x, y, f'{100 * (value / old_value - 1):+.2f}%' if old_value and value is not None else 'N/A')
         delivery = metric(entry, 'unreliable', 'deliveryPercent')
         label(820, y, 'N/A' if delivery is None else f'{delivery:.3f}')
@@ -133,7 +145,7 @@ def render(results, history):
     lines = ['## Channel RTT / delivery', '',
              'RTT is measured per request ID, including send queue delay. Missing responses are excluded from RTT and included in delivery loss.',
              'Values are medians across runs. Standalone v3 waits for each response/timeout; mixed throughput includes the drain interval. RTT includes send queue delay. Latency changes are informational.', '',
-             '| Scenario | Channel | Delivery % | Responses/s | p50 ms | p95 ms | p99 ms | Timeouts | Previous p95 delta | Delivery delta (pp) |',
+             '| Scenario | Channel | Delivery % | Responses/s | p50 µs | p95 µs | p99 µs | Timeouts | Previous p95 delta | Delivery delta (pp) |',
              '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
     def fmt(value):
         return 'N/A' if value is None else f'{value:.3f}'
@@ -151,7 +163,9 @@ def render(results, history):
             old_delivery = metric(previous, channel, 'deliveryPercent') if previous else None
             delta = f'{100 * (values[3] / old_p95 - 1):+.2f}%' if old_p95 and values[3] is not None else 'N/A'
             delivery_delta = fmt(values[0] - old_delivery) if old_delivery is not None else 'N/A'
-            lines.append('| ' + ' | '.join([result['scenarioName'], channel, *map(fmt, values), delta, delivery_delta]) + ' |')
+            names = ('deliveryPercent', 'responsesPerSecond', 'p50Ms', 'p95Ms', 'p99Ms', 'timedOut')
+            displayed = [format_metric(value, name) for value, name in zip(values, names)]
+            lines.append('| ' + ' | '.join([result['scenarioName'], channel, *displayed, delta, delivery_delta]) + ' |')
     baseline = next((r for r in results if r['scenarioName'] == 'reliable-baseline'), None)
     mixed = next((r for r in results if r['scenarioName'] == 'mixed'), None)
     if baseline and mixed and baseline['schemaVersion'] == mixed['schemaVersion']:
