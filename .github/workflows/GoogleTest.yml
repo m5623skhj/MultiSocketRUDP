@@ -87,6 +87,7 @@ jobs:
 
       - name: Trust IntegrationTest certificate
         id: test-cert-trust
+        timeout-minutes: 2
         shell: pwsh
         run: ./MultiSocketRUDP/Tool/ForTLS/Add-IntegrationTestTrust.ps1
 
@@ -384,7 +385,7 @@ jobs:
         env:
           TEST_CERT_THUMBPRINT: ${{ steps.test-cert-trust.outputs.thumbprint }}
         run: |
-          $certPath = "Cert:\CurrentUser\Root\$env:TEST_CERT_THUMBPRINT"
+          $certPath = "Cert:\LocalMachine\Root\$env:TEST_CERT_THUMBPRINT"
           if (Test-Path -LiteralPath $certPath) { Remove-Item -LiteralPath $certPath }
 
       - name: Upsert PR Comment
