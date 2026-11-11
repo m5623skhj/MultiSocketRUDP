@@ -4,12 +4,22 @@
 #pragma region Packet Handler
 void Player::OnChannelEcho(const ChannelEchoReq& packet)
 {
-	if (packet.unreliable > 1) return;
+	if (packet.unreliable > 1)
+	{
+		return;
+	}
+
 	ChannelEchoRes response;
 	response.requestId = packet.requestId;
 	response.unreliable = packet.unreliable;
-	if (packet.unreliable) SendUnreliablePacket(response);
-	else SendPacket(response);
+	if (packet.unreliable)
+	{
+		SendUnreliablePacket(response);
+	}
+	else
+	{
+		SendPacket(response);
+	}
 }
 
 void Player::OnPing(const Ping& packet)

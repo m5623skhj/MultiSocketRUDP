@@ -65,12 +65,20 @@ public:
 		return WaitUntil(timeout, [&]()
 		{
 			auto* buffer = GetReceivedUnreliablePacket();
-			if (buffer == nullptr) return false;
+			if (buffer == nullptr)
+			{
+				return false;
+			}
+
 			PacketId packetId{};
 			*buffer >> packetId;
 			TestStringPacketRes response;
 			const bool isEcho = packetId == static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_RES);
-			if (isEcho) response.BufferToPacket(*buffer);
+			if (isEcho)
+			{
+				response.BufferToPacket(*buffer);
+			}
+
 			NetBuffer::Free(buffer);
 			return isEcho && response.echoString == expectedText;
 		});

@@ -130,6 +130,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopTo
 				log->logString = std::format("Logic thread stop. ThreadId is {}", threadId);
 				Logger::GetInstance().WriteLog(log);
 			}
+
 			return;
 		case WAIT_FAILED:
 		{
@@ -138,6 +139,7 @@ void MultiSocketRUDPCore::RunRecvLogicWorkerThread(const std::stop_token& stopTo
 			ReportFatalError({ SERVER_FATAL_ERROR_CODE::RECV_LOGIC_WAIT_FAILED, threadId, errorCode });
 			return;
 		}
+
 		default:
 		{
 			LOG_ERROR("Recv logic wait returned an unexpected result");
@@ -221,11 +223,13 @@ void MultiSocketRUDPCore::RunRetransmissionThread(const std::stop_token& stopTok
 			{
 				break;
 			}
+
 			if (waitResult == WAIT_FAILED)
 			{
 				LOG_ERROR(std::format("Retransmission wait failed. error is {}", GetLastError()));
 				break;
 			}
+
 			if (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_OBJECT_0 + 1)
 			{
 				LOG_ERROR(std::format("Retransmission wait returned unexpected result {}", waitResult));
@@ -291,6 +295,7 @@ void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, 
 		SendPacketInfo::Free(sendPacketInfo);
 		return;
 	}
+
 	auto sendGuard = Util::MakeScopeExit([owner]() { owner->CompleteSendOperation(); });
 
 	if (shouldDisconnect)
@@ -300,14 +305,18 @@ void MultiSocketRUDPCore::ProcessRetransmission(SendPacketInfo* sendPacketInfo, 
 			std::scoped_lock lock(scheduler.lock);
 			auto expected = SendPacketInfo::Completion::Pending;
 			if (not sendPacketInfo->isErasedPacketInfo.load(std::memory_order_acquire))
+			{
 				claimed = sendPacketInfo->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::RetryLimit,
 					std::memory_order_acq_rel);
+			}
 		}
+
 		if (not claimed)
 		{
 			SendPacketInfo::Free(sendPacketInfo);
 			return;
 		}
+
 		// Never disconnect while holding scheduler.lock; ACK wins if it completed before the claim above.
 		owner->DoDisconnect(DISCONNECT_REASON::BY_RETRANSMISSION);
 		owner->TraceRetransmissionFailure(*sendPacketInfo, sendPacketInfo->retransmissionCount);
@@ -342,8 +351,10 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 					remainList.emplace_back(releaseSessionId);
 				}
 			}
+
 			RequeueReleaseSessionIds(remainList);
 		}
+
 		break;
 		case WAIT_OBJECT_0 + 1:
 		{
@@ -352,10 +363,12 @@ void MultiSocketRUDPCore::RunSessionReleaseThread(const std::stop_token& stopTok
 			Logger::GetInstance().WriteLog(log);
 			return;
 		}
+
 		default:
 		{
 			LOG_ERROR(std::format("RunSessionReleaseThread() : Invalid session release thread wait result. Error is {}", WSAGetLastError()));
 		}
+
 		break;
 		}
 	}
@@ -422,5 +435,6 @@ void MultiSocketRUDPCore::RequeueReleaseSessionIds(const std::vector<SessionIdTy
 	{
 		releaseSessionIdList.emplace_back(sessionId);
 	}
+
 	SetEvent(sessionReleaseEventHandle);
 }

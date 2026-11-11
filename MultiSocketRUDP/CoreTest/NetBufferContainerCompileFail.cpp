@@ -11,10 +11,15 @@ void CheckRejectedContainer()
     {
         bool operator()(int left, int right) const { return left < right; }
     };
+
     std::set<int, CustomCompare> values;
     buffer << values;
 #elif defined(NETBUFFER_REJECT_STRUCT)
-    struct Data { std::string text; };
+    struct Data
+    {
+        std::string text;
+    };
+
     std::vector<Data> values;
     buffer << values;
 #elif defined(NETBUFFER_REJECT_CONST_READ)
