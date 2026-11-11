@@ -1,24 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="674" viewBox="0 0 960 674">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="698" viewBox="0 0 960 698">
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 <style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
 <text x="28" y="38" class="title">Reliable vs unreliable · sequential Echo RTT</text>
 <text x="28" y="66">Latest 10 compatible main measurements · medians across runs</text>
-<text x="28" y="97">RTT (ms)</text>
+<text x="28" y="97">RTT (µs)</text>
 <line x1="80" y1="290.0" x2="900" y2="290.0" stroke="#30363d"/>
-<text x="15" y="294.0">0.000</text>
+<text x="15" y="294.0">0.0</text>
 <line x1="80" y1="246.25" x2="900" y2="246.25" stroke="#30363d"/>
-<text x="15" y="250.25">0.066</text>
+<text x="15" y="250.25">65.7</text>
 <line x1="80" y1="202.5" x2="900" y2="202.5" stroke="#30363d"/>
-<text x="15" y="206.5">0.131</text>
+<text x="15" y="206.5">131.3</text>
 <line x1="80" y1="158.75" x2="900" y2="158.75" stroke="#30363d"/>
-<text x="15" y="162.75">0.197</text>
+<text x="15" y="162.75">197.0</text>
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
-<text x="15" y="119.0">0.263</text>
-<circle cx="490" cy="151.42835389066548" r="4" fill="#58a6ff"><title>reliable p95Ms: 0.208</title></circle>
-<circle cx="490" cy="130.9090909090909" r="4" fill="#79c0ff"><title>reliable p99Ms: 0.239</title></circle>
-<circle cx="490" cy="173.8796253997259" r="4" fill="#f0883e"><title>unreliable p95Ms: 0.174</title></circle>
-<circle cx="490" cy="155.42561291305012" r="4" fill="#ffa657"><title>unreliable p99Ms: 0.202</title></circle>
-<text x="465" y="312">b5fed3c</text>
+<text x="15" y="119.0">262.7</text>
+<circle cx="80.0" cy="151.42835389066545" r="4" fill="#58a6ff"><title>reliable P95: 208.0 µs</title></circle>
+<line x1="80.0" y1="151.42835389066545" x2="900.0" y2="165.61862342013097" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="165.61862342013097" r="4" fill="#58a6ff"><title>reliable P95: 186.7 µs</title></circle>
+<circle cx="80.0" cy="130.9090909090909" r="4" fill="#79c0ff"><title>reliable P99: 238.8 µs</title></circle>
+<line x1="80.0" y1="130.9090909090909" x2="900.0" y2="143.63369879701537" stroke="#79c0ff" stroke-width="2" stroke-dasharray="6 4"/>
+<circle cx="900.0" cy="143.63369879701537" r="4" fill="#79c0ff"><title>reliable P99: 219.7 µs</title></circle>
+<circle cx="80.0" cy="173.8796253997259" r="4" fill="#f0883e"><title>unreliable P95: 174.3 µs</title></circle>
+<line x1="80.0" y1="173.8796253997259" x2="900.0" y2="181.40779655855033" stroke="#f0883e" stroke-width="2"/>
+<circle cx="900.0" cy="181.40779655855033" r="4" fill="#f0883e"><title>unreliable P95: 163.0 µs</title></circle>
+<circle cx="80.0" cy="155.42561291305012" r="4" fill="#ffa657"><title>unreliable P99: 202.0 µs</title></circle>
+<line x1="80.0" y1="155.42561291305012" x2="900.0" y2="168.61656768691944" stroke="#ffa657" stroke-width="2" stroke-dasharray="6 4"/>
+<circle cx="900.0" cy="168.61656768691944" r="4" fill="#ffa657"><title>unreliable P99: 182.2 µs</title></circle>
+<text x="55.0" y="312">b5fed3c</text>
+<text x="875.0" y="312">69aa11b</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -30,25 +39,37 @@
 <text x="15" y="400.25">75.000</text>
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
-<circle cx="490" cy="365.0" r="4" fill="#58a6ff"><title>reliable deliveryPercent: 100.000</title></circle>
-<circle cx="490" cy="365.0" r="4" fill="#f0883e"><title>unreliable deliveryPercent: 100.000</title></circle>
-<text x="465" y="512">b5fed3c</text>
+<circle cx="80.0" cy="365.0" r="4" fill="#58a6ff"><title>reliable deliveryPercent: 100.000%</title></circle>
+<line x1="80.0" y1="365.0" x2="900.0" y2="365.0" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="365.0" r="4" fill="#58a6ff"><title>reliable deliveryPercent: 100.000%</title></circle>
+<circle cx="80.0" cy="365.0" r="4" fill="#f0883e"><title>unreliable deliveryPercent: 100.000%</title></circle>
+<line x1="80.0" y1="365.0" x2="900.0" y2="365.0" stroke="#f0883e" stroke-width="2"/>
+<circle cx="900.0" cy="365.0" r="4" fill="#f0883e"><title>unreliable deliveryPercent: 100.000%</title></circle>
+<text x="55.0" y="512">b5fed3c</text>
+<text x="875.0" y="512">69aa11b</text>
 <text x="300" y="97">Reliable: blue · Unreliable: orange · P95: solid · P99: dashed</text>
 <text x="28" y="532">v3 · Same 9-byte Echo · Next request after response/timeout · No fixed send interval</text>
 <text x="28" y="574">Per channel/run: 1000 requests · 100 warmup · 3 runs · timeout 1000 ms</text>
 <text x="28" y="552">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="600">Commit</text>
-<text x="180" y="600">R P95 ms</text>
-<text x="300" y="600">R P99 ms</text>
-<text x="420" y="600">U P95 ms</text>
-<text x="540" y="600">U P99 ms</text>
+<text x="180" y="600">R P95 µs</text>
+<text x="300" y="600">R P99 µs</text>
+<text x="420" y="600">U P95 µs</text>
+<text x="540" y="600">U P99 µs</text>
 <text x="670" y="600">R response %</text>
 <text x="820" y="600">U response %</text>
 <text x="28" y="630">b5fed3cd313d</text>
-<text x="180" y="630">0.208</text>
-<text x="300" y="630">0.239</text>
-<text x="420" y="630">0.174</text>
-<text x="540" y="630">0.202</text>
+<text x="180" y="630">208.0</text>
+<text x="300" y="630">238.8</text>
+<text x="420" y="630">174.3</text>
+<text x="540" y="630">202.0</text>
 <text x="670" y="630">100.000</text>
 <text x="820" y="630">100.000</text>
+<text x="28" y="654">69aa11ba940c</text>
+<text x="180" y="654">186.7</text>
+<text x="300" y="654">219.7</text>
+<text x="420" y="654">163.0</text>
+<text x="540" y="654">182.2</text>
+<text x="670" y="654">100.000</text>
+<text x="820" y="654">100.000</text>
 </svg>

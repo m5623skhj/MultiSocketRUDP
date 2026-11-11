@@ -1,22 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="674" viewBox="0 0 960 674">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="698" viewBox="0 0 960 698">
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 <style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
 <text x="28" y="38" class="title">Unreliable channel: unreliable-only</text>
 <text x="28" y="66">Latest 10 compatible main measurements · medians across runs</text>
-<text x="28" y="97">RTT (ms)</text>
+<text x="28" y="97">RTT (µs)</text>
 <line x1="80" y1="290.0" x2="900" y2="290.0" stroke="#30363d"/>
-<text x="15" y="294.0">0.000</text>
+<text x="15" y="294.0">0.0</text>
 <line x1="80" y1="246.25" x2="900" y2="246.25" stroke="#30363d"/>
-<text x="15" y="250.25">0.056</text>
+<text x="15" y="250.25">55.6</text>
 <line x1="80" y1="202.5" x2="900" y2="202.5" stroke="#30363d"/>
-<text x="15" y="206.5">0.111</text>
+<text x="15" y="206.5">111.1</text>
 <line x1="80" y1="158.75" x2="900" y2="158.75" stroke="#30363d"/>
-<text x="15" y="162.75">0.167</text>
+<text x="15" y="162.75">166.7</text>
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
-<text x="15" y="119.0">0.222</text>
-<circle cx="490" cy="152.72502250225023" r="4" fill="#58a6ff"><title>unreliable p95Ms: 0.174</title></circle>
-<circle cx="490" cy="130.90909090909093" r="4" fill="#f85149"><title>unreliable p99Ms: 0.202</title></circle>
-<text x="465" y="312">b5fed3c</text>
+<text x="15" y="119.0">222.2</text>
+<circle cx="80.0" cy="152.72502250225023" r="4" fill="#58a6ff"><title>unreliable P95: 174.3 µs</title></circle>
+<line x1="80.0" y1="152.72502250225023" x2="900.0" y2="161.62466246624663" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="161.62466246624663" r="4" fill="#58a6ff"><title>unreliable P95: 163.0 µs</title></circle>
+<circle cx="80.0" cy="130.9090909090909" r="4" fill="#f85149"><title>unreliable P99: 202.0 µs</title></circle>
+<line x1="80.0" y1="130.9090909090909" x2="900.0" y2="146.50315031503152" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="146.50315031503152" r="4" fill="#f85149"><title>unreliable P99: 182.2 µs</title></circle>
+<text x="55.0" y="312">b5fed3c</text>
+<text x="875.0" y="312">69aa11b</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -28,20 +33,29 @@
 <text x="15" y="400.25">75.000</text>
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
-<circle cx="490" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000</title></circle>
-<text x="465" y="512">b5fed3c</text>
+<circle cx="80.0" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000%</title></circle>
+<line x1="80.0" y1="365.0" x2="900.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
+<circle cx="900.0" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000%</title></circle>
+<text x="55.0" y="512">b5fed3c</text>
+<text x="875.0" y="512">69aa11b</text>
 <text x="650" y="97">P95: blue · P99: red</text>
 <text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="585">Commit</text>
-<text x="180" y="585">P95 ms</text>
-<text x="330" y="585">P99 ms</text>
+<text x="180" y="585">P95 µs</text>
+<text x="330" y="585">P99 µs</text>
 <text x="480" y="585">Previous P95</text>
 <text x="650" y="585">Previous P99</text>
 <text x="820" y="585">Response %</text>
 <text x="28" y="615">b5fed3cd313d</text>
-<text x="180" y="615">0.174</text>
+<text x="180" y="615">174.3</text>
 <text x="480" y="615">N/A</text>
-<text x="330" y="615">0.202</text>
+<text x="330" y="615">202.0</text>
 <text x="650" y="615">N/A</text>
 <text x="820" y="615">100.000</text>
+<text x="28" y="639">69aa11ba940c</text>
+<text x="180" y="639">163.0</text>
+<text x="480" y="639">-6.48%</text>
+<text x="330" y="639">182.2</text>
+<text x="650" y="639">-9.80%</text>
+<text x="820" y="639">100.000</text>
 </svg>

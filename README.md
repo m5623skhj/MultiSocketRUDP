@@ -26,6 +26,7 @@ Mixed v1 keeps its separate 10:1 load with a 10 ms delay per batch. Missing resp
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-11-11 | `69aa11b` | * README의 비신뢰성 RTT 테스트 그래프 단위 수정 | 0.220 ms | 0.254 ms | 32.445 ms | 64.516 ms |
 | 2026-11-11 | `b5fed3c` | * RTT 벤치마크 테스트를 일관성 있게 그래프가 보이도록 수정   * 비신뢰성 송신 테스트를 10회 기준에서 1회 기준으로 수정   * 비신뢰성 송신 테스트를 10ms 대기에서 수신 즉시 재송신으로 수정 | 0.212 ms | 0.273 ms | 32.665 ms | 64.601 ms |
 | 2026-11-11 | `6a05d49` | * CI 테스트 인증서 등록 대기 문제 수정 | 0.140 ms | 0.160 ms | 32.160 ms | 66.918 ms |
 | 2026-11-06 | `99db792` | * 던전 비신뢰 패킷의 역순 수신과 재생 방지 지원 | 0.242 ms | 0.271 ms | 32.271 ms | 63.531 ms |
@@ -35,6 +36,5 @@ Mixed v1 keeps its separate 10:1 load with a 10 ms delay per batch. Missing resp
 | 2026-10-27 | `ce5083e` | * 호스트 로컬 RUDP 세션 접속 옵션 지원 | 0.217 ms | 0.260 ms | 32.431 ms | 65.886 ms |
 | 2026-10-24 | `bb59568` | * 원격 RUDP 버퍼 및 ACK 종료 경합 수정 통합 | 0.141 ms | 0.158 ms | 32.496 ms | 64.258 ms |
 | 2026-10-22 | `fa51ffb` | * NetBuffer 지연 초기화 연동과 ASan 회귀 검증 보완 | 0.166 ms | 0.188 ms | 32.619 ms | 64.520 ms |
-| 2026-10-21 | `0b8ab0d` | * RUDP 진단 로그 조건문 범위와 소스 인코딩 수정 | 0.171 ms | 0.202 ms | 32.627 ms | 64.184 ms |
 
-Last updated by `b5fed3cd313d1860069576252aadf4b769b94a25` at 2026-11-11T06:33:11.0999501+00:00.
+Last updated by `69aa11ba940c218b000c712851fe04ef0a22126d` at 2026-11-11T06:40:46.0005541+00:00.
