@@ -1,6 +1,6 @@
 # RTT benchmark history
 
-The JSON file keeps the complete official history. Charts and the table render the latest 10 `main` measurements.
+rtt-history.json keeps the complete official Ping/Pong history. Its charts and table render the latest 10 `main` measurements.
 
 ## Packet loss 0%
 
@@ -10,11 +10,13 @@ The JSON file keeps the complete official history. Charts and the table render t
 
 ![RTT loss 10%](./rtt-loss-10.svg)
 
-## Unreliable channel RTT and response rate
+## Sequential channel RTT and response rate
 
-Latest 10 measurements compatible with the latest result in each scenario. Missing responses are excluded from RTT; read latency together with response rate.
+Standalone v3 compares the latest 10 compatible same-commit pairs: the same 9-byte Echo, one outstanding request, and no fixed send interval. An unreliable request timeout counts as missing and permits the next request; a reliable timeout fails the measurement. Earlier versions are not joined to this trend.
 
-![Unreliable-only RTT and response rate](./channel-unreliable-only.svg)
+Mixed v1 keeps its separate 10:1 load with a 10 ms delay per batch. Missing responses are excluded from RTT; read latency together with response rate. Channel history retains the latest 150 scenario results.
+
+![Reliable vs unreliable, sequential Echo](./channel-comparison.svg)
 
 ![Mixed-load unreliable RTT and response rate](./channel-mixed.svg)
 
@@ -24,6 +26,7 @@ Latest 10 measurements compatible with the latest result in each scenario. Missi
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-11-11 | `b5fed3c` | * RTT 벤치마크 테스트를 일관성 있게 그래프가 보이도록 수정   * 비신뢰성 송신 테스트를 10회 기준에서 1회 기준으로 수정   * 비신뢰성 송신 테스트를 10ms 대기에서 수신 즉시 재송신으로 수정 | 0.212 ms | 0.273 ms | 32.665 ms | 64.601 ms |
 | 2026-11-11 | `6a05d49` | * CI 테스트 인증서 등록 대기 문제 수정 | 0.140 ms | 0.160 ms | 32.160 ms | 66.918 ms |
 | 2026-11-06 | `99db792` | * 던전 비신뢰 패킷의 역순 수신과 재생 방지 지원 | 0.242 ms | 0.271 ms | 32.271 ms | 63.531 ms |
 | 2026-11-06 | `4f0dfe9` | * 통합 테스트 CI의 TLS 인증서 신뢰 설정 수정 | 0.229 ms | 0.261 ms | 32.307 ms | 63.024 ms |
@@ -33,6 +36,5 @@ Latest 10 measurements compatible with the latest result in each scenario. Missi
 | 2026-10-24 | `bb59568` | * 원격 RUDP 버퍼 및 ACK 종료 경합 수정 통합 | 0.141 ms | 0.158 ms | 32.496 ms | 64.258 ms |
 | 2026-10-22 | `fa51ffb` | * NetBuffer 지연 초기화 연동과 ASan 회귀 검증 보완 | 0.166 ms | 0.188 ms | 32.619 ms | 64.520 ms |
 | 2026-10-21 | `0b8ab0d` | * RUDP 진단 로그 조건문 범위와 소스 인코딩 수정 | 0.171 ms | 0.202 ms | 32.627 ms | 64.184 ms |
-| 2026-10-20 | `caf723f` | * 클라이언트 응답 훅 경고 및 공통 코드 참조 정리 | 0.234 ms | 0.252 ms | 32.610 ms | 64.612 ms |
 
-Last updated by `6a05d49c66609d250fc793e5896761565183c9ec` at 2026-11-11T05:56:42.2565768+00:00.
+Last updated by `b5fed3cd313d1860069576252aadf4b769b94a25` at 2026-11-11T06:33:11.0999501+00:00.
