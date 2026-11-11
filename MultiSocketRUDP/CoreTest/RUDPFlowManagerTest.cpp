@@ -51,8 +51,16 @@ TEST(RUDPFlowManagerConcurrencyTest, AckAndTimeoutMatchOneCompleteSerialOrdering
 				manager.OnAckReceived(sequence);
 			}
 			std::barrier start(3);
-			std::jthread ack([&]() { start.arrive_and_wait(); manager.OnAckReceived(nextAck); });
-			std::jthread timeout([&]() { start.arrive_and_wait(); manager.OnTimeout(); });
+			std::jthread ack([&]()
+			{
+				start.arrive_and_wait();
+				manager.OnAckReceived(nextAck);
+			});
+			std::jthread timeout([&]()
+			{
+				start.arrive_and_wait();
+				manager.OnTimeout();
+			});
 			start.arrive_and_wait();
 			ack.join();
 			timeout.join();

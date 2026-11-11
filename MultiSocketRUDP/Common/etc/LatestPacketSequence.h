@@ -19,7 +19,12 @@ public:
         hasReceived = true;
         return true;
     }
-    void Reset() noexcept { latest = 0; hasReceived = false; }
+
+    void Reset() noexcept
+    {
+        latest = 0;
+        hasReceived = false;
+    }
 
 private:
     PacketSequence latest{};
@@ -33,24 +38,43 @@ class ReorderedUnreliablePacketSequence
 public:
     bool Accept(const PacketSequence sequence, const bool allowReordering = false) noexcept
     {
-        if (sequence == 0) return false;
+        if (sequence == 0)
+        {
+            return false;
+        }
+
         if (sequence > latest)
         {
             const auto distance = sequence - latest;
-            if (distance >= received.size()) received.reset();
-            else received <<= static_cast<std::size_t>(distance);
+            if (distance >= received.size())
+            {
+                received.reset();
+            }
+            else
+            {
+                received <<= static_cast<std::size_t>(distance);
+            }
+
             received.set(0);
             latest = sequence;
             return true;
         }
+
         const auto distance = latest - sequence;
         if (!allowReordering || distance >= received.size() || received[static_cast<std::size_t>(distance)])
+        {
             return false;
+        }
+
         received.set(static_cast<std::size_t>(distance));
         return true;
     }
 
-    void Reset() noexcept { latest = 0; received.reset(); }
+    void Reset() noexcept
+    {
+        latest = 0;
+        received.reset();
+    }
 
 private:
     PacketSequence latest{};

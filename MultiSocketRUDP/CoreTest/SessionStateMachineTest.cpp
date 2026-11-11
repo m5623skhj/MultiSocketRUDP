@@ -160,8 +160,16 @@ TEST(SessionStateMachineConcurrencyTest, ReleaseStateReflectsWinningConnectionTr
 		std::barrier start(3);
 		bool connected = false;
 		bool released = false;
-		std::jthread connector([&]() { start.arrive_and_wait(); connected = stateMachine.TryTransitionToConnected(); });
-		std::jthread releaser([&]() { start.arrive_and_wait(); released = stateMachine.TryTransitionToReleasing(); });
+		std::jthread connector([&]()
+		{
+			start.arrive_and_wait();
+			connected = stateMachine.TryTransitionToConnected();
+		});
+		std::jthread releaser([&]()
+		{
+			start.arrive_and_wait();
+			released = stateMachine.TryTransitionToReleasing();
+		});
 		start.arrive_and_wait();
 		connector.join();
 		releaser.join();

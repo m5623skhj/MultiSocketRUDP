@@ -152,6 +152,7 @@ protected:
 			PacketCryptoHelper::SetHeader(*info->buffer);
 			info->isReplyType = isReplyType;
 		}
+
 		return info;
 	}
 
@@ -218,6 +219,7 @@ TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_PushAddsReferenceAndSignalsWak
         EXPECT_EQ(scheduler.heap.top().info, info);
         EXPECT_EQ(scheduler.heap.top().version, info->scheduleVersion);
     }
+
     EXPECT_TRUE(SignalRetransmissionWakeEvent(scheduler));
     EXPECT_EQ(info->refCount.load(std::memory_order_acquire), 2);
     EXPECT_EQ(WaitForSingleObject(scheduler.wakeEventHandle, 0), WAIT_OBJECT_0);
@@ -227,6 +229,7 @@ TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_PushAddsReferenceAndSignalsWak
         SendPacketInfo::Free(scheduler.heap.top().info);
         scheduler.heap.pop();
     }
+
     SendPacketInfo::Free(info);
 }
 
@@ -258,6 +261,7 @@ TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_RequeueMarksOlderHeapEntryStal
             {
                 ++staleCount;
             }
+
             SendPacketInfo::Free(entry.info);
         }
     }
@@ -286,6 +290,7 @@ TEST_F(RUDPIOHandlerTest, RetransmissionScheduler_ErasedPacketEntryReturnsHeapRe
         EXPECT_TRUE(erasedInfo->isErasedPacketInfo.load(std::memory_order_acquire));
         SendPacketInfo::Free(erasedInfo);
     }
+
     EXPECT_EQ(info->refCount.load(std::memory_order_acquire), 1);
     SendPacketInfo::Free(info);
 }
@@ -412,6 +417,7 @@ TEST_F(RUDPIOHandlerTest, IOCompleted_OpSend_MultipleCalls_AllReturnTrue)
         EXPECT_TRUE(handler->IOCompleted(ctx, 0, THREAD_ID))
             << "Failed on iteration " << i;
     }
+
     EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
 }
 
@@ -601,6 +607,7 @@ TEST_F(RUDPIOHandlerTest, DoRecv_RepeatedSuccessfulCalls_CountAccumulates)
         mockDelegate.dummyRecvBuffer.CompleteRecvIo();
         mockDelegate.dummyRecvBuffer.ReleaseRecvContext(mockDelegate.recvBufferContextReturn.get());
     }
+
     EXPECT_EQ(mockRIO.rioReceiveExCallCount, 5);
 }
 
@@ -716,6 +723,7 @@ TEST_F(RUDPIOHandlerTest, DoSend_EmptyQueue_RepeatedCalls_AllReturnTrue)
     {
         EXPECT_TRUE(handler->DoSend(session, THREAD_ID)) << "Failed on iteration " << i;
     }
+
     EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
 }
 
@@ -741,6 +749,7 @@ TEST_F(RUDPIOHandlerTest, DoSend_AlternatingPaths_NoCrash)
 
         EXPECT_TRUE(handler->DoSend(session, THREAD_ID)) << "Failed on iteration " << i;
     }
+
     EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
 }
 
@@ -784,6 +793,7 @@ TEST_F(RUDPIOHandlerTest, DoSend_SplitsBatchAtWireLimitAndSendsReservedFrameOnCo
 		PacketCryptoHelper::SetHeader(*info->buffer);
 		mockDelegate.queuedSendPacketInfos.push_back(info);
 	}
+
 	ASSERT_TRUE(handler->DoSend(session, THREAD_ID));
 	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
 	EXPECT_EQ(mockRIO.lastSendLength, MAX_WIRE_PACKET_SIZE);
@@ -890,7 +900,11 @@ TEST_F(RUDPIOHandlerTest, DoSend_RechecksQueueWhenReservedReplacementProducesEmp
 	bool replaced = false;
 	mockDelegate.afterQueueSizeRead = [&]()
 	{
-		if (replaced) return;
+		if (replaced)
+		{
+			return;
+		}
+
 		replaced = true;
 		// Capacity one: replace the reserved packet after count=0 was captured.
 		SendPacketInfo::Free(mockDelegate.reservedSendReturn);
@@ -901,11 +915,16 @@ TEST_F(RUDPIOHandlerTest, DoSend_RechecksQueueWhenReservedReplacementProducesEmp
 		EXPECT_TRUE(handler->DoSend(session, THREAD_ID));
 		EXPECT_EQ(mockRIO.rioSendExCallCount, 0);
 	};
+
 	EXPECT_TRUE(handler->DoSend(session, THREAD_ID));
 	EXPECT_EQ(mockRIO.rioSendExCallCount, 1);
 	EXPECT_TRUE(mockDelegate.queuedSendPacketInfos.empty());
 	EXPECT_TRUE(retransmissionSchedulers[THREAD_ID]->heap.empty());
-	if (mockRIO.lastSendRequestContext != nullptr) CompleteOutstandingSend();
+	if (mockRIO.lastSendRequestContext != nullptr)
+	{
+		CompleteOutstandingSend();
+	}
+
 	while (not mockDelegate.queuedSendPacketInfos.empty())
 	{
 		SendPacketInfo::Free(mockDelegate.queuedSendPacketInfos.front());

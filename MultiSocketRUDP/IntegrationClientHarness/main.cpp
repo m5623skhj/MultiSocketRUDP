@@ -114,20 +114,33 @@ namespace
 	{
 		TestableRUDPClient client;
 		if (not client.StartClient(clientCoreOptionPath, sessionGetterOptionPath, true) ||
-			not client.WaitForConnected(8s)) return false;
+			not client.WaitForConnected(8s))
+		{
+			return false;
+		}
+
 		// The test config uses a 500 ms alive check. Never consume the reliable queue.
 		// Stay idle across several heartbeat periods before starting unreliable traffic.
 		Sleep(2000);
-		if (client.GetPendingReliablePacketCount() != 0) return false;
+		if (client.GetPendingReliablePacketCount() != 0)
+		{
+			return false;
+		}
+
 		const auto deadline = std::chrono::steady_clock::now() + 3s;
 		int index = 0;
 		while (std::chrono::steady_clock::now() < deadline)
 		{
 			const auto message = "unreliable:alive:" + std::to_string(index++);
 			if (not client.SendUnreliableEchoRequestPacket(message) ||
-				not client.WaitForUnreliableEcho(message, 1s)) return false;
+				not client.WaitForUnreliableEcho(message, 1s))
+			{
+				return false;
+			}
+
 			Sleep(10);
 		}
+
 		client.StopClient();
 		return true;
 	}
@@ -136,16 +149,28 @@ namespace
 	{
 		TestableRUDPClient client;
 		if (not client.StartClient(clientCoreOptionPath, sessionGetterOptionPath, true) ||
-			not client.WaitForConnected(8s)) return false;
+			not client.WaitForConnected(8s))
+		{
+			return false;
+		}
+
 		for (int index = 0; index < 2; ++index)
 		{
 			const auto reliable = "reliable:" + std::to_string(index);
 			const auto unreliable = "unreliable:" + std::to_string(index);
 			client.SendEchoRequestPacket(reliable);
-			if (not client.SendUnreliableEchoRequestPacket(unreliable)) return false;
+			if (not client.SendUnreliableEchoRequestPacket(unreliable))
+			{
+				return false;
+			}
+
 			if (not client.WaitForEcho(reliable, 3s) ||
-				not client.WaitForUnreliableEcho(unreliable, 3s)) return false;
+				not client.WaitForUnreliableEcho(unreliable, 3s))
+			{
+				return false;
+			}
 		}
+
 		client.StopClient();
 		return true;
 	}
@@ -260,6 +285,7 @@ namespace
 				std::cout << "client start failed\n";
 				return false;
 			}
+
 			clients.emplace_back(std::move(client));
 		}
 
@@ -287,6 +313,7 @@ namespace
 		{
 			client->StopClient();
 		}
+
 		return true;
 	}
 
@@ -304,6 +331,7 @@ namespace
 			{
 				return false;
 			}
+
 			clients.emplace_back(std::move(client));
 		}
 
@@ -323,18 +351,21 @@ namespace
 						break;
 					}
 				}
+
 				client->DisconnectClient();
 				Sleep(1000);
 				client->StopClient();
 				return succeeded;
 			}));
 		}
+
 		bool succeeded = true;
 		for (auto& worker : workers)
 		{
 			// Always join every worker before destroying its client, even after a failure.
 			succeeded = worker.get() && succeeded;
 		}
+
 		return succeeded;
 	}
 

@@ -77,17 +77,31 @@ namespace TLSHelper
             const auto& value = certificateConfig.certThumbprint;
             const auto digit = [](wchar_t inCharacter)
             {
-                if (inCharacter >= L'0' && inCharacter <= L'9') return inCharacter - L'0';
-                if (inCharacter >= L'a' && inCharacter <= L'f') return inCharacter - L'a' + 10;
-                if (inCharacter >= L'A' && inCharacter <= L'F') return inCharacter - L'A' + 10;
+                if (inCharacter >= L'0' && inCharacter <= L'9')
+                {
+                    return inCharacter - L'0';
+                }
+
+                if (inCharacter >= L'a' && inCharacter <= L'f')
+                {
+                    return inCharacter - L'a' + 10;
+                }
+
+                if (inCharacter >= L'A' && inCharacter <= L'F')
+                {
+                    return inCharacter - L'A' + 10;
+                }
+
                 return -1;
             };
+
             if (value.size() != thumbprintBytes.size() * 2)
             {
                 lastStatus = SEC_E_INVALID_TOKEN;
                 CertCloseStore(hStore, 0);
                 return false;
             }
+
             for (size_t index = 0; index < thumbprintBytes.size(); ++index)
             {
                 const int high = digit(value[index * 2]), low = digit(value[index * 2 + 1]);
@@ -97,13 +111,16 @@ namespace TLSHelper
                     CertCloseStore(hStore, 0);
                     return false;
                 }
+
                 thumbprintBytes[index] = static_cast<BYTE>((high << 4) | low);
             }
+
             thumbprint.cbData = static_cast<DWORD>(thumbprintBytes.size());
             thumbprint.pbData = thumbprintBytes.data();
             findType = CERT_FIND_HASH;
             findValue = &thumbprint;
         }
+
         PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
             hStore,
             X509_ASN_ENCODING,
@@ -214,6 +231,7 @@ namespace TLSHelper
                 {
                     return false;
                 }
+
                 fd_set readable{};
                 FD_SET(socket, &readable);
                 timeval timeout{ 0, 100000 };
@@ -222,11 +240,13 @@ namespace TLSHelper
                 {
                     return false;
                 }
+
                 if (ready > 0)
                 {
                     break;
                 }
             }
+
             if (not ReceiveHandshakeData(socket, recvBuffer))
             {
                 return false;
@@ -271,7 +291,11 @@ namespace TLSHelper
 
             if (lastStatus == SEC_E_OK)
             {
-                if (not FinalizeHandshake()) return false;
+                if (not FinalizeHandshake())
+                {
+                    return false;
+                }
+
                 PreserveExtraHandshakeData(recvBuffer, inBuffers[1]);
                 pendingHandshakeData = std::move(recvBuffer);
                 return true;
