@@ -2728,6 +2728,68 @@
           }
         }
       ]
+    },
+    {
+      "commitSha": "6a05d49c66609d250fc793e5896761565183c9ec",
+      "commitSubject": "* CI 테스트 인증서 등록 대기 문제 수정",
+      "recordedAtUtc": "2026-11-11T05:56:42.2565768+00:00",
+      "serverBuild": "Release /O2",
+      "botTesterBuild": "Release / Optimize=true",
+      "ioWorkerSleepMode": "NO_USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME",
+      "serverThreadCount": 1,
+      "environment": {
+        "operatingSystem": "Microsoft Windows 10.0.26100",
+        "processorCount": 4,
+        "processorIdentifier": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+        "runnerName": "GitHub Actions 1000001648",
+        "runnerImage": "win25-vs2026"
+      },
+      "scenarios": [
+        {
+          "scenarioName": "Loss 0%",
+          "lossRate": 0,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 500,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20260803,
+          "aggregate": {
+            "medianAverageRttMs": 0.0998722999999998,
+            "medianMinRttMs": 0.0548,
+            "medianP50RttMs": 0.0974,
+            "medianP95RttMs": 0.1403,
+            "medianP99RttMs": 0.16,
+            "medianMaxRttMs": 0.2201,
+            "worstMaxRttMs": 0.2913,
+            "medianElapsedSeconds": 0.1037273,
+            "totalRetransmissionSuspectedCount": 0
+          }
+        },
+        {
+          "scenarioName": "TX/RX Loss 10%",
+          "lossRate": 0.1,
+          "lossModel": "bot-tx-and-rx-independent",
+          "sampleCount": 1000,
+          "runCount": 5,
+          "warmupSampleCount": 100,
+          "timeoutMs": 5000,
+          "runTimeoutSeconds": 300,
+          "seedBase": 20261803,
+          "aggregate": {
+            "medianAverageRttMs": 5.855112999999997,
+            "medianMinRttMs": 0.0355,
+            "medianP50RttMs": 0.0815,
+            "medianP95RttMs": 32.1601,
+            "medianP99RttMs": 66.9182,
+            "medianMaxRttMs": 165.0752,
+            "worstMaxRttMs": 265.2785,
+            "medianElapsedSeconds": 5.8576325,
+            "totalRetransmissionSuspectedCount": 163
+          }
+        }
+      ]
     }
   ]
 }

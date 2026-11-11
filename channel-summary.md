@@ -5,9 +5,9 @@ Values are medians across runs. Throughput includes the fixed drain interval. La
 
 | Scenario | Channel | Delivery % | Responses/s | p50 ms | p95 ms | p99 ms | Previous p95 delta | Delivery delta (pp) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| unreliable-only | unreliable | 99.400 | 386.309 | 0.225 | 0.331 | 0.390 | -5.30% | 0.000 |
-| reliable-baseline | reliable | 100.000 | 39.340 | 0.207 | 0.283 | 0.298 | -6.18% | 0.000 |
-| mixed | reliable | 100.000 | 40.100 | 0.172 | 0.274 | 0.320 | -4.30% | 0.000 |
-| mixed | unreliable | 99.800 | 399.092 | 0.228 | 0.393 | 0.466 | +2.45% | 0.100 |
+| unreliable-only | unreliable | 99.400 | 387.958 | 0.133 | 0.196 | 0.257 | -40.62% | 0.000 |
+| reliable-baseline | reliable | 100.000 | 40.406 | 0.126 | 0.162 | 0.229 | -42.71% | 0.000 |
+| mixed | reliable | 100.000 | 41.028 | 0.119 | 0.172 | 0.237 | -37.08% | 0.000 |
+| mixed | unreliable | 99.600 | 408.233 | 0.150 | 0.223 | 0.398 | -43.18% | -0.200 |
 
-Reliable p95 under mixed load versus reliable-only: -3.15%.
+Reliable p95 under mixed load versus reliable-only: +6.36%.
