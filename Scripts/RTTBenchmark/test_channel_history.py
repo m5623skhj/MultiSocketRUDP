@@ -1,6 +1,10 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from channel_history import compatible, render, render_trend, trend_entries
+from channel_history import compatible, comparison_entries, main, render, render_trend, trend_entries
 
 
 def result(sha, p95, delivery=100):
@@ -13,6 +17,76 @@ def result(sha, p95, delivery=100):
 
 
 class ChannelHistoryTests(unittest.TestCase):
+    @staticmethod
+    def pair(sha, p95=1):
+        unreliable = result(sha, p95)
+        unreliable['schemaVersion'] = 3
+        reliable = dict(unreliable, scenarioName='reliable-baseline',
+                        runs=[dict(reliable=dict(unreliable['runs'][0]['unreliable']),
+                                   unreliable=dict(attempted=0))])
+        return [reliable, unreliable]
+
+    def test_comparison_requires_same_commit_version_conditions_and_request_counts(self):
+        for mismatch in ('commitSha', 'schemaVersion', 'sampleCount', 'timeoutMs',
+                         'warmupSampleCount', 'serverThreadCount', 'operatingSystem',
+                         'processorCount', 'runCount'):
+            pair = self.pair('new')
+            pair[0][mismatch] = 'different'
+            self.assertEqual([], comparison_entries(pair), mismatch)
+        pair = self.pair('new')
+        pair[0]['runs'][0]['reliable']['attempted'] = 1
+        self.assertEqual([], comparison_entries(pair))
+        self.assertEqual([], comparison_entries([result('old', 100)]))
+        interval_pair = self.pair('interval')
+        for entry in interval_pair:
+            entry['schemaVersion'] = 2
+        self.assertEqual([], comparison_entries(interval_pair))
+        self.assertEqual([], comparison_entries(self.pair('new')[:1]))
+
+    def test_comparison_keeps_latest_ten_pairs_and_shows_both_channels(self):
+        history = [entry for i in range(12) for entry in self.pair(str(i), i + 1)]
+        history += [result('legacy', 999)]
+        self.assertEqual([str(i) for i in range(2, 12)],
+                         [r['commitSha'] for r in comparison_entries(history)])
+        svg = render_trend(history, None)
+        ET.fromstring(svg)
+        self.assertIn('reliable p95Ms: 12.000', svg)
+        self.assertIn('unreliable p99Ms: 12.000', svg)
+        self.assertIn('R response %', svg)
+        self.assertNotIn('legacy', svg)
+        self.assertIn('Awaiting a complete pair', render_trend([], None))
+
+    def test_comparison_missing_rtt_breaks_all_latency_lines(self):
+        history = self.pair('a') + self.pair('b', None) + self.pair('c', 2)
+        root = ET.fromstring(render_trend(history, None))
+        ns = {'s': 'http://www.w3.org/2000/svg'}
+        latency_lines = [line for line in root.findall('s:line', ns)
+                         if line.get('stroke') != '#30363d' and float(line.get('y1')) < 300]
+        self.assertEqual([], latency_lines)
+
+    def test_version_change_does_not_reuse_old_baseline(self):
+        current = self.pair('new')[1]
+        self.assertFalse(compatible(result('old', 2), current))
+        self.assertNotIn('-50.00%', render([current], [result('old', 2)]))
+
+    def test_cli_preserves_legacy_version_and_writes_comparison_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = root / 'old.json'
+            old.write_text(json.dumps([result('same', 2)]), encoding='utf-8')
+            files = []
+            for index, entry in enumerate(self.pair('same')):
+                file = root / f'{index}.json'
+                file.write_text(json.dumps(entry), encoding='utf-8')
+                files.append(str(file))
+            args = ['channel_history.py', '--history', str(old), '--results', *files,
+                    '--output-history', str(root / 'history.json'),
+                    '--markdown', str(root / 'summary.md'), '--output-dir', str(root)]
+            with patch('sys.argv', args):
+                main()
+            self.assertEqual(3, len(json.loads((root / 'history.json').read_text())))
+            ET.fromstring((root / 'channel-comparison.svg').read_text(encoding='utf-8'))
+
     def test_trend_uses_latest_ten_matching_conditions_and_scenario(self):
         history = [result(str(i), i + 1) for i in range(12)]
         incompatible = result('different', 100)

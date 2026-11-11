@@ -91,22 +91,23 @@ PR 결과는 `benchmark-data`의 직전 공식 측정과 비교한다. `main`에
 | 유실률 0% | 워밍업 500회, 1,000회 × 5 runs |
 | 유실률 10% | 워밍업 100회, 1,000회 × 5 runs |
 | 유실 모델 | BotTester 송신과 수신에 각각 독립적으로 10% 적용 |
-| 채널 비교 | 비신뢰성 10개/10ms, 신뢰성 1개/10ms, 혼합은 둘을 함께 전송 |
-| 채널 표본 | 기본 워밍업 100단위, 본 측정 1,000단위 × 3 runs, 응답 timeout 1초 |
+| 채널 비교 | 단독은 응답 직후 다음 1건, 비신뢰 유실은 요청별 타임아웃 후 진행. 혼합은 10ms마다 비신뢰 10건·신뢰 1건 |
+| 채널 표본 | 단독은 각 채널 워밍업 100건·본 측정 1,000건 × 3 runs. 혼합은 run당 비신뢰 1,000건·신뢰 100건, 응답 timeout 1초 |
 | 대표값 | 각 run 통계의 중앙값 |
-| 실행 제한 | warmup과 각 run은 최대 300초, workflow는 최대 45분 |
+| 실행 제한 | Ping/Pong은 warmup과 각 run 각각 300초. 채널은 각 run의 연결·워밍업·본 측정 합계 60초. workflow는 최대 45분 |
 
 0%·10%와 세 채널 시나리오는 같은 runner에서 순차 실행한다. 병렬 측정은 CPU 경합으로 RTT를 왜곡하고 singleton BotTester 상태를 공유할 수 있으므로 사용하지 않는다.
-각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 처리량을 콘솔에 출력한다. 진행 로그가 300초 안에 완료되지 않으면 해당 run을 실패 처리하므로 무응답 상태로 전체 job 시간을 소비하지 않는다.
+Ping/Pong은 각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 처리량을 콘솔에 출력하며 각 실행은 300초로 제한한다. 채널은 run별 경과 시간과 결과를 `channel-*.json`에 기록한다. 단독 측정에서 비신뢰 요청은 1초 타임아웃 후 다음 요청으로 진행하고, 신뢰 요청은 타임아웃 시 측정을 실패 처리한다. 비신뢰 요청도 run 전체의 60초 제한은 적용받는다.
 
 ### 이력과 그래프 해석
 
 - `benchmark-data/rtt-history.json`은 commit별 전체 공식 이력을 보존한다.
 - `rtt-loss-0.svg`와 `rtt-loss-10.svg`는 최근 10개 공식 측정의 P95/P99를 표시한다.
 - `channel-unreliable-only.svg`와 `channel-mixed.svg`는 조건이 같은 최근 공식 측정의 비신뢰성 P95/P99와 응답률을 표시한다.
+- `channel-comparison.svg`는 같은 커밋·조건의 버전 3 단독 측정만 짝지어 신뢰·비신뢰 P95/P99와 응답률을 표시한다. 양쪽 모두 응답 직후 다음 요청을 보내며, 비신뢰 유실은 1초 타임아웃 후 진행한다. 워밍업 100건·본 측정 1,000건·3회 실행이며, 기존 Ping/Pong 및 버전 1·2 추세와 분리한다.
 - `channel-history.json`은 최근 150개 채널 시나리오 결과를 보존한다.
 - `rtt-loss-0.svg`와 `rtt-loss-10.svg`의 변화율은 현재 값과 이전 최대 5개 측정 중앙값을 비교한 백분율이다.
-- 채널 그래프의 변화율은 같은 commit을 제외한 직전 호환 측정값과 비교한 백분율이다. 이전 5개 중앙값을 사용하지 않는다. 두 종류 모두 RTT 변화율이 양수면 지연이 증가한 것이다.
+- `channel-unreliable-only.svg`와 `channel-mixed.svg`의 변화율은 같은 commit을 제외한 직전 호환 측정값과 비교한 백분율이다. 이전 5개 중앙값을 사용하지 않는다. `channel-comparison.svg`는 변화율 대신 양쪽 RTT와 응답률을 표시한다. RTT 변화율이 양수면 지연이 증가한 것이다.
 - Job Summary와 PR 코멘트의 변화율은 직전 공식 측정과 비교한다.
 - `Max`는 hosted runner의 OS 스케줄링 노이즈에 민감하므로 표의 참고값으로만 남기고 추세 그래프에는 사용하지 않는다.
 - 저장소 `README.md`는 `benchmark-data` 브랜치의 raw SVG를 표시하므로 공식 이력이 갱신되면 별도 README commit 없이 그래프도 바뀐다.
@@ -149,6 +150,7 @@ RTT workflow가 실패하면 다음 순서로 확인한다.
 2. 임시 인증서 생성과 정리, 서버 프로세스 종료, 사용 포트 충돌 여부를 확인한다.
 3. `rtt-loss-0.json`과 `rtt-loss-10.json` 생성 여부를 artifact에서 확인한다.
 4. `channel-unreliable-only.json`, `channel-reliable-baseline.json`, `channel-mixed.json` 생성 여부를 확인한다.
+   단독 결과의 `schemaVersion=3`, 각 run의 시도 수와 응답률·`timedOut`, `channel-comparison.svg`의 측정 쌍 표시 여부도 확인한다. 기존 버전만 있거나 조건이 맞는 쌍이 없으면 비교 그래프는 대기 안내를 표시한다.
 5. PR 비교가 실패하면 `benchmark-data` 브랜치의 `rtt-history.json`과 `channel-history.json`을 읽을 수 있는지 확인한다.
 6. `main` 측정은 성공했지만 이력 기록이 실패하면 workflow의 `contents: write` 권한과 branch 정책을 확인한다.
 
