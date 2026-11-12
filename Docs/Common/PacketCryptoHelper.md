@@ -60,22 +60,12 @@ static void EncodePacket(
     const std::vector<unsigned char>& sessionSalt,
     const BCRYPT_KEY_HANDLE& sessionKeyHandle,
     const bool isCorePacket);
-
-static void EncodePacket(
-    OUT NetBuffer& packet,
-    const PacketSequence packetSequence,
-    const PACKET_DIRECTION direction,
-    const unsigned char* sessionSalt,
-    const size_t sessionSaltSize,
-    const BCRYPT_KEY_HANDLE& sessionKeyHandle,
-    const bool isCorePacket);
 ```
 
 패킷이 이미 인코딩된 상태면 즉시 반환한다.
 그 외에는 `FitsWireLimit()`으로 태그 포함 1,024바이트 상한을 검사하고 태그 공간을 확보한다. 크기 초과 또는 nonce·암호화 실패 시 인코딩 완료 플래그를 설정하지 않는다. 이어서 nonce를 만들고, `SetHeader(packet, AUTH_TAG_SIZE)`로 AuthTag 공간을 반영한 뒤 body 영역을 in-place 암호화한다.
 
 암호화 성공 시 AuthTag를 버퍼 끝에 쓰고 `packet.m_bIsEncoded = true`로 설정한다.
-
 ### `DecodePacket`
 
 ```cpp
