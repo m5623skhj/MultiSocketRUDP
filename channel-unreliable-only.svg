@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="698" viewBox="0 0 960 698">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="722" viewBox="0 0 960 722">
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 <style>text{font:13px sans-serif;fill:#c9d1d9}.title{font-size:22px;font-weight:bold}</style>
 <text x="28" y="38" class="title">Unreliable channel: unreliable-only</text>
@@ -15,13 +15,18 @@
 <line x1="80" y1="115.0" x2="900" y2="115.0" stroke="#30363d"/>
 <text x="15" y="119.0">222.2</text>
 <circle cx="80.0" cy="152.72502250225023" r="4" fill="#58a6ff"><title>unreliable P95: 174.3 µs</title></circle>
-<line x1="80.0" y1="152.72502250225023" x2="900.0" y2="161.62466246624663" stroke="#58a6ff" stroke-width="2"/>
-<circle cx="900.0" cy="161.62466246624663" r="4" fill="#58a6ff"><title>unreliable P95: 163.0 µs</title></circle>
+<line x1="80.0" y1="152.72502250225023" x2="490.0" y2="161.62466246624663" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="490.0" cy="161.62466246624663" r="4" fill="#58a6ff"><title>unreliable P95: 163.0 µs</title></circle>
+<line x1="490.0" y1="161.62466246624663" x2="900.0" y2="158.00180018001802" stroke="#58a6ff" stroke-width="2"/>
+<circle cx="900.0" cy="158.00180018001802" r="4" fill="#58a6ff"><title>unreliable P95: 167.6 µs</title></circle>
 <circle cx="80.0" cy="130.9090909090909" r="4" fill="#f85149"><title>unreliable P99: 202.0 µs</title></circle>
-<line x1="80.0" y1="130.9090909090909" x2="900.0" y2="146.50315031503152" stroke="#f85149" stroke-width="2"/>
-<circle cx="900.0" cy="146.50315031503152" r="4" fill="#f85149"><title>unreliable P99: 182.2 µs</title></circle>
+<line x1="80.0" y1="130.9090909090909" x2="490.0" y2="146.50315031503152" stroke="#f85149" stroke-width="2"/>
+<circle cx="490.0" cy="146.50315031503152" r="4" fill="#f85149"><title>unreliable P99: 182.2 µs</title></circle>
+<line x1="490.0" y1="146.50315031503152" x2="900.0" y2="144.0616561656166" stroke="#f85149" stroke-width="2"/>
+<circle cx="900.0" cy="144.0616561656166" r="4" fill="#f85149"><title>unreliable P99: 185.3 µs</title></circle>
 <text x="55.0" y="312">b5fed3c</text>
-<text x="875.0" y="312">69aa11b</text>
+<text x="465.0" y="312">69aa11b</text>
+<text x="875.0" y="312">ac94f2c</text>
 <text x="28" y="347">Responses / attempted (%)</text>
 <line x1="80" y1="490.0" x2="900" y2="490.0" stroke="#30363d"/>
 <text x="15" y="494.0">0.000</text>
@@ -34,10 +39,13 @@
 <line x1="80" y1="365.0" x2="900" y2="365.0" stroke="#30363d"/>
 <text x="15" y="369.0">100.000</text>
 <circle cx="80.0" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000%</title></circle>
-<line x1="80.0" y1="365.0" x2="900.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
+<line x1="80.0" y1="365.0" x2="490.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
+<circle cx="490.0" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000%</title></circle>
+<line x1="490.0" y1="365.0" x2="900.0" y2="365.0" stroke="#3fb950" stroke-width="2"/>
 <circle cx="900.0" cy="365.0" r="4" fill="#3fb950"><title>unreliable deliveryPercent: 100.000%</title></circle>
 <text x="55.0" y="512">b5fed3c</text>
-<text x="875.0" y="512">69aa11b</text>
+<text x="465.0" y="512">69aa11b</text>
+<text x="875.0" y="512">ac94f2c</text>
 <text x="650" y="97">P95: blue · P99: red</text>
 <text x="28" y="548">Missing responses are excluded from RTT. Read latency together with response rate.</text>
 <text x="28" y="585">Commit</text>
@@ -58,4 +66,10 @@
 <text x="330" y="639">182.2</text>
 <text x="650" y="639">-9.80%</text>
 <text x="820" y="639">100.000</text>
+<text x="28" y="663">ac94f2c0d029</text>
+<text x="180" y="663">167.6</text>
+<text x="480" y="663">+2.82%</text>
+<text x="330" y="663">185.3</text>
+<text x="650" y="663">+1.70%</text>
+<text x="820" y="663">100.000</text>
 </svg>

@@ -7084,5 +7084,305 @@
     ],
     "runCount": 3,
     "healthy": true
+  },
+  {
+    "schemaVersion": 3,
+    "commitSha": "ac94f2c0d02970fd0a2d8d0b94591b3d3632327b",
+    "scenarioName": "unreliable-only",
+    "recordedAtUtc": "2026-11-15T07:04:33.4499873+00:00",
+    "sampleCount": 1000,
+    "warmupSampleCount": 100,
+    "timeoutMs": 1000,
+    "serverThreadCount": 1,
+    "operatingSystem": "Microsoft Windows 10.0.26100",
+    "processorCount": 4,
+    "runs": [
+      {
+        "reliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 8051.983606161378,
+          "p50Ms": 0.1003,
+          "p95Ms": 0.1544,
+          "p99Ms": 0.1817,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.124193
+      },
+      {
+        "reliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 6180.664532689226,
+          "p50Ms": 0.1431,
+          "p95Ms": 0.1711,
+          "p99Ms": 0.1853,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.1617949
+      },
+      {
+        "reliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 6219.582355044859,
+          "p50Ms": 0.1431,
+          "p95Ms": 0.1676,
+          "p99Ms": 0.1894,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.1607825
+      }
+    ],
+    "runCount": 3,
+    "healthy": true
+  },
+  {
+    "schemaVersion": 3,
+    "commitSha": "ac94f2c0d02970fd0a2d8d0b94591b3d3632327b",
+    "scenarioName": "reliable-baseline",
+    "recordedAtUtc": "2026-11-15T07:04:34.4694073+00:00",
+    "sampleCount": 1000,
+    "warmupSampleCount": 100,
+    "timeoutMs": 1000,
+    "serverThreadCount": 1,
+    "operatingSystem": "Microsoft Windows 10.0.26100",
+    "processorCount": 4,
+    "runs": [
+      {
+        "reliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 5041.8015768738605,
+          "p50Ms": 0.1632,
+          "p95Ms": 0.1934,
+          "p99Ms": 0.217,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.1983418
+      },
+      {
+        "reliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 5705.372292658213,
+          "p50Ms": 0.1544,
+          "p95Ms": 0.1875,
+          "p99Ms": 0.2131,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.1752734
+      },
+      {
+        "reliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 5202.353336555324,
+          "p50Ms": 0.1601,
+          "p95Ms": 0.1879,
+          "p99Ms": 0.2183,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 0,
+          "accepted": 0,
+          "received": 0,
+          "late": 0,
+          "deliveryPercent": 0,
+          "responsesPerSecond": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "p99Ms": null,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 0.1922207
+      }
+    ],
+    "runCount": 3,
+    "healthy": true
+  },
+  {
+    "schemaVersion": 1,
+    "commitSha": "ac94f2c0d02970fd0a2d8d0b94591b3d3632327b",
+    "scenarioName": "mixed",
+    "recordedAtUtc": "2026-11-15T07:04:45.7238656+00:00",
+    "sampleCount": 1000,
+    "warmupSampleCount": 100,
+    "timeoutMs": 1000,
+    "serverThreadCount": 1,
+    "operatingSystem": "Microsoft Windows 10.0.26100",
+    "processorCount": 4,
+    "runs": [
+      {
+        "reliable": {
+          "attempted": 100,
+          "accepted": 100,
+          "received": 100,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 41.37014956715654,
+          "p50Ms": 0.1998,
+          "p95Ms": 0.3022,
+          "p99Ms": 0.3543,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 994,
+          "late": 0,
+          "deliveryPercent": 99.4,
+          "responsesPerSecond": 411.21928669753595,
+          "p50Ms": 0.2444,
+          "p95Ms": 0.3689,
+          "p99Ms": 0.4464,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 2.4172018
+      },
+      {
+        "reliable": {
+          "attempted": 100,
+          "accepted": 100,
+          "received": 100,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 39.50318893442992,
+          "p50Ms": 0.1793,
+          "p95Ms": 32.6422,
+          "p99Ms": 95.79,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 1000,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 395.0318893442992,
+          "p50Ms": 0.2403,
+          "p95Ms": 0.4019,
+          "p99Ms": 0.454,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 2.5314412
+      },
+      {
+        "reliable": {
+          "attempted": 100,
+          "accepted": 100,
+          "received": 100,
+          "late": 0,
+          "deliveryPercent": 100,
+          "responsesPerSecond": 40.78571892945971,
+          "p50Ms": 0.1724,
+          "p95Ms": 0.2517,
+          "p99Ms": 0.2654,
+          "timedOut": 0
+        },
+        "unreliable": {
+          "attempted": 1000,
+          "accepted": 1000,
+          "received": 996,
+          "late": 0,
+          "deliveryPercent": 99.6,
+          "responsesPerSecond": 406.22576053741875,
+          "p50Ms": 0.2342,
+          "p95Ms": 0.3578,
+          "p99Ms": 0.4177,
+          "timedOut": 0
+        },
+        "connected": true,
+        "elapsedSeconds": 2.4518386
+      }
+    ],
+    "runCount": 3,
+    "healthy": true
   }
 ]
