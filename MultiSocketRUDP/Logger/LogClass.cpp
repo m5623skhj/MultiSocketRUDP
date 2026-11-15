@@ -13,14 +13,18 @@ nlohmann::json LogBase::ObjectToJsonImpl()
 
 void LogBase::SetLogTime()
 {
-    const auto now = std::chrono::system_clock::now();
+    SetLogTime(std::chrono::system_clock::now());
+}
+
+void LogBase::SetLogTime(const std::chrono::system_clock::time_point inTime)
+{
+    const auto now = inTime;
     const std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
 
     std::tm utcTime = {};
 
     if (const auto error = gmtime_s(&utcTime, &currentTime); error != 0)
     {
-        std::cerr << "Error in gmtime_s() : " << error << '\n';
         loggingTime = "INVALID_TIME";
         return;
     }

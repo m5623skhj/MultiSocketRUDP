@@ -1,5 +1,6 @@
 #pragma once
 #include "nlohmann/json.hpp"
+#include <chrono>
 
 class Logger;
 
@@ -28,6 +29,7 @@ public:
 private:
 	nlohmann::json ObjectToJsonImpl();
 	void SetLogTime();
+	void SetLogTime(std::chrono::system_clock::time_point inTime);
 
 public:
 	void SetLastErrorCode(const DWORD inLastErrorCode)

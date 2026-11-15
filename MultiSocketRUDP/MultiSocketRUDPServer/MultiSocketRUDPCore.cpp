@@ -127,8 +127,8 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 	MultiSocketRUDPCoreFunctionDelegate::Instance().Init(*this);
 	if (not InitNetwork())
 	{
-		StopServer();
 		LOG_ERROR("InitNetwork failed");
+		StopServer();
 		return false;
 	}
 
@@ -149,15 +149,15 @@ bool MultiSocketRUDPCore::StartServer(const std::wstring& coreOptionFilePath, co
 
 	if (not InitRIO())
 	{
-		StopServer();
 		LOG_ERROR("InitRIO failed");
+		StopServer();
 		return false;
 	}
 
 	if (not RunAllThreads())
 	{
-		StopServer();
 		LOG_ERROR("RunAllThreads failed");
+		StopServer();
 		return false;
 	}
 

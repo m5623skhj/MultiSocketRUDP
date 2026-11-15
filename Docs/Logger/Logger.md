@@ -1,166 +1,38 @@
 # Logger
 
-> 이벤트 기반 비동기 JSON 파일 로거. 별도 스레드에서 큐를 처리하여 게임 스레드 지연 최소화.
+게임/네트워크 스레드와 파일·콘솔 I/O를 분리하는 Windows 비동기 JSON 로거다. 빌드 대상은 C++20이다.
 
----
+## 기존 API와 일반 로그
 
-## 구조
+- RunLoggerThread(printToConsole) / StopLoggerThread()는 여러 사용자 참조를 직렬화해 관리한다. 마지막 사용자가 종료하면 입력을 차단하고 종료 신호를 보낸다. 참조 수가0인 상태의 추가 Stop은 아무 작업도 하지 않는다. 각 호출자는 획득한 참조만 한 번 반환해야 한다.
+- WriteLog(shared_ptr<LogBase>)는 일반 로그의 FIFO와 첫 사용자가 선택한 콘솔 미러링을 유지한다. 전체 대기 큐 상한은4096개다. 입력 차단·포화·큐 할당 실패는 normal_dropped에 집계하며 예외를 전파하지 않는다.
+- 일반 입력의 queue mutex 대기는 유지하지만 파일·콘솔 출력과 직렬화는 이 mutex 안에서 실행하지 않는다.
+- MakeLogObject 및 호출자의 메시지 생성은 할당 실패로 예외가 날 수 있다. 게임 진단처럼 실패를 허용해야 하는 호출자는 인자 생성까지 예외 경계로 감싼다.
+- 외부에서 Worker()를 직접 호출하지 않는다. RunLoggerThread가 생성한 작업 스레드만 큐를 소비한다.
 
-```
-Logger (싱글톤)
- ├── logWaitingQueue    ← std::queue<shared_ptr<LogBase>>
- ├── loggerThread       ← std::jthread (Worker)
- ├── logFileStream      ← 시간 기반 파일명 (log_YYYY-MM-DD_HH.txt)
- └── loggerEventHandles[2]
-      [0] AutoResetEvent  ← 새 로그 추가 시 Set
-      [1] ManualResetEvent ← 종료 시 Set
-```
+## 진단 전용 API
 
----
+- TryWriteLog(shared_ptr<LogBase>)는 queue mutex를 try_lock하며 경합 시 기다리지 않고 false를 반환한다.
+- 대기 진단은 최대256개이고 전체4096개 제한도 적용한다. 큐에서 꺼낸 작업 배치는 최대32개다. 진단이 일반 로그용 대기 공간을 모두 차지하지 않는다.
+- 진단은 파일에만 기록한다. 일반 로그의 콘솔 출력이 정체해도 생산자는 파일·콘솔 I/O를 기다리지 않으며, 큐 상한이 적체를 제한한다.
+- RecordDroppedDiagnostic()는 호출자에서 메시지를 만들지 못한 경우도 집계한다.
+- 실패·누락은 작업자가 기록 가능한 동안 JSON Log.event=logger_statistics에 누적 기록한다. diagnostic_dropped, normal_dropped, serialization_errors, file_errors, console_errors, stop_timeouts를 포함한다. 통계는 자기 자신을 큐에 넣지 않는다.
+- GetStatistics()는 현재/마지막 실행 세션의 카운터를 조회한다. 기록 불능·강제 종료·종료 타임아웃이면 마지막 통계까지 파일에 남는 것은 보장하지 않는다.
 
-## 사용 방법
+## 스레드와 기록 수명
 
-### 매크로
+입력은 공유 State를 보유하고 입력 허용 여부를 큐 잠금 안에서 다시 확인한다. UTC 수신 시각을 큐 항목에 캡처하며 작업 스레드가 그 시각으로 LogTime을 만든다. 지연된 파일 기록 시각으로 바꾸지 않는다. 로그 객체의 내용은 전달 후 호출자가 변경하지 않는다.
 
-```cpp
-LOG_ERROR("연결 실패: 에러 코드 " + std::to_string(code));
-LOG_DEBUG("디버그 정보");   // Release에서는 no-op
-```
+작업자는 고정32개 배치를 큐에서 이동한 뒤 잠금을 해제하고 JSON 직렬화·파일 추가·선택적 콘솔 출력을 수행한다. 레코드 직렬화 실패는 해당 레코드만 누락 처리한다. 파일을 열거나 쓸 수 없으면 추가 입력을 차단하고 카운터로 남긴다. 실패한 콘솔 미러링은 더 이상 반복하지 않는다.
 
-### 커스텀 로그 타입
+파일은 세션 시작 시의 작업 디렉터리 Log Folder/log_YYYY-MM-DD_HH.txt다. 이름은 UTC이며 실행 중 매시간 회전하지 않는다. GENERIC_WRITE로 연 동기 핸들에 EOF 오프셋의 WriteFile로 UTF-8 JSON 행을 추가하고 정상 종료 시 FlushFileBuffers를 호출한다.
 
-```cpp
-class ServerLog : public LogBase {
-    OBJECT_TO_JSON_LOG(
-        SET_LOG_ITEM(logString);
-    );
-public:
-    std::string logString;
-};
-```
+## 종료와 재시작
 
-### 직접 사용
+- 마지막 Stop은 먼저 입력을 차단하고 최대250ms 대기한다. 미완료 시 CancelSynchronousIo를 요청하고 최대50ms를 추가 대기한다. 이300ms는 작업 스레드 대기 예산이며 시작/종료 제어 mutex 등의 스케줄링 시간까지 포함한 실시간 보장은 아니다.
+- 종료를 위해 남은 콘솔 미러링은 생략한다. 정상 I/O에서는 큐를 비우고 flush하지만 정체 시에는 일부 기록의 보존을 포기한다.
+- TerminateThread를 사용하지 않는다. 타임아웃 작업자는 Logger 객체를 캡처하지 않고 자신의 공유 State와 파일·이벤트를 유지한다. 제어 객체는 그 자원을 강제로 해제하거나 무제한 join하지 않는다.
+- 이전 작업자가 완료되기 전에는 RunLoggerThread 재시작을 거부한다. 완료 후 새 세션을 시작할 수 있으며 카운터도 새 State에서 시작한다.
+- 작업 스레드의 JSON/파일 처리 예외는 격리한다. 파일 초기화 실패는 서버를 강제 크래시시키지 않지만 기록 기능은 사용할 수 없으므로 시작 표식·카운터를 확인한다.
 
-```cpp
-auto log = Logger::MakeLogObject<ServerLog>();
-log->logString = "상세 메시지";
-Logger::GetInstance().WriteLog(log);
-```
-
----
-
-## 비동기 처리 흐름
-
-```
-WriteLog(logObject)
-  ├─ logObject->SetLogTime()   ← UTC 타임스탬프 기록
-  ├─ logWaitingQueue.push()
-  └─ SetEvent(loggerEventHandles[0])
-
-Worker()
-  WaitForMultipleObjects(2 handles, INFINITE)
-  case 0 (LOG_HANDLE):
-    큐를 copyQueue로 swap
-    WriteLogImpl(copyQueue)   ← JSON 직렬화 → 파일 쓰기
-  case 1 (STOP_HANDLE):
-    Sleep(10초)
-    WriteLogImpl(copyQueue)   ← stop event 직후 swap한 snapshot 기록
-    return
-```
-
-stop event를 받은 뒤 10초 동안 새로 들어온 로그는 위 snapshot에 포함되지 않는다. 이후 `Logger` 소멸자가 대기 큐를 다시 swap해 남은 로그를 기록한다.
-
----
-
-## 로그 파일 형식
-
-파일명: `Log Folder/log_2025-01-15_14.txt`
-
-```json
-{"LogTime":"2025-01-15 14:30:45.123","GetLastErrorCode":0,"Log":{"logString":"Server started"}}
-{"LogTime":"2025-01-15 14:30:45.456","GetLastErrorCode":0,"Log":{"logString":"Client connected"}}
-```
-
----
-
-## 다중 컴포넌트 공유
-
-```
-RunLoggerThread()
-  if currentConnectedClientCount++ > 0 → 이미 실행 중, 건너뜀
-
-StopLoggerThread()
-  if --currentConnectedClientCount != 1 → 아직 사용자 있음, 건너뜀
-  SetEvent(stopHandle) → Worker 종료
-```
-
----
-
-## LogBase 확장 매크로
-
-```cpp
-#define OBJECT_TO_JSON_LOG(...)
-// ObjectToJson() 가상 함수 자동 생성
-
-#define SET_LOG_ITEM(logObject)
-// jsonObject[#logObject] = logObject  (변수명 = JSON 키)
-```
-
----
-
-## 로그 압축 도구
-
-각 `LogCompress.bat`는 **스크립트 파일이 있는 디렉터리 아래** `Log Folder`를 처리한다.
-
-- root와 1단계 하위 폴더의 `.txt` 로그 → `Archive/` 폴더에 `.tar.gz` 압축
-- 무결성 검사 실패 시 원본 유지, 손상 아카이브 삭제
-- 오늘 날짜가 아닌 기존 아카이브 자동 삭제
-- 같은 날짜·폴더의 아카이브가 이미 있으면 해당 폴더를 건너뜀
-
-상세 경로와 보존 주의점은 [[DevelopmentScripts]]를 참고한다.
-
----
-
-## 현재 코드 기준 함수 설명
-
-### 공개 함수
-
-#### `static Logger& GetInstance()`
-- 전역 Logger 싱글톤을 반환한다.
-
-#### `static bool IsAlive()`
-- Logger 스레드가 살아 있는지 반환한다.
-
-#### `void RunLoggerThread(const bool isAlsoPrintToConsole)`
-- 로거 스레드를 시작하고 콘솔 출력 여부를 설정한다.
-
-#### `void Worker()`
-- 이벤트를 기다리다가 대기 큐를 비우고 실제 파일 기록을 수행한다.
-
-#### `void StopLoggerThread()`
-- Logger 종료 이벤트를 보내고 스레드를 정리한다.
-
-#### `template<typename LogType> static std::shared_ptr<LogType> MakeLogObject()`
-- 타입 안전한 로그 객체 생성을 돕는 헬퍼다.
-
-#### `void WriteLog(std::shared_ptr<LogBase> logObject)`
-- 로그 객체를 대기 큐에 넣고 작업 스레드를 깨운다.
-
-### 내부 함수
-
-#### `static void CreateFolderIfNotExists(const std::string& folderPath)`
-- 로그 폴더가 없으면 생성한다.
-
-#### `void WriteLogImpl(std::queue<std::shared_ptr<LogBase>>& copyLogWaitingQueue)`
-- 복사된 큐를 순회하며 실제 출력 작업을 수행한다.
-
-#### `void WriteLogToFile(const std::shared_ptr<LogBase>& logObject)`
-- 단일 로그 객체를 JSON 라인 형식으로 파일에 기록한다.
-
----
-
-## 관련 문서
-
-- [[MultiSocketRUDPCore]] — RunLoggerThread / StopLoggerThread 호출
-- [[RUDPClientCore]] — 클라이언트 측 Logger 사용
-- [[DevelopmentScripts]] — 로그 압축 대상 경로와 보존 정책
+이번 변경은 정적으로 검토했으며 빌드·실행 검증 결과를 의미하지 않는다.
