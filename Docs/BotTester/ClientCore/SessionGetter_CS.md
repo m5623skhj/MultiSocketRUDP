@@ -16,9 +16,11 @@ new SslStream(tcpClient.GetStream(), false,
 ```
 
 > 개발 환경에서는 `certFingerprint = null`로 호출해 자체 서명 인증서를 허용.  
-> 운영 환경에서는 인증서 지문(SHA-1)을 전달해 핀닝 적용 권장.
+> 지문을 지정해도 현재 콜백은 SHA-1 해시 일치만 검사하고 체인·만료·호스트 이름 오류는 따로 거부하지 않는다. 운영용 검증 정책으로 간주하면 안 된다.
 
 ---
+
+`BotTesterCore`는 현재 지문 없이 호출한다. 따라서 기본 UI 경로는 인증서 검증을 생략한다. C++ `TLSHelperClient`의 체인·이름 검증과 구분해야 한다.
 
 ## 연결 흐름
 
@@ -51,7 +53,7 @@ while true:
   if receivedBytes == 0 → break
   totalBytes += receivedBytes
   if totalBytes < PacketHeaderSize → continue
-  payloadLength = BitConverter.ToUInt16(buffer, PayloadPosition)  // offset 2
+  payloadLength = BitConverter.ToUInt16(buffer, PayloadPosition)  // offset 1
   if totalBytes >= payloadLength + PacketHeaderSize → break
 
 new Client(buffer[PacketHeaderSize..totalBytes])

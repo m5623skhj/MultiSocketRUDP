@@ -544,6 +544,7 @@ bool MultiSocketRUDPCore::InitializeWorkerResources()
 			LOG_ERROR(std::format("Recv logic event handle creation failed. error is {}", GetLastError()));
 			return false;
 		}
+
 		recvLogicThreadEventHandles.emplace_back(recvLogicEventHandle);
 
 		auto scheduler = CreateRetransmissionScheduler();
@@ -662,6 +663,7 @@ void MultiSocketRUDPCore::CloseWorkerEventHandles()
 	{
 		CloseHandleIfValid(recvLogicThreadEventHandle);
 	}
+
 	recvLogicThreadEventHandles.clear();
 
 	CloseHandleIfValid(recvLogicThreadEventStopHandle);
@@ -732,7 +734,10 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 	const unsigned int port = udpPortStart == 0 ? 0 :
 		static_cast<unsigned int>(udpPortStart) + session.GetSessionId();
 	if (udpPortStart != 0 && (session.GetSessionId() >= numOfSockets || port > udpPortEnd))
+	{
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
+	}
+
 	session.socketContext.SetSocket(CreateRUDPSocket(static_cast<PortType>(port)));
 	const SOCKET sock = session.GetSocket();
 	if (sock == INVALID_SOCKET)
@@ -749,6 +754,7 @@ CONNECT_RESULT_CODE MultiSocketRUDPCore::InitReserveSession(OUT RUDPSession& ses
 		LOG_ERROR("Unable to verify the bound UDP port; reservation cancelled.");
 		return CONNECT_RESULT_CODE::CREATE_SOCKET_FAILED;
 	}
+
 	session.socketContext.SetServerPort(ntohs(serverAddr.sin_port));
 
 	if (not rioManager->InitializeSessionRIO(session, session.GetThreadId()))
@@ -831,6 +837,7 @@ void MultiSocketRUDPCore::CompleteRecvIOCompletedContext(RecvIOCompletedContext*
 	{
 		context->ownerRecvBuffer->CompleteRecvLogic();
 	}
+
 	recvIOCompletedContextPool.Free(context);
 }
 

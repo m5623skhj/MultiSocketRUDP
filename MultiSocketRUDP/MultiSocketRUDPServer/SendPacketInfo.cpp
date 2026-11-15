@@ -72,7 +72,11 @@ void SendPacketInfo::MarkSentForRttSample(const std::chrono::steady_clock::time_
 	}
 
 	std::scoped_lock lock(rttSampleLock);
-	if (firstSendTime.time_since_epoch().count() == 0) firstSendTime = now;
+	if (firstSendTime.time_since_epoch().count() == 0)
+	{
+		firstSendTime = now;
+	}
+
 	lastSendTime = now;
 }
 

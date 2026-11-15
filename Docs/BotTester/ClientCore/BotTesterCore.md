@@ -35,8 +35,9 @@ MainWindow
   [3-4]:  (reserved)
 
 페이로드:
-  [0]:    ConnectResultCode (1B)
-  [1..]:  serverIp (string: len(2B) + bytes)
+  [0..3]: RUDP_PROTOCOL_VERSION (4B, little-endian, 현재 2)
+  [4]:    ConnectResultCode (1B)
+  [5..]:  serverIp (string: len(2B) + bytes)
           serverPort (2B)
           sessionId (2B)
           sessionKey (16B)
@@ -97,6 +98,18 @@ int GetActiveBotCount()                   // IsConnected() == true 개수
 - SessionBroker에 TLS로 접속해 세션 정보를 받아 새 `Client`를 생성한다.
 
 ---
+
+## 완료 통지와 부하 측정
+
+`StartBotTest()`는 봇별 RTT 수집기와 완료 추적기를 설치한다. 모든 봇의 설정이 끝나고 전체 연결이 해제되면 `BotTestCompleted` 이벤트를 한 번 통지한다. `StopBotTest()`는 추적기를 취소하고 세션을 정리하므로 정상 완료 통지를 만들지 않는다.
+
+`StartRttStressTest(RttStressTestConfiguration, CancellationToken)`는 모든 클라이언트를 먼저 연결한 뒤 각 클라이언트에 요청 하나만 진행 중인 폐루프 부하를 실행한다. 워밍업·측정 시간·재전송 옵션을 검증하고 종료 시 생성한 클라이언트를 정리한다. 최대 처리량을 보장하는 측정은 아니다.
+
+세션 사전은 `sessionDictionaryLock`으로 보호하지만 연결용 `SessionGetter`는 공유 인스턴스다. 설정 변경과 테스트 시작·중지는 UI 또는 제어 계층에서 직렬화해야 한다.
+
+## 로그와 인증의 현재 제한
+
+`GetSessionInfoFromSessionBroker()`는 Debug 로그에 브로커 응답 전체의 16진 바이트를 기록한다. 성공 응답에는 세션 키·솔트가 포함되므로 해당 로그를 외부 공유하거나 운영 수집에 그대로 사용하면 안 된다. 기본 `SessionGetter` 호출은 지문을 전달하지 않아 인증서 검증을 생략한다. 두 동작은 현재 구현의 제한이며 이 문서 갱신에서는 코드를 바꾸지 않는다.
 
 ## 관련 문서
 - [[RudpSession_CS]] — Client가 상속하는 세션 클래스

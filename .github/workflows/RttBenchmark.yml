@@ -144,7 +144,8 @@ jobs:
           $global:LASTEXITCODE = 0
           python Scripts/RTTBenchmark/channel_history.py @historyArguments `
             --results rtt-results/channel-unreliable-only.json rtt-results/channel-reliable-baseline.json rtt-results/channel-mixed.json `
-            --output-history rtt-results/channel-history.json --markdown rtt-results/channel-summary.md
+            --output-history rtt-results/channel-history.json --markdown rtt-results/channel-summary.md `
+            --output-dir rtt-results
           if ($LASTEXITCODE -ne 0) { throw "Channel summary generation failed." }
           Get-Content rtt-results/channel-summary.md -Raw | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
           Get-Content rtt-results/channel-summary.md -Raw | Add-Content rtt-results/rtt-summary.md -Encoding utf8
@@ -265,6 +266,7 @@ jobs:
             channel-history.json \
             channel-summary.md \
             channel-unreliable-only.svg \
+            channel-comparison.svg \
             channel-mixed.svg \
             rtt-history.json \
             rtt-loss-0.svg \

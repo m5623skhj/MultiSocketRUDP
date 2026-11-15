@@ -19,7 +19,11 @@ namespace MultiSocketRUDP
 		// ----------------------------------------
 		bool operator<(const PacketSequenceSetKey& other) const
 		{
-			if (isUnreliable != other.isUnreliable) return isUnreliable < other.isUnreliable;
+			if (isUnreliable != other.isUnreliable)
+			{
+				return isUnreliable < other.isUnreliable;
+			}
+
 			if (isReplyType != other.isReplyType)
 			{
 				return isReplyType < other.isReplyType;

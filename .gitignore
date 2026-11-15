@@ -45,6 +45,7 @@ Log Folder/
 MultiSocketRUDP/IntegrationClientHarness/x64/
 MultiSocketRUDP/IntegrationTest/x64/
 MultiSocketRUDP/IntegrationTest/TestCert.pfx
+MultiSocketRUDP/IntegrationTest/TestCert.cer
 MultiSocketRUDP/MultiSocketRUDPServer/MultiSoc.16f99c50/
 MultiSocketRUDP/MultiSocketRUDPClient/MultiSoc.f3949482/
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.RttBenchmark/obj/

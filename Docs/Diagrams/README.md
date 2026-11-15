@@ -13,6 +13,8 @@
 
 ---
 
+SVG의 설명·캡션은 한국어이며 코드 식별자는 유지한다. 그래프 편집 화면의 버튼 표기는 개념 설명용 번역이므로 실제 UI의 영문 이름은 해당 컴포넌트 문서에서 확인한다. `CryptoStructure.svg`는 PacketId가 평문·AAD 제외임을 표시하고, `PacketFlow.svg`는 AutoResetEvent와 서버 수신 map을 기준으로 한다.
+
 ## BotTester 다이어그램
 
 | 파일 | 내용 | 사용 문서 |

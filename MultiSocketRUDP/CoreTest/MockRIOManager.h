@@ -13,7 +13,11 @@ public:
 		ULONG, PVOID) const override
 	{
 		++const_cast<MockRIOManager*>(this)->rioReceiveExCallCount;
-		if (onRIOReceiveEx) return onRIOReceiveEx();
+		if (onRIOReceiveEx)
+		{
+			return onRIOReceiveEx();
+		}
+
 		return rioReceiveExReturn;
 	}
 
@@ -30,7 +34,11 @@ public:
 		self->lastSendLength = rioBuffer != nullptr ? rioBuffer->Length : 0;
 		self->lastSendBufferId = rioBuffer != nullptr ? rioBuffer->BufferId : RIO_INVALID_BUFFERID;
 		self->lastSendRemoteAddress = remoteAddr;
-		if (onRIOSendEx) return onRIOSendEx();
+		if (onRIOSendEx)
+		{
+			return onRIOSendEx();
+		}
+
 		return rioSendExReturn;
 	}
 
@@ -50,7 +58,11 @@ public:
 	unsigned long DequeueCompletions(ThreadIdType threadId, RIORESULT* results, ULONG maxResults) const override
 	{
 		++const_cast<MockRIOManager*>(this)->dequeueCompletionsCallCount;
-		if (onDequeueCompletions) return onDequeueCompletions(threadId, results, maxResults);
+		if (onDequeueCompletions)
+		{
+			return onDequeueCompletions(threadId, results, maxResults);
+		}
+
 		return dequeueCompletionsReturn;
 	}
 

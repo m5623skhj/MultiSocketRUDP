@@ -2,7 +2,7 @@
 
 > **Windows RIO(Registered I/O) API를 추상화하는 관리자.**  
 > 완료 큐(CQ) 생성, 함수 테이블 로드, 세션별 RIO 초기화, 완료 결과 디큐를 담당한다.  
-> 일반 IOCP 기반 소켓보다 커널 → 사용자 공간 전환 비용이 적고 처리량이 높다.
+> 현재 구현은 스레드별 완료 큐를 알림 설정 없이 만들고 폴링한다. 성능 우위는 실행 환경과 측정으로 확인한다.
 
 ---
 
@@ -16,7 +16,7 @@
 6. [완료 큐 디큐 — DequeueCompletions](#6-완료-큐-디큐--dequeuecompletions)
 7. [버퍼 등록/해제](#7-버퍼-등록해제)
 8. [완료 큐 크기 계산](#8-완료-큐-크기-계산)
-9. [RIO vs IOCP 비교](#9-rio-vs-iocp-비교)
+9. [완료 알림과 성능 해석](#9-완료-알림과-성능-해석)
 
 ---
 
@@ -24,20 +24,9 @@
 
 **Registered I/O (RIO)**는 Windows 8 / Server 2012부터 지원하는 고성능 소켓 I/O 인터페이스.
 
-**일반 IOCP 소켓과의 차이:**
+이 구현은 세션의 수신·송신 메모리를 등록해 재사용하고, IO Worker마다 자신에게 배정된 완료 큐를 조회한다. 수신 완료 데이터는 별도의 `NetBuffer`로 복사해 로직 스레드에 전달한다. 따라서 전체 경로를 복사 없는 처리나 고정 복사 횟수로 설명하지 않는다.
 
-| 특성 | 일반 IOCP | RIO |
-|------|-----------|-----|
-| 버퍼 등록 | 매 호출마다 | **1회 등록 후 재사용** |
-| 완료 알림 | `GetQueuedCompletionStatus` (커널→유저 전환) | 폴링 (`RIODequeueCompletion`) |
-| 커널 전환 | 매 I/O마다 | 완료 확인 시 최소화 |
-| 메모리 복사 | 2회 (커널 버퍼→사용자 버퍼) | 1회 (등록된 버퍼에 직접 기록) |
-| 추천 용도 | 범용 | **고빈도 소형 패킷, 게임 서버** |
-
-**RIO의 핵심 절감:**
-1. `WSALock` / `WSAUnlock` 없음 → 락 오버헤드 제거
-2. 사전 등록된 버퍼(page-locked) 사용 → DMA 직접 전달, 복사 1회
-3. 폴링 기반 완료 확인 → 커널 진입 없이 사용자 공간에서 처리
+RIO API의 알림 지원과 현재 구현의 폴링 선택은 구분한다. 폴링은 유휴 시에도 CPU를 사용할 수 있으며 `BuildConfig.h`의 sleep 모드와 함께 평가해야 한다.
 
 ---
 
@@ -337,8 +326,8 @@ rioFunc.RIODeregisterBuffer(sendBufferId);
 세션당 최대 완료 수 = RECV_OUTSTANDING_COUNT + 최대 동시 Send(1)
 CQ 크기 = 스레드당 세션 수 × 세션당 최대 완료 수
 
-현재 샘플: numOfSockets=500, numOfWorkerThreads=4, RECV_OUTSTANDING_COUNT=8
-  → ceil(500/4) × (8+1) = 1125
+현재 샘플: numOfSockets=1100, numOfWorkerThreads=4, RECV_OUTSTANDING_COUNT=8
+  → ceil(1100/4) × (8+1) = 2475
 
 나머지 세션이 특정 worker에 배정되는 경우까지 포함하도록 올림 계산한다.
 ```
@@ -352,29 +341,11 @@ CQ 손상은 안전하게 복구할 수 없는 치명적 상태이므로 오류�
 
 ---
 
-## 9. RIO vs IOCP 비교
+## 9. 완료 알림과 성능 해석
 
-```
-IOCP 기반 UDP 서버 흐름:
-  1. WSARecvFrom() → OVERLAPPED 등록
-  2. 패킷 도착 → 커널이 사용자 버퍼로 복사
-  3. GetQueuedCompletionStatus() → 커널→유저 전환
-  4. 데이터 처리
-  5. WSARecvFrom() 다시 등록
+`CreateCompletionQueue()`는 `RIOCreateCompletionQueue(queueSize, nullptr)`로 생성한다. 현재 IO Worker는 `RIODequeueCompletion()`을 반복 호출하며 완료가 없으면 빌드 설정에 따른 sleep을 수행한다. RIO 자체의 이벤트·IOCP 알림 가능 여부와 이 선택을 혼동하지 않는다.
 
-RIO 기반 UDP 서버 흐름:
-  1. RIOReceiveEx() → 등록된 버퍼에 직접 수신 예약
-  2. 패킷 도착 → 등록된 page-locked 버퍼에 DMA 기록
-  3. RIODequeueCompletion() → 유저 공간 폴링 (커널 전환 없음)
-  4. 데이터 처리 (memcpy → NetBuffer)
-  5. RIOReceiveEx() 다시 등록
-
-성능 차이 발생 지점:
-  ▼ IOCP: 완료마다 커널→유저 컨텍스트 스위칭
-  ▼ IOCP: 내부 버퍼 → 사용자 버퍼 복사 (2회)
-  ✅ RIO: page-locked 버퍼 → DMA (1회만)
-  ✅ RIO: 폴링 → 컨텍스트 스위칭 없음 (CPU는 더 쓰지만 레이턴시 낮음)
-```
+서버 내부에는 RIO 수신 버퍼에서 `NetBuffer`로 옮기는 명시적 복사와 IO → Logic 전달이 있다. 커널 전환·DMA·복사 횟수나 IOCP 대비 지연 우위를 소스만으로 수치화할 수 없으며 같은 조건의 측정이 필요하다.
 
 ---
 

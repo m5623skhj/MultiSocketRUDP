@@ -52,7 +52,12 @@ void SessionSendContext::Reset()
 			SendPacketInfo::Free(sendPacketInfoQueue.front());
 			sendPacketInfoQueue.pop();
 		}
-		for (auto* info : unreliableQueue) SendPacketInfo::Free(info);
+
+		for (auto* info : unreliableQueue)
+		{
+			SendPacketInfo::Free(info);
+		}
+
 		unreliableQueue.clear();
 		unreliableDropped = 0;
 		preferUnreliable = false;
@@ -98,9 +103,11 @@ void SessionSendContext::PushSendPacketInfo(SendPacketInfo* info)
 				++unreliableDropped;
 			}
 		}
+
 		unreliableQueue.push_back(info);
 		return;
 	}
+
 	sendPacketInfoQueue.push(info);
 }
 
@@ -121,6 +128,7 @@ SendPacketInfo* SessionSendContext::TryGetFrontAndPop()
 		preferUnreliable = false;
 		return info;
 	}
+
 	if (sendPacketInfoQueue.empty())
 	{
 		return nullptr;
@@ -144,6 +152,7 @@ SendPacketInfo* SessionSendContext::GetReservedSendPacketInfo()
 	std::scoped_lock lock(sendPacketInfoQueueLock);
 	return reservedSendPacketInfo;
 }
+
 SendPacketInfo* SessionSendContext::TakeReservedSendPacketInfo()
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
@@ -151,6 +160,7 @@ SendPacketInfo* SessionSendContext::TakeReservedSendPacketInfo()
 	reservedSendPacketInfo = nullptr;
 	return info;
 }
+
 void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 {
 	std::scoped_lock lock(sendPacketInfoQueueLock);
@@ -161,6 +171,7 @@ void SessionSendContext::SetReservedSendPacketInfo(SendPacketInfo* info)
 		SendPacketInfo::Free(info);
 		return;
 	}
+
 	reservedSendPacketInfo = info;
 }
 

@@ -90,7 +90,7 @@ void MultiSocketRUDPCore::RunIOWorkerThread(
 #if USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME == USE_WORKER_THREAD_SLEEP_FOR_FRAME
         SleepRemainingFrameTime(tickSet, workerThreadOneFrameMs);
 #elif USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME == USE_WORKER_THREAD_SLEEP_ZERO
-        Sleep(0); // 현재 BuildConfig.h의 선택
+        Sleep(0); // 기본 빌드. RTT 빌드는 대기 없음
 #endif
     }
 }
@@ -119,15 +119,15 @@ RIO 오류나 두 해제 상태에서도 context를 먼저 버리지 않는다. 
 
 ### 폴링 vs 이벤트
 
-RIO는 IOCP와 달리 완료 알림 이벤트를 지원하지 않는다.  
-(정확히는 IOCP 모드가 있지만 성능상 폴링이 더 효율적이다.)
+현재 `RIOManager`는 완료 큐를 알림 설정 없이 만들고 IO Worker가 폴링한다. 이것은 이 구현의 선택이며 RIO API 전체가 이벤트·IOCP 알림을 지원하지 않는다는 뜻은 아니다. 성능 우위는 실행 환경과 측정으로 확인한다.
 
 ```
-IOCP: 완료 시 GetQueuedCompletionStatus()에서 깨어남 → 이벤트 기반, CPU 0%
+IOCP 방식 예: GetQueuedCompletionStatus() 대기
 RIO:  RIODequeueCompletion() 폴링 → 완료 없으면 0 반환, Sleep으로 조절
 
 USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=1: Sleep으로 CPU 사용률 조절
-USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=0: 완전 폴링 → 최저 레이턴시, 높은 CPU
+USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=2: Sleep(0), 기본 모드
+USE_IO_WORKER_THREAD_SLEEP_FOR_FRAME=0: sleep 없는 폴링 → CPU 사용량과 지연을 측정해 판단
 ```
 
 ---
@@ -516,7 +516,7 @@ SendHeartbeatPacket()
    └─ 이유: 이 시점에 retransmissionSchedulers와 wake/timer handle이 초기화됨
 
 8. Sleep(1000)
-   └─ 이유: 모든 스레드가 완전히 실행 상태가 될 때까지 대기
+   └─ 고정 시작 지연이며 준비 완료를 검증하는 장벽은 아님
 
 9. RUDPSessionBroker::Start()
    └─ 이유: 모든 인프라가 준비된 후 클라이언트 수락 시작

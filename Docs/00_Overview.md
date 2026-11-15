@@ -24,6 +24,8 @@
 
 ---
 
+전체 점검 범위·대조 코드·현재 구현 제한은 [문서와 코드 대조 기록](DocumentationAudit.md)을 참고한다.
+
 ## 문서 맵
 
 ![MultiSocketRUDP 아키텍처 개요](Diagrams/Architecture_Overview.svg)

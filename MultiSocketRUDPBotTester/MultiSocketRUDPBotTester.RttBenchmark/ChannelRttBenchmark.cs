@@ -1,12 +1,16 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using MultiSocketRUDPBotTester.Buffer;
 using MultiSocketRUDPBotTester.ClientCore;
+
+[assembly: InternalsVisibleTo("MultiSocketRUDPBotTester.UnitTests")]
 
 namespace MultiSocketRUDPBotTester.RttBenchmark;
 
 public sealed record ChannelMetrics(int Attempted, int Accepted, int Received, int Late,
-    double DeliveryPercent, double ResponsesPerSecond, double? P50Ms, double? P95Ms, double? P99Ms);
+    double DeliveryPercent, double ResponsesPerSecond, double? P50Ms, double? P95Ms, double? P99Ms,
+    int TimedOut = 0);
 public sealed record ChannelRun(ChannelMetrics Reliable, ChannelMetrics Unreliable, bool Connected, double ElapsedSeconds);
 public sealed record ChannelResult(int SchemaVersion, string CommitSha, string ScenarioName,
     DateTimeOffset RecordedAtUtc, int SampleCount, int WarmupSampleCount, int TimeoutMs,
@@ -21,15 +25,25 @@ public sealed record ChannelResult(int SchemaVersion, string CommitSha, string S
 public sealed class ChannelSamples(int timeoutMs)
 {
     private readonly object gate = new();
-    private readonly Dictionary<ulong, (bool Unreliable, long Timestamp)> pending = [];
+    private sealed class Request(bool unreliable, long timestamp)
+    {
+        public readonly bool Unreliable = unreliable;
+        public readonly long Timestamp = timestamp;
+        public readonly TaskCompletionSource<bool> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Expired;
+        public bool Received;
+    }
+
+    private readonly Dictionary<ulong, Request> pending = [];
     private readonly List<double>[] samples = [[], []];
     private readonly int[] attempted = new int[2], accepted = new int[2], late = new int[2];
+    private readonly int[] timedOut = new int[2];
 
     public void Begin(ulong id, bool unreliable, long timestamp)
     {
         lock (gate)
         {
-            pending.Add(id, (unreliable, timestamp));
+            pending.Add(id, new Request(unreliable, timestamp));
             attempted[unreliable ? 1 : 0]++;
         }
     }
@@ -37,21 +51,82 @@ public sealed class ChannelSamples(int timeoutMs)
     {
         lock (gate)
         {
-            if (success) accepted[unreliable ? 1 : 0]++;
-            else pending.Remove(id);
+            if (success)
+            {
+                accepted[unreliable ? 1 : 0]++;
+            }
+            else if (pending.Remove(id, out var request))
+            {
+                request.Completion.TrySetResult(false);
+            }
         }
     }
     public void Receive(ulong id, bool unreliable, long timestamp)
     {
         lock (gate)
         {
-            if (!pending.TryGetValue(id, out var request) || request.Unreliable != unreliable) return;
-            pending.Remove(id);
+            if (!pending.TryGetValue(id, out var request) || request.Unreliable != unreliable || request.Received)
+            {
+                return;
+            }
+
+            request.Received = true;
             var elapsed = Stopwatch.GetElapsedTime(request.Timestamp, timestamp).TotalMilliseconds;
             var index = unreliable ? 1 : 0;
-            if (elapsed > timeoutMs) late[index]++;
-            else samples[index].Add(elapsed);
+            if (request.Expired || elapsed > timeoutMs)
+            {
+                late[index]++;
+                Expire(request);
+            }
+            else
+            {
+                samples[index].Add(elapsed);
+                request.Completion.TrySetResult(true);
+            }
         }
+    }
+
+    // Receive and timeout settle one request under the same lock. Late replies cannot
+    // complete the next request or become successful RTT samples.
+    public async Task<bool> WaitForResponseAsync(ulong id, CancellationToken token)
+    {
+        Request request;
+        lock (gate)
+        {
+            if (!pending.TryGetValue(id, out request!))
+            {
+                return false;
+            }
+        }
+
+        var remaining = Math.Max(0, timeoutMs - Stopwatch.GetElapsedTime(request.Timestamp).TotalMilliseconds);
+        try
+        {
+            return await request.Completion.Task.WaitAsync(TimeSpan.FromMilliseconds(remaining), token).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            lock (gate)
+            {
+                if (!request.Completion.Task.IsCompleted)
+                {
+                    Expire(request);
+                }
+
+                return request.Completion.Task.Result;
+            }
+        }
+    }
+
+    private void Expire(Request request)
+    {
+        if (!request.Expired)
+        {
+            request.Expired = true;
+            timedOut[request.Unreliable ? 1 : 0]++;
+        }
+
+        request.Completion.TrySetResult(false);
     }
     public ChannelMetrics Snapshot(bool unreliable, double elapsedSeconds)
     {
@@ -62,7 +137,7 @@ public sealed class ChannelSamples(int timeoutMs)
             double? Percentile(double p) => sorted.Length == 0 ? null : sorted[(int)Math.Ceiling(sorted.Length * p) - 1];
             return new(attempted[index], accepted[index], sorted.Length, late[index],
                 attempted[index] == 0 ? 0 : 100.0 * sorted.Length / attempted[index],
-                sorted.Length / elapsedSeconds, Percentile(.5), Percentile(.95), Percentile(.99));
+                sorted.Length / elapsedSeconds, Percentile(.5), Percentile(.95), Percentile(.99), timedOut[index]);
         }
     }
 }
@@ -100,7 +175,7 @@ public static class ChannelRttBenchmark
             }
             finally { client.Disconnect(); }
         }
-        return new(1, options.CommitSha, options.ScenarioName, DateTimeOffset.UtcNow,
+        return new(options.ScenarioName == "mixed" ? 1 : 3, options.CommitSha, options.ScenarioName, DateTimeOffset.UtcNow,
             options.SampleCount, options.WarmupSampleCount, options.TimeoutMs, options.ServerThreadCount,
             System.Runtime.InteropServices.RuntimeInformation.OSDescription, Environment.ProcessorCount, runs);
     }
@@ -110,20 +185,54 @@ public static class ChannelRttBenchmark
         var samples = new ChannelSamples(options.TimeoutMs);
         client.Samples = samples;
         var started = Stopwatch.GetTimestamp();
-        // Identical 10 ms batches: up to ten unreliable requests and one reliable request.
-        for (var offset = 0; offset < count; offset += 10)
+        var waitForResponse = options.ScenarioName != "mixed";
+        // Standalone channels keep one outstanding request. Mixed retains its 10:1 load.
+        foreach (var batch in GetBatches(options.ScenarioName, count))
         {
             token.ThrowIfCancellationRequested();
-            if (!client.IsConnected()) break;
-            if (options.ScenarioName != "reliable-baseline")
-                for (var i = offset; i < Math.Min(count, offset + 10); i++) await client.SendEcho(true);
-            if (options.ScenarioName != "unreliable-only") await client.SendEcho(false);
-            await Task.Delay(10, token);
+            if (!client.IsConnected())
+            {
+                break;
+            }
+
+            for (var i = 0; i < batch.Unreliable; i++)
+            {
+                await client.SendEcho(true, waitForResponse, token);
+            }
+
+            for (var i = 0; i < batch.Reliable; i++)
+            {
+                await client.SendEcho(false, waitForResponse, token);
+            }
+
+            if (!waitForResponse)
+            {
+                await Task.Delay(10, token);
+            }
         }
-        // A fixed drain interval prevents fast responses from hiding missing or queued packets.
-        await Task.Delay(options.TimeoutMs, token);
+
+        if (!waitForResponse)
+        {
+            // Mixed requests can still be outstanding after the send loop.
+            await Task.Delay(options.TimeoutMs, token);
+        }
         var elapsed = Stopwatch.GetElapsedTime(started).TotalSeconds;
         return new(samples.Snapshot(false, elapsed), samples.Snapshot(true, elapsed), client.IsConnected(), elapsed);
+    }
+
+    internal static IEnumerable<(int Reliable, int Unreliable)> GetBatches(string scenario, int count)
+    {
+        var batchSize = scenario == "mixed" ? 10 : 1;
+        for (var offset = 0; offset < count; offset += batchSize)
+        {
+            yield return scenario switch
+            {
+                "reliable-baseline" => (1, 0),
+                "unreliable-only" => (0, 1),
+                "mixed" => (1, Math.Min(10, count - offset)),
+                _ => throw new ArgumentException("Unknown channel scenario.", nameof(scenario))
+            };
+        }
     }
 
     private sealed class EchoClient(byte[] response) : RudpSession(response)
@@ -132,7 +241,7 @@ public static class ChannelRttBenchmark
         private const PacketId ResponsePacketId = (PacketId)8;
         public volatile ChannelSamples? Samples;
         private ulong nextRequestId;
-        public async Task SendEcho(bool unreliable)
+        public async Task SendEcho(bool unreliable, bool waitForResponse, CancellationToken token)
         {
             var id = ++nextRequestId;
             var buffer = new NetBuffer(64);
@@ -149,6 +258,15 @@ public static class ChannelRttBenchmark
             }
             catch (Exception) when (!IsConnected()) { }
             finally { samples.Admission(id, unreliable, accepted); }
+
+            if (waitForResponse && accepted)
+            {
+                var received = await samples.WaitForResponseAsync(id, token).ConfigureAwait(false);
+                if (!received && !unreliable)
+                {
+                    throw new TimeoutException($"Timed out waiting for reliable Echo request {id}.");
+                }
+            }
         }
         protected override bool TryHandleRecvFastPath(PacketId packetId, NetBuffer buffer)
         {

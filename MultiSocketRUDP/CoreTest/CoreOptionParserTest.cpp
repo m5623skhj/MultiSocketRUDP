@@ -29,10 +29,12 @@ namespace
 		{
 			options += L"\tMIN_RETRANSMISSION_MS = " + std::to_wstring(*minRtoMs) + L"\n";
 		}
+
 		if (maxRtoMs.has_value())
 		{
 			options += L"\tMAX_RETRANSMISSION_MS = " + std::to_wstring(*maxRtoMs) + L"\n";
 		}
+
 		options +=
 			L"\tHEARTBEAT_THREAD_SLEEP_MS = 100\n"
 			L"\tTIMER_TICK_MS = 20\n"
@@ -43,6 +45,7 @@ namespace
 				L"\tSIMULATED_PACKET_LOSS_PERCENT = 25\n"
 				L"\tSIMULATED_PACKET_LOSS_SEED = 12345\n";
 		}
+
 		options +=
 			L"}\n"
 			L"\n"
@@ -195,7 +198,10 @@ TEST_F(CoreOptionParserTest, UnreliableQueueCapacityAcceptsPositivePacketCountsO
 		options.insert(options.find(L'{') + 1, L"\n\tUNRELIABLE_QUEUE_CAPACITY = " + std::to_wstring(capacity) + L"\n");
 		const bool valid = capacity >= 1 && capacity <= 65535;
 		EXPECT_EQ(Parse(core, options, MakeBrokerOptions()), valid);
-		if (valid) EXPECT_EQ(core.GetUnreliableQueueCapacity(), capacity);
+		if (valid)
+		{
+			EXPECT_EQ(core.GetUnreliableQueueCapacity(), capacity);
+		}
 	}
 }
 
@@ -257,6 +263,7 @@ TEST_F(CoreOptionParserTest, MissingRequiredCoreAndBrokerOptionsAreRejected)
 		L"PACKET_CODE",
 		L"PACKET_KEY"
 	};
+
 	for (const auto* key : coreKeys)
 	{
 		std::wstring coreOptions = MakeCoreOptions();

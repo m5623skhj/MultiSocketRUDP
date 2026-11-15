@@ -38,7 +38,7 @@ msbuild ..\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug /p:Platform=x6
 
 ### `CreateDevTLSCert.bat`
 
-현재 사용자 인증서 저장소 `Cert:\CurrentUser\My`에 `CN=DevServerCert` self-signed 인증서를 만든다. 키 길이는 2048-bit이고 만료 기간은 생성 시점부터 5년이다.
+현재 사용자 인증서 저장소 `Cert:\CurrentUser\My`에 `CN=DevServerCert` self-signed 인증서를 만든다. 키 길이는 2048비트이고 만료 기간은 생성 시점부터 5년이다. 이 스크립트는 신뢰 루트 등록이나 `localhost`·`127.0.0.1` SAN을 준비하지 않는다. 현재 C++ TLS 검증을 통과하려면 별도의 신뢰·이름 구성이 필요하다.
 
 ### `RemoveDevTLSCert.bat`
 

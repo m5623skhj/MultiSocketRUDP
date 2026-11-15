@@ -12,13 +12,22 @@ namespace TLSHelper
 			static_cast<char>(version >> 8), static_cast<char>(version) };
 		std::vector<char> encrypted(streamSizes.cbHeader + sizeof(plain) + streamSizes.cbTrailer);
 		size_t size{};
-		if (not EncryptData(plain, sizeof(plain), encrypted.data(), size)) return false;
+		if (not EncryptData(plain, sizeof(plain), encrypted.data(), size))
+		{
+			return false;
+		}
+
 		for (size_t sent = 0; sent < size;)
 		{
 			const int result = send(socket, encrypted.data() + sent, static_cast<int>(size - sent), 0);
-			if (result <= 0) return false;
+			if (result <= 0)
+			{
+				return false;
+			}
+
 			sent += result;
 		}
+
 		return true;
 	}
 
@@ -31,13 +40,18 @@ namespace TLSHelper
 			protocolVersionResult.socketError = inSocketError;
 			return false;
 		};
+
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 		auto encrypted = TakePendingHandshakeData();
 		std::vector<char> plain;
 		constexpr size_t MAX_VERSION_STREAM = 65536;
 		std::vector<char> decoded(MAX_VERSION_STREAM);
 		size_t totalEncrypted = encrypted.size();
-		if (totalEncrypted > MAX_VERSION_STREAM) return fail("version-stream-too-large");
+		if (totalEncrypted > MAX_VERSION_STREAM)
+		{
+			return fail("version-stream-too-large");
+		}
+
 		while (not stopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 		{
 			// The final handshake recv may already contain all or part of the version record.
@@ -46,36 +60,82 @@ namespace TLSHelper
 			{
 				size_t size{};
 				const auto result = DecryptDataStream(encrypted, decoded.data(), size);
-				if (result == TlsDecryptResult::Error) return fail("tls-decrypt-failed");
-				if (result == TlsDecryptResult::CloseNotify) return fail("tls-peer-closed");
+				if (result == TlsDecryptResult::Error)
+				{
+					return fail("tls-decrypt-failed");
+				}
+
+				if (result == TlsDecryptResult::CloseNotify)
+				{
+					return fail("tls-peer-closed");
+				}
+
 				protocolVersionResult.plainBytes = plain.size() + size;
-				if (protocolVersionResult.plainBytes > 4) return fail("invalid-version-length");
+				if (protocolVersionResult.plainBytes > 4)
+				{
+					return fail("invalid-version-length");
+				}
+
 				plain.insert(plain.end(), decoded.begin(), decoded.begin() + size);
 				if (plain.size() == 4)
 				{
 					uint32_t version{};
-					for (const unsigned char value : plain) version = (version << 8) | value;
+					for (const unsigned char value : plain)
+					{
+						version = (version << 8) | value;
+					}
+
 					protocolVersionResult.receivedVersion = version;
-					if (version != expectedVersion) return fail("version-mismatch");
-					if (not encrypted.empty()) return fail("unexpected-data-after-version");
+					if (version != expectedVersion)
+					{
+						return fail("version-mismatch");
+					}
+
+					if (not encrypted.empty())
+					{
+						return fail("unexpected-data-after-version");
+					}
+
 					protocolVersionResult.reason = "succeeded";
 					return true;
 				}
 			}
+
 			fd_set readable{};
 			FD_SET(socket, &readable);
 			timeval timeout{ 0, 100000 };
 			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
-			if (ready == SOCKET_ERROR) return fail("socket-select-failed", WSAGetLastError());
-			if (ready == 0) continue;
+			if (ready == SOCKET_ERROR)
+			{
+				return fail("socket-select-failed", WSAGetLastError());
+			}
+
+			if (ready == 0)
+			{
+				continue;
+			}
+
 			char bytes[4096];
 			const int received = recv(socket, bytes, sizeof(bytes), 0);
-			if (received == 0) return fail("peer-closed");
-			if (received < 0) return fail("socket-receive-failed", WSAGetLastError());
+			if (received == 0)
+			{
+				return fail("peer-closed");
+			}
+
+			if (received < 0)
+			{
+				return fail("socket-receive-failed", WSAGetLastError());
+			}
+
 			totalEncrypted += static_cast<size_t>(received);
-			if (totalEncrypted > MAX_VERSION_STREAM) return fail("version-stream-too-large");
+			if (totalEncrypted > MAX_VERSION_STREAM)
+			{
+				return fail("version-stream-too-large");
+			}
+
 			encrypted.insert(encrypted.end(), bytes, bytes + received);
 		}
+
 		return fail(stopToken.stop_requested() ? "cancelled"
 			: plain.empty() ? "version-not-received" : "version-incomplete");
 	}
@@ -121,6 +181,7 @@ namespace TLSHelper
         {
             DeleteSecurityContext(&ctxtHandle);
         }
+
         if (credHandle.dwLower || credHandle.dwUpper)
         {
             FreeCredentialsHandle(&credHandle);

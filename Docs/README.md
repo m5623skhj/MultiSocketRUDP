@@ -4,7 +4,7 @@
 
 > GitHub와 Obsidian에서 함께 사용할 수 있는 문서 진입점이다.
 
-처음 방문했다면 [문서 읽기 가이드](ReadingGuide.md)에서 역할·목적·시간에 맞는 경로를 선택한다. 전체 문서 목록은 [문서 카탈로그](00_Overview.md)에서 확인한다.
+처음 방문했다면 [문서 읽기 가이드](ReadingGuide.md)에서 역할·목적·시간에 맞는 경로를 선택한다. 전체 문서 목록은 [문서 카탈로그](00_Overview.md)에서 확인한다. 전체 대조 범위와 남은 구현 제한은 [문서와 코드 대조 기록](DocumentationAudit.md)에 정리한다.
 
 ---
 
@@ -41,7 +41,7 @@ README.md          짧은 진입점
   → *Reference     여러 영역을 한 번에 추적하는 상세 자료
 ```
 
-허브와 진입 문서는 GitHub에서도 클릭 가능한 표준 Markdown 링크를 사용한다. 기술 문서의 `[[문서명]]`과 `![[다이어그램.svg]]`는 Obsidian용이다.
+허브와 진입 문서는 GitHub에서도 클릭 가능한 표준 Markdown 링크를 사용한다. 기술 문서의 `[[문서명]]`과 `![[CryptoStructure.svg]]`는 Obsidian용이다.
 
 ---
 

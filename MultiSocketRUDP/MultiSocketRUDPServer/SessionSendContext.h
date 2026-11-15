@@ -68,7 +68,12 @@ public:
 	[[nodiscard]]
 	size_t GetSendPacketInfoQueueSize();
 	// Value snapshot under the queue mutex; counts local evictions, not network loss.
-	struct UnreliableQueueStats { size_t queued{},capacity{};std::uint64_t dropped{}; };
+	struct UnreliableQueueStats
+	{
+		size_t queued{}, capacity{};
+		std::uint64_t dropped{};
+	};
+
 	[[nodiscard]] UnreliableQueueStats GetUnreliableQueueStats();
 	// ----------------------------------------
 	// @brief 송신 패킷 정보를 큐에 추가합니다.

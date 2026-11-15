@@ -1,4 +1,4 @@
-# RUDPSessionBroker (Client View)
+# RUDPSessionBroker (클라이언트 관점)
 
 > 클라이언트가 SessionBroker에서 무엇을 받아 오고, 그 뒤 어떻게 UDP 세션을 여는지 현재 구현 기준으로 정리한다.
 
@@ -46,9 +46,9 @@ TLS 핸드셰이크 직후 클라이언트는 프로토콜 버전 `2`를 4바이
 `RUDPClientCore`는 대략 아래 순서로 동작한다.
 
 1. SessionBroker 옵션 로드
-2. TCP connect
-3. `TLSHelperClient::Initialize()`
-4. `TLSHelperClient::Handshake(socket)`
+2. `SetServerName()`과 `TLSHelperClient::Initialize()`
+3. DNS 해석(필요 시)과 취소 가능한 TCP 연결
+4. `TLSHelperClient::Handshake(socket, stopToken)` 및 서버 인증서 검증
 5. `SendProtocolVersion(socket, RUDP_PROTOCOL_VERSION)`
 6. `DecryptDataStream(...)`으로 응답 복호화
 7. 응답 버전과 결과 코드 검증 후 세션 정보 파싱
@@ -80,7 +80,7 @@ TLS 핸드셰이크 직후 클라이언트는 프로토콜 버전 `2`를 4바이
 
 - 서버 인증서 로딩 방식은 서버 문서 기준 `ServerCertificateConfig`다.
 - 클라이언트 문서는 TLS helper의 옛 생성자 시그니처를 전제로 읽으면 안 된다.
-- 개발 환경에서는 `CreateDevTLSCert.bat`로 만든 인증서를 기준으로 맞춘다.
+- C++ 클라이언트는 신뢰 체인·유효 기간·서버 인증 용도·DNS/IP 이름을 검증한다. `CreateDevTLSCert.bat`의 자체 서명 인증서만으로 준비가 끝나지 않는다. C# BotTester의 기본 지문 없는 연결은 인증서 검증을 생략하므로 같은 정책으로 설명하지 않는다.
 
 ---
 

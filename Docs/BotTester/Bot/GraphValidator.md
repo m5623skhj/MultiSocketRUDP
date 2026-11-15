@@ -1,6 +1,6 @@
 # GraphValidator
 
-> 빌드 전 그래프의 구조적·논리적 오류를 사전에 검출하는 정적 검증기.
+> 빌드된 실행 그래프의 구조적·논리적 오류를 실행 전에 검출하는 정적 검증기.
 
 ---
 
@@ -33,15 +33,24 @@ GraphValidator.ValidateGraph(graph)
 | 노드 | 규칙 |
 |------|------|
 | `SendPacketNode` | `PacketId == InvalidPacketId` |
-| `SendPacketNode` | `PacketBuilder == null` |
+| `SendPacketNode` | `PacketBuilder == null`이고 `PacketSchema.Get(PacketId) == null` |
 | `DelayNode` | `DelayMilliseconds <= 0` |
 | `WaitForPacketNode` | `ExpectedPacketId == InvalidPacketId` |
+| `WaitForPacketNode` | `TimeoutMilliseconds <= 0` |
 | `ConditionalNode` | `Condition == null` |
 | `LoopNode` | `ContinueCondition == null` |
+| `LoopNode` | `MaxIterations <= 0` |
+| `RandomDelayNode` | `MinDelayMilliseconds < 0` 또는 `MaxDelayMilliseconds < MinDelayMilliseconds` |
+| `RepeatTimerNode` | `RepeatCount <= 0` 또는 `IntervalMilliseconds < 0` |
 | `AssertNode` | `Condition == null` |
-| `RandomChoiceNode` | `Choices.Count < 2` |
+| `RetryNode` | `MaxRetries <= 0` 또는 `RetryDelayMilliseconds < 0` |
+| `RandomChoiceNode` | `Choices.Count < 2`, 연결 대상이 없는 선택지, 또는 `Weight <= 0` |
+| `SetVariableNode` | 빈 변수명, 지원하지 않는 `ValueType`, 또는 타입에 맞게 해석할 수 없는 `StringValue` |
 | `Graph` | 노드가 0개 |
 | `Cycle` | 순환 참조 발생 (LoopNode/RepeatTimerNode 제외) |
+| `Cycle` | 트리거 루트에서의 재귀 깊이가 500 초과 |
+
+스키마가 있는 패킷은 `PacketBuilder` 없이 전송할 수 있다. `SetVariableNode`는 `int`, `long`, `float`, `double`, `bool`, `string`을 지원하며 숫자는 `InvariantCulture`로 검사한다. 노드 설정 검사는 `switch`에서 처음 일치한 조건만 보고하므로 한 노드의 모든 오류를 동시에 나열하지 않을 수 있다.
 
 ### Warning 조건
 
@@ -65,12 +74,12 @@ DetectCycle(node, visited, recursionStack, path, depth)
   foreach nextNode in GetAllNextNodes(node):
     if 미방문 → 재귀
     if recursionStack에 있음:
-      LoopNode | RepeatTimerNode → Info (정상 루프)
+      현재 노드가 LoopNode | RepeatTimerNode → Info (허용된 되돌아가는 간선)
       그 외 → Error (순환 참조)
 ```
 
 `GetAllNextNodes`는 `NextNodes` 외에도 분기 노드의 모든 자식을 포함:
-`TrueNodes`, `FalseNodes`, `LoopBody`, `ExitNodes`, `RepeatBody`, `TimeoutNodes`, `FailureNodes`, `RetryBody` 등
+`TrueNodes`, `FalseNodes`, `LoopBody`, `ExitNodes`, `RepeatBody`, `TimeoutNodes`, `FailureNodes`, `RetryBody`, `SuccessNodes`, `RandomChoiceNode.Choices`의 연결 대상 등
 
 ---
 

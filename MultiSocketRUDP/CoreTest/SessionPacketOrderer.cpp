@@ -37,7 +37,14 @@ protected:
 	struct AutoBuf
 	{
 		NetBuffer* p = NetBuffer::Alloc();
-		~AutoBuf() { if (p) NetBuffer::Free(p); }
+		~AutoBuf()
+		{
+			if (p)
+			{
+				NetBuffer::Free(p);
+			}
+		}
+
 		NetBuffer& get() const { return *p; }
 	};
 
@@ -77,7 +84,9 @@ TEST_F(SessionPacketOrdererTest, InOrder_SequenceAdvancesPerPacket)
 
 	ASSERT_EQ(processed.size(), 5u);
 	for (size_t i = 0; i < processed.size(); ++i)
+	{
 		EXPECT_EQ(processed[i], static_cast<PacketSequence>(START + i));
+	}
 
 	EXPECT_EQ(orderer.GetNextExpected(), START + 5);
 }
@@ -148,7 +157,9 @@ TEST_F(SessionPacketOrdererTest, MultipleHeldPackets_ProcessedInOrder)
 
 	ASSERT_EQ(processed.size(), 4u);
 	for (size_t i = 0; i < processed.size(); ++i)
+	{
 		EXPECT_EQ(processed[i], static_cast<PacketSequence>(START + i));
+	}
 }
 
 // ------------------------------------------------------------

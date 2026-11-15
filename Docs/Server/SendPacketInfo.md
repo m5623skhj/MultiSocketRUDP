@@ -43,6 +43,9 @@ struct SendPacketInfo
 
 | 필드 | 역할 |
 |------|------|
+| `completion` | ACK와 재전송 한도 초과를 `Pending → Acknowledged/RetryLimit` CAS로 확정하는 atomic 상태 |
+| `packetType`, `packetId`, `wireBytes` | 재전송 한도 초과 진단용 패킷 종류·ID·최종 크기 |
+| `firstSendTime` | 최초 송신 스트림 등록 시각. `rttSampleLock`으로 보호 |
 | `buffer` | 전송할 암호화된 패킷 버퍼. 재전송 시 같은 버퍼를 재사용한다. |
 | `owner` | 패킷을 소유한 세션. 재전송 실패 시 disconnect 처리에 사용한다. |
 | `ownerGeneration` | 세션 재사용 후 오래된 패킷이 새 세션을 건드리지 않도록 세션 generation을 저장한다. |
@@ -280,6 +283,10 @@ Session Release Thread
 ```
 
 ---
+
+## 완료 상태의 경쟁
+
+ACK가 먼저 `Acknowledged`로 전이하면 한도 초과 CAS는 실패하고 종료를 건너뛴다. `RetryLimit`가 먼저 확정되면 늦은 ACK는 추적 참조만 정리한다. 재전송 작업은 scheduler 잠금을 해제한 뒤 세션 generation과 진행 중 송신 guard를 확보하며, 잠금을 보유한 채 세션 종료를 호출하지 않는다. 진단 시간·ACK 관측값만으로 유실 원인을 단정하지 않는다.
 
 ## 관련 문서
 - [[RUDPSession]] — `InsertSendPacketInfo`, `FindAndEraseSendPacketInfo`, RTT 샘플 반영

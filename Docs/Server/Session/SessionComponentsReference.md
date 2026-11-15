@@ -3,7 +3,7 @@
 > 세션의 모든 하위 컴포넌트와 상호 의존을 한 번에 추적하는 통합 레퍼런스다.
 > 일반적인 검토는 상위 [[SessionComponents|세션 컴포넌트 허브]]에서 상태·수신·송신 문서를 먼저 선택한다.
 
-> **`RUDPSession`을 구성하는 6개 서브 컴포넌트의 전체 멤버, 역할, 상호 관계.**  
+> **`RUDPSession`을 구성하는 6개 서브 컴포넌트의 주요 멤버, 역할, 상호 관계.**
 > 각 컴포넌트는 독립된 파일로 분리되어 있으며,  
 > `RUDPSession`이 이들을 조합해 상태 관리, 암호화, I/O, 흐름 제어를 수행한다.
 
@@ -141,7 +141,7 @@ void RUDPSession::InitializeSession() {
     sessionReservedTime = {};
 
     flowManager.Initialize(maximumHoldingPacketQueueSize);  // CWND/윈도우 재초기화
-    rioContext.GetSendContext().Reset();                     // sendPacketInfoMap 정리
+    rioContext.GetSendContext().Reset();                     // 큐·예약·송신 상태 정리, ACK 맵은 별도 정리
     sessionPacketOrderer.Initialize(maximumHoldingPacketQueueSize);
 }
 ```
@@ -226,9 +226,16 @@ class SessionRIOContext {
     SessionRecvContext recvContext;
     SessionSendContext sendContext;
 public:
-    RecvBuffer& GetRecvBuffer() { return recvContext.GetRecvBuffer(); }
-    SessionSendContext& GetSendContext() { return sendContext; }
-    void Cleanup();  // 두 컨텍스트 모두 정리
+    [[nodiscard]]
+    RecvBuffer& GetRecvBuffer();
+    [[nodiscard]]
+    SessionSendContext& GetSendContext();
+    [[nodiscard]]
+    bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable,
+        const RIO_CQ& rioRecvCQ, const RIO_CQ& rioSendCQ, SOCKET sock,
+        SessionIdType sessionId, RUDPSession* ownerSession,
+        unsigned short pendingQueueCapacity);
+    void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
 };
 
 struct RecvBufferSlot {
@@ -244,6 +251,7 @@ struct RecvBuffer {
 
     IOContext* AcquireFreeRecvContext();
     void ReleaseRecvContext(IOContext* context);
+    [[nodiscard]]
     bool IsDrained() const;
 };
 
@@ -251,10 +259,12 @@ class SessionRecvContext {
     RecvBuffer recvBuffer;
 
 public:
+    [[nodiscard]]
     bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rio,
                     SessionIdType sessionId, RUDPSession* ownerSession);
     void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rio) const;
     void RecvContextReset();
+    [[nodiscard]]
     RecvBuffer& GetRecvBuffer();
 };
 ```
@@ -321,7 +331,7 @@ class SessionSendContext {
 
     // ─── ACK 대기 추적 ──────────────────────────────────────────────
     std::map<PacketSequence, SendPacketInfo*> sendPacketInfoMap;
-    mutable std::shared_mutex sendPacketInfoMapLock;
+    std::shared_mutex sendPacketInfoMapLock;
     // Insert/Erase/FindAndErase/ForEachAndClear에서 보호
 
     // ─── I/O 모드 제어 ───────────────────────────────────────────────
@@ -340,22 +350,32 @@ class SessionSendContext {
     std::mutex pendingPacketQueueLock;
 
 public:
-    char* GetRIOSendBuffer()    { return rioSendBuffer; }
-    RIO_BUFFERID GetSendBufferId() { return sendBufferId; }
+    [[nodiscard]]
+    bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable,
+        unsigned short pendingQueueCapacity);
+    void Cleanup(const RIO_EXTENSION_FUNCTION_TABLE& rioFunctionTable);
+    [[nodiscard]]
+    char* GetRIOSendBuffer();
+    [[nodiscard]]
+    RIO_BUFFERID GetSendBufferId() const;
 
+    [[nodiscard]]
     std::atomic<IO_MODE>& GetIOMode();
 
     // sendPacketInfoMap 접근
     void InsertSendPacketInfo(PacketSequence seq, SendPacketInfo* info);
-    SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq);
+    [[nodiscard]]
+    SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence sequence);
     void ForEachAndClearSendPacketInfoMap(
         const std::function<void(SendPacketInfo*)>& func);
 
     // pendingPacketQueue 접근
     bool PushToPendingQueue(PacketSequence seq, NetBuffer* buf);
-    bool PopFromPendingQueue(std::pair<PacketSequence, NetBuffer*>& item);
+    bool PopFromPendingQueue(OUT std::pair<PacketSequence, NetBuffer*>& item);
+    [[nodiscard]]
     bool IsPendingQueueEmpty() const noexcept;
-    std::mutex& GetPendingQueueLock() { return pendingPacketQueueLock; }
+    [[nodiscard]]
+    std::mutex& GetPendingQueueLock();
 };
 ```
 
@@ -368,7 +388,8 @@ public:
 auto& packetSequenceSet = sessionDelegate.GetCachedSequenceSet(session);
 packetSequenceSet.clear();
 
-const MultiSocketRUDP::PacketSequenceSetKey key{ info->isReplyType, info->sendPacketSequence };
+const MultiSocketRUDP::PacketSequenceSetKey key{
+    info->isReplyType, info->sendPacketSequence, info->isUnreliable };
 if (packetSequenceSet.contains(key)) {
     SendPacketInfo::Free(info);
     return SEND_PACKET_INFO_TO_STREAM_RETURN::IS_SENT;
@@ -388,6 +409,8 @@ ACK 수신 전 같은 sequence가 다시 schedule되는 경우
 같은 sequence의 패킷이 스트림에 두 번 포함될 수 있다.
 재전송 schedule 자체의 중복 entry는 `SendPacketInfo::scheduleVersion`으로 stale 처리된다.
 
+중복 검사 키는 채널(`isUnreliable`)·응답 여부·시퀀스를 모두 포함한다. 신뢰성·비신뢰성 채널은 번호를 독립적으로 사용하므로 채널을 생략하면 정상 패킷을 중복으로 제거할 수 있다.
+
 `cachedSequenceSet`은 `IO_NONE_SENDING → IO_SENDING`을 획득한 단일 send-stream 작성자만 접근하므로 별도 mutex가 없다. 이 소유권 계약을 깨는 새 호출 경로를 추가할 때는 동기화를 다시 설계해야 한다.
 
 **`sendPacketInfoMap shared_mutex` 패턴:**
@@ -396,8 +419,10 @@ ACK 수신 전 같은 sequence가 다시 schedule되는 경우
 // 송신 등록
 {
     std::unique_lock lock(sendPacketInfoMapLock);
-    info->AddRefCount();
-    sendPacketInfoMap.insert({ sequence, info });
+    const auto [_, inserted] = sendPacketInfoMap.try_emplace(sequence, info);
+    if (inserted) {
+        info->AddRefCount();  // 등록 성공한 경우에만 맵 소유 참조 추가
+    }
 }
 
 // ACK 수신
@@ -414,34 +439,44 @@ SendPacketInfo* FindAndEraseSendPacketInfo(PacketSequence seq) {
 ForEachAndClearSendPacketInfoMap(func);
 ```
 
+`FindAndEraseSendPacketInfo()`는 맵 소유 참조를 호출자에게 넘긴다. 호출자는 사용 후 `SendPacketInfo::Free()`로 해제해야 한다. 보류 큐 연산은 내부에서 잠그지 않으므로 `GetPendingQueueLock()`을 보유한 상태에서 호출한다.
+
 ---
+
+`GetUnreliableQueueStats()`는 큐 잠금 아래에서 reserved 항목을 포함한 대기 수·용량·로컬 교체 누계를 반환한다. `Reset()`은 교체 누계도 초기화한다. 상세 의미는 [[SendAndFlow]]를 참고한다.
 
 ## 7. RUDPFlowManager
 
-**파일:** `RUDPFlowManager.h / .cpp`
+**파일:** `MultiSocketRUDP/Common/FlowController/RUDPFlowManager.h` (헤더 구현)
 
 ```cpp
 class RUDPFlowManager {
+    mutable std::mutex sendFlowMutex;   // 송신 상태의 복합 연산 보호
     RUDPFlowController flowController;  // CWND 관리
     RUDPReceiveWindow  receiveWindow;   // 수신 윈도우 관리
     // lastAckedSequence는 flowController 내부에서 관리
 
 public:
-    void Reset(PacketSequence recvStartSequence) noexcept;
+    void Reset(const PacketSequence recvStartSequence) noexcept;
 
     // 송신 제어
-    bool CanSend(PacketSequence nextSeq) noexcept;
-    void OnAckReceived(PacketSequence ackedSeq) noexcept;
+    [[nodiscard]]
+    bool CanSend(PacketSequence nextSend) noexcept;
+    void OnAckReceived(PacketSequence replySeq) noexcept;
     void OnTimeout() noexcept;
 
     // 수신 제어
-    bool CanAccept(PacketSequence sequence) const noexcept;
-    void MarkReceived(PacketSequence sequence) noexcept;
+    [[nodiscard]]
+    bool CanAccept(PacketSequence seq) const noexcept;
+    void MarkReceived(PacketSequence seq) noexcept;
+    [[nodiscard]]
     BYTE GetAdvertisableWindow() const noexcept;  // receiveWindow.GetAdvertiseWindow() 위임
 };
 ```
 
 → 상세 동작: [[FlowController]]
+
+송신 판단·ACK·timeout 연산은 `sendFlowMutex`로 보호한다. 수신 윈도우는 수신 로직 스레드의 단일 소유 계약이며 초기화와 크기 변경은 세션이 drain된 상태에서 수행한다. `CanSend()`는 송신 용량을 예약하지 않는다.
 
 **`Reset` 호출 시점:**
 
@@ -455,7 +490,7 @@ flowManager.Reset(LOGIN_PACKET_SEQUENCE + 1);  // = 1
 // receiveWindow.Reset(1):
 //   windowStart = 1, startIndex = 0, usedCount = 0
 //   receivedFlags.fill(0)
-// (lastAckedSequence は flowController 내부에서 관리)
+// lastAckedSequence는 flowController 내부에서 관리한다.
 ```
 
 ---
@@ -498,9 +533,12 @@ sessionPacketOrderer
 1. stateMachine.SetReserved() + 실패 release guard
 2. socketContext.SetSocket(newSocket)
 3. socketContext.SetServerPort(port)
-4. rioContext.recvContext.Initialize(rioFunctionTable, sessionId, ...)
-5. rioContext.sendContext.Initialize(rioFunctionTable)
-6. DoRecv() 등록
+4. rioContext.Initialize(rioFunctionTable, rioRecvCQ, rioSendCQ,
+                         sock, sessionId, this, pendingQueueCapacity)
+   ├─ recvContext.Initialize(rioFunctionTable, sessionId, this)
+   ├─ sendContext.Initialize(rioFunctionTable, pendingQueueCapacity)
+   └─ RIOCreateRequestQueue (실패하면 앞서 등록한 자원 정리)
+5. DoRecv() 등록
 ```
 
 **해제 순서 (Disconnect — Session Release Thread 경유):**

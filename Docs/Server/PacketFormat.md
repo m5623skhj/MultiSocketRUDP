@@ -16,7 +16,7 @@
 6. [PACKET_TYPE 열거형](#6-packet_type-열거형)
 7. [PACKET_DIRECTION 열거형](#7-packet_direction-열거형)
 8. [오프셋 상수 전체](#8-오프셋-상수-전체)
-9. [직렬화 (`NetBuffer << / >>`)](#9-직렬화-netbuffer--)
+9. [직렬화 (`NetBuffer << / >>`)](#9-직렬화-netbuffer)
 10. [버퍼 크기 제한](#10-버퍼-크기-제한)
 
 ---
@@ -26,8 +26,9 @@
 패킷 데이터는 `NetBuffer`가 소유한 동적 버퍼에 저장된다. 기본 용량은 1024바이트이며 `Resize()`로 최대 16384바이트까지 확장할 수 있다.
 
 ```cpp
+// 내부 배치 설명용 요약이다. 실제 NetBuffer 별칭의 해당 필드는 private이며 friend만 직접 접근한다.
 class NetBuffer {
-public:
+private:
     char* m_pSerializeBuffer;  // 기본 1024 bytes, BUFFFER_MAX=16384
 
     WORD m_iRead;       // 읽기 커서 (Serialize >> 연산이 여기서 읽음)
@@ -43,7 +44,7 @@ public:
 **버퍼 커서 흐름:**
 
 ```
-초기:  m_iRead=0, m_iWrite=0
+초기:  m_iRead=5, m_iWrite=5 (헤더 공간을 건너뜀)
 <<:    m_iWrite += sizeof(T)  (데이터 기록)
 >>:    m_iRead  += sizeof(T)  (데이터 읽기)
 SetHeader 후: m_iWriteLast = m_iWrite + AUTH_TAG_SIZE
@@ -101,11 +102,11 @@ Byte
         │              │
         │ PacketSeq    │  8 B  (uint64_t)
         │              │
-14      ├──────────────┤  ← AES-GCM 암호화 시작
+14      ├──────────────┤  ← PacketId는 평문·AAD 제외
         │              │
         │ PacketId     │  4 B  (uint32_t)
         │              │
-18      ├──────────────┤
+18      ├──────────────┤  ← 일반 패킷 AES-GCM 암호화 시작
         │              │
         │ Payload      │  N B  (콘텐츠 데이터)
         │              │
@@ -116,7 +117,7 @@ Byte
 18+N+16 └──────────────┘
 
 ← AAD 범위: [0 .. 13] (Header 5B + PacketType 1B + Sequence 8B) →
-←───────── AES-GCM 암호화 범위: [14 .. 18+N-1] ──────────────────→
+←───────── AES-GCM 암호화 범위: [18 .. 18+N-1] ──────────────────→
 ```
 
 ---
@@ -212,11 +213,7 @@ packet.PacketToBuffer(buf);  // 콘텐츠 직렬화
 
 ### SEND_REPLY_TYPE (양방향, isCorePacket=true)
 
-```
-페이로드:
-  PacketSequence  (8B) = 확인하는 패킷 번호
-  AdvertiseWindow (1B) = 수신 윈도우 여유 공간
-```
+공통 `PacketSequence` 8바이트가 ACK 대상 번호다. 서버→클라이언트에는 암호화 본문으로 `AdvertiseWindow` 1바이트가 추가되며, 클라이언트→서버에는 본문이 없다. 헤더와 인증 태그를 포함한 전체 크기는 각각 31바이트와 30바이트다.
 
 ```cpp
 // RUDPSession::SendReplyToClient
@@ -225,6 +222,9 @@ buf << SEND_REPLY_TYPE << recvPacketSequence << advertiseWindow;
 // 클라이언트 수신 시
 recvPacket >> packetSequence;        // ACK 대상 시퀀스
 recvPacket >> remoteAdvertisedWindow; // 서버 수신 윈도우
+
+// 클라이언트→서버 ACK 작성: AdvertiseWindow 없음
+buf << PACKET_TYPE::SEND_REPLY_TYPE << recvPacketSequence;
 ```
 
 ---
@@ -245,7 +245,7 @@ recvPacket >> remoteAdvertisedWindow; // 서버 수신 윈도우
 페이로드: 없음
 ```
 
-클라이언트가 HEARTBEAT 수신 시 동일 시퀀스로 응답. 서버는 이를 `OnSendReply()`로 처리.
+클라이언트가 HEARTBEAT 수신 시 동일 시퀀스로 응답한다. C++ 클라이언트는 `HEARTBEAT_REPLY_TYPE`, C# BotTester는 `SEND_REPLY_TYPE`을 사용하며 둘 다 `AdvertiseWindow`는 없다. 서버는 두 타입 모두 `OnSendReply()`로 처리한다.
 
 ---
 
@@ -256,7 +256,7 @@ enum class PACKET_TYPE : BYTE {
     CONNECT_TYPE          = 0x01,   // C→S  RUDP 연결 요청
     DISCONNECT_TYPE       = 0x02,   // C→S  정상 연결 해제
     SEND_TYPE             = 0x03,   // 양방향 신뢰성 데이터 전송
-    SEND_REPLY_TYPE       = 0x04,   // 양방향 ACK + advertiseWindow
+    SEND_REPLY_TYPE       = 0x04,   // 양방향 ACK, 서버→클라이언트에만 advertiseWindow 추가
     HEARTBEAT_TYPE        = 0x05,   // S→C  생존 확인
     HEARTBEAT_REPLY_TYPE  = 0x06,   // C→S  하트비트 응답
     UNRELIABLE_SEND_TYPE  = 0x07,   // 양방향 비신뢰성 데이터 전송
@@ -342,7 +342,7 @@ constexpr size_t CRYPTO_START_OFFSET = df_HEADER_SIZE; // = 5
 
 ---
 
-## 9. 직렬화 (`NetBuffer << / >>`)
+## 9. 직렬화 (`NetBuffer`)
 
 기본 숫자 타입은 기존 `WriteBuffer`/`ReadBuffer`로 고정 크기 값을 기록한다. 생성된 사용자 정의 구조체는 객체 메모리나 padding을 복사하지 않고 `NetBufferCodec<T>`가 YAML 필드 순서대로 재귀 처리한다.
 
@@ -413,6 +413,8 @@ Header(5) + Type(1) + Seq(8) + PacketId(4) + Payload(N) + AuthTag(16) <= 1024 (M
 > 대용량 데이터는 애플리케이션 레이어에서 분할 전송해야 한다.
 
 ---
+
+> **현재 구현의 보안 한계:** 일반 콘텐츠 패킷의 `PacketId` 4바이트는 암호화와 AAD 인증 범위에서 모두 제외된다. 본문 인증 성공만으로 패킷 ID의 무결성을 보장할 수 없다. C++ `PacketCryptoHelper.h`와 C# `NetBuffer.cs`가 같은 범위를 사용한다. 프로토콜 개선 시 양쪽 구현과 공용 벡터를 함께 검토해야 한다.
 
 ## 관련 문서
 - [[CryptoSystem]] — 암호화 범위 상세 설명

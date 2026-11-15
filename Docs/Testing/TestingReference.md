@@ -105,7 +105,7 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:CoreTest /p:Configuration=Debug
 MultiSocketRUDPBotTester/MultiSocketRUDPBotTester.UnitTests/MultiSocketRUDPBotTester.UnitTests.csproj
 ```
 
-현재 15개 테스트 파일에 `[Fact]`/`[Theory]` 선언 127개가 있으며, `[Theory]` 데이터 케이스는 실행 시 개별 test case로 확장된다. 이 수치는 테스트 선언 추가에 따라 바뀔 수 있으므로 아래 명령으로 다시 확인한다.
+테스트 수는 생성 파일과 `[Theory]` 데이터에 따라 달라지므로 고정 수치로 관리하지 않는다. 아래 명령으로 현재 선언을 확인하고 실제 실행 건수는 테스트 실행 결과에서 확인한다.
 
 ```powershell
 rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.UnitTests -g "*Tests.cs"
@@ -127,6 +127,7 @@ rg -n "\[(Fact|Theory)\]" .\MultiSocketRUDPBotTester\MultiSocketRUDPBotTester.Un
 | `BotRttSampleCollectorTests.cs` | RTT 요약, 빈 표본 결과, 동시 표본 수집 |
 | `ChannelRttTests.cs` | 비신뢰성 단독·혼합 채널 RTT 표본, 중복 응답, 응답률 집계 |
 | `RttStressBenchmarkTests.cs` | 폐루프 stress 옵션 검증, histogram과 결과 집계 |
+| `GeneratedPacketPayloadTests.g.cs`, `GeneratedPacketSchemaPayloadTests.g.cs`, `PacketFieldCodecTests.cs` | 생성 패킷·중첩 스키마·실제 송신 노드의 바이트 형식 |
 | `UnreliableChannelTests.cs` | 비신뢰성 큐 교체, 번호·nonce 분리, 수신 순서, 생존 검사와 종료 경합 |
 
 실행:
@@ -200,6 +201,8 @@ msbuild .\MultiSocketRUDP\MultiSocketRUDP.sln /t:IntegrationTest /p:Configuratio
 
 ---
 
+비신뢰성 전용·혼합 채널, 동시 송수신·해제와 풀 재사용, 재시작 중 이전 직렬화 거부·동시 Stop 완료 대기, CONNECT 재전송 소진 정리도 검증한다. TLS 미수신·불완전 연결 제한, 종료 시 대기 소켓 닫기, 핸드셰이크와 함께 받은 전체·부분 버전 레코드 보존 테스트도 포함한다. 정확한 이름은 `--gtest_list_tests`로 확인한다.
+
 ## C++/C# 프로토콜 상호운용 테스트
 
 공용 vector:
@@ -232,7 +235,7 @@ dotnet run --project .\MultiSocketRUDPBotTester\ProtocolInteropTest\ProtocolInte
 MultiSocketRUDP/IntegrationTest/TestCert.pfx
 ```
 
-이 파일은 저장소에 커밋하지 않는다. 필요할 때 아래 스크립트로 생성한다.
+이 파일은 저장소에 커밋하지 않는다. 아래 스크립트는 서버 PFX만 생성한다. 현재 C++ 클라이언트가 요구하는 신뢰 루트와 접속 DNS/IP 이름은 별도 준비가 필요하며 스크립트만 실행하면 모든 TLS 통합 테스트가 통과한다는 보장은 없다. [TLS 인증서 전제 조건](../Common/TLSHelper.md#개발테스트-인증서)을 함께 확인한다.
 
 ```powershell
 .\MultiSocketRUDP\Tool\ForTLS\CreateDevTLSPfx.bat
@@ -268,15 +271,7 @@ RTT 성능 측정과 기타 PR 자동화는 별도 workflow로 실행한다.
 
 `CI.yml`은 모든 PR에서 실행되고 변경 파일을 기준으로 필요한 workflow만 호출한다.
 
-| 변경 경로 | Native GTest | BotTester | actionlint | RTT Benchmark |
-|---|---:|---:|---:|---:|
-| `MultiSocketRUDP/**`, C++ 테스트 및 submodule | 실행 | 미실행 | 미실행 | 실행 |
-| `MultiSocketRUDPBotTester/**` | 미실행 | 실행 | 미실행 | 실행 |
-| 공용 `ProtocolInteropV2Vector.json` | 실행 | 실행 | 미실행 | 실행 |
-| `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
-| `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
-| 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
-| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
+프로토콜 관련 경로는 C++·BotTester 검사를 함께 실행하고 생성 결과 동기화도 확인한다. 네트워크·콘텐츠·버퍼·생성기 경로가 이 분류에 포함된다. 정확한 표는 [CI 가이드의 변경 경로별 실행 범위](CI.md#변경-경로별-실행-범위), 실제 조건은 `.github/workflows/CI.yml`을 기준으로 확인한다.
 
 같은 PR에 새 commit이 올라오면 PR 번호 기반 concurrency가 이전 실행을 취소한다. workflow 파일이 하나라도 변경되면 actionlint가 전체 `.github/workflows/**`를 검사한다.
 

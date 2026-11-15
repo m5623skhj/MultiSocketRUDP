@@ -50,6 +50,7 @@ public:
 
         return tryGetFrontReturn;
     }
+
     [[nodiscard]]
     SendPacketInfo* GetReservedSendPacketInfo(RUDPSession&) override { return reservedSendReturn; }
     [[nodiscard]]
@@ -60,18 +61,25 @@ public:
         isNothingToSendReturn = queuedSendPacketInfos.empty() && tryGetFrontReturn == nullptr;
         return info;
     }
+
     void SetReservedSendPacketInfo(RUDPSession&, SendPacketInfo* info) override
     {
         reservedSendReturn = info;
         isNothingToSendReturn = queuedSendPacketInfos.empty() && tryGetFrontReturn == nullptr && reservedSendReturn == nullptr;
     }
+
     [[nodiscard]]
     size_t GetSendPacketInfoQueueSize(RUDPSession&) override
     {
         const size_t count = queuedSendPacketInfos.empty() ? sendPacketInfoQueueSizeRet : queuedSendPacketInfos.size();
-        if (afterQueueSizeRead) afterQueueSizeRead();
+        if (afterQueueSizeRead)
+        {
+            afterQueueSizeRead();
+        }
+
         return count;
     }
+
     [[nodiscard]]
     char* GetRIOSendBuffer(RUDPSession&) override { return dummySendBuffer; }
     [[nodiscard]]
@@ -84,7 +92,8 @@ public:
     [[nodiscard]]
     bool TryConnect(RUDPSession&, NetBuffer&, const sockaddr_in&) override
     {
-        ++tryConnectCount; return tryConnectReturn;
+        ++tryConnectCount;
+        return tryConnectReturn;
     }
 
     [[nodiscard]]
@@ -93,7 +102,8 @@ public:
     [[nodiscard]]
     bool OnRecvPacket(RUDPSession&, NetBuffer&) override
     {
-        ++onRecvPacketCount; return onRecvPacketReturn;
+        ++onRecvPacketCount;
+        return onRecvPacketReturn;
     }
 
 	void RefreshLastRecvPacketTime(RUDPSession&, unsigned long long now) override
@@ -111,6 +121,7 @@ public:
     {
         return checkReservedTimeoutReturn;
     }
+
     void AbortReservedSession(RUDPSession&) override { ++abortReservedCount; }
 	void InitializeSession(RUDPSession&) override {}
     void SetSessionReservedTime(RUDPSession&, unsigned long long now) override
@@ -124,12 +135,14 @@ public:
     {
         std::copy_n(k, sizeof(dummyKey), dummyKey);
     }
+
     [[nodiscard]]
     const unsigned char* GetSessionSalt(const RUDPSession&) override { return dummySalt; }
     void SetSessionSalt(RUDPSession&, const unsigned char* s) override
     {
         std::copy_n(s, sizeof(dummySalt), dummySalt);
     }
+
     [[nodiscard]]
     const BCRYPT_KEY_HANDLE& GetSessionKeyHandle(const RUDPSession&) override { return dummyKeyHandle; }
     void SetSessionKeyHandle(RUDPSession&, const BCRYPT_KEY_HANDLE& h) override { dummyKeyHandle = h; }
@@ -139,7 +152,8 @@ public:
 
     void GetServerPortAndSessionId(const RUDPSession&, PortType& outPort, SessionIdType& outId) override
     {
-        outPort = portReturn; outId = sessionIdReturn;
+        outPort = portReturn;
+        outId = sessionIdReturn;
     }
 
     void ResetCounts()

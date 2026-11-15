@@ -48,9 +48,13 @@ TEST(NetBufferPoolTest, ConcurrentFirstAccessGrowsBuffersAndReturnsAcrossThreads
                 *buffers[index] >> restored;
                 restoredCorrectly[index] = restored == payload;
             }
-            catch (...) { errors[index] = std::current_exception(); }
+            catch (...)
+            {
+                errors[index] = std::current_exception();
+            }
         });
     }
+
     workers.clear(); // Join all workers before inspecting results or returning their buffers.
     std::set<NetBuffer*> addresses;
     for (int index = 0; index < THREAD_COUNT; ++index)
@@ -60,9 +64,14 @@ TEST(NetBufferPoolTest, ConcurrentFirstAccessGrowsBuffersAndReturnsAcrossThreads
         EXPECT_NE(buffers[index], nullptr);
         addresses.insert(buffers[index].get());
     }
+
     EXPECT_EQ(addresses.size(), THREAD_COUNT);
     EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), THREAD_COUNT);
-    for (auto& buffer : buffers) buffer.reset();
+    for (auto& buffer : buffers)
+    {
+        buffer.reset();
+    }
+
     EXPECT_EQ(NetBuffer::GetUsingSerializeBufNodeCount(), 0);
 }
 
@@ -190,7 +199,11 @@ TEST(NetBufferContainerTest, ScalarAndStringWritesGrowActualAllocation)
     buffer >> restored;
     EXPECT_EQ(restored, text);
     buffer.Init();
-    for (int i = 0; i < 1000; ++i) buffer << i;
+    for (int i = 0; i < 1000; ++i)
+    {
+        buffer << i;
+    }
+
     for (int i = 0; i < 1000; ++i)
     {
         int value{};

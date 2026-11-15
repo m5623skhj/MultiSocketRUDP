@@ -43,7 +43,7 @@ ACK timeout
 - 입력: thread별 RIO completion queue의 `RIORESULT`
 - 처리: 요청 당시 generation과 세션 유효성을 확인하고, 성공·오류·취소 completion을 모두 `RUDPIOHandler::IOCompleted`로 전달
 - 출력: 수신 context enqueue, 다음 receive 등록, send mode 해제와 후속 send
-- 주의: completion queue가 비어 있으면 polling이 계속된다. 현재 빌드는 compile-time 설정에 따라 항상 `Sleep(0)`을 사용하므로 `WORKER_THREAD_ONE_FRAME_MS`는 반영되지 않는다.
+- 주의: completion queue가 비어 있으면 polling이 계속된다. 기본 빌드는 `Sleep(0)`, RTT 빌드는 sleep 없음이다. `USE_WORKER_THREAD_SLEEP_FOR_FRAME`로 빌드한 경우에만 `WORKER_THREAD_ONE_FRAME_MS`를 반영한다.
 - 치명 오류: `RIODequeueCompletion()`이 `RIO_CORRUPT_CQ`를 반환하면 해당 worker는 오류를 상위 레이어에 전달하고 종료한다. CQ 완료를 더 이상 신뢰할 수 없으므로 프로세스 재시작이 필요하다.
 
 [상세 코드 해설](ThreadModelReference.md#2-io-worker-thread-상세)

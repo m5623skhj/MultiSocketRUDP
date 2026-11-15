@@ -42,6 +42,7 @@ namespace
 		{
 			bytes[i] = static_cast<unsigned char>(std::stoul(hex.substr(i * 2, 2), nullptr, 16));
 		}
+
 		return bytes;
 	}
 
@@ -95,10 +96,12 @@ namespace
 			{
 				result.packetId = item.at("packetId").get<PacketId>();
 			}
+
 			result.plaintext = HexToBytes(item.at("plaintextHex").get<std::string>());
 			result.encodedPacket = HexToBytes(item.at("encodedPacketHex").get<std::string>());
 			results.push_back(std::move(result));
 		}
+
 		return results;
 	}
 
@@ -125,6 +128,7 @@ namespace
 			{
 				result[i] = static_cast<unsigned char>(i + 1);
 			}
+
 			return result;
 		}
 
@@ -140,6 +144,7 @@ namespace
 		{
 			salt[i] = static_cast<unsigned char>(0xA0 + i);
 		}
+
 		return salt;
 	}
 
@@ -273,6 +278,7 @@ TEST_F(PacketCryptoTest, WrongDirectionAndSaltAreRejected)
 		{
 			testSalt[0] ^= 0x01;
 		}
+
 		EXPECT_FALSE(PacketCryptoHelper::DecodePacket(packet, testSalt.data(), testSalt.size(), key.Get(), false,
 			useWrongDirection ? PACKET_DIRECTION::SERVER_TO_CLIENT : PACKET_DIRECTION::CLIENT_TO_SERVER));
 	}
@@ -313,7 +319,10 @@ TEST(CryptoHelperTest, SameSequenceHasDistinctNonceForAllSixDirections)
 	{
 		ASSERT_TRUE(CryptoHelper::FillNonce(salt.data(), salt.size(), 1,
 			static_cast<PACKET_DIRECTION>(index), nonces[index].data(), NONCE_SIZE));
-		for (size_t previous = 0; previous < index; ++previous) EXPECT_NE(nonces[index], nonces[previous]);
+		for (size_t previous = 0; previous < index; ++previous)
+		{
+			EXPECT_NE(nonces[index], nonces[previous]);
+		}
 	}
 }
 
@@ -344,6 +353,7 @@ TEST_F(PacketCryptoTest, AesGcmMatchesProtocolV2GoldenVectors)
 			ASSERT_TRUE(testVector.packetId.has_value());
 			packet << *testVector.packetId;
 		}
+
 		if (not testVector.plaintext.empty())
 		{
 			packet.WriteBuffer(testVector.plaintext.data(), static_cast<int>(testVector.plaintext.size()));
@@ -372,11 +382,13 @@ TEST_F(PacketCryptoTest, AesGcmMatchesProtocolV2GoldenVectors)
 			packet >> decodedPacketId;
 			EXPECT_EQ(decodedPacketId, *testVector.packetId);
 		}
+
 		std::vector<unsigned char> decodedPlaintext(testVector.plaintext.size());
 		if (not decodedPlaintext.empty())
 		{
 			packet.ReadBuffer(reinterpret_cast<char*>(decodedPlaintext.data()), static_cast<int>(decodedPlaintext.size()));
 		}
+
 		EXPECT_EQ(decodedPlaintext, testVector.plaintext);
 		EXPECT_EQ(packet.GetUseSize(), 0);
 	}

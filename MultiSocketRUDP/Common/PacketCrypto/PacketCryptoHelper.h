@@ -48,14 +48,17 @@ public:
 			return;
 		}
 
-        if (not FitsWireLimit(packet))
-        {
-            LOG_ERROR(std::format("RUDP encode size rejected: wireBytes={} limit={}", packet.m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
-            return;
-        }
-        // Reserve tag space before obtaining pointers used by AES-GCM.
-        if (packet.GetFreeSize() < static_cast<int>(AUTH_TAG_SIZE))
-            packet.Resize(packet.m_iWrite + static_cast<int>(AUTH_TAG_SIZE));
+		if (not FitsWireLimit(packet))
+		{
+			LOG_ERROR(std::format("RUDP encode size rejected: wireBytes={} limit={}", packet.m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
+			return;
+		}
+
+		// Reserve tag space before obtaining pointers used by AES-GCM.
+		if (packet.GetFreeSize() < static_cast<int>(AUTH_TAG_SIZE))
+		{
+			packet.Resize(packet.m_iWrite + static_cast<int>(AUTH_TAG_SIZE));
+		}
 
 		unsigned char nonce[NONCE_SIZE];
 		if (not CryptoHelper::FillNonce(sessionSalt, sessionSaltSize, packetSequence, direction, nonce, NONCE_SIZE))

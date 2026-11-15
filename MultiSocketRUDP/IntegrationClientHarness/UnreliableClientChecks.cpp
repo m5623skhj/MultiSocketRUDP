@@ -30,6 +30,7 @@ class RUDPClientCoreTestAccess
 	private:
 		std::function<void()> callback;
 	};
+
 public:
 	static bool RunLifecycle(const std::wstring& corePath, const std::wstring& brokerPath, bool timeout)
 	{
@@ -41,16 +42,25 @@ public:
 			{
 				bool ShouldSendConnectPacketOnStart() const override { return false; }
 			} reserved;
-			if (not reserved.Start(corePath, brokerPath, true)) return false;
+			if (not reserved.Start(corePath, brokerPath, true))
+			{
+				return false;
+			}
+
 			const SOCKET sink = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 			sockaddr_in sinkAddress{};
 			sinkAddress.sin_family = AF_INET;
 			sinkAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 			if (sink == INVALID_SOCKET || ::bind(sink, reinterpret_cast<sockaddr*>(&sinkAddress), sizeof(sinkAddress)) != 0)
 			{
-				if (sink != INVALID_SOCKET) closesocket(sink);
+				if (sink != INVALID_SOCKET)
+				{
+					closesocket(sink);
+				}
+
 				return false;
 			}
+
 			int size = sizeof(sinkAddress);
 			getsockname(sink, reinterpret_cast<sockaddr*>(&sinkAddress), &size);
 			{
@@ -58,6 +68,7 @@ public:
 				reserved.serverAddr = sinkAddress;
 				reserved.SendConnectPacket();
 			}
+
 			const bool stopped = WaitUntil([&] { return reserved.IsStopped(); });
 			closesocket(sink);
 			reserved.Stop();
@@ -66,7 +77,11 @@ public:
 		}
 
 		if (not client.Start(corePath, brokerPath, true) ||
-			not WaitUntil([&] { return client.IsConnected(); })) return false;
+			not WaitUntil([&] { return client.IsConnected(); }))
+		{
+			return false;
+		}
+
 		bool restarted = false;
 		// Stop and restart while an old reliable call is still serializing user data.
 		CallbackPacket pausedSerializer([&]
@@ -75,20 +90,32 @@ public:
 			restarted = client.Start(corePath, brokerPath, true) &&
 				WaitUntil([&] { return client.IsConnected(); });
 		});
+
 		client.SendPacket(pausedSerializer);
-		if (not restarted || client.lastSendPacketSequence != 0) return false;
+		if (not restarted || client.lastSendPacketSequence != 0)
+		{
+			return false;
+		}
 
 		for (int cycle = 0; cycle < 2; ++cycle)
 		{
 			TestStringPacketReq request;
 			request.testString = "lifecycle-restart";
 			client.SendPacket(request);
-			if (client.lastSendPacketSequence != 1) return false;
+			if (client.lastSendPacketSequence != 1)
+			{
+				return false;
+			}
+
 			bool echo = false;
 			if (not WaitUntil([&]
 			{
 				auto* buffer = client.GetReceivedPacket();
-				if (buffer == nullptr) return false;
+				if (buffer == nullptr)
+				{
+					return false;
+				}
+
 				PacketId id{};
 				*buffer >> id;
 				if (id == static_cast<PacketId>(PACKET_ID::TEST_STRING_PACKET_RES))
@@ -97,9 +124,14 @@ public:
 					reply.BufferToPacket(*buffer);
 					echo = reply.echoString == request.testString;
 				}
+
 				NetBuffer::Free(buffer);
 				return echo;
-			})) return false;
+			}))
+			{
+				return false;
+			}
+
 			std::promise<void> gate;
 			auto ready = gate.get_future().share();
 			const auto stop = [&]
@@ -108,14 +140,23 @@ public:
 				client.Stop();
 				return client.IsStopped() && not client.IsConnected();
 			};
+
 			auto first = std::async(std::launch::async, stop);
 			auto second = std::async(std::launch::async, stop);
 			gate.set_value();
 			if (not first.get() || not second.get() || client.sendEventHandles[0] != nullptr ||
-				not client.sendPacketInfoMap.empty() || not client.pendingPacketQueue.empty()) return false;
+				not client.sendPacketInfoMap.empty() || not client.pendingPacketQueue.empty())
+			{
+				return false;
+			}
+
 			if (cycle == 0 && (not client.Start(corePath, brokerPath, true) ||
-				not WaitUntil([&] { return client.IsConnected(); }))) return false;
+				not WaitUntil([&] { return client.IsConnected(); })))
+			{
+				return false;
+			}
 		}
+
 		return true;
 	}
 
@@ -132,6 +173,7 @@ public:
 			stream.write(reinterpret_cast<const char*>(text.data()), text.size() * sizeof(wchar_t));
 			return stream.good();
 		};
+
 		bool passed = not client.ReadClientCoreOptionFile(path.wstring() + L".missing") &&
 			not client.ReadSessionGetterOptionFile(path.wstring() + L".missing");
 		for (const auto* value : { L"0", L"-1", L"2147483648", L"999999999999999999999", L"abc", L"" })
@@ -140,6 +182,7 @@ public:
 				std::wstring(value) + L"\nSERVER_ALIVE_CHECK_MS = 15000\n}\n");
 			passed &= not client.ReadClientCoreOptionFile(path.wstring());
 		}
+
 		passed &= write(L":CORE\n{\nMAX_PACKET_RETRANSMISSION_COUNT = 65535\nRETRANSMISSION_MS = 50\nSERVER_ALIVE_CHECK_MS = 15000\n}\n");
 		passed &= client.ReadClientCoreOptionFile(path.wstring());
 		passed &= client.maxPacketRetransmissionCount == 65535;
@@ -152,6 +195,7 @@ public:
 				L"\n}\n:SERIALIZEBUF\n{\nPACKET_CODE = 119\nPACKET_KEY = 50\n}\n");
 			passed &= not client.ReadSessionGetterOptionFile(path.wstring());
 		}
+
 		passed &= write(std::wstring(2048, L' '));
 		passed &= not client.ReadClientCoreOptionFile(path.wstring());
 		passed &= write(L"");
@@ -177,6 +221,7 @@ public:
 			client.Stop();
 			return false;
 		}
+
 		bool passed = true;
 		TestStringPacketReq request;
 		request.testString = "queue-test";
@@ -184,6 +229,7 @@ public:
 		{
 			passed &= client.SendUnreliablePacket(request);
 		}
+
 		passed &= client.unreliableSendQueue.size() == 3 && client.sendPacketInfoMap.empty() &&
 			client.lastSendPacketSequence == 0 && client.pendingPacketQueue.empty();
 		PacketSequence expected = 2;
@@ -197,7 +243,11 @@ public:
 		// A forged high sequence must not advance the authenticated receive state.
 		Receive(client, 100, true);
 		passed &= client.authenticatedReceiveCount.load() == 0;
-		for (const PacketSequence sequence : { 0, 5, 3, 5, 7, 9 }) Receive(client, sequence, false);
+		for (const PacketSequence sequence : { 0, 5, 3, 5, 7, 9 })
+		{
+			Receive(client, sequence, false);
+		}
+
 		passed &= client.authenticatedReceiveCount.load() == 6;
 		passed &= client.serverAliveChecker.IsServerAlive(client.authenticatedReceiveCount.load());
 		Receive(client, 200, true);
@@ -207,7 +257,12 @@ public:
 		for (const PacketSequence sequence : { 5, 7, 9 })
 		{
 			auto* buffer = client.GetReceivedUnreliablePacket();
-			if (buffer == nullptr) { passed = false; break; }
+			if (buffer == nullptr)
+			{
+				passed = false;
+				break;
+			}
+
 			PacketId packetId{};
 			PacketSequence value{};
 			*buffer >> packetId >> value;
@@ -215,6 +270,7 @@ public:
 			passed &= buffer->GetUseSize() == 0;
 			NetBuffer::Free(buffer);
 		}
+
 		Receive(client, 10, false);
 		Receive(client, 1, false, PACKET_TYPE::HEARTBEAT_TYPE);
 		Receive(client, 1, false, PACKET_TYPE::HEARTBEAT_TYPE);
@@ -234,7 +290,11 @@ public:
 			passed &= content->GetUseSize() == 0;
 			NetBuffer::Free(content);
 		}
-		else passed = false;
+		else
+		{
+			passed = false;
+		}
+
 		passed &= client.recvPacketHoldingQueue.empty() && client.nextRecvPacketSequence == 4;
 		Receive(client, 5, false, PACKET_TYPE::HEARTBEAT_TYPE);
 		Receive(client, 6, false, PACKET_TYPE::SEND_TYPE);
@@ -248,7 +308,11 @@ public:
 			client.SendPacket(oversized);
 			passed &= not client.SendUnreliablePacket(oversized);
 		}
-		catch (...) { passed = false; }
+		catch (...)
+		{
+			passed = false;
+		}
+
 		passed &= client.lastSendPacketSequence == reliableBefore && client.lastUnreliableSendSequence == unreliableBefore;
 		// Exercise both completion orders through the real ACK handler, retaining the worker reference.
 		client.remoteAdvertisedWindow = 10;
@@ -257,10 +321,19 @@ public:
 			client.SendPacket(request);
 			const auto sequence = client.lastSendPacketSequence.load();
 			const auto it = client.sendPacketInfoMap.find(sequence);
-			if (it == client.sendPacketInfoMap.end()) { passed = false; break; }
+			if (it == client.sendPacketInfoMap.end())
+			{
+				passed = false;
+				break;
+			}
+
 			auto* info = it->second;
 			info->AddRefCount();
-			if (failureFirst) info->completion.store(SendPacketInfo::Completion::RetryLimit);
+			if (failureFirst)
+			{
+				info->completion.store(SendPacketInfo::Completion::RetryLimit);
+			}
+
 			const auto ackedBefore = client.lastAckedSequence.load();
 			NetBuffer reply;
 			reply << BYTE{5};
@@ -272,9 +345,14 @@ public:
 			passed &= info->completion == (failureFirst ? SendPacketInfo::Completion::RetryLimit : SendPacketInfo::Completion::Acknowledged);
 			SendPacketInfo::Free(info);
 		}
+
 		// This harness has no send worker; release the ACKs generated by the injected packets.
 		NetBuffer* ack{};
-		while (client.sendBufferQueue.Dequeue(&ack)) NetBuffer::Free(ack);
+		while (client.sendBufferQueue.Dequeue(&ack))
+		{
+			NetBuffer::Free(ack);
+		}
+
 		client.Stop();
 		passed &= client.recvPacketHoldingQueue.empty() && client.nextRecvPacketSequence == 1;
 		passed &= client.unreliableSendQueue.empty() && client.unreliableReceivedPackets.empty() &&
@@ -292,6 +370,7 @@ public:
 			client.isConnected = true;
 			client.sendEventHandles[0] = CreateSemaphore(nullptr, 0, LONG_MAX, nullptr);
 		});
+
 		passed &= not client.SendUnreliablePacket(pausedSerializer);
 		passed &= client.lastUnreliableSendSequence == 0 && client.unreliableSendQueue.empty();
 		client.Stop();
@@ -305,23 +384,37 @@ private:
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
 		while (std::chrono::steady_clock::now() < deadline)
 		{
-			if (predicate()) return true;
+			if (predicate())
+			{
+				return true;
+			}
+
 			Sleep(5);
 		}
+
 		return predicate();
 	}
+
 	static void Receive(RUDPClientCore& client, const PacketSequence sequence, const bool tampered,
 		PACKET_TYPE type = PACKET_TYPE::UNRELIABLE_SEND_TYPE)
 	{
 		auto* buffer = NetBuffer::Alloc();
 		const bool isCore = type == PACKET_TYPE::HEARTBEAT_TYPE;
 		*buffer << type << sequence;
-		if (not isCore) *buffer << PacketId{ 77 } << sequence;
+		if (not isCore)
+		{
+			*buffer << PacketId{ 77 } << sequence;
+		}
+
 		const auto direction = type == PACKET_TYPE::UNRELIABLE_SEND_TYPE ?
 			PACKET_DIRECTION::SERVER_TO_CLIENT_UNREL : PACKET_DIRECTION::SERVER_TO_CLIENT;
 		PacketCryptoHelper::EncodePacket(*buffer, sequence, direction,
 			client.sessionSalt, SESSION_SALT_SIZE, client.sessionKeyHandle, isCore);
-		if (tampered) buffer->GetReadBufferPtr()[buffer->GetUseSize() - 1] ^= 1;
+		if (tampered)
+		{
+			buffer->GetReadBufferPtr()[buffer->GetUseSize() - 1] ^= 1;
+		}
+
 		char header[df_HEADER_SIZE];
 		buffer->ReadBuffer(header, sizeof(header));
 		client.ProcessRecvPacket(*buffer);

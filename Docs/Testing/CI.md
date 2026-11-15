@@ -50,12 +50,14 @@ ASan 검사는 PR 필수 체크와 별도로 실행한다. 일반 빌드와 분�
 | `Scripts/RTTBenchmark/**` | 미실행 | 미실행 | 미실행 | 실행 |
 | `.github/workflows/CI.yml` | 실행 | 실행 | 실행 | 미실행 |
 | 그 밖의 `.github/workflows/**` | 경로별 선택 | 경로별 선택 | 실행 | workflow별 선택 |
-| 관련 없는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
+| 아래 경로에 해당하지 않는 문서만 변경 | 미실행 | 미실행 | 미실행 | 미실행 |
 
 프로토콜 경로 변경 시 `Protocol generated code sync`도 실행하여 생성기 회귀 테스트와 `--check`를 수행한다.
 생성 결과가 오래됐거나 양쪽 검사 중 하나라도 실패하면 `build-and-test`가 실패한다.
 기존 네트워크·콘텐츠 구현은 보수적으로 포함하며 정확한 목록은 `CI.yml`의 `protocol` 필터가 기준이다.
 사용 방법은 [패킷 생성기](../Tools/PacketGenerator.md)를 참고한다.
+
+문서도 경로로 분류한다. 예를 들어 `MultiSocketRUDPBotTester/README.md`는 BotTester 분류에, `Scripts/RTTBenchmark/README.md`는 RTT 분류에 포함된다. 문서 확장자만으로 자동 제외하지 않는다.
 
 경로 분류 결과는 테스트 면제를 뜻하지 않는다. 문서만 바뀌었더라도 문서가 설명하는 동작과 현재 코드가 일치하는지는 reviewer가 확인한다.
 
@@ -89,21 +91,24 @@ PR 결과는 `benchmark-data`의 직전 공식 측정과 비교한다. `main`에
 | 유실률 0% | 워밍업 500회, 1,000회 × 5 runs |
 | 유실률 10% | 워밍업 100회, 1,000회 × 5 runs |
 | 유실 모델 | BotTester 송신과 수신에 각각 독립적으로 10% 적용 |
-| 채널 비교 | 비신뢰성 10개/10ms, 신뢰성 1개/10ms, 혼합은 둘을 함께 전송 |
-| 채널 표본 | 기본 워밍업 100단위, 본 측정 1,000단위 × 3 runs, 응답 timeout 1초 |
+| 채널 비교 | 단독은 응답 직후 다음 1건, 비신뢰 유실은 요청별 타임아웃 후 진행. 혼합은 10ms마다 비신뢰 10건·신뢰 1건 |
+| 채널 표본 | 단독은 각 채널 워밍업 100건·본 측정 1,000건 × 3 runs. 혼합은 run당 비신뢰 1,000건·신뢰 100건, 응답 timeout 1초 |
 | 대표값 | 각 run 통계의 중앙값 |
-| 실행 제한 | warmup과 각 run은 최대 300초, workflow는 최대 45분 |
+| 실행 제한 | Ping/Pong은 warmup과 각 run 각각 300초. 채널은 각 run의 연결·워밍업·본 측정 합계 60초. workflow는 최대 45분 |
 
 0%·10%와 세 채널 시나리오는 같은 runner에서 순차 실행한다. 병렬 측정은 CPU 경합으로 RTT를 왜곡하고 singleton BotTester 상태를 공유할 수 있으므로 사용하지 않는다.
-각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 처리량을 콘솔에 출력한다. 진행 로그가 300초 안에 완료되지 않으면 해당 run을 실패 처리하므로 무응답 상태로 전체 job 시간을 소비하지 않는다.
+Ping/Pong은 각 warmup/run의 시작과 완료, P95/P99, 경과 시간, 초당 처리량을 콘솔에 출력하며 각 실행은 300초로 제한한다. 채널은 run별 경과 시간과 결과를 `channel-*.json`에 기록한다. 단독 측정에서 비신뢰 요청은 1초 타임아웃 후 다음 요청으로 진행하고, 신뢰 요청은 타임아웃 시 측정을 실패 처리한다. 비신뢰 요청도 run 전체의 60초 제한은 적용받는다.
 
 ### 이력과 그래프 해석
 
 - `benchmark-data/rtt-history.json`은 commit별 전체 공식 이력을 보존한다.
 - `rtt-loss-0.svg`와 `rtt-loss-10.svg`는 최근 10개 공식 측정의 P95/P99를 표시한다.
 - `channel-unreliable-only.svg`와 `channel-mixed.svg`는 조건이 같은 최근 공식 측정의 비신뢰성 P95/P99와 응답률을 표시한다.
+- `channel-comparison.svg`는 같은 커밋·조건의 버전 3 단독 측정만 짝지어 신뢰·비신뢰 P95/P99와 응답률을 표시한다. 양쪽 모두 응답 직후 다음 요청을 보내며, 비신뢰 유실은 1초 타임아웃 후 진행한다. 워밍업 100건·본 측정 1,000건·3회 실행이며, 기존 Ping/Pong 및 버전 1·2 추세와 분리한다.
 - `channel-history.json`은 최근 150개 채널 시나리오 결과를 보존한다.
-- 그래프의 변화율은 현재 값과 이전 5개 측정 중앙값의 차이다. 양수면 RTT가 증가해 느려진 것이다.
+- 채널 SVG의 RTT 축·툴팁·하단 표와 채널 요약의 RTT는 µs로 표시한다. JSON의 `p50Ms`·`p95Ms`·`p99Ms`는 ms를 유지하고 표시할 때만 변환한다. 응답률·변화율은 %를 유지한다.
+- `rtt-loss-0.svg`와 `rtt-loss-10.svg`의 변화율은 현재 값과 이전 최대 5개 측정 중앙값을 비교한 백분율이다.
+- `channel-unreliable-only.svg`와 `channel-mixed.svg`의 변화율은 같은 commit을 제외한 직전 호환 측정값과 비교한 백분율이다. 이전 5개 중앙값을 사용하지 않는다. `channel-comparison.svg`는 변화율 대신 양쪽 RTT와 응답률을 표시한다. RTT 변화율이 양수면 지연이 증가한 것이다.
 - Job Summary와 PR 코멘트의 변화율은 직전 공식 측정과 비교한다.
 - `Max`는 hosted runner의 OS 스케줄링 노이즈에 민감하므로 표의 참고값으로만 남기고 추세 그래프에는 사용하지 않는다.
 - 저장소 `README.md`는 `benchmark-data` 브랜치의 raw SVG를 표시하므로 공식 이력이 갱신되면 별도 README commit 없이 그래프도 바뀐다.
@@ -115,6 +120,8 @@ GitHub-hosted runner는 전용 성능 장비가 아니므로 한 번의 상승�
 PR 측정 job은 저장소를 읽고 PR 코멘트를 갱신할 권한만 사용한다. `main` push 뒤의 이력 기록 job만 `contents: write`로 `benchmark-data`를 갱신한다. 이 push는 `GITHUB_TOKEN`으로 생성되고 workflow의 push 대상도 `main`으로 제한되어 있으므로 RTT workflow를 재귀 실행하지 않는다.
 
 ---
+
+현재 인증서 배치 파일은 C++ 클라이언트의 새 체인·이름 검증 전제 조건을 모두 준비하지 않는다. workflow에 PFX 생성 단계가 있다는 이유만으로 TLS 환경이 충족됐다고 판단하지 않는다. [TLS 인증서 전제 조건](../Common/TLSHelper.md#개발테스트-인증서)을 확인한다.
 
 ## 필수 체크
 
@@ -133,7 +140,7 @@ AI 리뷰 status `ai-review-check`는 외부 API의 rate limit과 일시 장애 
 1. `build-and-test`가 요구한 하위 workflow를 확인한다.
 2. build 실패와 test 실패를 분리한다.
 3. test 실패면 XML과 실패 test 이름을 기준으로 로컬 단일 실행을 시도한다.
-4. IntegrationTest면 인증서 생성, child process 종료, 포트·timeout 영향을 확인한다.
+4. IntegrationTest면 인증서 신뢰·접속 이름·생성 스크립트의 한계, child process 종료, 포트·timeout 영향을 확인한다.
 5. retry 성공만으로 종료하지 말고 최초 실패가 timing 의존인지 조사한다.
 
 Native GTest 실행은 CoreTest에 10분 상한을 적용하고 전체 job은 45분으로 제한한다. IntegrationTest는 반복 서버 생성·정리 과정의 RIO 종료 상태가 다음 fixture에 영향을 주지 않도록 `--gtest_list_tests` 결과의 각 테스트를 별도 프로세스에서 실행하며, 실패 재시도도 테스트별 독립 프로세스를 유지한다. 테스트별 180초 상한을 넘기면 프로세스 트리를 종료하고 해당 테스트 이름과 제한 시간을 crash 항목 및 콘솔에 보고한다. IntegrationTest의 child process 출력은 pipe EOF를 무기한 기다리지 않고 현재 읽을 수 있는 데이터만 회수한다.
@@ -144,6 +151,7 @@ RTT workflow가 실패하면 다음 순서로 확인한다.
 2. 임시 인증서 생성과 정리, 서버 프로세스 종료, 사용 포트 충돌 여부를 확인한다.
 3. `rtt-loss-0.json`과 `rtt-loss-10.json` 생성 여부를 artifact에서 확인한다.
 4. `channel-unreliable-only.json`, `channel-reliable-baseline.json`, `channel-mixed.json` 생성 여부를 확인한다.
+   단독 결과의 `schemaVersion=3`, 각 run의 시도 수와 응답률·`timedOut`, `channel-comparison.svg`의 측정 쌍 표시 여부도 확인한다. 기존 버전만 있거나 조건이 맞는 쌍이 없으면 비교 그래프는 대기 안내를 표시한다.
 5. PR 비교가 실패하면 `benchmark-data` 브랜치의 `rtt-history.json`과 `channel-history.json`을 읽을 수 있는지 확인한다.
 6. `main` 측정은 성공했지만 이력 기록이 실패하면 workflow의 `contents: write` 권한과 branch 정책을 확인한다.
 

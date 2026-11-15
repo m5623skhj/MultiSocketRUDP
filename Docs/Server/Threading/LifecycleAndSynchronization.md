@@ -67,7 +67,7 @@ SessionBroker 중단
 | 콘텐츠·송신 경로 | send map, pending queue | IO/ACK 처리 | send mode, map lock/ownership 계약 |
 | 송신 경로 | retransmission scheduler | Retransmission Worker | schedule version, erased flag, ref-count |
 | 모든 disconnect 경로 | release target queue | Session Release Worker | session state, 처리 중·I/O 상태 |
-| Heartbeat Worker | heartbeat send info | Retransmission Worker | session thread id, session lifetime |
+| 하트비트 스레드 | 하트비트 송신 정보 | 재전송 스레드 | 세션 스레드 ID, 세션 수명 |
 
 [전체 데이터 흐름](ThreadModelReference.md#9-스레드-간-공유-데이터-흐름)
 

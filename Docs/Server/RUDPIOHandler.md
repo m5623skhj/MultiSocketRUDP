@@ -10,13 +10,13 @@
 
 1. [위치와 의존 관계](#1-위치와-의존-관계)
 2. [함수 설명](#2-함수-설명)
-3. [DoRecv — 수신 등록](#3-dorecv-수신-등록)
-4. [DoSend — 송신 시도 (SpinLock 방식)](#4-dosend-송신-시도-spinlock-방식)
-5. [MakeSendContext / MakeSendStream](#5-makesendcontext-makesendstream)
-6. [ReservedSendPacketInfoToStream / StoredSendPacketInfoToStream](#6-reservedsendpacketinfotostream-storedsendpacketinfotostream)
-7. [IOCompleted — 완료 처리 분기](#7-iocompleted-완료-처리-분기)
-8. [RecvIOCompleted — 수신 완료](#8-recviocompleted-수신-완료)
-9. [SendIOCompleted — 송신 완료](#9-sendiocompleted-송신-완료)
+3. [DoRecv — 수신 등록](#3-dorecv--수신-등록)
+4. [DoSend — 송신 소유권 획득 (CAS 방식)](#4-dosend--송신-소유권-획득-cas-방식)
+5. [MakeSendContext / MakeSendStream](#5-makesendcontext--makesendstream)
+6. [ReservedSendPacketInfoToStream / StoredSendPacketInfoToStream](#6-reservedsendpacketinfotostream--storedsendpacketinfotostream)
+7. [IOCompleted — 완료 처리 분기](#7-iocompleted--완료-처리-분기)
+8. [RecvIOCompleted — 수신 완료](#8-recviocompleted--수신-완료)
+9. [SendIOCompleted — 송신 완료](#9-sendiocompleted--송신-완료)
 10. [RefreshRetransmissionSendPacketInfo](#10-refreshretransmissionsendpacketinfo)
 
 ---
@@ -137,13 +137,13 @@ bool DoRecv(RUDPSession& session) const override;
 수신 완료 뒤에는 해제된 context를 다시 등록해 동시 수신 대기 수를 유지한다.
 
 > 반환값을 무시하면 컴파일 경고가 발생한다. 호출 측에서 반드시 검사해야 한다.
-## 4. DoSend — 송신 시도 (SpinLock 방식)
+## 4. DoSend — 송신 소유권 획득 (CAS 방식)
 
 ```cpp
 bool RUDPIOHandler::DoSend(RUDPSession& session, ThreadIdType threadId) const
 ```
 
-**한 세션에 동시에 하나의 RIO Send만 허용**하는 SpinLock 패턴.
+**한 세션에 동시에 하나의 RIO Send만 허용**하는 CAS 방식이다. 소유권 획득 실패 시 계속 회전하며 기다리지 않고 반환한다.
 
 ```cpp
 {
@@ -169,7 +169,7 @@ bool RUDPIOHandler::DoSend(RUDPSession& session, ThreadIdType threadId) const
 }
 ```
 
-**왜 SpinLock이 필요한가:**
+**왜 송신 소유권이 필요한가:**
 
 ```
 RIO_RQ(Request Queue)는 세션당 1개.
@@ -195,7 +195,7 @@ std::pair<bool, unsigned int> RUDPIOHandler::MakeSendStream(
 `MakeSendContext()`는 이번 송신에 사용할 `IOContext`를 준비하고,  
 `MakeSendStream()`은 신뢰·신뢰성 없는 두 큐에서 선택한 여러 패킷을 송신 버퍼에 묶어 단일 `RIOSendEx`에 실을 스트림을 구성한다.
 
-**여러 패킷을 32KB 버퍼에 묶어 단일 `RIOSendEx`로 전송한다.**
+**32KB 할당 버퍼에 여러 완전한 프레임을 묶되 실제 단일 `RIOSendEx` 데이터그램은 최대 1024바이트다.**
 
 ```cpp
 {

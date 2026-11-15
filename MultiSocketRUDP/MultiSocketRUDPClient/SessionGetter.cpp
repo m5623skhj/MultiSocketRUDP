@@ -72,21 +72,43 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 {
 	hostLoopback = false;
 	ClientOptionFile options;
-	if (not options.Load(optionFilePath)) return false;
+	if (not options.Load(optionFilePath))
+	{
+		return false;
+	}
+
 	const auto ip = options.GetValue(L"SESSION_BROKER", L"IP");
-	if (not ip || ip->size() < 3 || ip->front() != L'"' || ip->back() != L'"') return false;
+	if (not ip || ip->size() < 3 || ip->front() != L'"' || ip->back() != L'"')
+	{
+		return false;
+	}
+
 	const auto address = ip->substr(1, ip->size() - 2);
 	if (address.empty() || address.size() >= std::size(sessionBrokerIP) ||
-		!std::all_of(address.begin(), address.end(), [](wchar_t c) {
+		!std::all_of(address.begin(), address.end(), [](wchar_t c)
+		{
 			return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') ||
-				(c >= L'0' && c <= L'9') || c == L'.' || c == L'-'; })) return false;
+				(c >= L'0' && c <= L'9') || c == L'.' || c == L'-';
+		}))
+	{
+		return false;
+	}
+
 	unsigned int brokerPort{}, packetCode{}, packetKey{};
 	if (not options.GetNumber(L"SESSION_BROKER", L"PORT", 1, 65535, brokerPort) ||
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_CODE", 0, 255, packetCode) ||
-		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_KEY", 0, 255, packetKey)) return false;
+		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_KEY", 0, 255, packetKey))
+	{
+		return false;
+	}
+
 	unsigned int loopback{};
 	if (options.GetValue(L"SESSION_BROKER", L"HOST_LOOPBACK") &&
-		not options.GetNumber(L"SESSION_BROKER", L"HOST_LOOPBACK", 0, 1, loopback)) return false;
+		not options.GetNumber(L"SESSION_BROKER", L"HOST_LOOPBACK", 0, 1, loopback))
+	{
+		return false;
+	}
+
 	hostLoopback = loopback != 0;
 	wcscpy_s(sessionBrokerIP, address.c_str());
 	sessionBrokerPort = static_cast<PortType>(brokerPort);
@@ -98,7 +120,11 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 
 bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 {
-	if (inStopToken.stop_requested()) return false;
+	if (inStopToken.stop_requested())
+	{
+		return false;
+	}
+
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
@@ -158,6 +184,7 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
 	}
+
 	return TrySetTargetSessionInfo(inStopToken);
 }
 
@@ -175,11 +202,17 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		PADDRINFOEXW result{};
+
 		OVERLAPPED pending{};
 		pending.hEvent = WSACreateEvent();
-		if (pending.hEvent == WSA_INVALID_EVENT) return false;
+		if (pending.hEvent == WSA_INVALID_EVENT)
+		{
+			return false;
+		}
+
 		HANDLE lookup{};
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+
 		int status = GetAddrInfoExW(sessionBrokerIP, nullptr, NS_DNS, nullptr, &hints,
 			&result, nullptr, &pending, nullptr, &lookup);
 		if (status == WSA_IO_PENDING)
@@ -188,27 +221,48 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 			while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 			{
 				waited = WaitForSingleObject(pending.hEvent, 100);
-				if (waited != WAIT_TIMEOUT) break;
+				if (waited != WAIT_TIMEOUT)
+				{
+					break;
+				}
 			}
+
 			if (waited != WAIT_OBJECT_0)
 			{
 				GetAddrInfoExCancel(&lookup);
 				// The OS must stop referencing pending/result before these locals die.
 				WaitForSingleObject(pending.hEvent, INFINITE);
 			}
+
 			status = GetAddrInfoExOverlappedResult(&pending);
 		}
+
 		const bool resolved = status == 0 && result && result->ai_addr &&
 			result->ai_addrlen >= sizeof(sockaddr_in) && !inStopToken.stop_requested() &&
 			std::chrono::steady_clock::now() < deadline;
-		if (resolved) sessionGetterAddr.sin_addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
-		if (result) FreeAddrInfoExW(result);
+		if (resolved)
+		{
+			sessionGetterAddr.sin_addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
+		}
+
+		if (result)
+		{
+			FreeAddrInfoExW(result);
+		}
+
 		WSACloseEvent(pending.hEvent);
-		if (!resolved) return false;
+		if (!resolved)
+		{
+			return false;
+		}
 	}
 
 	u_long nonblocking = 1;
-	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR) return false;
+	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR)
+	{
+		return false;
+	}
+
 	bool connected = false;
 	if (!inStopToken.stop_requested())
 	{
@@ -224,8 +278,16 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 			FD_SET(sessionBrokerSocket, &errors);
 			timeval timeout{ 0, 100000 };
 			const int ready = select(0, nullptr, &writable, &errors, &timeout);
-			if (ready == SOCKET_ERROR) break;
-			if (ready == 0) continue;
+			if (ready == SOCKET_ERROR)
+			{
+				break;
+			}
+
+			if (ready == 0)
+			{
+				continue;
+			}
+
 			int socketError{};
 			int errorSize = sizeof(socketError);
 			connected = getsockopt(sessionBrokerSocket, SOL_SOCKET, SO_ERROR,
@@ -234,6 +296,7 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 			break;
 		}
 	}
+
 	nonblocking = 0;
 	return ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == 0
 		&& connected && !inStopToken.stop_requested();
@@ -265,8 +328,16 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 			FD_SET(sessionBrokerSocket, &readable);
 			timeval timeout{ 0, 100000 };
 			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
-			if (ready == SOCKET_ERROR) break;
-			if (ready == 0) continue;
+			if (ready == SOCKET_ERROR)
+			{
+				break;
+			}
+
+			if (ready == 0)
+			{
+				continue;
+			}
+
 			char tlsRecvBuffer[maxTlsPacketSize];
 			const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 			if (bytesReceived <= 0)
@@ -287,7 +358,9 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 
 			encryptedStream.insert(encryptedStream.end(), tlsRecvBuffer, tlsRecvBuffer + bytesReceived);
 		}
+
 		processBufferedData = false;
+
 		char plainBuffer[maxTlsPacketSize];
 		size_t plainSize = 0;
 
@@ -348,7 +421,11 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 
 bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 {
-	if (receivedBuffer.GetUseSize() < sizeof(uint32_t) + sizeof(char)) return false;
+	if (receivedBuffer.GetUseSize() < sizeof(uint32_t) + sizeof(char))
+	{
+		return false;
+	}
+
 	uint32_t version{};
 	receivedBuffer >> version;
 	if (version != RUDP_PROTOCOL_VERSION)
@@ -356,6 +433,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 		LOG_ERROR("Unsupported RUDP server protocol version");
 		return false;
 	}
+
 	char connectResultCode;
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)
@@ -366,7 +444,10 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 
 	receivedBuffer >> serverIp >> port >> sessionId >> sessionKey >> sessionSalt;
 	// Port, session credentials and the wire layout remain the broker's authenticated values.
-	if (hostLoopback) serverIp = "127.0.0.1";
+	if (hostLoopback)
+	{
+		serverIp = "127.0.0.1";
+	}
 
 	if (keyObjectBuffer == nullptr)
 	{

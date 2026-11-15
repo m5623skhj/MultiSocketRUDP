@@ -120,6 +120,7 @@ void RUDPSession::Disconnect()
 			SendPacketInfo::Free(info);
 		});
 	}
+
 	if (stateMachine.GetSessionState() == SESSION_STATE::RELEASING)
 	{
 		OnReleased();
@@ -135,6 +136,7 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	{
 		return false;
 	}
+
 	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 
 	NetBuffer* buffer = NetBuffer::Alloc();
@@ -150,14 +152,22 @@ bool RUDPSession::SendPacket(IPacket& packet)
 	constexpr int SEND_HEADER_SIZE = sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId);
 	buffer->MoveWritePos(SEND_HEADER_SIZE);
 	const PacketId packetId = packet.GetPacketId();
-	try { packet.PacketToBuffer(*buffer); }
+	try
+	{
+		packet.PacketToBuffer(*buffer);
+	}
 	catch (const std::exception&)
 	{
 		// Container writers use runtime_error; only translate NetBuffer write errors.
-		if (buffer->GetBufferError() != 2) throw;
+		if (buffer->GetBufferError() != 2)
+		{
+			throw;
+		}
+
 		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
 		return false;
 	}
+
 	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
 	{
 		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
@@ -193,27 +203,44 @@ SessionSendContext::UnreliableQueueStats RUDPSession::GetUnreliableQueueStats()
 
 bool RUDPSession::SendUnreliablePacket(IPacket& packet)
 {
-	if (not TryBeginSendOperation()) return false;
+	if (not TryBeginSendOperation())
+	{
+		return false;
+	}
+
 	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 	NetBuffer* buffer = NetBuffer::Alloc();
-	if (buffer == nullptr) return false;
+	if (buffer == nullptr)
+	{
+		return false;
+	}
+
 	std::unique_ptr<NetBuffer, decltype(&NetBuffer::Free)> bufferGuard(buffer, &NetBuffer::Free);
 	buffer->MoveWritePos(sizeof(PACKET_TYPE) + sizeof(PacketSequence) + sizeof(PacketId));
 	const PacketId packetId = packet.GetPacketId();
-	try { packet.PacketToBuffer(*buffer); }
+	try
+	{
+		packet.PacketToBuffer(*buffer);
+	}
 	catch (const std::exception&)
 	{
 		// Container writers use runtime_error; only translate NetBuffer write errors.
-		if (buffer->GetBufferError() != 2) throw;
+		if (buffer->GetBufferError() != 2)
+		{
+			throw;
+		}
+
 		LOG_ERROR(std::format("RUDP serialization size rejected: packetId={}", packetId));
 		return false;
 	}
+
 	if (not PacketCryptoHelper::FitsWireLimit(*buffer))
 	{
 		LOG_ERROR(std::format("RUDP send size rejected: packetId={} wireBytes={} limit={}", packetId,
 			buffer->m_iWrite + AUTH_TAG_SIZE, MAX_WIRE_PACKET_SIZE));
 		return false;
 	}
+
 	// Keep numbering and queue admission ordered, but never lock around user code.
 	std::scoped_lock lock(unreliableSendMutex);
 	const auto sequence = ++lastUnreliableSendSequence;
@@ -298,6 +325,7 @@ bool RUDPSession::SendPacketImmediate(
 		NetBuffer::Free(&buffer);
 		return false;
 	}
+
 	const auto sendPacketInfo = sendPacketInfoPool->Alloc();
 	if (sendPacketInfo == nullptr)
 	{
@@ -317,9 +345,12 @@ bool RUDPSession::SendPacketImmediate(
 			const char* header = buffer.GetReadBufferPtr();
 			std::memcpy(&sendPacketInfo->packetType, header, sizeof(PACKET_TYPE));
 			if (not isCorePacket && buffer.GetUseSize() >= TRANSPORT_HEADER_SIZE + static_cast<int>(sizeof(PacketId)))
+			{
 				std::memcpy(&sendPacketInfo->packetId, header + TRANSPORT_HEADER_SIZE, sizeof(PacketId));
+			}
 		}
 	}
+
 	if (sendPacketInfo->RequiresRetransmission())
 	{
 		rioContext.GetSendContext().InsertSendPacketInfo(inSendPacketSequence, sendPacketInfo);
@@ -368,6 +399,7 @@ void RUDPSession::TryFlushPendingQueue()
 	{
 		return;
 	}
+
 	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 
 	std::vector<std::pair<PacketSequence, NetBuffer*>> sendBuffers;
@@ -411,6 +443,7 @@ void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 	{
 		return;
 	}
+
 	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 
 	if (not NeedToSendHeartbeat(now))
@@ -435,6 +468,7 @@ void RUDPSession::SendHeartbeatPacket(const unsigned long long now)
 			NetBuffer::Free(buffer);
 			return;
 		}
+
 		packetSequence = rioContext.GetSendContext().IncrementLastSendPacketSequence();
 		auto packetType = PACKET_TYPE::HEARTBEAT_TYPE;
 		*buffer << packetType << packetSequence;
@@ -509,6 +543,7 @@ void RUDPSession::BeginIOShutdown()
 	{
 		OnDisconnected();
 	}
+
 	CloseSocket();
 }
 
@@ -584,6 +619,7 @@ bool RUDPSession::TryConnect(NetBuffer& recvPacket, const sockaddr_in& inClientA
 		{
 			SendReplyToClient(packetSequence);
 		}
+
 		// true is reserved for the first transition: the caller increments the user count.
 		return false;
 	}
@@ -640,11 +676,13 @@ bool RUDPSession::OnRecvPacket(NetBuffer& recvPacket)
 		SendReplyToClient(packetSequence);
 		[[fallthrough]];
 	}
+
 	case ON_RECV_RESULT::PROCESSED:
 	case ON_RECV_RESULT::PACKET_HELD:
 	{
 		return true;
 	}
+
 	case ON_RECV_RESULT::ERROR_OCCURED:
 	{
 		return false;
@@ -722,6 +760,7 @@ void RUDPSession::SendReplyToClient(const PacketSequence recvPacketSequence)
 	{
 		return;
 	}
+
 	auto sendGuard = Util::MakeScopeExit([this]() { CompleteSendOperation(); });
 
 	NetBuffer* buffer = NetBuffer::Alloc();
@@ -760,6 +799,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	{
 		return;
 	}
+
 	// ACK and retry exhaustion share one atomic completion point. A late ACK cannot undo failure.
 	auto expected = SendPacketInfo::Completion::Pending;
 	if (not sendPacketInfo->completion.compare_exchange_strong(expected, SendPacketInfo::Completion::Acknowledged,
@@ -780,6 +820,7 @@ void RUDPSession::OnSendReply(NetBuffer& recvPacket)
 	{
 		OnRttSample(rttSample);
 	}
+
 	SendPacketInfo::Free(sendPacketInfo);
 	TryFlushPendingQueue();
 }
@@ -792,12 +833,14 @@ void RUDPSession::TraceRetransmissionFailure(const SendPacketInfo& inPacketInfo,
 		firstSent = inPacketInfo.firstSendTime;
 		lastSent = inPacketInfo.lastSendTime;
 	}
+
 	const auto now = std::chrono::steady_clock::now();
 	const auto ageMs = [now](const auto inTime)
 	{
 		return inTime.time_since_epoch().count() == 0 ? -1LL
 			: static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(now - inTime).count());
 	};
+
 	const auto lastAckTick = lastAcknowledgedAtTick.load(std::memory_order_relaxed);
 	const auto nowTick = GetTickCount64();
 	const auto lastAckAgeMs = lastAckTick == 0 ? -1LL : static_cast<long long>(nowTick - lastAckTick);

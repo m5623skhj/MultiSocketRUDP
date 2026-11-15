@@ -56,9 +56,9 @@ void Fire() override
 
 ---
 
-## one-shot 이벤트
+## 한 번 실행하는 이벤트
 
-한 번만 실행하는 타이머는 `Fire()` 내부에서 자기 자신을 해제하면 된다.
+한 번만 실행하는 타이머는 `Fire()` 내부에서 등록 해제를 요청한다. `UnregisterTimerEvent()`는 즉시 파괴하지 않고 다음 tick의 해제 목록에 ID를 넣는다. 현재 콜백은 `shared_ptr` 실행 대상 목록으로 수명을 유지한다.
 
 ```cpp
 void Fire() override
@@ -73,7 +73,9 @@ void Fire() override
 ## 주의할 점
 
 - `Fire()`는 Ticker thread에서 실행된다.
-- 무거운 블로킹 작업은 피한다.
+- 무거운 블로킹 작업은 피한다. 콜백 실행은 같은 Ticker 스레드에서 직렬로 진행한다.
+- `Start()`·`Stop()`은 제어 계층에서 직렬 호출한다. `Fire()`에서 자기 스레드를 join하는 `Stop()`을 호출하면 안 된다.
+- `RoomManager` 예시는 콘텐츠 계층이 직접 제공하는 타입이며 이 저장소의 기본 API가 아니다.
 - Ticker 문서에서는 현재 공개되지 않은 코어 세션 조회 API를 사용 예제로 노출하지 않는다.
 
 ---

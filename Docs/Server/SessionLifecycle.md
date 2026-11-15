@@ -141,7 +141,7 @@ SendSessionInfoToClient(...);
 ```cpp
 bool RUDPSession::TryConnect(
     NetBuffer& recvPacket,
-    const sockaddr_in& clientAddr)
+    const sockaddr_in& inClientAddr)
 {
     // ① 시퀀스 확인 (반드시 0)
     PacketSequence packetSequence;
@@ -154,19 +154,27 @@ bool RUDPSession::TryConnect(
     if (recvSessionId != GetSessionId()) return false;
 
     // ③ 상태 전이 (RESERVED → CONNECTED, CAS)
-    if (!stateMachine.TryTransitionToConnected()) return false;
-    // → CAS: RESERVED(1) → CONNECTED(2)
-    // → 이미 CONNECTED이거나 두 해제 상태 중 하나이면 실패
+    if (!stateMachine.TryTransitionToConnected()) {
+        // 같은 클라이언트의 연결 ACK 유실을 복구한다.
+        if (IsConnected() && CheckMyClient(inClientAddr)) {
+            SendReplyToClient(packetSequence);
+        }
+        // 최초 전이만 true: 호출자의 연결 카운터 중복 증가를 막는다.
+        return false;
+    }
 
     // ④ 클라이언트 주소 저장
-    this->clientAddr = clientAddr;
+    clientAddr = inClientAddr;
+    memset(&clientSockAddrInet, 0, sizeof(clientSockAddrInet));
+    clientSockAddrInet.Ipv4 = inClientAddr;
 
-    // ⑤ 흐름 제어 초기화
-    flowManager.Reset(LOGIN_PACKET_SEQUENCE + 1);
-    // → sendController.Reset(1), receiveWindow.Reset(1, windowSize)
+    // ⑤ 수신 순서와 흐름 제어를 같은 시작 번호로 초기화
+    constexpr PacketSequence startSequence = LOGIN_PACKET_SEQUENCE + 1;
+    sessionPacketOrderer.Reset(startSequence);
+    flowManager.Reset(startSequence);
 
     // ⑥ 콘텐츠 훅
-    OnConnected();   // ← 콘텐츠 서버가 구현
+    OnConnected(sessionId);   // 내부 초기화 후 콘텐츠의 OnConnected() 훅 호출
 
     // ⑦ ACK 전송 (sequence=0)
     SendReplyToClient(LOGIN_PACKET_SEQUENCE);
@@ -181,7 +189,9 @@ bool RUDPSession::TryConnect(
 |------|-----------|------|
 | `packetSequence == 0` | 아닌 경우 | 잘못된 연결 요청 |
 | `recvSessionId == GetSessionId()` | 불일치 | 다른 세션 ID로 연결 시도 |
-| `TryTransitionToConnected()` CAS | 이미 CONNECTED/해제 상태 | 중복 연결 요청 |
+| `TryTransitionToConnected()` CAS | 이미 CONNECTED/해제 상태 | 같은 클라이언트가 이미 연결됐다면 ACK만 재전송하고 `false`; 그 외에는 폐기 |
+
+`false`가 항상 ACK 미전송을 뜻하지는 않는다. 인증된 동일 클라이언트의 중복 CONNECT는 기존 연결을 유지하며 ACK를 다시 보낸다. 이때 `OnConnected()`와 연결 카운터 갱신은 반복하지 않는다.
 
 ---
 
