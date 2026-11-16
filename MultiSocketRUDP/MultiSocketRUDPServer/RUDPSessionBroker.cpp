@@ -9,6 +9,63 @@
 #include "../Common/Crypto/CryptoHelper.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
 
+namespace
+{
+	std::uint64_t ElapsedMilliseconds(const std::chrono::steady_clock::time_point inStarted)
+	{
+		return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - inStarted).count());
+	}
+
+	// Queue diagnostics through this client checkout's Logger, outside the broker queue lock.
+	void LogBrokerProgress(const std::uint64_t inConnectionId, const char* inEvent,
+		const std::uint64_t inQueueMs, const std::uint64_t inCertificateMs) noexcept
+	{
+		try
+		{
+			const auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = std::format(
+				"Broker TLS progress; process={}; connection={}; event={}; queue_ms={}; certificate_ms={}",
+				GetCurrentProcessId(), inConnectionId, inEvent, inQueueMs, inCertificateMs);
+			Logger::GetInstance().WriteLog(log);
+		}
+		catch (...)
+		{
+			// Diagnostics are best-effort; do not retry the logger or fail the TLS operation.
+		}
+	}
+
+	void LogBrokerHandshake(const TLSHelper::TLSHelperServer& inTlsHelper, const bool inSucceeded,
+		const std::uint64_t inConnectionId, const std::uint64_t inQueueMs,
+		const std::uint64_t inCertificateMs) noexcept
+	{
+		try
+		{
+			const auto& result = inTlsHelper.GetHandshakeResult();
+			const auto message = std::format(
+				"Broker TLS handshake {}; process={}; connection={}; queue_ms={}; certificate_ms={}; reason={}; stage={}; socket_error={}; elapsed_ms={}; buffered_bytes={}; security_status={:#010x}; tls_sent_bytes={}; tls_received_bytes={}; send_calls={}; recv_calls={}; security_calls={}",
+				inSucceeded ? "succeeded" : "failed", GetCurrentProcessId(), inConnectionId, inQueueMs, inCertificateMs,
+				result.reason, result.stage, result.socketError, result.elapsedMs, result.bufferedBytes,
+				static_cast<unsigned long>(inTlsHelper.GetLastStatus()), result.sentBytes, result.receivedBytes,
+				result.sendCalls, result.receiveCalls, result.securityCalls);
+			if (inSucceeded)
+			{
+				const auto log = Logger::MakeLogObject<ServerLog>();
+				log->logString = message;
+				Logger::GetInstance().WriteLog(log);
+			}
+			else
+			{
+				LOG_ERROR(message);
+			}
+		}
+		catch (...)
+		{
+			// Diagnostics are best-effort; do not retry the logger or fail the TLS operation.
+		}
+	}
+}
+
 RUDPSessionBroker::RUDPSessionBroker(
 	MultiSocketRUDPCore& inCore,
 	ISessionDelegate& inSessionDelegate,
@@ -82,7 +139,7 @@ void RUDPSessionBroker::Stop()
 		std::scoped_lock lock(clientQueueLock);
 		while (not clientQueue.empty())
 		{
-			closesocket(clientQueue.front().first);
+			closesocket(clientQueue.front().socket);
 			clientQueue.pop();
 		}
 	}
@@ -124,9 +181,14 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 			continue;
 		}
 
+		PendingConnection connection{
+			clientSocket, rudpSessionIP, ++nextConnectionId, std::chrono::steady_clock::now() };
+		LogBrokerProgress(connection.connectionId, "accepted", 0, 0);
 		{
 			std::scoped_lock lock(clientQueueLock);
-			clientQueue.push({ clientSocket, rudpSessionIP });
+			// Bound unauthenticated work; expired entries are also rejected before initialization.
+            if (clientQueue.size() >= 32) { closesocket(clientSocket); continue; }
+			clientQueue.push(std::move(connection));
 		}
 		clientQueueCV.notify_one();
 	}
@@ -146,8 +208,7 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 
 	while (not stopToken.stop_requested())
 	{
-		SOCKET clientSocket = INVALID_SOCKET;
-		std::string rudpSessionIP;
+		PendingConnection connection;
 
 		{
 			std::unique_lock lock(clientQueueLock);
@@ -161,12 +222,11 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 				return;
 			}
 
-			auto [socket, ip] = clientQueue.front();
-			clientSocket = socket;
-			rudpSessionIP = ip;
+			connection = std::move(clientQueue.front());
 			clientQueue.pop();
 		}
 
+		const SOCKET clientSocket = connection.socket;
 		{
 			// Destroy the callback before closing: shutdown must never target a reused handle.
 			std::stop_callback cancelConnection(stopToken, [clientSocket]()
@@ -175,55 +235,69 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 				});
 			if (not stopToken.stop_requested())
 			{
-				HandleClientConnection(clientSocket, rudpSessionIP, stopToken);
+				HandleClientConnection(connection, stopToken);
 			}
 		}
 		closesocket(clientSocket);
 	}
 }
 
-void RUDPSessionBroker::HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP, const std::stop_token& stopToken)
+void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnection, const std::stop_token& stopToken)
 {
+	const SOCKET clientSocket = inConnection.socket;
+	const auto& rudpSessionIP = inConnection.rudpSessionIP;
+	const auto connectionId = inConnection.connectionId;
+	const auto queueMs = ElapsedMilliseconds(inConnection.acceptedAt);
+    const auto deadline = inConnection.acceptedAt + std::chrono::seconds(12);
+    if (std::chrono::steady_clock::now() >= deadline)
+    { LogBrokerProgress(connectionId, "queue_expired", queueMs, 0); return; }
+	LogBrokerProgress(connectionId, "worker_started", queueMs, 0);
 	// Bound each blocking socket operation, including the initial TLS receive.
-	constexpr DWORD BROKER_IO_TIMEOUT_MS = 5000;
+	constexpr DWORD BROKER_IO_TIMEOUT_MS = 12000;
 	if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO,
 		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR ||
 		setsockopt(clientSocket, SOL_SOCKET, SO_SNDTIMEO,
 			reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR)
 	{
-		LOG_ERROR(std::format("Broker socket timeout setup failed with error {}", WSAGetLastError()));
+		const int socketError = WSAGetLastError();
+		LOG_ERROR(std::format("Broker socket timeout setup failed with error {}; process={}; connection={}; queue_ms={}", socketError, GetCurrentProcessId(), connectionId, queueMs));
 		return;
 	}
 
 	TLSHelper::TLSHelperServer localTlsHelper(serverCertificateConfig);
+    localTlsHelper.SetConnectionDeadline(deadline);
 
-	if (not localTlsHelper.Initialize())
+	const auto certificateStarted = std::chrono::steady_clock::now();
+	const bool initialized = localTlsHelper.Initialize();
+	const auto certificateMs = ElapsedMilliseconds(certificateStarted);
+	if (not initialized)
 	{
 		LOG_ERROR(std::format(
-			"HandleClientConnection localTlsHelper.Initialize() failed with security status {:#010x}",
-			static_cast<unsigned long>(localTlsHelper.GetLastStatus())));
+			"HandleClientConnection localTlsHelper.Initialize() failed with security status {:#010x}; process={}; connection={}; queue_ms={}; certificate_ms={}",
+			static_cast<unsigned long>(localTlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId, queueMs, certificateMs));
 		return;
 	}
+	LogBrokerProgress(connectionId, "certificate_ready", queueMs, certificateMs);
 
-	if (not localTlsHelper.Handshake(clientSocket, stopToken))
+	const bool handshakeSucceeded = localTlsHelper.Handshake(clientSocket, stopToken);
+	LogBrokerHandshake(localTlsHelper, handshakeSucceeded, connectionId, queueMs, certificateMs);
+	if (not handshakeSucceeded)
 	{
-		LOG_ERROR(std::format(
-			"HandleClientConnection localTlsHelper.Handshake failed with security status {:#010x}",
-			static_cast<unsigned long>(localTlsHelper.GetLastStatus())));
 		return;
 	}
 	if (not localTlsHelper.ReceiveProtocolVersion(clientSocket, RUDP_PROTOCOL_VERSION, stopToken))
 	{
 		const auto& result = localTlsHelper.GetProtocolVersionResult();
-		LOG_ERROR(std::format("RUDP protocol negotiation failed; reason={}; expected_version={}; received_version={}; plain_bytes={}; socket_error={}",
+		LOG_ERROR(std::format("RUDP protocol negotiation failed; reason={}; expected_version={}; received_version={}; plain_bytes={}; socket_error={}; process={}; connection={}",
 			result.reason, RUDP_PROTOCOL_VERSION,
 			result.receivedVersion ? std::to_string(*result.receivedVersion) : "unavailable",
-			result.plainBytes, result.socketError));
+			result.plainBytes, result.socketError, GetCurrentProcessId(), connectionId));
 		return;
 	}
 	NetBuffer sendBuffer;
 	sendBuffer.Init();
 
+	if (!localTlsHelper.ApplyRemainingTimeout(clientSocket)) return;
 	const auto session = ReserveSession(sendBuffer, rudpSessionIP);
 	if (not SendSessionInfoToClient(clientSocket, localTlsHelper, sendBuffer))
 	{
@@ -401,7 +475,6 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, TLSH
 	constexpr size_t maxTlsPacketSize = 16 * 1024 + 512;
 	char encryptedBuffer[maxTlsPacketSize];
 	size_t encryptedSize = 0;
-	constexpr DWORD tlsShutdownTimeout = 300;
 
 	if (not localTlsHelper.EncryptData(
 		sendBuffer.GetBufferPtr(),
@@ -413,7 +486,7 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, TLSH
 		return false;
 	}
 
-	if (not SendAll(clientSocket, encryptedBuffer, encryptedSize))
+	if (not SendAll(clientSocket, encryptedBuffer, encryptedSize, localTlsHelper))
 	{
 		LOG_ERROR(std::format("RunSessionBrokerThread send failed with error {}", WSAGetLastError()));
 		return false;
@@ -421,37 +494,29 @@ bool RUDPSessionBroker::SendSessionInfoToClient(const SOCKET& clientSocket, TLSH
 
 	if (localTlsHelper.EncryptCloseNotify(encryptedBuffer, sizeof(encryptedBuffer), encryptedSize))
 	{
-		if (not SendAll(clientSocket, encryptedBuffer, encryptedSize))
+		if (not SendAll(clientSocket, encryptedBuffer, encryptedSize, localTlsHelper))
 		{
 			LOG_ERROR(std::format("SendSessionInfoToClient send close notify failed with error {}", WSAGetLastError()));
 			return false;
 		}
 	}
 
-	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tlsShutdownTimeout), sizeof(tlsShutdownTimeout));
+	// Application data and close_notify are already sent. Do not extend the budget waiting for peer FIN.
 	shutdown(clientSocket, SD_SEND);
-
-	while (true)
-	{
-		constexpr size_t tlsFinBufferSize = 256;
-		if (char finRecv[tlsFinBufferSize]; recv(clientSocket, finRecv, sizeof(finRecv), 0) <= 0)
-		{
-			break;
-		}
-	}
 
 	sendBuffer.Init();
 
 	return true;
 }
 
-bool RUDPSessionBroker::SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize)
+bool RUDPSessionBroker::SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize, TLSHelper::TLSHelperServer& tls)
 {
 	size_t sent = 0;
 	while (sent < sendSize)
 	{
+		if (!tls.ApplyRemainingTimeout(socket)) return false;
 		const int ret = send(socket, sendBuffer + sent, static_cast<int>(sendSize - sent), 0);
-		if (ret == SOCKET_ERROR)
+		if (ret <= 0)
 		{
 			return false;
 		}

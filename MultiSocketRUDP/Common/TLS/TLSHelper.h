@@ -4,11 +4,13 @@
 #include <windows.h>
 #include <security.h>
 #include <schannel.h>
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <optional>
 #include <stop_token>
 #include <utility>
+#include <chrono>
 
 #pragma comment(lib, "Secur32.lib")
 #pragma comment(lib, "Crypt32.lib")
@@ -77,6 +79,19 @@ namespace TLSHelper
 		}
 	};
 
+	struct HandshakeResult
+	{
+		const char* reason{ "not-started" };
+		const char* stage{ "not-started" };
+		int socketError{};
+		std::uint64_t elapsedMs{};
+		size_t bufferedBytes{};
+		// Handshake only: actual successful send/recv bytes, including partial sends.
+		// send/recv calls count attempted system calls; securityCalls counts SSPI calls.
+		std::uint64_t sentBytes{}, receivedBytes{};
+		std::uint64_t sendCalls{}, receiveCalls{}, securityCalls{};
+	};
+
 	struct ProtocolVersionReceiveResult
 	{
 		const char* reason{ "not-started" };
@@ -92,6 +107,10 @@ namespace TLSHelper
 		virtual ~TLSHelperBase();
 
 	public:
+        // Owned by the connection worker; the same deadline covers all broker phases.
+        void SetConnectionDeadline(std::chrono::steady_clock::time_point value) { connectionDeadline = value; }
+        auto GetConnectionDeadline() const { return connectionDeadline; }
+        bool ApplyRemainingTimeout(SOCKET socket) const;
 		virtual bool Initialize() = 0;
 		virtual bool Handshake(SOCKET socket) = 0;
 		[[nodiscard]]
@@ -110,6 +129,8 @@ namespace TLSHelper
 		bool EncryptCloseNotify(char* buffer, const size_t bufferSize, size_t& encryptedSize);
 		bool SendProtocolVersion(SOCKET socket, uint32_t version);
 		bool ReceiveProtocolVersion(SOCKET socket, uint32_t expectedVersion, const std::stop_token& stopToken);
+		// Inspect on the connection worker after Handshake returns; no token bytes are retained here.
+		[[nodiscard]] const HandshakeResult& GetHandshakeResult() const { return handshakeResult; }
 		[[nodiscard]] const ProtocolVersionReceiveResult& GetProtocolVersionResult() const { return protocolVersionResult; }
 		// Connection-thread only: transfer trailing handshake bytes to the first application receive.
 		[[nodiscard]] std::vector<char> TakePendingHandshakeData()
@@ -121,9 +142,9 @@ namespace TLSHelper
 
 	protected:
 		[[nodiscard]]
-		static bool SendHandshakeToken(SOCKET socket, SecBuffer& tokenBuffer);
+		bool SendHandshakeToken(SOCKET socket, SecBuffer& tokenBuffer, int& outSocketError);
 		[[nodiscard]]
-		static bool ReceiveHandshakeData(SOCKET socket, std::vector<char>& recvBuffer);
+		bool ReceiveHandshakeData(SOCKET socket, std::vector<char>& recvBuffer, int& outSocketError);
 		static void PreserveExtraHandshakeData(std::vector<char>& recvBuffer, const SecBuffer& extraBuffer);
 		[[nodiscard]]
 		bool FinalizeHandshake();
@@ -133,9 +154,11 @@ namespace TLSHelper
 		CtxtHandle ctxtHandle;
 		SECURITY_STATUS lastStatus = SEC_E_OK;
 
+        std::chrono::steady_clock::time_point connectionDeadline = (std::chrono::steady_clock::time_point::max)();
 		bool handshakeCompleted = false;
 		SecPkgContext_StreamSizes streamSizes{};
 		std::vector<char> pendingHandshakeData;
+		HandshakeResult handshakeResult;
 		ProtocolVersionReceiveResult protocolVersionResult;
 	};
 
@@ -172,7 +195,7 @@ namespace TLSHelper
 		[[nodiscard]]
 		bool Handshake(SOCKET socket) override;
 		[[nodiscard]]
-		// Receive waits share a five-second deadline and observe cancellation.
+		// Receive waits share the broker deadline and observe cancellation.
 		bool Handshake(SOCKET socket, const std::stop_token& stopToken);
 
 	private:
