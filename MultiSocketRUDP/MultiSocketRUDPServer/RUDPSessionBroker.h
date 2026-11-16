@@ -3,6 +3,8 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <chrono>
+#include <cstdint>
 
 #include "../Common/etc/CoreType.h"
 #include "../Common/TLS/TLSHelper.h"
@@ -46,12 +48,20 @@ public:
 	void Stop();
 
 private:
+	struct PendingConnection
+	{
+		SOCKET socket{ INVALID_SOCKET };
+		std::string rudpSessionIP;
+		std::uint64_t connectionId{};
+		std::chrono::steady_clock::time_point acceptedAt{};
+	};
+
 	// ----------------------------------------
 	// accept 스레드와 TLS 처리 워커가 공유하는 clientQueue는 clientQueueLock으로 보호됩니다.
 	// ----------------------------------------
 	void RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP);
 	void RunBrokerWorkerThread(const std::stop_token& stopToken);
-	void HandleClientConnection(SOCKET clientSocket, const std::string& rudpSessionIP, const std::stop_token& stopToken);
+	void HandleClientConnection(const PendingConnection& inConnection, const std::stop_token& stopToken);
 
 	[[nodiscard]]
 	bool OpenSessionBrokerSocket(PortType listenPort);
@@ -82,7 +92,7 @@ private:
 	[[nodiscard]]
 	static bool SendSessionInfoToClient(const SOCKET& clientSocket, TLSHelper::TLSHelperServer& localTlsHelper, OUT NetBuffer& sendBuffer);
 	[[nodiscard]]
-	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize);
+	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize, TLSHelper::TLSHelperServer& tls);
 
 private:
 	MultiSocketRUDPCore& core;
@@ -96,7 +106,9 @@ private:
 	static constexpr unsigned int BROKER_THREAD_POOL_SIZE = 4;
 	std::vector<std::jthread> threadPool;
 
-	std::queue<std::pair<SOCKET, std::string>> clientQueue;
+	// Only the accept thread assigns IDs; queued metadata moves to one worker.
+	std::uint64_t nextConnectionId{};
+	std::queue<PendingConnection> clientQueue;
 	std::mutex clientQueueLock;
 	std::condition_variable clientQueueCV;
 

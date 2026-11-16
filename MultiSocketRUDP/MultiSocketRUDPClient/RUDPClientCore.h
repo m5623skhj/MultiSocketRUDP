@@ -177,7 +177,8 @@ private:
 	// TrySetTargetSessionInfo는 TLS close_notify와 전체 RUDP 세션 페이로드를 모두 확인합니다.
 	// ----------------------------------------
 	bool RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken);
-	bool GetSessionFromServer(const std::stop_token& inStopToken);
+	bool GetSessionFromServer(const std::stop_token& inStopToken,
+		std::uint64_t inConnectionId, std::uint64_t inCredentialMs);
 	bool TryConnectToSessionBroker(const std::stop_token& inStopToken) const;
 	bool TrySetTargetSessionInfo(const std::stop_token& inStopToken);
 

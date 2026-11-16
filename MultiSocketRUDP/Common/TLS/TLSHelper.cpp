@@ -6,6 +6,17 @@
 
 namespace TLSHelper
 {
+    bool TLSHelperBase::ApplyRemainingTimeout(SOCKET socket) const
+    {
+        if (connectionDeadline == (std::chrono::steady_clock::time_point::max)()) return true;
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            connectionDeadline - std::chrono::steady_clock::now()).count();
+        if (remaining <= 0) { WSASetLastError(WSAETIMEDOUT); return false; }
+        const DWORD timeout = static_cast<DWORD>(remaining);
+        return setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == 0
+            && setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == 0;
+    }
+
 	bool TLSHelperBase::SendProtocolVersion(const SOCKET socket, const uint32_t version)
 	{
 		const char plain[4] = { static_cast<char>(version >> 24), static_cast<char>(version >> 16),
@@ -19,6 +30,7 @@ namespace TLSHelper
 
 		for (size_t sent = 0; sent < size;)
 		{
+			if (!ApplyRemainingTimeout(socket)) return false;
 			const int result = send(socket, encrypted.data() + sent, static_cast<int>(size - sent), 0);
 			if (result <= 0)
 			{
@@ -41,7 +53,8 @@ namespace TLSHelper
 			return false;
 		};
 
-		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		const auto deadline = connectionDeadline == (std::chrono::steady_clock::time_point::max)()
+            ? std::chrono::steady_clock::now() + std::chrono::seconds(12) : connectionDeadline;
 		auto encrypted = TakePendingHandshakeData();
 		std::vector<char> plain;
 		constexpr size_t MAX_VERSION_STREAM = 65536;
@@ -116,6 +129,7 @@ namespace TLSHelper
 			}
 
 			char bytes[4096];
+			if (!ApplyRemainingTimeout(socket)) return fail("timeout", WSAETIMEDOUT);
 			const int received = recv(socket, bytes, sizeof(bytes), 0);
 			if (received == 0)
 			{
@@ -398,8 +412,9 @@ namespace TLSHelper
         return true;
     }
 
-    bool TLSHelperBase::SendHandshakeToken(const SOCKET socket, SecBuffer& tokenBuffer)
+    bool TLSHelperBase::SendHandshakeToken(const SOCKET socket, SecBuffer& tokenBuffer, int& outSocketError)
     {
+        outSocketError = 0;
         ContextBufferGuard bufferGuard(tokenBuffer);
         if (tokenBuffer.cbBuffer == 0 || tokenBuffer.pvBuffer == nullptr)
         {
@@ -410,6 +425,8 @@ namespace TLSHelper
         const int sendSize = static_cast<int>(tokenBuffer.cbBuffer);
         while (totalSent < sendSize)
         {
+            if (!ApplyRemainingTimeout(socket)) { outSocketError = WSAGetLastError(); return false; }
+            ++handshakeResult.sendCalls;
             const int sent = send(
                 socket,
                 static_cast<const char*>(tokenBuffer.pvBuffer) + totalSent,
@@ -417,24 +434,32 @@ namespace TLSHelper
                 0);
             if (sent <= 0)
             {
+                // Capture before ContextBufferGuard releases Schannel's output token.
+                if (sent == SOCKET_ERROR) outSocketError = WSAGetLastError();
                 return false;
             }
 
+            handshakeResult.sentBytes += static_cast<std::uint64_t>(sent);
             totalSent += sent;
         }
 
         return true;
     }
 
-    bool TLSHelperBase::ReceiveHandshakeData(const SOCKET socket, std::vector<char>& recvBuffer)
+    bool TLSHelperBase::ReceiveHandshakeData(const SOCKET socket, std::vector<char>& recvBuffer, int& outSocketError)
     {
+        outSocketError = 0;
         char tempBuffer[HANDSHAKE_BUFFER_SIZE];
+        if (!ApplyRemainingTimeout(socket)) { outSocketError = WSAGetLastError(); return false; }
+        ++handshakeResult.receiveCalls;
         const int received = recv(socket, tempBuffer, sizeof(tempBuffer), 0);
         if (received <= 0)
         {
+            if (received == SOCKET_ERROR) outSocketError = WSAGetLastError();
             return false;
         }
 
+        handshakeResult.receivedBytes += static_cast<std::uint64_t>(received);
         recvBuffer.insert(recvBuffer.end(), tempBuffer, tempBuffer + received);
         return true;
     }

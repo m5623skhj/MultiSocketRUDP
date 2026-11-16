@@ -6,6 +6,8 @@
 #include "ClientOptionFile.h"
 #include <chrono>
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -48,20 +50,86 @@ void RUDPClientCore::SessionGetter::OnError(st_Error* error)
 }
 
 #else
-bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken)
+
+namespace
 {
-	tlsHelper.SetServerName(sessionBrokerIP);
-	if (not tlsHelper.Initialize())
+	std::uint64_t ElapsedMilliseconds(const std::chrono::steady_clock::time_point inStarted)
 	{
-		LOG_ERROR(std::format(
-			"RUDPClientCore::tlsHelper.Initialize() failed with security status {:#010x}",
-			static_cast<unsigned long>(tlsHelper.GetLastStatus())));
-		return false;
+		return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - inStarted).count());
 	}
 
-	if (not GetSessionFromServer(inStopToken))
+	void LogClientProgress(const std::uint64_t inConnectionId, const char* inEvent,
+		const std::uint64_t inElapsedMs) noexcept
 	{
-		LOG_ERROR("RUDPClientCore::GetSessionFromServer() failed");
+		try
+		{
+			const auto log = Logger::MakeLogObject<ClientLog>();
+			log->logString = std::format(
+				"Client broker TLS progress; process={}; connection={}; event={}; elapsed_ms={}",
+				GetCurrentProcessId(), inConnectionId, inEvent, inElapsedMs);
+			(void)Logger::GetInstance().TryWriteLog(log);
+		}
+		catch (...)
+		{
+			Logger::GetInstance().RecordDroppedDiagnostic();
+		}
+	}
+
+	// Counters contain sizes only; neither TLS tokens nor certificate/key data are logged.
+	void LogClientHandshake(const TLSHelper::TLSHelperClient& inTlsHelper, const bool inSucceeded,
+		const std::uint64_t inConnectionId, const std::uint64_t inCredentialMs,
+		const std::uint64_t inConnectMs) noexcept
+	{
+		try
+		{
+			const auto& result = inTlsHelper.GetHandshakeResult();
+			const auto message = std::format(
+				"TLS Handshake {} in GetSessionFromServer(); process={}; connection={}; credential_ms={}; connect_ms={}; reason={}; stage={}; socket_error={}; elapsed_ms={}; buffered_bytes={}; security_status={:#010x}; tls_sent_bytes={}; tls_received_bytes={}; send_calls={}; recv_calls={}; security_calls={}",
+				inSucceeded ? "succeeded" : "failed", GetCurrentProcessId(), inConnectionId, inCredentialMs, inConnectMs,
+				result.reason, result.stage, result.socketError, result.elapsedMs, result.bufferedBytes,
+				static_cast<unsigned long>(inTlsHelper.GetLastStatus()), result.sentBytes, result.receivedBytes,
+				result.sendCalls, result.receiveCalls, result.securityCalls);
+			if (inSucceeded)
+			{
+				const auto log = Logger::MakeLogObject<ClientLog>();
+				log->logString = message;
+				(void)Logger::GetInstance().TryWriteLog(log);
+			}
+			else
+			{
+				LOG_ERROR(message);
+			}
+		}
+		catch (...)
+		{
+			Logger::GetInstance().RecordDroppedDiagnostic();
+		}
+	}
+}
+
+bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken)
+{
+	// Process-local sequence also separates simultaneous clients and reconnect attempts.
+	static std::atomic_uint64_t nextConnectionId{};
+	const auto connectionId = nextConnectionId.fetch_add(1, std::memory_order_relaxed) + 1;
+	tlsHelper.SetServerName(sessionBrokerIP);
+	LogClientProgress(connectionId, "credential_initialize_started", 0);
+	const auto credentialStarted = std::chrono::steady_clock::now();
+	const bool initialized = tlsHelper.Initialize();
+	const auto credentialMs = ElapsedMilliseconds(credentialStarted);
+	if (not initialized)
+	{
+		LOG_ERROR(std::format(
+			"RUDPClientCore::tlsHelper.Initialize() failed with security status {:#010x}; process={}; connection={}; credential_ms={}",
+			static_cast<unsigned long>(tlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId, credentialMs));
+		return false;
+	}
+	LogClientProgress(connectionId, "credential_ready", credentialMs);
+
+	if (not GetSessionFromServer(inStopToken, connectionId, credentialMs))
+	{
+		LOG_ERROR(std::format("RUDPClientCore::GetSessionFromServer() failed; process={}; connection={}", GetCurrentProcessId(), connectionId));
 		return false;
 	}
 
@@ -118,7 +186,8 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 	return true;
 }
 
-bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
+bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
+	const std::uint64_t inConnectionId, const std::uint64_t inCredentialMs)
 {
 	if (inStopToken.stop_requested())
 	{
@@ -128,17 +197,27 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 	sessionBrokerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
-		LOG_ERROR(std::format("socket() failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
+		const int socketError = WSAGetLastError();
+		LOG_ERROR(std::format("socket() failed in GetSessionFromServer() with error code {}; process={}; connection={}", socketError, GetCurrentProcessId(), inConnectionId));
 		return false;
 	}
 
-	if (not TryConnectToSessionBroker(inStopToken))
+	LogClientProgress(inConnectionId, "tcp_connect_started", 0);
+	const auto connectStarted = std::chrono::steady_clock::now();
+	const bool connected = TryConnectToSessionBroker(inStopToken);
+	const int connectError = connected ? 0 : WSAGetLastError();
+	const auto connectMs = ElapsedMilliseconds(connectStarted);
+	if (not connected)
 	{
-		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}", WSAGetLastError()));
+		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}; process={}; connection={}; connect_ms={}",
+			connectError, GetCurrentProcessId(), inConnectionId, connectMs));
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
 	}
+
+	tlsHelper.SetConnectionDeadline(std::chrono::steady_clock::now() + std::chrono::seconds(15));
+	LogClientProgress(inConnectionId, "tcp_connected", connectMs);
 
 	// A host-only override must never redirect a remotely reached broker's UDP endpoint.
 	// Check the connected peer before closing this socket; TLS name/chain checks still follow.
@@ -157,7 +236,7 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 	}
 
 	// Bound sends as well as reads before the TLS handshake starts.
-	constexpr DWORD BROKER_IO_TIMEOUT_MS = 6000;
+	constexpr DWORD BROKER_IO_TIMEOUT_MS = 15000;
 	if (setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
 		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR ||
 		setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
@@ -168,11 +247,10 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken)
 		return false;
 	}
 
-	if (not tlsHelper.Handshake(sessionBrokerSocket, inStopToken))
+	const bool handshakeSucceeded = tlsHelper.Handshake(sessionBrokerSocket, inStopToken);
+	LogClientHandshake(tlsHelper, handshakeSucceeded, inConnectionId, inCredentialMs, connectMs);
+	if (not handshakeSucceeded)
 	{
-		LOG_ERROR(std::format(
-			"TLS Handshake failed in GetSessionFromServer() with security status {:#010x}",
-			static_cast<unsigned long>(tlsHelper.GetLastStatus())));
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
@@ -318,7 +396,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 	WORD payloadLength{};
 
 	bool payloadComplete{ false };
-	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+	const auto deadline = tlsHelper.GetConnectionDeadline();
 
 	while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 	{
@@ -339,6 +417,7 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 			}
 
 			char tlsRecvBuffer[maxTlsPacketSize];
+			if (!tlsHelper.ApplyRemainingTimeout(sessionBrokerSocket)) break;
 			const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 			if (bytesReceived <= 0)
 			{

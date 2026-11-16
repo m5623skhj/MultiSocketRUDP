@@ -217,103 +217,116 @@ namespace TLSHelper
 
         handshakeCompleted = false;
         pendingHandshakeData.clear();
-        CtxtHandle* context = nullptr;
+        handshakeResult = {};
         std::vector<char> recvBuffer;
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-
-        while (true)
+        const auto started = std::chrono::steady_clock::now();
+        const auto deadline = connectionDeadline == (std::chrono::steady_clock::time_point::max)()
+            ? started + std::chrono::seconds(12) : connectionDeadline;
+        const auto fail = [&](const char* inReason, const char* inStage, int inSocketError = 0)
         {
-            // Poll readiness so stopping does not depend on shutdown interrupting recv.
-            // A single deadline also bounds peers that trickle incomplete TLS records.
-            while (true)
-            {
-                if (stopToken.stop_requested() || std::chrono::steady_clock::now() >= deadline)
-                {
-                    return false;
-                }
+            // Preserve cumulative I/O even when a later send/receive fails.
+            handshakeResult.reason = inReason;
+            handshakeResult.stage = inStage;
+            handshakeResult.socketError = inSocketError;
+            handshakeResult.elapsedMs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - started).count());
+            handshakeResult.bufferedBytes = recvBuffer.size();
+            return false;
+        };
 
+        // Only the connection worker reads this socket; keep receive cancellation bounded.
+        const auto receiveData = [&]()
+        {
+            while (!stopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
+            {
                 fd_set readable{};
                 FD_SET(socket, &readable);
                 timeval timeout{ 0, 100000 };
                 const int ready = select(0, &readable, nullptr, nullptr, &timeout);
                 if (ready == SOCKET_ERROR)
                 {
-                    return false;
+                    const int socketError = WSAGetLastError();
+                    return fail(stopToken.stop_requested() ? "cancelled" : "socket-error",
+                        "wait-read", socketError);
                 }
-
                 if (ready > 0)
                 {
-                    break;
+                    int socketError{};
+                    if (ReceiveHandshakeData(socket, recvBuffer, socketError)) return true;
+                    return fail(stopToken.stop_requested() ? "cancelled"
+                        : socketError == WSAETIMEDOUT ? "timeout"
+                        : socketError ? "socket-error" : "peer-closed", "receive", socketError);
                 }
             }
+            return fail(stopToken.stop_requested() ? "cancelled" : "timeout", "wait-read");
+        };
 
-            if (not ReceiveHandshakeData(socket, recvBuffer))
-            {
-                return false;
-            }
+        CtxtHandle* context = nullptr;
+        bool receiveRequired = true;
+        while (true)
+        {
+            if (stopToken.stop_requested() || std::chrono::steady_clock::now() >= deadline)
+                return fail(stopToken.stop_requested() ? "cancelled" : "timeout", "handshake");
 
-            SecBuffer inBuffers[2] = {};
-            inBuffers[0].pvBuffer = recvBuffer.data();
-            inBuffers[0].cbBuffer = static_cast<DWORD>(recvBuffer.size());
-            inBuffers[0].BufferType = SECBUFFER_TOKEN;
-            inBuffers[1].BufferType = SECBUFFER_EMPTY;
+            // EXTRA is already received input. Read again only when it is absent or incomplete.
+            if (receiveRequired && !receiveData()) return false;
 
-            SecBufferDesc inBufferDesc = {};
-            inBufferDesc.cBuffers = 2;
-            inBufferDesc.pBuffers = inBuffers;
-            inBufferDesc.ulVersion = SECBUFFER_VERSION;
-
-            SecBuffer outBuffers[1] = {};
+            SecBuffer outBuffers[1]{};
             outBuffers[0].BufferType = SECBUFFER_TOKEN;
-
-            SecBufferDesc outBufferDesc = {};
+            SecBufferDesc outBufferDesc{};
             outBufferDesc.cBuffers = 1;
             outBufferDesc.pBuffers = outBuffers;
             outBufferDesc.ulVersion = SECBUFFER_VERSION;
 
-            DWORD contextAttributes = 0;
-            lastStatus = AcceptSecurityContext(
-                &credHandle,
-                context,
-                &inBufferDesc,
-                ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY | ASC_REQ_STREAM | ASC_REQ_ALLOCATE_MEMORY,
-                SECURITY_NATIVE_DREP,
-                &ctxtHandle,
-                &outBufferDesc,
-                &contextAttributes,
-                nullptr
-            );
+            SecBuffer inBuffers[2]{};
+            SecBufferDesc inBufferDesc{};
+            inBuffers[0].pvBuffer = recvBuffer.data();
+            inBuffers[0].cbBuffer = static_cast<DWORD>(recvBuffer.size());
+            inBuffers[0].BufferType = SECBUFFER_TOKEN;
+            inBuffers[1].BufferType = SECBUFFER_EMPTY;
+            inBufferDesc.cBuffers = 2;
+            inBufferDesc.pBuffers = inBuffers;
+            inBufferDesc.ulVersion = SECBUFFER_VERSION;
 
-            if (not SendHandshakeToken(socket, outBuffers[0]))
-            {
-                return false;
-            }
+            DWORD contextAttributes{};
+            ++handshakeResult.securityCalls;
+            lastStatus = AcceptSecurityContext(
+                &credHandle, context, &inBufferDesc,
+                ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY | ASC_REQ_STREAM | ASC_REQ_ALLOCATE_MEMORY,
+                SECURITY_NATIVE_DREP, &ctxtHandle, &outBufferDesc, &contextAttributes, nullptr);
+
+            int socketError{};
+            if (!SendHandshakeToken(socket, outBuffers[0], socketError))
+                return fail(stopToken.stop_requested() ? "cancelled"
+                    : socketError == WSAETIMEDOUT ? "timeout"
+                    : socketError ? "socket-error" : "send-no-progress", "send-token", socketError);
 
             if (lastStatus == SEC_E_OK)
             {
-                if (not FinalizeHandshake())
-                {
-                    return false;
-                }
-
+                if (!FinalizeHandshake()) return fail("stream-sizes-failed", "finalize");
                 PreserveExtraHandshakeData(recvBuffer, inBuffers[1]);
                 pendingHandshakeData = std::move(recvBuffer);
+                handshakeResult.reason = "succeeded";
+                handshakeResult.stage = "complete";
+                handshakeResult.elapsedMs = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - started).count());
+                handshakeResult.bufferedBytes = pendingHandshakeData.size();
                 return true;
             }
-
             if (lastStatus == SEC_E_INCOMPLETE_MESSAGE)
             {
-                // Keep the partial token and append more bytes on the next iteration.
+                // Preserve this partial token and append bytes before trying Schannel again.
+                receiveRequired = true;
                 continue;
             }
-
             if (lastStatus != SEC_I_CONTINUE_NEEDED)
-            {
-                return false;
-            }
+                return fail("security-context-failed", "security-context");
 
             PreserveExtraHandshakeData(recvBuffer, inBuffers[1]);
             context = &ctxtHandle;
+            receiveRequired = recvBuffer.empty();
         }
     }
 }
