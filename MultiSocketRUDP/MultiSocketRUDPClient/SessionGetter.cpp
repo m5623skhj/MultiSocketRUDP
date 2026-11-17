@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <string_view>
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -59,6 +60,30 @@ namespace
 			std::chrono::steady_clock::now() - inStarted).count());
 	}
 
+	// Connection-worker only. Capture API errors before calling this helper or cleaning up resources.
+	// No endpoint credentials, TLS tokens, keys or session payloads are recorded.
+	void LogBrokerStage(const std::uint64_t inConnectionId, const char* inStage, const char* inReason,
+		const std::chrono::steady_clock::time_point inStarted,
+		const char* inErrorDomain = "none", const std::int64_t inErrorCode = 0) noexcept
+	{
+		try
+		{
+			const auto log = Logger::MakeLogObject<ClientLog>();
+			log->logString = std::format(
+				"Client broker connection; process={}; connection={}; stage={}; reason={}; elapsed_ms={}; error_domain={}; error_code={}; error_hex={:#010x}",
+				GetCurrentProcessId(), inConnectionId, inStage, inReason, ElapsedMilliseconds(inStarted),
+				inErrorDomain, inErrorCode, static_cast<std::uint32_t>(inErrorCode));
+			if (std::string_view(inReason) == "started")
+				(void)Logger::GetInstance().TryWriteLog(log);
+			else
+				Logger::GetInstance().WriteLog(log); // Retain terminal outcomes in the ordinary bounded queue.
+		}
+		catch (...)
+		{
+			Logger::GetInstance().RecordDroppedDiagnostic();
+		}
+	}
+
 	void LogClientProgress(const std::uint64_t inConnectionId, const char* inEvent,
 		const std::uint64_t inElapsedMs) noexcept
 	{
@@ -94,7 +119,7 @@ namespace
 			{
 				const auto log = Logger::MakeLogObject<ClientLog>();
 				log->logString = message;
-				(void)Logger::GetInstance().TryWriteLog(log);
+				Logger::GetInstance().WriteLog(log);
 			}
 			else
 			{
@@ -113,42 +138,58 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath,
 	// Process-local sequence also separates simultaneous clients and reconnect attempts.
 	static std::atomic_uint64_t nextConnectionId{};
 	const auto connectionId = nextConnectionId.fetch_add(1, std::memory_order_relaxed) + 1;
-	tlsHelper.SetServerName(sessionBrokerIP);
-	LogClientProgress(connectionId, "credential_initialize_started", 0);
-	const auto credentialStarted = std::chrono::steady_clock::now();
-	const bool initialized = tlsHelper.Initialize();
-	const auto credentialMs = ElapsedMilliseconds(credentialStarted);
-	if (not initialized)
+	const auto startupStarted = std::chrono::steady_clock::now();
+	try
 	{
-		LOG_ERROR(std::format(
-			"RUDPClientCore::tlsHelper.Initialize() failed with security status {:#010x}; process={}; connection={}; credential_ms={}",
-			static_cast<unsigned long>(tlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId, credentialMs));
-		return false;
-	}
-	LogClientProgress(connectionId, "credential_ready", credentialMs);
+		tlsHelper.SetServerName(sessionBrokerIP);
+		LogClientProgress(connectionId, "credential_initialize_started", 0);
+		const auto credentialStarted = std::chrono::steady_clock::now();
+		const bool initialized = tlsHelper.Initialize();
+		const auto credentialMs = ElapsedMilliseconds(credentialStarted);
+		if (not initialized)
+		{
+			LOG_ERROR(std::format(
+				"RUDPClientCore::tlsHelper.Initialize() failed with security status {:#010x}; process={}; connection={}; credential_ms={}",
+				static_cast<unsigned long>(tlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId, credentialMs));
+			return false;
+		}
+		LogClientProgress(connectionId, "credential_ready", credentialMs);
 
-	if (not GetSessionFromServer(inStopToken, connectionId, credentialMs))
+		if (not GetSessionFromServer(inStopToken, connectionId, credentialMs))
+		{
+			LOG_ERROR(std::format("RUDPClientCore::GetSessionFromServer() failed; process={}; connection={}", GetCurrentProcessId(), connectionId));
+			return false;
+		}
+
+		return true;
+	}
+	catch (...)
 	{
-		LOG_ERROR(std::format("RUDPClientCore::GetSessionFromServer() failed; process={}; connection={}", GetCurrentProcessId(), connectionId));
-		return false;
+		LogBrokerStage(connectionId, "broker-startup", "exception", startupStarted);
+		throw; // Preserve the caller's existing startup/cleanup policy.
 	}
-
-	return true;
 }
 
 bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFilePath)
 {
+	const auto started = std::chrono::steady_clock::now();
+	const auto fail = [started](const char* inReason)
+	{
+		// Configuration is checked before a connection ID is allocated; zero denotes pre-connection work.
+		LogBrokerStage(0, "configuration", inReason, started);
+		return false;
+	};
 	hostLoopback = false;
 	ClientOptionFile options;
 	if (not options.Load(optionFilePath))
 	{
-		return false;
+		return fail("option-load-failed");
 	}
 
 	const auto ip = options.GetValue(L"SESSION_BROKER", L"IP");
 	if (not ip || ip->size() < 3 || ip->front() != L'"' || ip->back() != L'"')
 	{
-		return false;
+		return fail("invalid-address-option");
 	}
 
 	const auto address = ip->substr(1, ip->size() - 2);
@@ -159,7 +200,7 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 				(c >= L'0' && c <= L'9') || c == L'.' || c == L'-';
 		}))
 	{
-		return false;
+		return fail("invalid-address");
 	}
 
 	unsigned int brokerPort{}, packetCode{}, packetKey{};
@@ -167,14 +208,14 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_CODE", 0, 255, packetCode) ||
 		not options.GetNumber(L"SERIALIZEBUF", L"PACKET_KEY", 0, 255, packetKey))
 	{
-		return false;
+		return fail("invalid-port-or-packet-options");
 	}
 
 	unsigned int loopback{};
 	if (options.GetValue(L"SESSION_BROKER", L"HOST_LOOPBACK") &&
 		not options.GetNumber(L"SESSION_BROKER", L"HOST_LOOPBACK", 0, 1, loopback))
 	{
-		return false;
+		return fail("invalid-loopback-option");
 	}
 
 	hostLoopback = loopback != 0;
@@ -189,8 +230,10 @@ bool RUDPClientCore::ReadSessionGetterOptionFile(const std::wstring& optionFileP
 bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 	const std::uint64_t inConnectionId, const std::uint64_t inCredentialMs)
 {
+	const auto socketStarted = std::chrono::steady_clock::now();
 	if (inStopToken.stop_requested())
 	{
+		LogBrokerStage(inConnectionId, "socket-create", "cancelled", socketStarted);
 		return false;
 	}
 
@@ -198,19 +241,15 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 	if (sessionBrokerSocket == INVALID_SOCKET)
 	{
 		const int socketError = WSAGetLastError();
-		LOG_ERROR(std::format("socket() failed in GetSessionFromServer() with error code {}; process={}; connection={}", socketError, GetCurrentProcessId(), inConnectionId));
+		LogBrokerStage(inConnectionId, "socket-create", "socket-failed", socketStarted, "winsock", socketError);
 		return false;
 	}
 
-	LogClientProgress(inConnectionId, "tcp_connect_started", 0);
 	const auto connectStarted = std::chrono::steady_clock::now();
-	const bool connected = TryConnectToSessionBroker(inStopToken);
-	const int connectError = connected ? 0 : WSAGetLastError();
+	const bool connected = TryConnectToSessionBroker(inStopToken, inConnectionId);
 	const auto connectMs = ElapsedMilliseconds(connectStarted);
 	if (not connected)
 	{
-		LOG_ERROR(std::format("Connection failed in GetSessionFromServer() with error code {}; process={}; connection={}; connect_ms={}",
-			connectError, GetCurrentProcessId(), inConnectionId, connectMs));
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
@@ -223,12 +262,16 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 	// Check the connected peer before closing this socket; TLS name/chain checks still follow.
 	if (hostLoopback)
 	{
+		const auto peerStarted = std::chrono::steady_clock::now();
 		sockaddr_in brokerPeer{};
 		int peerSize = sizeof(brokerPeer);
-		if (getpeername(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&brokerPeer), &peerSize) == SOCKET_ERROR ||
+		const int peerResult = getpeername(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&brokerPeer), &peerSize);
+		const int peerError = peerResult == SOCKET_ERROR ? WSAGetLastError() : 0;
+		if (peerResult == SOCKET_ERROR ||
 			brokerPeer.sin_family != AF_INET || (ntohl(brokerPeer.sin_addr.s_addr) >> 24) != 127)
 		{
-			LOG_ERROR("HOST_LOOPBACK requires an IPv4 loopback session broker connection");
+			LogBrokerStage(inConnectionId, "loopback-check", peerResult == SOCKET_ERROR
+				? "peer-name-failed" : "non-loopback-peer", peerStarted, peerError ? "winsock" : "none", peerError);
 			closesocket(sessionBrokerSocket);
 			sessionBrokerSocket = INVALID_SOCKET;
 			return false;
@@ -237,11 +280,18 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 
 	// Bound sends as well as reads before the TLS handshake starts.
 	constexpr DWORD BROKER_IO_TIMEOUT_MS = 15000;
-	if (setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
-		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR ||
-		setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
-		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS)) == SOCKET_ERROR)
+	const auto timeoutStarted = std::chrono::steady_clock::now();
+	const int receiveSetup = setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_RCVTIMEO,
+		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS));
+	const int receiveError = receiveSetup == SOCKET_ERROR ? WSAGetLastError() : 0;
+	const int sendSetup = receiveSetup == SOCKET_ERROR ? 0 : setsockopt(sessionBrokerSocket, SOL_SOCKET, SO_SNDTIMEO,
+		reinterpret_cast<const char*>(&BROKER_IO_TIMEOUT_MS), sizeof(BROKER_IO_TIMEOUT_MS));
+	const int sendError = sendSetup == SOCKET_ERROR ? WSAGetLastError() : 0;
+	if (receiveSetup == SOCKET_ERROR || sendSetup == SOCKET_ERROR)
 	{
+		LogBrokerStage(inConnectionId, "socket-timeout-setup", receiveSetup == SOCKET_ERROR
+			? "receive-timeout-setup-failed" : "send-timeout-setup-failed", timeoutStarted,
+			"winsock", receiveSetup == SOCKET_ERROR ? receiveError : sendError);
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
@@ -256,24 +306,36 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 		return false;
 	}
 
-	if (inStopToken.stop_requested() || not tlsHelper.SendProtocolVersion(sessionBrokerSocket, RUDP_PROTOCOL_VERSION))
+	const auto protocolStarted = std::chrono::steady_clock::now();
+	const bool protocolCancelled = inStopToken.stop_requested();
+	const bool protocolSent = !protocolCancelled && tlsHelper.SendProtocolVersion(sessionBrokerSocket, RUDP_PROTOCOL_VERSION);
+	if (!protocolSent)
 	{
+		const auto& result = tlsHelper.GetProtocolVersionSendResult();
+		const bool encryptFailed = !protocolCancelled && std::string_view(result.reason) == "encrypt-failed";
+		LogBrokerStage(inConnectionId, "protocol-send", protocolCancelled ? "cancelled" : result.reason,
+			protocolStarted, protocolCancelled ? "none" : encryptFailed ? "sspi" : result.socketError ? "winsock" : "none",
+			protocolCancelled ? 0 : encryptFailed ? static_cast<std::int64_t>(tlsHelper.GetLastStatus()) : result.socketError);
 		closesocket(sessionBrokerSocket);
 		sessionBrokerSocket = INVALID_SOCKET;
 		return false;
 	}
 
-	return TrySetTargetSessionInfo(inStopToken);
+	LogBrokerStage(inConnectionId, "protocol-send", "succeeded", protocolStarted);
+	return TrySetTargetSessionInfo(inStopToken, inConnectionId);
 }
 
 // Poll a nonblocking connect so startup cancellation never waits for the OS TCP timeout.
-bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToken) const
+bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToken,
+	const std::uint64_t inConnectionId) const
 {
 	sockaddr_in sessionGetterAddr{};
 	sessionGetterAddr.sin_family = AF_INET;
 	sessionGetterAddr.sin_port = htons(sessionBrokerPort);
+	const auto dnsStarted = std::chrono::steady_clock::now();
 	if (InetPtonW(AF_INET, sessionBrokerIP, &sessionGetterAddr.sin_addr) != 1)
 	{
+		LogBrokerStage(inConnectionId, "dns", "started", dnsStarted);
 		// Async DNS shares startup cancellation; its result storage remains alive
 		// until cancellation has completed. The wire's game endpoint stays IPv4.
 		ADDRINFOEXW hints{};
@@ -285,6 +347,8 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 		pending.hEvent = WSACreateEvent();
 		if (pending.hEvent == WSA_INVALID_EVENT)
 		{
+			const int eventError = WSAGetLastError();
+			LogBrokerStage(inConnectionId, "dns", "event-create-failed", dnsStarted, "winsock", eventError);
 			return false;
 		}
 
@@ -293,12 +357,15 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 
 		int status = GetAddrInfoExW(sessionBrokerIP, nullptr, NS_DNS, nullptr, &hints,
 			&result, nullptr, &pending, nullptr, &lookup);
+		DWORD waitError{};
+		bool waitFailed{}, timedOut{}, cancelled{};
 		if (status == WSA_IO_PENDING)
 		{
 			DWORD waited = WAIT_TIMEOUT;
 			while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 			{
 				waited = WaitForSingleObject(pending.hEvent, 100);
+				if (waited == WAIT_FAILED) waitError = GetLastError();
 				if (waited != WAIT_TIMEOUT)
 				{
 					break;
@@ -307,9 +374,23 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 
 			if (waited != WAIT_OBJECT_0)
 			{
-				GetAddrInfoExCancel(&lookup);
+				waitFailed = waited != WAIT_TIMEOUT;
+				cancelled = inStopToken.stop_requested();
+				timedOut = !waitFailed && !cancelled;
+				// The primary cause is logged before cancellation/join can replace its error state.
+				LogBrokerStage(inConnectionId, "dns-wait", waitFailed ? "wait-failed"
+					: cancelled ? "cancelled" : "timeout", dnsStarted,
+					waitFailed ? "win32" : "winsock", waitFailed ? waitError
+					: cancelled ? WSA_OPERATION_ABORTED : WSAETIMEDOUT);
+				const auto cancelStarted = std::chrono::steady_clock::now();
+				const int cancelStatus = GetAddrInfoExCancel(&lookup);
+				if (cancelStatus != 0)
+					LogBrokerStage(inConnectionId, "dns-cancel", "cancel-request-failed", cancelStarted, "resolver", cancelStatus);
 				// The OS must stop referencing pending/result before these locals die.
-				WaitForSingleObject(pending.hEvent, INFINITE);
+				const DWORD joined = WaitForSingleObject(pending.hEvent, INFINITE);
+				const DWORD joinError = joined == WAIT_FAILED ? GetLastError() : 0;
+				LogBrokerStage(inConnectionId, "dns-cancel", joined == WAIT_OBJECT_0 ? "completed" : "wait-failed",
+					cancelStarted, joined == WAIT_OBJECT_0 ? "none" : "win32", joinError);
 			}
 
 			status = GetAddrInfoExOverlappedResult(&pending);
@@ -322,32 +403,53 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 		{
 			sessionGetterAddr.sin_addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
 		}
+		cancelled = cancelled || inStopToken.stop_requested();
+		timedOut = timedOut || std::chrono::steady_clock::now() >= deadline;
+		LogBrokerStage(inConnectionId, "dns", resolved ? "succeeded" : waitFailed ? "wait-failed"
+			: cancelled ? "cancelled" : timedOut ? "timeout" : status != 0 ? "resolve-failed" : "invalid-address-result",
+			dnsStarted, status != 0 ? "resolver" : waitFailed ? "win32" : "none", status != 0 ? status : waitError);
 
 		if (result)
 		{
 			FreeAddrInfoExW(result);
 		}
 
-		WSACloseEvent(pending.hEvent);
+		if (!WSACloseEvent(pending.hEvent))
+		{
+			const int closeError = WSAGetLastError();
+			LogBrokerStage(inConnectionId, "dns-event-close", "event-close-failed", dnsStarted, "winsock", closeError);
+		}
 		if (!resolved)
 		{
 			return false;
 		}
 	}
+	else LogBrokerStage(inConnectionId, "dns", "skipped-literal-ip", dnsStarted);
 
+	const auto tcpStarted = std::chrono::steady_clock::now();
+	LogBrokerStage(inConnectionId, "tcp", "started", tcpStarted);
 	u_long nonblocking = 1;
 	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR)
 	{
+		const int setupError = WSAGetLastError();
+		LogBrokerStage(inConnectionId, "tcp", "nonblocking-setup-failed", tcpStarted, "winsock", setupError);
 		return false;
 	}
 
 	bool connected = false;
+	const char* failureReason = "cancelled";
+	const char* errorDomain = "none";
+	int failureError{};
 	if (!inStopToken.stop_requested())
 	{
 		const int result = connect(sessionBrokerSocket, reinterpret_cast<sockaddr*>(&sessionGetterAddr), sizeof(sessionGetterAddr));
 		connected = result == 0;
 		const int connectError = connected ? 0 : WSAGetLastError();
+		failureReason = "connect-failed";
+		errorDomain = connected ? "none" : "winsock";
+		failureError = connectError;
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+		bool waitFailed{};
 		while (!connected && (connectError == WSAEWOULDBLOCK || connectError == WSAEINPROGRESS)
 			&& !inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
 		{
@@ -358,6 +460,9 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 			const int ready = select(0, nullptr, &writable, &errors, &timeout);
 			if (ready == SOCKET_ERROR)
 			{
+				failureError = WSAGetLastError();
+				failureReason = "select-failed";
+				waitFailed = true;
 				break;
 			}
 
@@ -368,20 +473,43 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 
 			int socketError{};
 			int errorSize = sizeof(socketError);
-			connected = getsockopt(sessionBrokerSocket, SOL_SOCKET, SO_ERROR,
-				reinterpret_cast<char*>(&socketError), &errorSize) == 0 && socketError == 0
-				&& FD_ISSET(sessionBrokerSocket, &writable);
+			const int queryResult = getsockopt(sessionBrokerSocket, SOL_SOCKET, SO_ERROR,
+				reinterpret_cast<char*>(&socketError), &errorSize);
+			const int queryError = queryResult == SOCKET_ERROR ? WSAGetLastError() : 0;
+			connected = queryResult == 0 && socketError == 0 && FD_ISSET(sessionBrokerSocket, &writable);
+			failureError = queryResult == SOCKET_ERROR ? queryError : socketError;
+			failureReason = queryResult == SOCKET_ERROR ? "socket-error-query-failed"
+				: socketError != 0 ? "connect-failed" : "not-writable";
+			waitFailed = true;
 			break;
+		}
+		if (!connected && !waitFailed && (connectError == WSAEWOULDBLOCK || connectError == WSAEINPROGRESS))
+		{
+			failureReason = inStopToken.stop_requested() ? "cancelled" : "timeout";
+			failureError = inStopToken.stop_requested() ? WSA_OPERATION_ABORTED : WSAETIMEDOUT;
 		}
 	}
 
+	// Restoring socket mode may reset WSAGetLastError. Keep the connect/select/SO_ERROR result above.
 	nonblocking = 0;
-	return ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == 0
-		&& connected && !inStopToken.stop_requested();
+	const int restoreResult = ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking);
+	const int restoreError = restoreResult == SOCKET_ERROR ? WSAGetLastError() : 0;
+	if (restoreResult == SOCKET_ERROR)
+		LogBrokerStage(inConnectionId, "tcp-restore", "blocking-restore-failed", tcpStarted, "winsock", restoreError);
+	const bool cancelled = inStopToken.stop_requested();
+	const bool succeeded = restoreResult == 0 && connected && !cancelled;
+	LogBrokerStage(inConnectionId, "tcp", succeeded ? "succeeded" : !connected ? failureReason
+		: restoreResult == SOCKET_ERROR ? "blocking-restore-failed" : "cancelled", tcpStarted,
+		!connected ? errorDomain : restoreResult == SOCKET_ERROR ? "winsock" : "none",
+		!connected ? failureError : restoreError);
+	return succeeded;
 }
 
-bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
+bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken,
+	const std::uint64_t inConnectionId)
 {
+	const auto receiveStarted = std::chrono::steady_clock::now();
+	LogBrokerStage(inConnectionId, "session-receive", "started", receiveStarted);
 	auto& recvBuffer = *NetBuffer::Alloc();
 	recvBuffer.m_iRead = 0;
 	// Append plaintext across TLS records, including a split session header.
@@ -396,6 +524,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 	WORD payloadLength{};
 
 	bool payloadComplete{ false };
+	const char* receiveReason = "timeout";
+	int receiveError = WSAETIMEDOUT;
 	const auto deadline = tlsHelper.GetConnectionDeadline();
 
 	while (!inStopToken.stop_requested() && std::chrono::steady_clock::now() < deadline)
@@ -408,6 +538,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 			const int ready = select(0, &readable, nullptr, nullptr, &timeout);
 			if (ready == SOCKET_ERROR)
 			{
+				receiveError = WSAGetLastError();
+				receiveReason = "select-failed";
 				break;
 			}
 
@@ -417,17 +549,25 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 			}
 
 			char tlsRecvBuffer[maxTlsPacketSize];
-			if (!tlsHelper.ApplyRemainingTimeout(sessionBrokerSocket)) break;
+			if (!tlsHelper.ApplyRemainingTimeout(sessionBrokerSocket))
+			{
+				receiveError = WSAGetLastError();
+				receiveReason = receiveError == WSAETIMEDOUT ? "timeout" : "socket-timeout-setup-failed";
+				break;
+			}
 			const int bytesReceived = recv(sessionBrokerSocket, tlsRecvBuffer, sizeof(tlsRecvBuffer), 0);
 			if (bytesReceived <= 0)
 			{
-				const int error = WSAGetLastError();
+				const int error = bytesReceived == SOCKET_ERROR ? WSAGetLastError() : 0;
+				receiveError = error;
+				receiveReason = bytesReceived == 0 ? "peer-closed"
+					: error == WSAETIMEDOUT ? "timeout" : "socket-receive-failed";
 				if (bytesReceived == 0 || error == WSAETIMEDOUT)
 				{
 					break;
 				}
 
-				LOG_ERROR(std::format("recv() failed in TrySetTargetSessionInfo() with error code {}", error));
+				LogBrokerStage(inConnectionId, "session-receive", receiveReason, receiveStarted, "winsock", receiveError);
 				closesocket(sessionBrokerSocket);
 				sessionBrokerSocket = INVALID_SOCKET;
 				NetBuffer::Free(&recvBuffer);
@@ -446,7 +586,8 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 		const auto decryptResult = tlsHelper.DecryptDataStream(encryptedStream, plainBuffer, plainSize);
 		if (decryptResult == TLSHelper::TlsDecryptResult::Error)
 		{
-			LOG_ERROR("TLS DecryptDataStream failed");
+			const auto decryptStatus = tlsHelper.GetLastStatus();
+			LogBrokerStage(inConnectionId, "session-receive", "decrypt-failed", receiveStarted, "sspi", decryptStatus);
 			closesocket(sessionBrokerSocket);
 			sessionBrokerSocket = INVALID_SOCKET;
 			NetBuffer::Free(&recvBuffer);
@@ -479,29 +620,43 @@ bool RUDPClientCore::TrySetTargetSessionInfo(const std::stop_token& inStopToken)
 		{
 			break;
 		}
+		if (decryptResult == TLSHelper::TlsDecryptResult::CloseNotify)
+		{
+			// Keep existing receive/accept behavior; retain why an incomplete payload cannot finish.
+			receiveReason = "tls-close-notify-before-payload";
+			receiveError = 0;
+		}
 	}
 
 	shutdown(sessionBrokerSocket, SD_BOTH);
 	closesocket(sessionBrokerSocket);
 	sessionBrokerSocket = INVALID_SOCKET;
 
-	if (inStopToken.stop_requested() || not payloadComplete)
+	const bool receiveCancelled = inStopToken.stop_requested();
+	LogBrokerStage(inConnectionId, "session-receive", receiveCancelled ? "cancelled"
+		: payloadComplete ? "succeeded" : receiveReason, receiveStarted,
+		receiveCancelled || payloadComplete || receiveError == 0 ? "none" : "winsock",
+		receiveCancelled || payloadComplete ? 0 : receiveError);
+	if (receiveCancelled || not payloadComplete)
 	{
 		NetBuffer::Free(&recvBuffer);
 		return false;
 	}
 
 	recvBuffer.m_iRead = df_HEADER_SIZE;
-	const bool retval = SetTargetSessionInfo(recvBuffer);
+	const bool retval = SetTargetSessionInfo(recvBuffer, inConnectionId);
 	NetBuffer::Free(&recvBuffer);
 
 	return retval;
 }
 
-bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
+bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer, const std::uint64_t inConnectionId)
 {
+	const auto decodeStarted = std::chrono::steady_clock::now();
+	LogBrokerStage(inConnectionId, "session-decode", "started", decodeStarted);
 	if (receivedBuffer.GetUseSize() < sizeof(uint32_t) + sizeof(char))
 	{
+		LogBrokerStage(inConnectionId, "session-decode", "header-too-short", decodeStarted);
 		return false;
 	}
 
@@ -509,7 +664,7 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	receivedBuffer >> version;
 	if (version != RUDP_PROTOCOL_VERSION)
 	{
-		LOG_ERROR("Unsupported RUDP server protocol version");
+		LogBrokerStage(inConnectionId, "session-decode", "unsupported-protocol-version", decodeStarted, "protocol", version);
 		return false;
 	}
 
@@ -517,7 +672,8 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 	receivedBuffer >> connectResultCode;
 	if (connectResultCode != 0)
 	{
-		LOG_ERROR(std::format("SetTargetSessionInfo() failed with connectResultCode {}", connectResultCode));
+		LogBrokerStage(inConnectionId, "session-decode", "broker-rejected", decodeStarted,
+			"broker-result", static_cast<unsigned char>(connectResultCode));
 		return false;
 	}
 
@@ -539,8 +695,13 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer)
 		sessionKeyHandle = nullptr;
 	}
 
-	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObjectBuffer, sessionKey);
+	NTSTATUS keyStatus{};
+	const bool keySizeAvailable = CryptoHelper::GetTLSInstance().GetKeyObjectSize() != 0;
+	sessionKeyHandle = CryptoHelper::GetTLSInstance().GetSymmetricKeyHandle(keyObjectBuffer, sessionKey, &keyStatus);
 
+	LogBrokerStage(inConnectionId, "session-decode", sessionKeyHandle ? "succeeded"
+		: keySizeAvailable ? "session-key-initialize-failed" : "key-object-size-unavailable",
+		decodeStarted, !sessionKeyHandle && keySizeAvailable ? "ntstatus" : "none", keyStatus);
 	return sessionKeyHandle != nullptr;
 }
 

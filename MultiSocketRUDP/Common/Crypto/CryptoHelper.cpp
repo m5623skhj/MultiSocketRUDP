@@ -168,8 +168,10 @@ bool CryptoHelper::DecryptAESGCM(
 	return BCRYPT_SUCCESS(status);
 }
 
-BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const
+BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey,
+	NTSTATUS* outStatus) const
 {
+	if (outStatus) *outStatus = 0;
 	if (keyObjectSize == 0)
 	{
 		return nullptr;
@@ -186,6 +188,7 @@ BCRYPT_KEY_HANDLE CryptoHelper::GetSymmetricKeyHandle(OUT unsigned char* keyObje
 		0
 	);
 
+	if (outStatus) *outStatus = status;
 	return BCRYPT_SUCCESS(status) ? keyHandle : nullptr;
 }
 

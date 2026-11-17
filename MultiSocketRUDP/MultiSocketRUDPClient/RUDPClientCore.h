@@ -179,8 +179,8 @@ private:
 	bool RunGetSessionFromServer(const std::wstring& optionFilePath, const std::stop_token& inStopToken);
 	bool GetSessionFromServer(const std::stop_token& inStopToken,
 		std::uint64_t inConnectionId, std::uint64_t inCredentialMs);
-	bool TryConnectToSessionBroker(const std::stop_token& inStopToken) const;
-	bool TrySetTargetSessionInfo(const std::stop_token& inStopToken);
+	bool TryConnectToSessionBroker(const std::stop_token& inStopToken, std::uint64_t inConnectionId) const;
+	bool TrySetTargetSessionInfo(const std::stop_token& inStopToken, std::uint64_t inConnectionId);
 
 private:
 	WCHAR sessionBrokerIP[254]{};
@@ -198,7 +198,7 @@ private:
 	// ----------------------------------------
 	// @brief 브로커 응답에서 RUDP 서버 주소, 세션 식별자 및 암호 컨텍스트를 설정합니다.
 	// ----------------------------------------
-	bool SetTargetSessionInfo(OUT NetBuffer& receivedBuffer);
+	bool SetTargetSessionInfo(OUT NetBuffer& receivedBuffer, std::uint64_t inConnectionId);
 
 private:
 	std::string serverIp{};

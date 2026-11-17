@@ -56,7 +56,8 @@ public:
 		const BCRYPT_KEY_HANDLE keyHandle
 	);
 	[[nodiscard]]
-	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey) const;
+	BCRYPT_KEY_HANDLE GetSymmetricKeyHandle(OUT unsigned char* keyObject, unsigned char* sessionKey,
+		NTSTATUS* outStatus = nullptr) const;
 	[[nodiscard]]
 	ULONG GetKeyObjectSize() const { return keyObjectSize; }
 	static void DestroySymmetricKeyHandle(BCRYPT_KEY_HANDLE keyHandle);

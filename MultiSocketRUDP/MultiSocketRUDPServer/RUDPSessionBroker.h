@@ -72,7 +72,8 @@ private:
 	// @brief 풀에서 세션을 예약하고 키·솔트를 생성하여 브로커 응답 버퍼를 구성합니다.
 	// @return 풀 고갈 시 nullptr입니다. 초기화 실패 시 반환된 포인터는 이미 세션 정리 경로에 진입했을 수 있습니다.
 	// ----------------------------------------
-    RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP) const;
+	RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP,
+		std::uint64_t inConnectionId) const;
 	[[nodiscard]]
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
 
@@ -90,9 +91,11 @@ private:
 private:
     void SetSessionInfoToBuffer(const RUDPSession& session, const std::string& rudpServerIP, OUT NetBuffer& buffer) const;
 	[[nodiscard]]
-	static bool SendSessionInfoToClient(const SOCKET& clientSocket, TLSHelper::TLSHelperServer& localTlsHelper, OUT NetBuffer& sendBuffer);
+	static bool SendSessionInfoToClient(const SOCKET& clientSocket, TLSHelper::TLSHelperServer& localTlsHelper,
+		OUT NetBuffer& sendBuffer, std::uint64_t inConnectionId);
 	[[nodiscard]]
-	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize, TLSHelper::TLSHelperServer& tls);
+	static bool SendAll(const SOCKET& socket, const char* sendBuffer, const size_t sendSize,
+		TLSHelper::TLSHelperServer& tls, std::uint64_t inConnectionId, const char* inStage);
 
 private:
 	MultiSocketRUDPCore& core;

@@ -19,27 +19,39 @@ namespace TLSHelper
 
 	bool TLSHelperBase::SendProtocolVersion(const SOCKET socket, const uint32_t version)
 	{
+		protocolVersionSendResult = {};
 		const char plain[4] = { static_cast<char>(version >> 24), static_cast<char>(version >> 16),
 			static_cast<char>(version >> 8), static_cast<char>(version) };
 		std::vector<char> encrypted(streamSizes.cbHeader + sizeof(plain) + streamSizes.cbTrailer);
 		size_t size{};
 		if (not EncryptData(plain, sizeof(plain), encrypted.data(), size))
 		{
+			protocolVersionSendResult.reason = "encrypt-failed";
 			return false;
 		}
 
 		for (size_t sent = 0; sent < size;)
 		{
-			if (!ApplyRemainingTimeout(socket)) return false;
+			if (!ApplyRemainingTimeout(socket))
+			{
+				protocolVersionSendResult.socketError = WSAGetLastError();
+				protocolVersionSendResult.reason = protocolVersionSendResult.socketError == WSAETIMEDOUT
+					? "timeout" : "socket-timeout-setup-failed";
+				return false;
+			}
 			const int result = send(socket, encrypted.data() + sent, static_cast<int>(size - sent), 0);
 			if (result <= 0)
 			{
+				protocolVersionSendResult.socketError = result == SOCKET_ERROR ? WSAGetLastError() : 0;
+				protocolVersionSendResult.reason = result == 0 ? "peer-closed"
+					: protocolVersionSendResult.socketError == WSAETIMEDOUT ? "timeout" : "socket-send-failed";
 				return false;
 			}
 
 			sent += result;
 		}
 
+		protocolVersionSendResult.reason = "succeeded";
 		return true;
 	}
 
@@ -206,6 +218,7 @@ namespace TLSHelper
     {
         if (not handshakeCompleted)
         {
+            lastStatus = SEC_E_INVALID_HANDLE;
             return false;
         }
 
@@ -235,6 +248,7 @@ namespace TLSHelper
 
         if (const SECURITY_STATUS status = EncryptMessage(&ctxtHandle, 0, &bufferDesc, 0); status != SEC_E_OK)
         {
+            lastStatus = status;
             return false;
         }
 
@@ -298,6 +312,7 @@ namespace TLSHelper
         plainSize = 0;
         if (not handshakeCompleted)
         {
+            lastStatus = SEC_E_INVALID_HANDLE;
             return TlsDecryptResult::Error;
         }
 
@@ -331,6 +346,7 @@ namespace TLSHelper
 
             if (status != SEC_E_OK)
             {
+                lastStatus = status;
                 return TlsDecryptResult::Error;
             }
 
@@ -388,8 +404,9 @@ namespace TLSHelper
         controlDesc.cBuffers = 1;
         controlDesc.pBuffers = &controlBuffer;
 
-        if (ApplyControlToken(&ctxtHandle, &controlDesc) != SEC_E_OK)
+        if (const SECURITY_STATUS status = ApplyControlToken(&ctxtHandle, &controlDesc); status != SEC_E_OK)
         {
+            lastStatus = status;
             return false;
         }
 
@@ -403,8 +420,9 @@ namespace TLSHelper
         desc.cBuffers = 1;
         desc.pBuffers = buffers;
 
-        if (EncryptMessage(&ctxtHandle, 0, &desc, 0) != SEC_E_OK)
+        if (const SECURITY_STATUS status = EncryptMessage(&ctxtHandle, 0, &desc, 0); status != SEC_E_OK)
         {
+            lastStatus = status;
             return false;
         }
 

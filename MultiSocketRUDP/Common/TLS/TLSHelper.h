@@ -100,6 +100,12 @@ namespace TLSHelper
 		int socketError{};
 	};
 
+	struct ProtocolVersionSendResult
+	{
+		const char* reason{ "not-started" };
+		int socketError{};
+	};
+
 	class TLSHelperBase
 	{
 	public:
@@ -132,6 +138,7 @@ namespace TLSHelper
 		// Inspect on the connection worker after Handshake returns; no token bytes are retained here.
 		[[nodiscard]] const HandshakeResult& GetHandshakeResult() const { return handshakeResult; }
 		[[nodiscard]] const ProtocolVersionReceiveResult& GetProtocolVersionResult() const { return protocolVersionResult; }
+		[[nodiscard]] const ProtocolVersionSendResult& GetProtocolVersionSendResult() const { return protocolVersionSendResult; }
 		// Connection-thread only: transfer trailing handshake bytes to the first application receive.
 		[[nodiscard]] std::vector<char> TakePendingHandshakeData()
 		{
@@ -160,6 +167,7 @@ namespace TLSHelper
 		std::vector<char> pendingHandshakeData;
 		HandshakeResult handshakeResult;
 		ProtocolVersionReceiveResult protocolVersionResult;
+		ProtocolVersionSendResult protocolVersionSendResult;
 	};
 
 	class TLSHelperClient : public TLSHelperBase
