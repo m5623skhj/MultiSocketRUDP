@@ -8,6 +8,9 @@
 #include "ISessionDelegate.h"
 #include "../Common/Crypto/CryptoHelper.h"
 #include "../Common/PacketCrypto/PacketCryptoHelper.h"
+#include <string_view>
+#include <condition_variable>
+#include <ws2tcpip.h>
 
 namespace
 {
@@ -35,20 +38,66 @@ namespace
 
 	// Bounded asynchronous diagnostics: never log while holding the broker queue lock.
 	void LogBrokerProgress(const std::uint64_t inConnectionId, const char* inEvent,
-		const std::uint64_t inQueueMs, const std::uint64_t inCertificateMs) noexcept
+		const std::uint64_t inQueueMs, const std::uint64_t inCertificateMs,
+		const std::string_view inDetails = {}) noexcept
 	{
 		try
 		{
 			const auto log = Logger::MakeLogObject<ServerLog>();
 			log->logString = std::format(
-				"Broker TLS progress; process={}; connection={}; event={}; queue_ms={}; certificate_ms={}",
-				GetCurrentProcessId(), inConnectionId, inEvent, inQueueMs, inCertificateMs);
-			(void)Logger::GetInstance().TryWriteLog(log);
+				"Broker TLS progress; process={}; connection={}; event={}; queue_ms={}; certificate_ms={}{}",
+				GetCurrentProcessId(), inConnectionId, inEvent, inQueueMs, inCertificateMs, inDetails);
+			// A scoped accept is used as evidence when the NIC trace has no matching broker record.
+			// Keep it on the normal bounded queue so logger lock contention alone cannot discard it.
+			if (inDetails.empty()) (void)Logger::GetInstance().TryWriteLog(log);
+			else Logger::GetInstance().WriteLog(log);
 		}
 		catch (...)
 		{
 			Logger::GetInstance().RecordDroppedDiagnostic();
 		}
+	}
+
+	// The external bot host opts in for a single peer. Use the tuple after NAT, as seen by the server NIC.
+	void LogBrokerAccepted(const std::uint64_t inConnectionId, SOCKET inSocket,
+		const sockaddr_in& inPeer, std::uint64_t inPeerAcceptNumber) noexcept
+	{
+		if (!inPeerAcceptNumber)
+		{
+			LogBrokerProgress(inConnectionId, "accepted", 0, 0);
+			return;
+		}
+		try
+		{
+			char peerAddress[INET_ADDRSTRLEN]{};
+			char localAddress[INET_ADDRSTRLEN]{};
+			sockaddr_in local{};
+			int localSize = sizeof(local);
+			const bool resolved = InetNtopA(AF_INET, &inPeer.sin_addr, peerAddress, sizeof(peerAddress))
+				&& getsockname(inSocket, reinterpret_cast<sockaddr*>(&local), &localSize) == 0
+				&& InetNtopA(AF_INET, &local.sin_addr, localAddress, sizeof(localAddress));
+			const auto endpoints = resolved
+				? std::format("; peer={}:{}; local={}:{}", peerAddress, ntohs(inPeer.sin_port), localAddress, ntohs(local.sin_port))
+				: std::format("; endpoint_error={}", WSAGetLastError());
+			LogBrokerProgress(inConnectionId, "accepted", 0, 0,
+				std::format("{}; peer_accept_number={}", endpoints, inPeerAcceptNumber));
+		}
+		catch (...)
+		{
+			Logger::GetInstance().RecordDroppedDiagnostic();
+			LogBrokerProgress(inConnectionId, "accepted", 0, 0);
+		}
+	}
+
+	void LogTracedQueue(std::uint64_t inConnectionId, const char* inEvent,
+		std::size_t inDepth, std::chrono::steady_clock::time_point inAcceptedAt) noexcept
+	{
+		try
+		{
+			LogBrokerProgress(inConnectionId, inEvent, ElapsedMilliseconds(inAcceptedAt), 0,
+				std::format("; queue_depth={}; thread={}", inDepth, GetCurrentThreadId()));
+		}
+		catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
 	}
 
 	void LogBrokerHandshake(const TLSHelper::TLSHelperServer& inTlsHelper, const bool inSucceeded,
@@ -58,12 +107,16 @@ namespace
 		try
 		{
 			const auto& result = inTlsHelper.GetHandshakeResult();
-			const auto message = std::format(
+			auto message = std::format(
 				"Broker TLS handshake {}; process={}; connection={}; queue_ms={}; certificate_ms={}; reason={}; stage={}; socket_error={}; elapsed_ms={}; buffered_bytes={}; security_status={:#010x}; tls_sent_bytes={}; tls_received_bytes={}; send_calls={}; recv_calls={}; security_calls={}",
 				inSucceeded ? "succeeded" : "failed", GetCurrentProcessId(), inConnectionId, inQueueMs, inCertificateMs,
 				result.reason, result.stage, result.socketError, result.elapsedMs, result.bufferedBytes,
 				static_cast<unsigned long>(inTlsHelper.GetLastStatus()), result.sentBytes, result.receivedBytes,
 				result.sendCalls, result.receiveCalls, result.securityCalls);
+			if (inTlsHelper.HasHandshakeTrace())
+				message += std::format("; hello_tag={}; first_send_utc_ms={}; first_recv_utc_ms={}",
+					result.clientHelloTag ? std::format("{:016x}", *result.clientHelloTag) : "unavailable",
+					result.firstSendUtcMs, result.firstReceiveUtcMs);
 			if (inSucceeded)
 			{
 				const auto log = Logger::MakeLogObject<ServerLog>();
@@ -121,9 +174,9 @@ bool RUDPSessionBroker::Start(const PortType listenPort, const std::string& rudp
 	}
 
 	isRunning = true;
-	sessionBrokerThread = std::jthread([this, rudpSessionIP](const std::stop_token& stopToken)
+	sessionBrokerThread = std::jthread([this, rudpSessionIP, listenSocket = sessionBrokerListenSocket](const std::stop_token& stopToken)
 		{
-			this->RunSessionBrokerThread(stopToken, rudpSessionIP);
+			this->RunSessionBrokerThread(stopToken, listenSocket, rudpSessionIP);
 		});
 
 	return true;
@@ -136,11 +189,11 @@ void RUDPSessionBroker::Stop()
 		return;
 	}
 
+	if (sessionBrokerThread.joinable())
+		sessionBrokerThread.request_stop();
 	CloseListenSocket();
-
 	if (sessionBrokerThread.joinable())
 	{
-		sessionBrokerThread.request_stop();
 		sessionBrokerThread.join();
 	}
 
@@ -176,15 +229,37 @@ void RUDPSessionBroker::Stop()
 	Logger::GetInstance().WriteLog(log);
 }
 
-void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP)
+void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken, SOCKET listenSocket, const std::string& rudpSessionIP)
 {
-	SOCKET clientSocket = INVALID_SOCKET;
-	sockaddr_in clientAddr;
-	int sockAddrSize = sizeof(clientAddr);
+	IN_ADDR tracedPeer{};
+	wchar_t tracedPeerText[INET_ADDRSTRLEN]{};
+	const auto length = GetEnvironmentVariableW(L"ACTIONRPG_ROOM_BROKER_TRACE_PEER_IPV4", tracedPeerText, INET_ADDRSTRLEN);
+	const bool traceEnabled = length > 0 && length < INET_ADDRSTRLEN && InetPtonW(AF_INET, tracedPeerText, &tracedPeer) == 1;
+	// Keep health samples independent of accept and TLS work even when the last connection
+	// never reaches the application. The diagnostic thread joins when the accept loop exits.
+	std::jthread traceHealthThread;
+	if (traceEnabled)
+	{
+		char peerText[INET_ADDRSTRLEN]{};
+		sockaddr_in local{};
+		int size = sizeof(local);
+		if (InetNtopA(AF_INET, &tracedPeer, peerText, sizeof(peerText))
+			&& getsockname(listenSocket, reinterpret_cast<sockaddr*>(&local), &size) == 0)
+		{
+			try
+			{
+				traceHealthThread = std::jthread([this, peer = std::string(peerText), port = ntohs(local.sin_port)](std::stop_token stop)
+				{ RunTraceHealth(stop, peer, port); });
+			}
+			catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+		}
+	}
 
 	while (not stopToken.stop_requested())
 	{
-		clientSocket = accept(sessionBrokerListenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
+		sockaddr_in clientAddr{};
+		int sockAddrSize = sizeof(clientAddr);
+		const auto clientSocket = accept(listenSocket, reinterpret_cast<sockaddr*>(&clientAddr), &sockAddrSize);
 		if (clientSocket == INVALID_SOCKET)
 		{
 			auto error = WSAGetLastError();
@@ -197,27 +272,62 @@ void RUDPSessionBroker::RunSessionBrokerThread(const std::stop_token& stopToken,
 			continue;
 		}
 
+		const bool tracePeer = traceEnabled && clientAddr.sin_family == AF_INET
+			&& clientAddr.sin_addr.s_addr == tracedPeer.s_addr;
 		PendingConnection connection{
-			clientSocket, rudpSessionIP, ++nextConnectionId, std::chrono::steady_clock::now() };
-		LogBrokerProgress(connection.connectionId, "accepted", 0, 0);
+			clientSocket, rudpSessionIP, ++nextConnectionId, std::chrono::steady_clock::now(), tracePeer };
+		const auto connectionId = connection.connectionId;
+		const auto acceptedAt = connection.acceptedAt;
+		const auto peerOrdinal = tracePeer ? tracedAccepts.fetch_add(1, std::memory_order_relaxed) + 1 : 0;
+		LogBrokerAccepted(connectionId, clientSocket, clientAddr, peerOrdinal);
 		bool queued{};
+		std::size_t depth{};
 		{
 			std::scoped_lock lock(clientQueueLock);
 			// Bound unauthenticated work; expired entries are also rejected before initialization.
-			if (clientQueue.size() < 32) { clientQueue.push(std::move(connection)); queued = true; }
+			if (clientQueue.size() < MAX_QUEUED_CONNECTIONS) { clientQueue.push(std::move(connection)); queued = true; }
+			depth = clientQueue.size();
 		}
 		if (!queued)
 		{
+			if (tracePeer) tracedQueueRejections.fetch_add(1, std::memory_order_relaxed);
 			LogBrokerFailure(connection.connectionId, "queue", "queue-full", connection.acceptedAt);
 			closesocket(clientSocket);
 			continue;
 		}
 		clientQueueCV.notify_one();
+		if (tracePeer) LogTracedQueue(connectionId, "queued", depth, acceptedAt);
 	}
 
 	const auto log = Logger::MakeLogObject<ServerLog>();
 	log->logString = "Session broker thread stopped";
 	Logger::GetInstance().WriteLog(log);
+}
+
+void RUDPSessionBroker::RunTraceHealth(std::stop_token inStopToken, const std::string& inPeer, PortType inPort) const noexcept
+{
+	try
+	{
+		std::mutex mutex;
+		std::condition_variable_any wake;
+		std::unique_lock lock(mutex);
+		for (std::uint64_t sample = 0; !inStopToken.stop_requested(); ++sample)
+		{
+			const auto counts = Logger::GetInstance().GetStatistics();
+			const auto log = Logger::MakeLogObject<ServerLog>();
+			log->logString = std::format("Broker WAN trace; event={}; version=2; process={}; peer={}; listen_port={}; sample={}; "
+				"workers={}; queue_capacity={}; accepted={}; dequeued={}; completed={}; queue_rejected={}; "
+				"normal_dropped={}; diagnostic_dropped={}; file_errors={}; serialization_errors={}; console_errors={}; stop_timeouts={}",
+				sample ? "health" : "ready", GetCurrentProcessId(), inPeer, inPort, sample, BROKER_THREAD_POOL_SIZE,
+				MAX_QUEUED_CONNECTIONS, tracedAccepts.load(std::memory_order_relaxed), tracedDequeues.load(std::memory_order_relaxed),
+				tracedCompletions.load(std::memory_order_relaxed), tracedQueueRejections.load(std::memory_order_relaxed),
+				counts.normalDropped, counts.diagnosticDropped, counts.fileErrors, counts.serializationErrors,
+				counts.consoleErrors, counts.stopTimeouts);
+			Logger::GetInstance().WriteLog(log);
+			wake.wait_for(lock, inStopToken, std::chrono::seconds(5), [] { return false; });
+		}
+	}
+	catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
 }
 
 void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
@@ -231,6 +341,7 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 	while (not stopToken.stop_requested())
 	{
 		PendingConnection connection;
+		std::size_t depth{};
 
 		{
 			std::unique_lock lock(clientQueueLock);
@@ -246,8 +357,14 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 
 			connection = std::move(clientQueue.front());
 			clientQueue.pop();
+			depth = clientQueue.size();
 		}
 
+		if (connection.traceEnabled)
+		{
+			tracedDequeues.fetch_add(1, std::memory_order_relaxed);
+			LogTracedQueue(connection.connectionId, "dequeued", depth, connection.acceptedAt);
+		}
 		const SOCKET clientSocket = connection.socket;
 		{
 			// Destroy the callback before closing: shutdown must never target a reused handle.
@@ -261,6 +378,11 @@ void RUDPSessionBroker::RunBrokerWorkerThread(const std::stop_token& stopToken)
 			}
 		}
 		closesocket(clientSocket);
+		if (connection.traceEnabled)
+		{
+			tracedCompletions.fetch_add(1, std::memory_order_relaxed);
+			LogBrokerProgress(connection.connectionId, "worker_closed", 0, 0, "; wan_trace=1");
+		}
 	}
 }
 
@@ -273,7 +395,8 @@ void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnec
     const auto deadline = inConnection.acceptedAt + std::chrono::seconds(12);
     if (std::chrono::steady_clock::now() >= deadline)
     { LogBrokerFailure(connectionId, "queue", "timeout", inConnection.acceptedAt); return; }
-	LogBrokerProgress(connectionId, "worker_started", queueMs, 0);
+	const auto traceDetails = inConnection.traceEnabled ? "; wan_trace=1" : "";
+	LogBrokerProgress(connectionId, "worker_started", queueMs, 0, traceDetails);
 	// Bound each blocking socket operation, including the initial TLS receive.
 	constexpr DWORD BROKER_IO_TIMEOUT_MS = 12000;
 	if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO,
@@ -287,6 +410,7 @@ void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnec
 	}
 
 	TLSHelper::TLSHelperServer localTlsHelper(serverCertificateConfig);
+	if (inConnection.traceEnabled) localTlsHelper.EnableHandshakeTrace();
     localTlsHelper.SetConnectionDeadline(deadline);
 
 	const auto certificateStarted = std::chrono::steady_clock::now();
@@ -299,7 +423,7 @@ void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnec
 			static_cast<unsigned long>(localTlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId, queueMs, certificateMs));
 		return;
 	}
-	LogBrokerProgress(connectionId, "certificate_ready", queueMs, certificateMs);
+	LogBrokerProgress(connectionId, "certificate_ready", queueMs, certificateMs, traceDetails);
 
 	const bool handshakeSucceeded = localTlsHelper.Handshake(clientSocket, stopToken);
 	LogBrokerHandshake(localTlsHelper, handshakeSucceeded, connectionId, queueMs, certificateMs);
@@ -316,6 +440,7 @@ void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnec
 			result.plainBytes, result.socketError, static_cast<unsigned long>(localTlsHelper.GetLastStatus()), GetCurrentProcessId(), connectionId));
 		return;
 	}
+	if (inConnection.traceEnabled) LogBrokerProgress(connectionId, "protocol_received", queueMs, certificateMs, traceDetails);
 	NetBuffer sendBuffer;
 	sendBuffer.Init();
 
@@ -326,13 +451,17 @@ void RUDPSessionBroker::HandleClientConnection(const PendingConnection& inConnec
 			? "timeout" : "socket-timeout-setup-failed", inConnection.acceptedAt, "winsock", socketError);
 		return;
 	}
-	const auto session = ReserveSession(sendBuffer, rudpSessionIP, connectionId);
+	const auto session = ReserveSession(sendBuffer, rudpSessionIP, connectionId, inConnection.traceEnabled);
 	if (not SendSessionInfoToClient(clientSocket, localTlsHelper, sendBuffer, connectionId))
 	{
 		if (session != nullptr)
 		{
 			sessionDelegate.AbortReservedSession(*session);
 		}
+	}
+	else if (inConnection.traceEnabled)
+	{
+		LogBrokerProgress(connectionId, "session_response_sent", queueMs, certificateMs, traceDetails);
 	}
 }
 
@@ -377,7 +506,7 @@ void RUDPSessionBroker::CloseListenSocket()
 }
 
 RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP,
-	const std::uint64_t inConnectionId) const
+	const std::uint64_t inConnectionId, const bool inTraceEnabled) const
 {
 	const auto started = std::chrono::steady_clock::now();
 	CONNECT_RESULT_CODE connectResultCode;
@@ -410,6 +539,18 @@ RUDPSession* RUDPSessionBroker::ReserveSession(OUT NetBuffer& sendBuffer, const 
 	{
 		SetSessionInfoToBuffer(*session, rudpServerIP, sendBuffer);
 		sessionDelegate.SetSessionReservedTime(*session, GetTickCount64());
+		if (inTraceEnabled)
+		{
+			try
+			{
+				PortType port{};
+				SessionIdType sessionId{};
+				sessionDelegate.GetServerPortAndSessionId(*session, port, sessionId);
+				LogBrokerProgress(inConnectionId, "rudp_reserved", 0, 0,
+					std::format("; udp_port={}; rudp_session={}", port, sessionId));
+			}
+			catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+		}
 	}
 	else
 	{
