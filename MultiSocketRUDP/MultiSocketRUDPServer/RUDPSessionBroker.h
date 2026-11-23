@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <atomic>
 #include <thread>
 #include <mutex>
 #include <queue>
@@ -54,12 +55,14 @@ private:
 		std::string rudpSessionIP;
 		std::uint64_t connectionId{};
 		std::chrono::steady_clock::time_point acceptedAt{};
+		bool traceEnabled{};
 	};
 
 	// ----------------------------------------
 	// accept 스레드와 TLS 처리 워커가 공유하는 clientQueue는 clientQueueLock으로 보호됩니다.
 	// ----------------------------------------
-	void RunSessionBrokerThread(const std::stop_token& stopToken, const std::string& rudpSessionIP);
+	void RunSessionBrokerThread(const std::stop_token& stopToken, SOCKET listenSocket, const std::string& rudpSessionIP);
+	void RunTraceHealth(std::stop_token inStopToken, const std::string& inPeer, PortType inPort) const noexcept;
 	void RunBrokerWorkerThread(const std::stop_token& stopToken);
 	void HandleClientConnection(const PendingConnection& inConnection, const std::stop_token& stopToken);
 
@@ -73,7 +76,7 @@ private:
 	// @return 풀 고갈 시 nullptr입니다. 초기화 실패 시 반환된 포인터는 이미 세션 정리 경로에 진입했을 수 있습니다.
 	// ----------------------------------------
 	RUDPSession* ReserveSession(OUT NetBuffer& sendBuffer, const std::string& rudpServerIP,
-		std::uint64_t inConnectionId) const;
+		std::uint64_t inConnectionId, bool inTraceEnabled) const;
 	[[nodiscard]]
 	static CONNECT_RESULT_CODE InitReserveSession(OUT RUDPSession& session);
 
@@ -107,10 +110,12 @@ private:
 	std::jthread sessionBrokerThread{};
 
 	static constexpr unsigned int BROKER_THREAD_POOL_SIZE = 4;
+	static constexpr std::size_t MAX_QUEUED_CONNECTIONS = 32;
 	std::vector<std::jthread> threadPool;
 
 	// Only the accept thread assigns IDs; queued metadata moves to one worker.
 	std::uint64_t nextConnectionId{};
+	std::atomic_uint64_t tracedAccepts{}, tracedDequeues{}, tracedCompletions{}, tracedQueueRejections{};
 	std::queue<PendingConnection> clientQueue;
 	std::mutex clientQueueLock;
 	std::condition_variable clientQueueCV;
