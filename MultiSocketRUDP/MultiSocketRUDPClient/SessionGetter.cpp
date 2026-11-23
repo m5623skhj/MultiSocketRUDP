@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string_view>
+#include <mstcpip.h>
 
 #if USE_IOCP_SESSION_GETTER
 bool RUDPClientCore::SessionGetter::Start(const std::wstring& optionFilePath)
@@ -64,15 +65,16 @@ namespace
 	// No endpoint credentials, TLS tokens, keys or session payloads are recorded.
 	void LogBrokerStage(const std::uint64_t inConnectionId, const char* inStage, const char* inReason,
 		const std::chrono::steady_clock::time_point inStarted,
-		const char* inErrorDomain = "none", const std::int64_t inErrorCode = 0) noexcept
+		const char* inErrorDomain = "none", const std::int64_t inErrorCode = 0,
+		const std::string_view inDetails = {}) noexcept
 	{
 		try
 		{
 			const auto log = Logger::MakeLogObject<ClientLog>();
 			log->logString = std::format(
-				"Client broker connection; process={}; connection={}; stage={}; reason={}; elapsed_ms={}; error_domain={}; error_code={}; error_hex={:#010x}",
+				"Client broker connection; process={}; connection={}; stage={}; reason={}; elapsed_ms={}; error_domain={}; error_code={}; error_hex={:#010x}{}",
 				GetCurrentProcessId(), inConnectionId, inStage, inReason, ElapsedMilliseconds(inStarted),
-				inErrorDomain, inErrorCode, static_cast<std::uint32_t>(inErrorCode));
+				inErrorDomain, inErrorCode, static_cast<std::uint32_t>(inErrorCode), inDetails);
 			if (std::string_view(inReason) == "started")
 				(void)Logger::GetInstance().TryWriteLog(log);
 			else
@@ -101,6 +103,49 @@ namespace
 		}
 	}
 
+	bool WanBrokerTraceEnabled() noexcept
+	{
+		wchar_t enabled[2]{};
+		return GetEnvironmentVariableW(L"ACTIONRPG_BOT_WAN_TCP_TRACE", enabled, 2) == 1 && enabled[0] == L'1';
+	}
+
+	// Query the same socket before it closes. TCP information is diagnostic only.
+	void LogClientSocketProbe(SOCKET inSocket, std::uint64_t inConnectionId, const char* inStage) noexcept
+	{
+		const auto started = std::chrono::steady_clock::now();
+		try
+		{
+			sockaddr_in local{}, peer{};
+			int localSize = sizeof(local), peerSize = sizeof(peer);
+			char localText[INET_ADDRSTRLEN]{}, peerText[INET_ADDRSTRLEN]{};
+			const bool haveLocal = getsockname(inSocket, reinterpret_cast<sockaddr*>(&local), &localSize) == 0
+				&& InetNtopA(AF_INET, &local.sin_addr, localText, sizeof(localText));
+			const int localError = haveLocal ? 0 : WSAGetLastError();
+			const bool havePeer = getpeername(inSocket, reinterpret_cast<sockaddr*>(&peer), &peerSize) == 0
+				&& InetNtopA(AF_INET, &peer.sin_addr, peerText, sizeof(peerText));
+			const int peerError = havePeer ? 0 : WSAGetLastError();
+			auto details = haveLocal ? std::format("; local={}:{}", localText, ntohs(local.sin_port))
+				: std::format("; local_error={}", localError);
+			details += havePeer ? std::format("; peer={}:{}", peerText, ntohs(peer.sin_port))
+				: std::format("; peer_error={}", peerError);
+
+			ULONG version = 0;
+			DWORD returned{};
+			TCP_INFO_v0 info{};
+			const int result = WSAIoctl(inSocket, SIO_TCP_INFO, &version, sizeof(version),
+				&info, sizeof(info), &returned, nullptr, nullptr);
+			const int infoError = result == SOCKET_ERROR ? WSAGetLastError() : 0;
+			if (result == 0 && returned >= sizeof(info))
+				details += std::format("; tcp_state={}; rtt_us={}; tcp_tx={}; tcp_rx={}; tcp_in_flight={}; tcp_retrans_bytes={}; tcp_syn_retrans={}; tcp_timeouts={}",
+					static_cast<int>(info.State), info.RttUs, info.BytesOut, info.BytesIn, info.BytesInFlight,
+					info.BytesRetrans, static_cast<unsigned>(info.SynRetrans), info.TimeoutEpisodes);
+			else
+				details += std::format("; tcp_info_error={}; tcp_info_bytes={}", infoError, returned);
+			LogBrokerStage(inConnectionId, inStage, "observed", started, "none", 0, details);
+		}
+		catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+	}
+
 	// Counters contain sizes only; neither TLS tokens nor certificate/key data are logged.
 	void LogClientHandshake(const TLSHelper::TLSHelperClient& inTlsHelper, const bool inSucceeded,
 		const std::uint64_t inConnectionId, const std::uint64_t inCredentialMs,
@@ -109,12 +154,16 @@ namespace
 		try
 		{
 			const auto& result = inTlsHelper.GetHandshakeResult();
-			const auto message = std::format(
+			auto message = std::format(
 				"TLS Handshake {} in GetSessionFromServer(); process={}; connection={}; credential_ms={}; connect_ms={}; reason={}; stage={}; socket_error={}; elapsed_ms={}; buffered_bytes={}; security_status={:#010x}; tls_sent_bytes={}; tls_received_bytes={}; send_calls={}; recv_calls={}; security_calls={}",
 				inSucceeded ? "succeeded" : "failed", GetCurrentProcessId(), inConnectionId, inCredentialMs, inConnectMs,
 				result.reason, result.stage, result.socketError, result.elapsedMs, result.bufferedBytes,
 				static_cast<unsigned long>(inTlsHelper.GetLastStatus()), result.sentBytes, result.receivedBytes,
 				result.sendCalls, result.receiveCalls, result.securityCalls);
+			if (inTlsHelper.HasHandshakeTrace())
+				message += std::format("; hello_tag={}; first_send_utc_ms={}; first_recv_utc_ms={}",
+					result.clientHelloTag ? std::format("{:016x}", *result.clientHelloTag) : "unavailable",
+					result.firstSendUtcMs, result.firstReceiveUtcMs);
 			if (inSucceeded)
 			{
 				const auto log = Logger::MakeLogObject<ClientLog>();
@@ -138,6 +187,7 @@ bool RUDPClientCore::RunGetSessionFromServer(const std::wstring& optionFilePath,
 	// Process-local sequence also separates simultaneous clients and reconnect attempts.
 	static std::atomic_uint64_t nextConnectionId{};
 	const auto connectionId = nextConnectionId.fetch_add(1, std::memory_order_relaxed) + 1;
+	wanBrokerConnectionId = WanBrokerTraceEnabled() ? connectionId : 0;
 	const auto startupStarted = std::chrono::steady_clock::now();
 	try
 	{
@@ -257,6 +307,11 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 
 	tlsHelper.SetConnectionDeadline(std::chrono::steady_clock::now() + std::chrono::seconds(15));
 	LogClientProgress(inConnectionId, "tcp_connected", connectMs);
+	if (WanBrokerTraceEnabled())
+	{
+		tlsHelper.EnableHandshakeTrace();
+		LogClientSocketProbe(sessionBrokerSocket, inConnectionId, "tcp-before-tls");
+	}
 
 	// A host-only override must never redirect a remotely reached broker's UDP endpoint.
 	// Check the connected peer before closing this socket; TLS name/chain checks still follow.
@@ -299,6 +354,7 @@ bool RUDPClientCore::GetSessionFromServer(const std::stop_token& inStopToken,
 
 	const bool handshakeSucceeded = tlsHelper.Handshake(sessionBrokerSocket, inStopToken);
 	LogClientHandshake(tlsHelper, handshakeSucceeded, inConnectionId, inCredentialMs, connectMs);
+	if (tlsHelper.HasHandshakeTrace()) LogClientSocketProbe(sessionBrokerSocket, inConnectionId, "tcp-after-tls");
 	if (not handshakeSucceeded)
 	{
 		closesocket(sessionBrokerSocket);
@@ -427,6 +483,19 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 	else LogBrokerStage(inConnectionId, "dns", "skipped-literal-ip", dnsStarted);
 
 	const auto tcpStarted = std::chrono::steady_clock::now();
+	if (WanBrokerTraceEnabled())
+	{
+		char address[INET_ADDRSTRLEN]{};
+		if (InetNtopA(AF_INET, &sessionGetterAddr.sin_addr, address, sizeof(address)))
+		{
+			try
+			{
+				const auto details = std::format("; peer={}:{}", address, sessionBrokerPort);
+				LogBrokerStage(inConnectionId, "tcp-target", "selected", tcpStarted, "none", 0, details);
+			}
+			catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+		}
+	}
 	LogBrokerStage(inConnectionId, "tcp", "started", tcpStarted);
 	u_long nonblocking = 1;
 	if (ioctlsocket(sessionBrokerSocket, FIONBIO, &nonblocking) == SOCKET_ERROR)
@@ -502,6 +571,8 @@ bool RUDPClientCore::TryConnectToSessionBroker(const std::stop_token& inStopToke
 		: restoreResult == SOCKET_ERROR ? "blocking-restore-failed" : "cancelled", tcpStarted,
 		!connected ? errorDomain : restoreResult == SOCKET_ERROR ? "winsock" : "none",
 		!connected ? failureError : restoreError);
+	if (!succeeded && WanBrokerTraceEnabled())
+		LogClientSocketProbe(sessionBrokerSocket, inConnectionId, "tcp-connect-failed");
 	return succeeded;
 }
 
@@ -702,6 +773,15 @@ bool RUDPClientCore::SetTargetSessionInfo(OUT NetBuffer& receivedBuffer, const s
 	LogBrokerStage(inConnectionId, "session-decode", sessionKeyHandle ? "succeeded"
 		: keySizeAvailable ? "session-key-initialize-failed" : "key-object-size-unavailable",
 		decodeStarted, !sessionKeyHandle && keySizeAvailable ? "ntstatus" : "none", keyStatus);
+	if (sessionKeyHandle && tlsHelper.HasHandshakeTrace())
+	{
+		try
+		{
+			const auto details = std::format("; udp_port={}; rudp_session={}", port, sessionId);
+			LogBrokerStage(inConnectionId, "rudp-reservation", "received", decodeStarted, "none", 0, details);
+		}
+		catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+	}
 	return sessionKeyHandle != nullptr;
 }
 

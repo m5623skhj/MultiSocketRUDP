@@ -90,6 +90,9 @@ namespace TLSHelper
 		// send/recv calls count attempted system calls; securityCalls counts SSPI calls.
 		std::uint64_t sentBytes{}, receivedBytes{};
 		std::uint64_t sendCalls{}, receiveCalls{}, securityCalls{};
+		// WAN probe only. The tag is derived from the public ClientHello random.
+		std::uint64_t firstSendUtcMs{}, firstReceiveUtcMs{};
+		std::optional<std::uint64_t> clientHelloTag;
 	};
 
 	struct ProtocolVersionReceiveResult
@@ -116,6 +119,8 @@ namespace TLSHelper
         // Owned by the connection worker; the same deadline covers all broker phases.
         void SetConnectionDeadline(std::chrono::steady_clock::time_point value) { connectionDeadline = value; }
         auto GetConnectionDeadline() const { return connectionDeadline; }
+        void EnableHandshakeTrace() noexcept { handshakeTraceEnabled = true; }
+        bool HasHandshakeTrace() const noexcept { return handshakeTraceEnabled; }
         bool ApplyRemainingTimeout(SOCKET socket) const;
 		virtual bool Initialize() = 0;
 		virtual bool Handshake(SOCKET socket) = 0;
@@ -165,6 +170,7 @@ namespace TLSHelper
 		bool handshakeCompleted = false;
 		SecPkgContext_StreamSizes streamSizes{};
 		std::vector<char> pendingHandshakeData;
+		bool handshakeTraceEnabled{};
 		HandshakeResult handshakeResult;
 		ProtocolVersionReceiveResult protocolVersionResult;
 		ProtocolVersionSendResult protocolVersionSendResult;

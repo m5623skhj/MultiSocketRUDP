@@ -170,6 +170,32 @@ namespace TLSHelper
     {
         constexpr size_t HANDSHAKE_BUFFER_SIZE = 4096;
 
+        std::uint64_t HandshakeUtcMs()
+        {
+            return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        }
+
+        // TLS record header, handshake header and legacy_version precede the 32-byte public random.
+        std::optional<std::uint64_t> ClientHelloTag(const char* inBytes, const size_t inSize) noexcept
+        {
+            constexpr size_t RANDOM_OFFSET = 11;
+            constexpr size_t RANDOM_SIZE = 32;
+            if (inSize < RANDOM_OFFSET + RANDOM_SIZE) return std::nullopt;
+            const auto* bytes = reinterpret_cast<const unsigned char*>(inBytes);
+            const auto recordLength = (bytes[3] << 8) | bytes[4];
+            const auto messageLength = (bytes[6] << 16) | (bytes[7] << 8) | bytes[8];
+            if (bytes[0] != 22 || bytes[1] != 3 || bytes[5] != 1 || bytes[9] != 3
+                || recordLength < 38 || messageLength < 34) return std::nullopt;
+            std::uint64_t tag = 14695981039346656037ULL;
+            for (size_t index = RANDOM_OFFSET; index < RANDOM_OFFSET + RANDOM_SIZE; ++index)
+            {
+                tag ^= bytes[index];
+                tag *= 1099511628211ULL;
+            }
+            return tag;
+        }
+
         class ContextBufferGuard
         {
         public:
@@ -439,6 +465,8 @@ namespace TLSHelper
             return true;
         }
 
+        if (handshakeTraceEnabled && !handshakeResult.sentBytes && !handshakeResult.receivedBytes)
+            handshakeResult.clientHelloTag = ClientHelloTag(static_cast<const char*>(tokenBuffer.pvBuffer), tokenBuffer.cbBuffer);
         int totalSent = 0;
         const int sendSize = static_cast<int>(tokenBuffer.cbBuffer);
         while (totalSent < sendSize)
@@ -457,6 +485,7 @@ namespace TLSHelper
                 return false;
             }
 
+            if (handshakeTraceEnabled && !handshakeResult.sentBytes) handshakeResult.firstSendUtcMs = HandshakeUtcMs();
             handshakeResult.sentBytes += static_cast<std::uint64_t>(sent);
             totalSent += sent;
         }
@@ -477,8 +506,11 @@ namespace TLSHelper
             return false;
         }
 
+        if (handshakeTraceEnabled && !handshakeResult.receivedBytes) handshakeResult.firstReceiveUtcMs = HandshakeUtcMs();
         handshakeResult.receivedBytes += static_cast<std::uint64_t>(received);
         recvBuffer.insert(recvBuffer.end(), tempBuffer, tempBuffer + received);
+        if (handshakeTraceEnabled && !handshakeResult.sentBytes && !handshakeResult.clientHelloTag)
+            handshakeResult.clientHelloTag = ClientHelloTag(recvBuffer.data(), recvBuffer.size());
         return true;
     }
 

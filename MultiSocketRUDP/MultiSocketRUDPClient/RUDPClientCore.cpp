@@ -56,6 +56,7 @@ bool RUDPClientCore::Start(const std::wstring& clientCoreOptionFile, const std::
 	threadStopFlag = false;
 	isConnected = false;
 	acceptingConnectAck = true;
+	wanConnectSendSamples = 0;
 	lastSendPacketSequence = 0;
 	lastAckedSequence = 0;
 	remoteAdvertisedWindow = 1;
@@ -379,6 +380,20 @@ bool RUDPClientCore::CreateRUDPSocket()
 	return true;
 }
 
+// Only called for a traced admission. Neither the UDP payload nor the session key is inspected.
+void RUDPClientCore::LogWanUdp(const char* inStage, const char* inReason, int inBytes, int inError) const noexcept
+{
+	try
+	{
+		const auto log = Logger::MakeLogObject<ClientLog>();
+		log->logString = std::format(
+			"Client broker connection; process={}; connection={}; stage={}; reason={}; udp_port={}; rudp_session={}; udp_bytes={}; socket_error={}",
+			GetCurrentProcessId(), wanBrokerConnectionId, inStage, inReason, port, sessionId, inBytes, inError);
+		Logger::GetInstance().WriteLog(log);
+	}
+	catch (...) { Logger::GetInstance().RecordDroppedDiagnostic(); }
+}
+
 void RUDPClientCore::SendConnectPacket()
 {
 	NetBuffer& connectPacket = *NetBuffer::Alloc();
@@ -422,6 +437,7 @@ void RUDPClientCore::RunRecvThread()
 	buffer->Resize(RECV_BUFFER_SIZE);
 	sockaddr_in senderAddr{};
 	int senderLength{sizeof(senderAddr)};
+	unsigned wanReceiveSamples{};
 
 	while (not threadStopFlag)
 	{
@@ -443,6 +459,11 @@ void RUDPClientCore::RunRecvThread()
 				continue;
 			}
 
+			if (wanBrokerConnectionId && wanReceiveSamples < 8 && !isConnected)
+			{
+				++wanReceiveSamples;
+				LogWanUdp("udp-connect-recv", "socket-error", 0, error);
+			}
 			const auto log = Logger::MakeLogObject<ClientLog>();
 			if (error == WSAENOTSOCK || error == WSAEINTR)
 			{
@@ -457,6 +478,13 @@ void RUDPClientCore::RunRecvThread()
 			continue;
 		}
 
+		if (wanBrokerConnectionId && wanReceiveSamples < 8 && !isConnected)
+		{
+			++wanReceiveSamples;
+			const bool fromBrokerEndpoint = senderAddr.sin_addr.s_addr == serverAddr.sin_addr.s_addr
+				&& senderAddr.sin_port == serverAddr.sin_port;
+			LogWanUdp("udp-connect-recv", fromBrokerEndpoint ? "expected-peer" : "other-peer", bytesReceived, 0);
+		}
 		buffer->MoveWritePos(bytesReceived);
 		buffer->m_iRead = 0;
 		OnRecvStream(*buffer, bytesReceived);
@@ -560,6 +588,8 @@ void RUDPClientCore::RunRetransmissionThread()
 					continue;
 				}
 
+				if (wanBrokerConnectionId && sendPacketInfo->sendPacketSequence == 0)
+					LogWanUdp("udp-connect-ack", "retry-limit", 0, 0);
 				LOG_ERROR("The maximum number of packet retransmission controls has been exceeded, and RUDPClientCore terminates");
 				RequestStop();
 				SendPacketInfo::Free(sendPacketInfo);
@@ -779,6 +809,7 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 	remoteAdvertisedWindow.store(remoteWindow, std::memory_order_relaxed);
 	lastAckedSequence.store(packetSequence, std::memory_order_relaxed);
 
+	bool traceConnectAck{};
 	{
 		std::scoped_lock lock(lifecycleLock);
 		if (threadStopFlag)
@@ -790,10 +821,12 @@ void RUDPClientCore::OnSendReply(NetBuffer& recvPacket, const PacketSequence pac
 		{
 			isConnected = true;
 			acceptingConnectAck = false;
+			traceConnectAck = wanBrokerConnectionId != 0;
 			serverAliveChecker.StartServerAliveCheck(serverAliveCheckMs);
 		}
 	}
 
+	if (traceConnectAck) LogWanUdp("udp-connect-ack", "authenticated", 0, 0);
 	TryFlushPendingQueue();
 }
 
@@ -849,9 +882,18 @@ void RUDPClientCore::DoSend()
 			return;
 		}
 
-		if (sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0, reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
+		const bool traceSend = wanBrokerConnectionId && wanConnectSendSamples < 8 && !isConnected;
+		const int sent = sendto(rudpSocket, packet->GetBufferPtr(), packet->GetAllUseSize(), 0,
+			reinterpret_cast<const sockaddr*>(&serverAddr), sizeof(serverAddr));
+		const int error = sent == SOCKET_ERROR ? WSAGetLastError() : 0;
+		if (sent == SOCKET_ERROR)
 		{
-			LOG_ERROR(std::format("sendto() failed with error code {}", WSAGetLastError()));
+			LOG_ERROR(std::format("sendto() failed with error code {}", error));
+		}
+		if (traceSend)
+		{
+			++wanConnectSendSamples;
+			LogWanUdp("udp-connect-send", sent == SOCKET_ERROR ? "socket-error" : "submitted", sent == SOCKET_ERROR ? 0 : sent, error);
 		}
 
 		NetBuffer::Free(packet);

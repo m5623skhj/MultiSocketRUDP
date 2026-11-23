@@ -145,6 +145,10 @@ private:
 	std::jthread shutdownThread;
 	bool loggerStarted{};
 	bool acceptingConnectAck{};
+	// Set by the startup owner before UDP threads launch; unchanged until they have joined.
+	std::uint64_t wanBrokerConnectionId{};
+	unsigned wanConnectSendSamples{}; // Send thread only, reset before launch.
+	void LogWanUdp(const char* inStage, const char* inReason, int inBytes, int inError) const noexcept;
 	void RequestStop();
 	void CleanupStoppedSession();
 
