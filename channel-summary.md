@@ -5,7 +5,7 @@ Values are medians across runs. Standalone v3 waits for each response/timeout; m
 
 | Scenario | Channel | Delivery % | Responses/s | p50 µs | p95 µs | p99 µs | Timeouts | Previous p95 delta | Delivery delta (pp) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| unreliable-only | unreliable | 100.000 | 6337.160 | 142.5 | 168.2 | 193.1 | 0.000 | +79.89% | 0.000 |
-| reliable-baseline | reliable | 100.000 | 5526.999 | 165.9 | 187.0 | 212.9 | 0.000 | +74.93% | 0.000 |
-| mixed | reliable | 100.000 | 40.392 | 163.5 | 254.7 | 405.1 | N/A | +49.56% | 0.000 |
-| mixed | unreliable | 99.700 | 402.587 | 227.7 | 381.3 | 559.2 | N/A | +82.97% | 0.300 |
+| unreliable-only | unreliable | 100.000 | 30086.861 | 23.6 | 51.3 | 64.5 | 0.000 | -69.50% | 0.000 |
+| reliable-baseline | reliable | 100.000 | 23839.607 | 35.0 | 67.4 | 78.7 | 0.000 | -63.96% | 0.000 |
+| mixed | reliable | 100.000 | 40.065 | 69.8 | 129.8 | 193.4 | N/A | -49.04% | 0.000 |
+| mixed | unreliable | 99.500 | 399.043 | 94.1 | 172.9 | 243.2 | N/A | -54.66% | -0.200 |

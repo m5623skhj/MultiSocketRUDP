@@ -26,6 +26,7 @@ Mixed v1 keeps its separate 10:1 load with a 10 ms delay per batch. Missing resp
 
 | Date (UTC) | Commit | Commit log | Loss 0% P95 | Loss 0% P99 | TX/RX loss 10% P95 | TX/RX loss 10% P99 |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
+| 2026-11-23 | `254ebba` | * RUDP 서버·클라이언트 진단 통합 | 0.065 ms | 0.084 ms | 32.581 ms | 63.520 ms |
 | 2026-11-17 | `d39f356` | * TLS·브로커 연결 단계별 진단과 오류 원인 보존 | 0.227 ms | 0.250 ms | 32.461 ms | 63.982 ms |
 | 2026-11-16 | `8b65e4b` | * 서버와 클라이언트 TLS 변경 이력 통합 | 0.137 ms | 0.156 ms | 32.461 ms | 65.435 ms |
 | 2026-11-15 | `3b21e76` | * 통합 클라이언트의 Windows 소켓 헤더 포함 순서 수정 | 0.213 ms | 0.242 ms | 32.449 ms | 64.507 ms |
@@ -35,6 +36,5 @@ Mixed v1 keeps its separate 10:1 load with a 10 ms delay per batch. Missing resp
 | 2026-11-11 | `6a05d49` | * CI 테스트 인증서 등록 대기 문제 수정 | 0.140 ms | 0.160 ms | 32.160 ms | 66.918 ms |
 | 2026-11-06 | `99db792` | * 던전 비신뢰 패킷의 역순 수신과 재생 방지 지원 | 0.242 ms | 0.271 ms | 32.271 ms | 63.531 ms |
 | 2026-11-06 | `4f0dfe9` | * 통합 테스트 CI의 TLS 인증서 신뢰 설정 수정 | 0.229 ms | 0.261 ms | 32.307 ms | 63.024 ms |
-| 2026-10-28 | `f3da8b1` | * 문서 전면 최신화 및 코드 대조 오류 정정 | 0.157 ms | 0.180 ms | 32.290 ms | 64.549 ms |
 
-Last updated by `d39f3561c85e3190a56b3e571e6440ddb243d661` at 2026-11-17T18:46:19.3412584+00:00.
+Last updated by `254ebba427189922291a38b1f9535cc3a37b69e3` at 2026-11-23T15:06:14.5483421+00:00.
